@@ -640,7 +640,7 @@ describe("YahooFxProvider", () => {
       expect(await provider.searchCurrency("some rand query")).toBe("ZAR");
     });
 
-    it("answers the query upper-cased for a symbol that is not a six-letter pair, as the lookup always has", async () => {
+    it("answers the query upper-cased for a symbol that is not a six-letter pair (carried over unchanged; not an ISO code)", async () => {
       search([{ symbol: "BTC=X", quoteType: "CURRENCY" }]);
 
       expect(await provider.searchCurrency("btc crypto")).toBe("BTC CRYPTO");

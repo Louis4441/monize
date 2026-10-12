@@ -132,7 +132,9 @@ function usable(rate: number | null | undefined): rate is number {
  * Two lookup aids answer the currency lookup through the same client:
  * `verifyCurrency` asks the code's chart against USD (Yahoo's `null` cannot
  * say "unknown", so it answers `true` or `null`, never `false`), and
- * `searchCurrency` reads the first FX quote of `searchQuotes`.
+ * `searchCurrency` reads the first FX quote of `searchQuotes`. The chain asks
+ * `verifyCurrency` only of a code no provider carries, and `carries` is
+ * always true here, so it is not reached while this adapter is configured.
  *
  * Observations come back in the orientation that answered; the writer orients
  * them. A quote is dated `todayYMD()`, as the refresh dates it today, so no

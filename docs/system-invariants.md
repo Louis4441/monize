@@ -1105,9 +1105,11 @@ Enforcement         backend/src/currencies/providers/fx-provider-chain.ts asks
                     a quoted source slug under backend/src/currencies/ outside
                     the providers directory and on an import of
                     yahoo-finance.service there outside the Yahoo adapter.
-                    Still outside the chain: the currency lookup and
-                    verification in currencies/currencies.service.ts reach
-                    Yahoo with their own fetch calls (task B5). The Frankfurter
+                    The currency lookup and verification in
+                    currencies/currencies.service.ts ask the chain too
+                    (carriesAny, verifyCurrency, searchCurrency; task B5), and
+                    provider-call.guard.spec.ts scans the whole currencies
+                    directory for a fetch outside the breaker. The Frankfurter
                     adapter (currencies/providers/frankfurter-fx.provider.ts)
                     exists and answers null only for a non-answer, but nothing
                     asks it until an operator names it in FX_PROVIDERS (the
@@ -1119,12 +1121,15 @@ Test                The section 5 truth table of
                     exchange-rate.service.spec.ts with the chain faked (the
                     source and the date taken from the observation, the three
                     refresh reports kept apart, an unanswered window never
-                    remembered); fx-provider-source.guard.spec.ts.
-Status              partial -- the chain, the service on it and the source
-                    guard are on main (tasks B1 and B2 of
-                    docs/future-plans/exchange-rate-providers-tasks.md); the
-                    currency lookup is outside the chain until B5. Task Q moves
-                    this entry to enforced.
+                    remembered); currencies.service.spec.ts with the chain
+                    faked (no global fetch reached by the lookup);
+                    fx-provider-source.guard.spec.ts;
+                    provider-call.guard.spec.ts over currencies.
+Status              partial -- the chain, the service on it, the source guard
+                    and the currency lookup on the chain are on main (tasks
+                    B1, B2 and B5 of
+                    docs/future-plans/exchange-rate-providers-tasks.md). Task Q
+                    moves this entry to enforced.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived

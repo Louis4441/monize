@@ -924,7 +924,7 @@ describe("CurrenciesService", () => {
         expect(result).toEqual({
           code: "JPY",
           name: "Japanese Yen",
-          symbol: "¥",
+          symbol: "\u00A5",
           decimalPlaces: 0,
         });
       });
@@ -967,11 +967,26 @@ describe("CurrenciesService", () => {
           expect(result).toEqual({
             code: "EUR",
             name: "Euro",
-            symbol: "€",
+            symbol: "\u20AC",
             decimalPlaces: 2,
           });
         },
       );
+
+      it("still returns local metadata when a provider's verification throws", async () => {
+        chain.carriesAny.mockResolvedValue(false);
+        chain.verifyCurrency.mockRejectedValue(new Error("boom"));
+
+        const result = await service.lookupCurrency("KWD");
+
+        expect(chain.verifyCurrency).toHaveBeenCalledWith("KWD");
+        expect(result).toEqual({
+          code: "KWD",
+          name: "Kuwaiti Dinar",
+          symbol: "KWD",
+          decimalPlaces: 3,
+        });
+      });
 
       it("still returns local metadata when verification throws", async () => {
         chain.carriesAny.mockRejectedValue(new Error("Network error"));
@@ -981,7 +996,7 @@ describe("CurrenciesService", () => {
         expect(result).toEqual({
           code: "GBP",
           name: "British Pound",
-          symbol: "£",
+          symbol: "\u00A3",
           decimalPlaces: 2,
         });
       });
@@ -1006,7 +1021,7 @@ describe("CurrenciesService", () => {
         expect(result).toEqual({
           code: "JPY",
           name: "Japanese Yen",
-          symbol: "¥",
+          symbol: "\u00A5",
           decimalPlaces: 0,
         });
       });
@@ -1028,7 +1043,7 @@ describe("CurrenciesService", () => {
         expect(result).toEqual({
           code: "THB",
           name: "Thai Baht",
-          symbol: "฿",
+          symbol: "\u0E3F",
           decimalPlaces: 2,
         });
       });
