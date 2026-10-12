@@ -812,6 +812,8 @@ export interface CreateSecurityData {
   isFavourite?: boolean;
   priceAlertPercent?: number | null;
   priceChartEnabled?: boolean;
+  /** Turns off automatic price fetching; omitted means "leave as stored". */
+  skipPriceUpdates?: boolean;
   /** Manual ETF/fund country breakdown; weight is a decimal 0-1 (like sectorWeightings). */
   countryWeightings?: { name: string; weight: number }[];
   /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */

@@ -68,6 +68,7 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   quoteProvider: z.enum(['', 'yahoo', 'msn', 'lse', 'deutsche_boerse']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
   priceChartEnabled: z.boolean().optional(),
+  skipPriceUpdates: z.boolean().optional(),
   priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
   isFavourite: z.boolean().optional(),
 });
@@ -228,7 +229,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     getValues,
     watch,
     reset,
-    formState: { errors, isSubmitting, isDirty, defaultValues },
+    formState: { errors, isSubmitting, isDirty, dirtyFields, defaultValues },
   } = useForm<SecurityFormData>({
     resolver: zodResolver(buildSecuritySchema(t)),
     defaultValues: {
@@ -244,6 +245,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       msnInstrumentId: security?.msnInstrumentId || '',
       isFavourite: security?.isFavourite || false,
       priceChartEnabled: security?.priceChartEnabled ?? false,
+      skipPriceUpdates: security?.skipPriceUpdates ?? false,
       priceAlertPercent: security?.priceAlertPercent == null ? '' : String(security.priceAlertPercent),
     },
   });
@@ -395,6 +397,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         msnInstrumentId: '',
         isFavourite: false,
         priceChartEnabled: false,
+        skipPriceUpdates: false,
         priceAlertPercent: '',
       });
       setSelectedTagIds([]);
@@ -482,6 +485,11 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
       isFavourite: data.isFavourite ?? false,
       priceChartEnabled: data.priceChartEnabled ?? false,
+      // Sent only when the user changed it: left alone, the backend decides,
+      // and a newly picked provider or MSN Instrument ID turns updates back on.
+      ...(dirtyFields.skipPriceUpdates
+        ? { skipPriceUpdates: data.skipPriceUpdates ?? false }
+        : {}),
       priceAlertPercent: data.priceAlertPercent?.trim() ? Number(data.priceAlertPercent) : null,
       // Only ETFs/funds carry the manual breakdowns; send [] to clear them.
       ...(isFund
@@ -648,6 +656,20 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
             {t('form.msnNotConfigured')}
           </p>
         )}
+      </div>
+
+      <div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            aria-describedby="skip-price-updates-help"
+            {...register('skipPriceUpdates')}
+          />
+          {t('form.skipPriceUpdatesLabel')}
+        </label>
+        <p id="skip-price-updates-help" className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          {t('form.skipPriceUpdatesHelp')}
+        </p>
       </div>
 
       {/*
