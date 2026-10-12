@@ -121,6 +121,14 @@
       "assetClass": "By asset class"
     }
   },
+  "assetClasses": {
+    "equity": "Equities",
+    "fixedIncome": "Fixed Income",
+    "cash": "Cash",
+    "preferred": "Preferred Shares",
+    "convertible": "Convertibles",
+    "crypto": "Crypto"
+  },
   "holdingsList": {
     "title": "Holdings",
     "noHoldings": "No holdings in this portfolio.",
