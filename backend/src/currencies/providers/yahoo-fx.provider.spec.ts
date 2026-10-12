@@ -5,6 +5,7 @@ import {
   QuoteResult,
 } from "../../securities/providers/quote-provider.interface";
 import {
+  CURRENCY_SEARCH_COUNT,
   FX_FETCH_CONCURRENCY,
   PLACEHOLDER_TOLERANCE,
   REVERSE_FIRST_MEMORY_LIMIT,
@@ -41,7 +42,10 @@ const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 describe("YahooFxProvider", () => {
   let yahoo: jest.Mocked<
-    Pick<YahooFinanceService, "fetchQuote" | "fetchHistoricalWindow">
+    Pick<
+      YahooFinanceService,
+      "fetchQuote" | "fetchHistoricalWindow" | "searchQuotes"
+    >
   >;
   let provider: YahooFxProvider;
   let warn: jest.SpyInstance;
@@ -66,6 +70,7 @@ describe("YahooFxProvider", () => {
     yahoo = {
       fetchQuote: jest.fn().mockResolvedValue(null),
       fetchHistoricalWindow: jest.fn().mockResolvedValue(null),
+      searchQuotes: jest.fn().mockResolvedValue(null),
     };
     provider = new YahooFxProvider(yahoo as unknown as YahooFinanceService);
     warn = jest.spyOn(Logger.prototype, "warn").mockImplementation(() => {});
@@ -572,6 +577,86 @@ describe("YahooFxProvider", () => {
       quotes({});
 
       expect(await provider.fetchLive("USD", "CAD")).toBeNull();
+    });
+  });
+
+  describe("verifyCurrency", () => {
+    it("is true when Yahoo answers the code's chart against USD", async () => {
+      quotes({ "KWDUSD=X": quoteOf("KWDUSD=X", 3.25) });
+
+      expect(await provider.verifyCurrency("kwd")).toBe(true);
+      expect(askedSymbols()).toEqual(["KWDUSD=X"]);
+    });
+
+    it("asks USD against EUR rather than against itself", async () => {
+      quotes({ "USDEUR=X": quoteOf("USDEUR=X", 0.89) });
+
+      expect(await provider.verifyCurrency("USD")).toBe(true);
+      expect(askedSymbols()).toEqual(["USDEUR=X"]);
+    });
+
+    it("is no answer, never false, when Yahoo returns null: an outage and an unknown symbol look the same", async () => {
+      quotes({});
+
+      expect(await provider.verifyCurrency("XYZ")).toBeNull();
+    });
+  });
+
+  describe("searchCurrency", () => {
+    const search = (
+      result: Awaited<ReturnType<YahooFinanceService["searchQuotes"]>>,
+    ) => yahoo.searchQuotes.mockResolvedValue(result);
+
+    it("asks Yahoo's search through the client and reads the first FX quote", async () => {
+      search([
+        { symbol: "MAYBANK.KL", quoteType: "EQUITY" },
+        { symbol: "MYRUSD=X", quoteType: "CURRENCY" },
+      ]);
+
+      expect(await provider.searchCurrency("Ringgit Malaysia")).toBe("MYR");
+      expect(yahoo.searchQuotes).toHaveBeenCalledWith(
+        "Ringgit Malaysia",
+        CURRENCY_SEARCH_COUNT,
+      );
+    });
+
+    it("takes the half of the pair the query spells", async () => {
+      search([{ symbol: "JPYUSD=X", quoteType: "CURRENCY" }]);
+      expect(await provider.searchCurrency("usd")).toBe("USD");
+
+      search([{ symbol: "EURUSD=X", quoteType: "CURRENCY" }]);
+      expect(await provider.searchCurrency("EUR")).toBe("EUR");
+    });
+
+    it("defaults to the base when neither half is the query", async () => {
+      search([{ symbol: "GBPJPY=X", quoteType: "CURRENCY" }]);
+
+      expect(await provider.searchCurrency("some unknown forex")).toBe("GBP");
+    });
+
+    it("reads an =X symbol as FX whatever its quoteType", async () => {
+      search([{ symbol: "ZARUSD=X", quoteType: "OTHER" }]);
+
+      expect(await provider.searchCurrency("some rand query")).toBe("ZAR");
+    });
+
+    it("answers the query upper-cased for a symbol that is not a six-letter pair, as the lookup always has", async () => {
+      search([{ symbol: "BTC=X", quoteType: "CURRENCY" }]);
+
+      expect(await provider.searchCurrency("btc crypto")).toBe("BTC CRYPTO");
+    });
+
+    it.each([
+      [
+        "no FX quote among the results",
+        [{ symbol: "AAPL", quoteType: "EQUITY" }],
+      ],
+      ["no results", []],
+      ["no answer", null],
+    ])("is null for %s", async (_label, result) => {
+      search(result);
+
+      expect(await provider.searchCurrency("something weird")).toBeNull();
     });
   });
 });

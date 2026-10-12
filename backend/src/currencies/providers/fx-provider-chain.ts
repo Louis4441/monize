@@ -158,6 +158,35 @@ export class FxProviderChain {
     return false;
   }
 
+  /**
+   * Whether the configured providers that can verify a code know it: `true`
+   * when any says so, `false` only when every one answered no, `null` when one
+   * did not answer (it may know the code) or none can verify at all. A lookup
+   * aid for a code `carriesAny` does not vouch for; it never gates a rate.
+   */
+  async verifyCurrency(code: string): Promise<boolean | null> {
+    let everyVerifierAnswered = true;
+    let anyVerifier = false;
+    for (const provider of this.providers) {
+      if (!provider.verifyCurrency) continue;
+      anyVerifier = true;
+      const known = await provider.verifyCurrency(code);
+      if (known === true) return true;
+      if (known === null) everyVerifierAnswered = false;
+    }
+    return anyVerifier && everyVerifierAnswered ? false : null;
+  }
+
+  /** The first code a configured provider's free-text search resolves `query` to, in order. */
+  async searchCurrency(query: string): Promise<string | null> {
+    for (const provider of this.providers) {
+      if (!provider.searchCurrency) continue;
+      const code = await provider.searchCurrency(query);
+      if (code !== null) return code;
+    }
+    return null;
+  }
+
   /** Name and source slug per configured provider, in order, for the status endpoint. */
   describe(): FxProviderDescription[] {
     return this.providers.map((provider) => ({

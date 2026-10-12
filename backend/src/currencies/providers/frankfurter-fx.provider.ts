@@ -144,11 +144,11 @@ function readCurrencyList(body: unknown): ReadonlySet<string> | null {
  * Three endpoints. `latest?base=B&symbols=Q1,Q2` and `{start}..{end}?base=B&
  * symbols=Q` answer `rates[Q]` as "Q per 1 B", which is `FxObservation
  * { from: B, to: Q }` with no inversion; `currencies` is the list `carries`
- * reads, cached for a day, with the compiled-in list standing in while it
- * cannot be fetched. A range or a date on a non-business day is moved back to
- * the previous business day, including the start of a range, so a series
- * drops the observations dated before `start`. A date range of any length
- * answers daily in one response.
+ * and `verifyCurrency` read, cached for a day, with the compiled-in list
+ * standing in while it cannot be fetched. A range or a date on a
+ * non-business day is moved back to the previous business day, including the
+ * start of a range, so a series drops the observations dated before `start`.
+ * A date range of any length answers daily in one response.
  *
  * Every call goes through the breaker in the shape every outbound client here
  * uses, with Google Places' two asymmetries: a non-2xx is a complete answer and
@@ -179,6 +179,17 @@ export class FrankfurterFxProvider implements FxRateProvider {
   async carries(code: string): Promise<boolean> {
     const codes = await this.currencyCodes();
     return codes.has(code.toUpperCase());
+  }
+
+  /**
+   * Whether the instance's own list names the code. While the compiled-in list
+   * stands in, a code it names is still known, but one it does not is no
+   * answer: the instance may carry it.
+   */
+  async verifyCurrency(code: string): Promise<boolean | null> {
+    const codes = await this.currencyCodes();
+    if (codes.has(code.toUpperCase())) return true;
+    return codes === FALLBACK_CURRENCY_SET ? null : false;
   }
 
   async fetchLatest(

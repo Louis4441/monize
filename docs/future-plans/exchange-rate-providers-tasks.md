@@ -109,6 +109,7 @@ No task adds a migration. Every task before R1 leaves a deployment with no `FX_P
 
 - `verifyAndReturnCurrency` asks `chain.carriesAny(code)` and, when no provider carries it, each provider's `verifyCurrency`; the local metadata is still the name and symbol source. The free-text step 3 asks `searchCurrency` of each provider that implements it (Yahoo, through the new door). The two bare `fetch` calls are gone.
 - Acceptance: `currencies.service.spec.ts` green with the chain faked; the breaker guard now scanning `currencies` finds no bare `fetch`; `yahoo-finance.service.spec.ts` covers `searchQuotes`; the recorded-in-one-place count for Yahoo stays 3.
+- As built: the chain is the door for both aids, `FxProviderChain.verifyCurrency` (`true` when any verifier knows the code, `false` only when every one answered no, `null` otherwise) and `FxProviderChain.searchCurrency` (the first code, in configured order). Verification stays a lookup aid: an unverified code still returns its local metadata, as before. Yahoo's `verifyCurrency` answers `true` or `null`, never `false`, because its client cannot tell an unknown symbol from an outage; Frankfurter's answers `null` for a code missing from the compiled-in list while that list stands in. `GUARDED_DIRS` replaces `currencies/providers` with `currencies`, which contains it.
 
 ### B6 -- Status endpoint
 

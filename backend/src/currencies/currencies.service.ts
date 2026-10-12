@@ -21,6 +21,7 @@ import {
   type CurrencyMetadata,
 } from "./currency-metadata";
 import { FALLBACK_DEFAULT_CURRENCY } from "../common/default-currency.util";
+import { FxProviderChain } from "./providers/fx-provider-chain";
 
 export interface CurrencyLookupResult {
   code: string;
@@ -55,7 +56,10 @@ const DEFAULT_CURRENCY_CODE = FALLBACK_DEFAULT_CURRENCY;
 export class CurrenciesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(CurrenciesService.name);
 
-  constructor(private dataSource: DataSource) {}
+  constructor(
+    private dataSource: DataSource,
+    private readonly fxProviders: FxProviderChain,
+  ) {}
 
   /**
    * Currencies are created on demand rather than pre-seeded, but a brand-new
@@ -516,41 +520,11 @@ export class CurrenciesService implements OnApplicationBootstrap {
         );
       }
 
-      // 3. Fall back to Yahoo Finance search API for unknown currencies
-      const searchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(trimmed)}&quotesCount=20&newsCount=0`;
-      const searchResponse = await fetch(searchUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      });
-
-      if (!searchResponse.ok) {
-        this.logger.warn(
-          `Yahoo Finance search returned ${searchResponse.status} for currency query: ${query}`,
-        );
+      // 3. Fall back to the providers' free-text search for unknown currencies
+      const resultCode = await this.fxProviders.searchCurrency(trimmed);
+      if (resultCode === null) {
         return null;
       }
-
-      const searchData = await searchResponse.json();
-      const quotes = searchData.quotes || [];
-
-      // Find currency-type results (forex pairs like EURUSD=X)
-      const currencyQuotes = quotes.filter(
-        (q: any) =>
-          q.quoteType === "CURRENCY" || (q.symbol && q.symbol.includes("=X")),
-      );
-
-      if (currencyQuotes.length === 0) {
-        return null;
-      }
-
-      // Extract the currency code from the first forex pair result
-      const firstResult = currencyQuotes[0];
-      const resultCode = this.extractCurrencyCode(
-        firstResult.symbol,
-        upperQuery,
-      );
 
       const resultMetadata = CURRENCY_METADATA[resultCode];
 
@@ -659,34 +633,30 @@ export class CurrenciesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Verify a currency exists on Yahoo Finance and return our metadata name.
+   * Verify a currency through the configured exchange rate providers and
+   * return our metadata. A code some provider carries is verified without a
+   * call; otherwise each provider that can verify one is asked. The local
+   * metadata is the name and symbol source either way, and an unverified code
+   * is still returned: verification is a lookup aid, not a gate.
    */
   private async verifyAndReturnCurrency(
     code: string,
     metadata: CurrencyMetadata,
   ): Promise<CurrencyLookupResult> {
     try {
-      const yahooSymbol = `${code}USD=X`;
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=1d`;
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      });
-
-      if (response.ok) {
-        // Verified on Yahoo - use our metadata name (not Yahoo's forex pair name)
-        return {
-          code,
-          name: metadata.name,
-          symbol: metadata.symbol,
-          decimalPlaces: metadata.decimalPlaces,
-        };
+      if (!(await this.fxProviders.carriesAny(code))) {
+        const known = await this.fxProviders.verifyCurrency(code);
+        if (known !== true) {
+          this.logger.debug(
+            known === false
+              ? `No configured exchange rate provider knows ${code}; returning local metadata`
+              : `No configured exchange rate provider could verify ${code}; returning local metadata`,
+          );
+        }
       }
     } catch (err) {
       this.logger.debug(
-        `Yahoo verification failed for ${code}, falling back to local metadata: ${err instanceof Error ? err.message : err}`,
+        `Provider verification failed for ${code}, falling back to local metadata: ${err instanceof Error ? err.message : err}`,
       );
     }
 
@@ -696,24 +666,5 @@ export class CurrenciesService implements OnApplicationBootstrap {
       symbol: metadata.symbol,
       decimalPlaces: metadata.decimalPlaces,
     };
-  }
-
-  /**
-   * Extract a currency code from a Yahoo Finance forex symbol like "EURUSD=X"
-   */
-  private extractCurrencyCode(symbol: string, originalQuery: string): string {
-    // Remove =X suffix
-    const pair = symbol.replace("=X", "");
-    // Forex pairs are 6 chars: EURUSD -> EUR + USD
-    if (pair.length === 6) {
-      const base = pair.substring(0, 3);
-      const quote = pair.substring(3, 6);
-      // Return whichever part matches the query
-      const upperQuery = originalQuery.toUpperCase();
-      if (base === upperQuery) return base;
-      if (quote === upperQuery) return quote;
-      return base; // Default to base currency
-    }
-    return originalQuery.toUpperCase();
   }
 }

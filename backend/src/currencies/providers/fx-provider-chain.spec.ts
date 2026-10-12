@@ -438,3 +438,76 @@ describe("FxProviderChain.carriesAny and describe", () => {
     ]);
   });
 });
+
+describe("FxProviderChain.verifyCurrency and searchCurrency", () => {
+  /** A provider double with the two optional lookup aids. */
+  const withLookup = (
+    label: string,
+    known: boolean | null | "not implemented",
+    found: string | null | "not implemented" = "not implemented",
+  ) => {
+    const double = provider(label, []) as ProviderDouble & {
+      verifyCurrency?: jest.Mock<Promise<boolean | null>, [string]>;
+      searchCurrency?: jest.Mock<Promise<string | null>, [string]>;
+    };
+    if (known !== "not implemented") {
+      double.verifyCurrency = jest.fn().mockResolvedValue(known);
+    }
+    if (found !== "not implemented") {
+      double.searchCurrency = jest.fn().mockResolvedValue(found);
+    }
+    return double;
+  };
+
+  it.each<[string, Array<boolean | null | "not implemented">, boolean | null]>([
+    ["one provider knows the code", [false, true], true],
+    ["every verifier answered no", [false, false], false],
+    ["a verifier did not answer and none knew it", [false, null], null],
+    ["no provider can verify a code", ["not implemented"], null],
+    ["no provider is configured", [], null],
+    [
+      "a provider without the aid is passed over",
+      ["not implemented", false],
+      false,
+    ],
+  ])("verifyCurrency: %s", async (_label, answers, expected) => {
+    const chain = new FxProviderChain(
+      answers.map((known, index) => withLookup(`p${index + 1}`, known)),
+    );
+
+    expect(await chain.verifyCurrency("KWD")).toBe(expected);
+  });
+
+  it("verifyCurrency stops at the first provider that knows the code", async () => {
+    const first = withLookup("p1", true);
+    const second = withLookup("p2", true);
+
+    expect(
+      await new FxProviderChain([first, second]).verifyCurrency("KWD"),
+    ).toBe(true);
+    expect(first.verifyCurrency).toHaveBeenCalledWith("KWD");
+    expect(second.verifyCurrency).not.toHaveBeenCalled();
+  });
+
+  it("searchCurrency answers the first provider's code, in configured order", async () => {
+    const without = withLookup("p1", "not implemented");
+    const nothing = withLookup("p2", "not implemented", null);
+    const found = withLookup("p3", "not implemented", "MYR");
+    const later = withLookup("p4", "not implemented", "SGD");
+
+    const chain = new FxProviderChain([without, nothing, found, later]);
+
+    expect(await chain.searchCurrency("Ringgit Malaysia")).toBe("MYR");
+    expect(nothing.searchCurrency).toHaveBeenCalledWith("Ringgit Malaysia");
+    expect(later.searchCurrency).not.toHaveBeenCalled();
+  });
+
+  it("searchCurrency is null when no provider resolves the query", async () => {
+    const chain = new FxProviderChain([
+      withLookup("p1", "not implemented"),
+      withLookup("p2", "not implemented", null),
+    ]);
+
+    expect(await chain.searchCurrency("xyz")).toBeNull();
+  });
+});
