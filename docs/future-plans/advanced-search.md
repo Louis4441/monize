@@ -168,24 +168,36 @@ So `#10` matches `10`, `#10`, `0010` and `00010`, and not `100` or `A10`
 
 ### 4.4 Grain
 
-The five call sites run at two grains, and a term is evaluated against the
-row the query counts:
+The builder supports two grains, and a term is evaluated against the row
+the query counts:
 
-- **Transaction grain** (`findAll`, `buildFilteredIdsSubquery`, the
-  bulk-update filter, `createFilteredAnalyticsQuery`): a split arm is
-  `EXISTS (SELECT 1 FROM transaction_splits ... WHERE ... = t.id AND ...)`.
-  Two terms can be satisfied by different splits, and `-term` excludes the
-  transaction if any split matches.
-- **Split grain** (`getLlmGroupedBreakdown`, whose rows are split lines via
-  `joinSplitsForAnalytics`): a split arm reads the row's own split alias,
-  as it does today, so a category breakdown of `groceries` still counts the
-  groceries line and not its sibling.
+- **Split grain**, used by every call site (question 5): the query joins
+  its splits, and a split arm reads the row's own split, as the joined-alias
+  clause always has. Every term must hold on the same line, so the register
+  draws only matching lines with a filtered total, bulk update acts on
+  matching lines, and a category breakdown of `groceries` counts the
+  groceries line and not its sibling. `findAll`, `buildFilteredIdsSubquery`,
+  `createFilteredAnalyticsQuery`, the bulk-update filter and
+  `getLlmGroupedBreakdown`.
+- **Transaction grain**, available but unused: a split arm is
+  `EXISTS (SELECT 1 FROM transaction_splits ... WHERE ... = t.id AND ...)`,
+  so two terms can be satisfied by different splits and `-term` excludes the
+  transaction if any split matches. Kept for a future surface that lists
+  whole transactions without hydrating lines; the builder's specs pin it.
 
-The builder takes the grain as an argument. B2 records, in its spec, which
-grain each site is, and checks whether today's filter on the joined
-`splits` alias in `findAll` also trims the splits the register draws for a
-split-memo search. If it does, that is an existing defect, and the EXISTS
-form removes it. If it does not, nothing changes.
+The builder takes the grain as an argument, and correlates every split
+condition through one subquery (`search_sx.transaction_id = t.id` at
+transaction grain, `search_sx.id = <split alias>.id` at split grain), so
+split fields never depend on how a call site joined its splits.
+
+**Finding recorded during B2 (2026-10-12): the register's joined-alias
+filter is deliberate, not a defect.** `findAll` filters on the `splits`
+alias it also hydrates from, so a filtered split transaction is drawn with
+only its matching lines; `applyCategoryFilters` documents this as the
+mechanism by which the frontend detects a partial amount and shows a
+filtered total. Today's search inherits the same behaviour: a split-memo
+search draws only the matching line. Which grain the register's search
+uses was open question 5, decided for split grain before B3.
 
 ## 5. Invariants
 
@@ -387,3 +399,12 @@ task Q.
 3. Is the term cap 12? **Default: 12.**
 4. Should an amount comparison read the total only (decision 8), or also
    the splits? **Default: total only.**
+5. Does the register's search (`findAll` and `buildFilteredIdsSubquery`,
+   which must agree) run at transaction grain, listing whole transactions
+   with every split drawn, or at split grain, keeping today's partial-line
+   hydration and filtered totals the category filter also uses? Split grain
+   changes the second truth table's transaction column to its split column
+   for the register. **Decided 2026-10-12: split grain.** The register
+   keeps drawing only matching lines with a filtered total, as its category
+   filter does, and bulk update keeps acting on matching lines; every term
+   of a search must hold on the same line.
