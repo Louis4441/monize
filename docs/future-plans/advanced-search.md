@@ -181,11 +181,19 @@ row the query counts:
   as it does today, so a category breakdown of `groceries` still counts the
   groceries line and not its sibling.
 
-The builder takes the grain as an argument. B2 records, in its spec, which
-grain each site is, and checks whether today's filter on the joined
-`splits` alias in `findAll` also trims the splits the register draws for a
-split-memo search. If it does, that is an existing defect, and the EXISTS
-form removes it. If it does not, nothing changes.
+The builder takes the grain as an argument, and correlates every split
+condition through one subquery (`search_sx.transaction_id = t.id` at
+transaction grain, `search_sx.id = <split alias>.id` at split grain), so
+split fields never depend on how a call site joined its splits.
+
+**Finding recorded during B2 (2026-10-12): the register's joined-alias
+filter is deliberate, not a defect.** `findAll` filters on the `splits`
+alias it also hydrates from, so a filtered split transaction is drawn with
+only its matching lines; `applyCategoryFilters` documents this as the
+mechanism by which the frontend detects a partial amount and shows a
+filtered total. Today's search inherits the same behaviour: a split-memo
+search draws only the matching line. Which grain the register's search
+uses is therefore open question 5, decided before B3.
 
 ## 5. Invariants
 
@@ -387,3 +395,9 @@ task Q.
 3. Is the term cap 12? **Default: 12.**
 4. Should an amount comparison read the total only (decision 8), or also
    the splits? **Default: total only.**
+5. Does the register's search (`findAll` and `buildFilteredIdsSubquery`,
+   which must agree) run at transaction grain, listing whole transactions
+   with every split drawn, or at split grain, keeping today's partial-line
+   hydration and filtered totals the category filter also uses? Split grain
+   changes the second truth table's transaction column to its split column
+   for the register. **No default; decided before B3.**

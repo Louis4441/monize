@@ -85,13 +85,13 @@ There is no migration. B3 is the only **change**, and it swaps every call site i
 - `backend/src/transactions/transactions.controller.ts`
 - `backend/src/transactions/transaction-search.util.ts` (delete `buildTransactionSearchClause`)
 - `backend/src/transactions/transaction-search.guard.spec.ts` (new)
-- `backend/test/integration/transaction-search.integration.spec.ts` (new)
+- `backend/test/integration/transaction-search.integration.spec.ts` (B2 created it with the builder's truth tables; B3 adds the call-site cases)
 - each touched service's spec
 - `docs/system-invariants.md` (a "Search" section with INV-SEARCH-001 to 005, and their index rows)
 
 Work:
 - Each site becomes one helper call with its own prefix and grain. Record the grain decision in a one-line comment at each call. `findAll` and `buildFilteredIdsSubquery` must read the string identically, so the target-page lookup and the running balance agree with the listed rows (INV-REGISTER-001).
-- While swapping `findAll`, record in the PR whether today's `splits` alias filter trims the drawn splits (plan section 4.4). If it does, the integration spec gains a case showing the register now draws every split of a matched transaction.
+- `findAll` and `buildFilteredIdsSubquery` use the grain open question 5 settles (plan section 4.4); do not start B3 until it is answered. At split grain they correlate to the `splits` / `bfSplits` aliases they already join, so the register keeps drawing only matching lines; at transaction grain the integration spec gains a case showing the register now draws every split of a matched transaction.
 - The controller: `/summary`, `/grouped-totals`, `/tag-key-breakdown` and `/monthly-totals` get the same `assertStringParam` and 200-character cut that `findAll` already has.
 - Delete `sanitizeLikePattern`. The LLM paths pass the raw string, as the rows path already does (INV-SEARCH-005).
 - The guard: no import of the builder or the parser outside the util and the helper, and no `%${` template next to a search identifier in `backend/src/transactions/`. Its failure message names the helper.
