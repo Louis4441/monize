@@ -311,7 +311,9 @@
       "heldOption": "{code} ({quantity} gehalten)",
       "noLongerHeld": "{code} (an diesem Datum nicht mehr gehalten)",
       "noLongerHeldUnknown": "Gespeicherte Serie (an diesem Datum nicht mehr gehalten)",
-      "storedSeries": "Gespeicherte Serie"
+      "storedSeries": "Gespeicherte Serie",
+      "seriesOnSaleMonth": "{code} — im Verkauf {month}",
+      "seriesOnSaleRange": "{code} — im Verkauf von {from} bis {to}"
     },
     "bondRedemption": {
       "summary": "Zinsen {interest}, Abzug für vorzeitige Rückzahlung {deduction}, Auszahlung {payout}",

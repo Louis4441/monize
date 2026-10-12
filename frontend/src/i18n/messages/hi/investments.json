@@ -311,7 +311,9 @@
       "heldOption": "{code} ({quantity} धारित)",
       "noLongerHeld": "{code} (इस तारीख पर अब धारित नहीं)",
       "noLongerHeldUnknown": "सहेजी गई सीरीज़ (इस तारीख पर अब धारित नहीं)",
-      "storedSeries": "सहेजी गई सीरीज़"
+      "storedSeries": "सहेजी गई सीरीज़",
+      "seriesOnSaleMonth": "{code} — {month} में बिक्री पर",
+      "seriesOnSaleRange": "{code} — {from} से {to} तक बिक्री पर"
     },
     "bondRedemption": {
       "summary": "ब्याज {interest}, समय-पूर्व मोचन कटौती {deduction}, भुगतान {payout}",

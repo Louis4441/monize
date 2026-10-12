@@ -311,7 +311,9 @@
       "heldOption": "{code} (보유 {quantity})",
       "noLongerHeld": "{code} (이 날짜에는 더 이상 보유하지 않음)",
       "noLongerHeldUnknown": "저장된 시리즈 (이 날짜에는 더 이상 보유하지 않음)",
-      "storedSeries": "저장된 시리즈"
+      "storedSeries": "저장된 시리즈",
+      "seriesOnSaleMonth": "{code} — {month} 판매",
+      "seriesOnSaleRange": "{code} — {from}부터 {to}까지 판매"
     },
     "bondRedemption": {
       "summary": "이자 {interest}, 조기 상환 공제 {deduction}, 지급액 {payout}",

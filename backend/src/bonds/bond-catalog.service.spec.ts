@@ -102,6 +102,19 @@ function setup(adapters: readonly BondAdapter[], seed: Partial<Db> = {}) {
           series_code: "TOS1029",
           currency_code: "PLN",
           terms_provider: "curated",
+          sale_from: "2026-10-01",
+          sale_to: "2026-10-31",
+        },
+        {
+          id: "i-2",
+          issuer_country_code: "PL",
+          issuer_code: "PL_MF",
+          program_code: "TOS",
+          series_code: "TOS0000",
+          currency_code: "PLN",
+          terms_provider: "curated",
+          sale_from: null,
+          sale_to: null,
         },
       ];
     }
@@ -286,6 +299,17 @@ describe("BondCatalogService", () => {
         seriesCode: "TOS1029",
         currencyCode: "PLN",
         termsProvider: "curated",
+        saleWindow: { from: "2026-10-01", to: "2026-10-31" },
+      },
+      {
+        id: "i-2",
+        issuerCountryCode: "PL",
+        issuerCode: "PL_MF",
+        programCode: "TOS",
+        seriesCode: "TOS0000",
+        currencyCode: "PLN",
+        termsProvider: "curated",
+        saleWindow: null,
       },
     ]);
     expect(statements[0]).toMatch(
@@ -293,6 +317,8 @@ describe("BondCatalogService", () => {
     );
     // The origin of the newest terms version rides with every instrument.
     expect(statements[0]).toContain("terms->'source'->>'provider'");
+    // The sale window is read from the newest version, dates as YYYY-MM-DD text.
+    expect(statements[0]).toContain("TO_CHAR((v.terms->'saleWindow'->>'from')::date");
   });
 
   it("finds a stored series by country and series code, compared without case, and only with version 1 stored", async () => {

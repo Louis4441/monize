@@ -26,6 +26,36 @@ export function programSeries(
     .sort((a, b) => a.seriesCode.localeCompare(b.seriesCode));
 }
 
+/**
+ * Newest sale window first; a series with no window after those with one,
+ * ties and the unwindowed by code. A new array: the input is not reordered.
+ */
+export function sortBySaleWindowDesc(
+  instruments: readonly BondInstrumentSummary[],
+): BondInstrumentSummary[] {
+  return [...instruments].sort((a, b) => {
+    const af = a.saleWindow?.from ?? null;
+    const bf = b.saleWindow?.from ?? null;
+    if (af !== bf) {
+      if (af === null) return 1;
+      if (bf === null) return -1;
+      return bf.localeCompare(af);
+    }
+    return a.seriesCode.localeCompare(b.seriesCode);
+  });
+}
+
+/**
+ * The calendar month (YYYY-MM) a sale window spans exactly, from its first day
+ * to its last; null when it is any other period.
+ */
+export function saleWindowMonth(window: { from: string; to: string }): string | null {
+  const m = /^(\d{4})-(\d{2})-01$/.exec(window.from);
+  if (m === null) return null;
+  const last = new Date(Date.UTC(Number(m[1]), Number(m[2]), 0)).getUTCDate();
+  return window.to === `${m[1]}-${m[2]}-${String(last).padStart(2, '0')}` ? `${m[1]}-${m[2]}` : null;
+}
+
 /** A money total over decimal strings: null unless every part is known (a subtotal is not a total). */
 function sumKnown(values: ReadonlyArray<string | null>): string | null {
   if (values.length === 0 || values.some((v) => v === null)) return null;

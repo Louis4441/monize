@@ -80,6 +80,7 @@ const inst = (id: string, seriesCode: string, programCode = 'EDO') => ({
   seriesCode,
   currencyCode: 'PLN',
   termsProvider: 'curated',
+  saleWindow: null,
 });
 const instruments = [inst('i-0936', 'EDO0936'), inst('i-1036', 'EDO1036'), inst('i-tos', 'TOS1029', 'TOS')];
 

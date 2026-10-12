@@ -311,7 +311,9 @@
       "heldOption": "{code} ({quantity} dimiliki)",
       "noLongerHeld": "{code} (tidak lagi dimiliki pada tanggal ini)",
       "noLongerHeldUnknown": "Seri tersimpan (tidak lagi dimiliki pada tanggal ini)",
-      "storedSeries": "Seri tersimpan"
+      "storedSeries": "Seri tersimpan",
+      "seriesOnSaleMonth": "{code} — dijual {month}",
+      "seriesOnSaleRange": "{code} — dijual {from} sampai {to}"
     },
     "bondRedemption": {
       "summary": "Bunga {interest}, potongan pelunasan dipercepat {deduction}, pembayaran {payout}",

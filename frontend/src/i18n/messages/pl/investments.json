@@ -311,7 +311,9 @@
       "heldOption": "{code} (posiadane: {quantity})",
       "noLongerHeld": "{code} (nie jest już posiadana w tym dniu)",
       "noLongerHeldUnknown": "Zapisana seria (nie jest już posiadana w tym dniu)",
-      "storedSeries": "Zapisana seria"
+      "storedSeries": "Zapisana seria",
+      "seriesOnSaleMonth": "{code} — w sprzedaży {month}",
+      "seriesOnSaleRange": "{code} — w sprzedaży od {from} do {to}"
     },
     "bondRedemption": {
       "summary": "Odsetki {interest}, potrącenie za wykup przedterminowy {deduction}, wypłata {payout}",

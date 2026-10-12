@@ -10,6 +10,16 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     useNumberFormat: () => ({ ...numberFormatMockDefaults(), defaultCurrency: 'PLN' }),
   };
 });
+vi.mock('@/hooks/useDateFormat', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/hooks/useDateFormat')>();
+  return {
+    useDateFormat: () => ({
+      ...actual.useDateFormat(),
+      formatDate: (d: string) => `D:${d}`,
+      formatMonth: (m: string) => `M:${m}`,
+    }),
+  };
+});
 vi.mock('@/hooks/useExchangeRates', () => ({
   useExchangeRates: () => ({
     getRate: () => null,
@@ -77,6 +87,7 @@ const inst = (id: string, seriesCode: string, programCode = 'EDO') => ({
   seriesCode,
   currencyCode: 'PLN',
   termsProvider: 'curated',
+  saleWindow: null,
 });
 const instruments = [inst('i-0936', 'EDO0936'), inst('i-1036', 'EDO1036'), inst('i-tos', 'TOS1029', 'TOS')];
 
@@ -141,6 +152,44 @@ beforeEach(() => {
   });
   api.createTransaction.mockResolvedValue({} as any);
   api.updateTransaction.mockResolvedValue({} as any);
+});
+
+describe('InvestmentTransactionForm: the sale period in the series labels', () => {
+  const windowed = [
+    inst('i-0936', 'EDO0936'),
+    { ...inst('i-1036', 'EDO1036'), saleWindow: { from: '2026-10-01', to: '2026-10-31' } },
+    { ...inst('i-0836', 'EDO0836'), saleWindow: { from: '2026-08-03', to: '2026-08-21' } },
+  ];
+
+  it('shows the month for a one-month window, the dates for another, the code alone for none, newest first', async () => {
+    api.listBondInstruments.mockResolvedValue(windowed);
+    await openForm();
+    await pickSecurity('sec-edo');
+    const select = await seriesSelect();
+    await waitFor(() =>
+      expect(optionLabels(select)).toEqual([
+        'From the date: EDO1036 — on sale M:2026-10',
+        'EDO1036 — on sale M:2026-10',
+        'EDO0836 — on sale D:2026-08-03 to D:2026-08-21',
+        'EDO0936',
+      ]),
+    );
+  });
+
+  it('keeps the choose option ahead of the sorted series', async () => {
+    api.listBondInstruments.mockResolvedValue(windowed);
+    await openForm();
+    await pickSecurity('sec-edo', 'ADD_SHARES');
+    const select = await seriesSelect();
+    await waitFor(() =>
+      expect(optionLabels(select)).toEqual([
+        'Choose a series',
+        'EDO1036 — on sale M:2026-10',
+        'EDO0836 — on sale D:2026-08-03 to D:2026-08-21',
+        'EDO0936',
+      ]),
+    );
+  });
 });
 
 describe('InvestmentTransactionForm: the series of a bond program', () => {

@@ -18,6 +18,8 @@ export interface BondInstrumentSummary {
   currencyCode: string;
   /** Where the terms came from: "curated", "obligacjeskarbowe.pl" or "manual". */
   termsProvider: string;
+  /** The newest terms' sale window (YYYY-MM-DD both ends); null when the terms state none. */
+  saleWindow: { from: string; to: string } | null;
 }
 
 /** One program of the catalog (`GET /bonds/programs`): the product a security is linked to, e.g. EDO. */

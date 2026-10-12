@@ -311,7 +311,9 @@
       "heldOption": "{code}(保有 {quantity})",
       "noLongerHeld": "{code}(この日付ではすでに保有していません)",
       "noLongerHeldUnknown": "保存済みのシリーズ(この日付ではすでに保有していません)",
-      "storedSeries": "保存済みのシリーズ"
+      "storedSeries": "保存済みのシリーズ",
+      "seriesOnSaleMonth": "{code} — {month}に販売",
+      "seriesOnSaleRange": "{code} — {from}から{to}まで販売"
     },
     "bondRedemption": {
       "summary": "利息 {interest}、期限前償還の控除 {deduction}、支払額 {payout}",

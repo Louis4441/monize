@@ -311,7 +311,9 @@
       "heldOption": "{code}(持有 {quantity})",
       "noLongerHeld": "{code}(在此日期已不再持有)",
       "noLongerHeldUnknown": "已儲存的系列(在此日期已不再持有)",
-      "storedSeries": "已儲存的系列"
+      "storedSeries": "已儲存的系列",
+      "seriesOnSaleMonth": "{code} — {month}發售",
+      "seriesOnSaleRange": "{code} — {from}至{to}發售"
     },
     "bondRedemption": {
       "summary": "利息 {interest}，提前贖回扣減 {deduction}，支付金額 {payout}",

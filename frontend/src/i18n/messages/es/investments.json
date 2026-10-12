@@ -311,7 +311,9 @@
       "heldOption": "{code} ({quantity} en cartera)",
       "noLongerHeld": "{code} (ya no se posee en esta fecha)",
       "noLongerHeldUnknown": "Serie guardada (ya no se posee en esta fecha)",
-      "storedSeries": "Serie guardada"
+      "storedSeries": "Serie guardada",
+      "seriesOnSaleMonth": "{code} — a la venta en {month}",
+      "seriesOnSaleRange": "{code} — a la venta del {from} al {to}"
     },
     "bondRedemption": {
       "summary": "Intereses {interest}, deducción por amortización anticipada {deduction}, pago {payout}",

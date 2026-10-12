@@ -3,6 +3,8 @@ import {
   groupLotsBySeries,
   programFacts,
   programSeries,
+  saleWindowMonth,
+  sortBySaleWindowDesc,
   type HeldSeries,
 } from './bond-series';
 import type {
@@ -25,6 +27,7 @@ const inst = (
   seriesCode,
   currencyCode: 'PLN',
   termsProvider: 'curated',
+  saleWindow: null,
   ...over,
 });
 
@@ -295,5 +298,31 @@ describe('programFacts', () => {
     it('is null with neither a series on sale nor one held', () => {
       expect(programFacts([offer({ programCode: 'TOS' })], [], 'EDO')).toBeNull();
     });
+  });
+});
+
+describe('sortBySaleWindowDesc', () => {
+  const w = (from: string, to: string) => ({ from, to });
+  it('puts the newest sale window first, series without one last, ties by code', () => {
+    const list = [
+      inst('a', 'EDO0936', { saleWindow: w('2026-09-01', '2026-09-30') }),
+      inst('b', 'EDO0000'),
+      inst('c', 'EDO1036', { saleWindow: w('2026-10-01', '2026-10-31') }),
+      inst('d', 'EDO0001', { saleWindow: w('2026-10-01', '2026-10-31') }),
+    ];
+    expect(sortBySaleWindowDesc(list).map((i) => i.id)).toEqual(['d', 'c', 'a', 'b']);
+    expect(list.map((i) => i.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
+
+describe('saleWindowMonth', () => {
+  it('names the month of a window spanning exactly one calendar month', () => {
+    expect(saleWindowMonth({ from: '2026-10-01', to: '2026-10-31' })).toBe('2026-10');
+    expect(saleWindowMonth({ from: '2028-02-01', to: '2028-02-29' })).toBe('2028-02');
+  });
+  it('is null for any other period', () => {
+    expect(saleWindowMonth({ from: '2026-10-01', to: '2026-10-30' })).toBeNull();
+    expect(saleWindowMonth({ from: '2026-10-02', to: '2026-10-31' })).toBeNull();
+    expect(saleWindowMonth({ from: '2026-10-01', to: '2026-11-30' })).toBeNull();
   });
 });

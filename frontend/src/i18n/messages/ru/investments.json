@@ -311,7 +311,9 @@
       "heldOption": "{code} (в наличии: {quantity})",
       "noLongerHeld": "{code} (на эту дату уже не числится)",
       "noLongerHeldUnknown": "Сохранённая серия (на эту дату уже не числится)",
-      "storedSeries": "Сохранённая серия"
+      "storedSeries": "Сохранённая серия",
+      "seriesOnSaleMonth": "{code} — в продаже {month}",
+      "seriesOnSaleRange": "{code} — в продаже с {from} по {to}"
     },
     "bondRedemption": {
       "summary": "Проценты {interest}, удержание за досрочное погашение {deduction}, выплата {payout}",

@@ -311,7 +311,9 @@
       "heldOption": "{code} ({quantity} detenuti)",
       "noLongerHeld": "{code} (non più detenuta a questa data)",
       "noLongerHeldUnknown": "Serie memorizzata (non più detenuta a questa data)",
-      "storedSeries": "Serie memorizzata"
+      "storedSeries": "Serie memorizzata",
+      "seriesOnSaleMonth": "{code} — in vendita {month}",
+      "seriesOnSaleRange": "{code} — in vendita dal {from} al {to}"
     },
     "bondRedemption": {
       "summary": "Interessi {interest}, trattenuta per rimborso anticipato {deduction}, importo erogato {payout}",

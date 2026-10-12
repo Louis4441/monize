@@ -311,7 +311,9 @@
       "heldOption": "{code} ({quantity} aangehouden)",
       "noLongerHeld": "{code} (op deze datum niet meer aangehouden)",
       "noLongerHeldUnknown": "Opgeslagen serie (op deze datum niet meer aangehouden)",
-      "storedSeries": "Opgeslagen serie"
+      "storedSeries": "Opgeslagen serie",
+      "seriesOnSaleMonth": "{code} — te koop {month}",
+      "seriesOnSaleRange": "{code} — te koop van {from} tot {to}"
     },
     "bondRedemption": {
       "summary": "Rente {interest}, aftrek bij vervroegde aflossing {deduction}, uitbetaling {payout}",

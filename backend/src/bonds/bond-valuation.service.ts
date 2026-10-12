@@ -59,6 +59,12 @@ export interface BondInstrumentSummary {
    * administrator's entry (INV-BOND-006).
    */
   readonly termsProvider: string;
+  /**
+   * The newest terms version's sale window (YYYY-MM-DD both ends), or null when
+   * the terms state none. Optional only so internal builders that never read it
+   * need not name it; the catalog list always sets it.
+   */
+  readonly saleWindow?: { readonly from: string; readonly to: string } | null;
 }
 
 /**

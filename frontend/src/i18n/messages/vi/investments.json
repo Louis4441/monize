@@ -311,7 +311,9 @@
       "heldOption": "{code} (đang nắm giữ {quantity})",
       "noLongerHeld": "{code} (không còn nắm giữ vào ngày này)",
       "noLongerHeldUnknown": "Series đã lưu (không còn nắm giữ vào ngày này)",
-      "storedSeries": "Series đã lưu"
+      "storedSeries": "Series đã lưu",
+      "seriesOnSaleMonth": "{code} — mở bán {month}",
+      "seriesOnSaleRange": "{code} — mở bán từ {from} đến {to}"
     },
     "bondRedemption": {
       "summary": "Lãi {interest}, khoản khấu trừ khi hoàn trả sớm {deduction}, số tiền chi trả {payout}",

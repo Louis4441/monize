@@ -311,7 +311,9 @@
       "heldOption": "{code} ({quantity} eldeki)",
       "noLongerHeld": "{code} (bu tarihte artık elde değil)",
       "noLongerHeldUnknown": "Kayıtlı seri (bu tarihte artık elde değil)",
-      "storedSeries": "Kayıtlı seri"
+      "storedSeries": "Kayıtlı seri",
+      "seriesOnSaleMonth": "{code} — satışta {month}",
+      "seriesOnSaleRange": "{code} — satışta {from} - {to}"
     },
     "bondRedemption": {
       "summary": "Faiz {interest}, erken itfa kesintisi {deduction}, ödeme {payout}",

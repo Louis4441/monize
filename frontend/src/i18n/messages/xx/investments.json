@@ -344,7 +344,9 @@
       "heldOption": "[XX-{code} ({quantity} held)-XX]",
       "noLongerHeld": "[XX-{code} (no longer held on this date)-XX]",
       "noLongerHeldUnknown": "[XX-Stored series (no longer held on this date)-XX]",
-      "storedSeries": "[XX-Stored series-XX]"
+      "storedSeries": "[XX-Stored series-XX]",
+      "seriesOnSaleMonth": "[XX-{code} — on sale {month}-XX]",
+      "seriesOnSaleRange": "[XX-{code} — on sale {from} to {to}-XX]"
     },
     "bondRedemption": {
       "summary": "[XX-Interest {interest}, early-redemption deduction {deduction}, payout {payout}-XX]",

@@ -5,9 +5,10 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select } from '@/components/ui/Select';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { baseInvestmentAction } from '@/lib/investment-actions';
-import { programSeries } from '@/lib/bond-series';
+import { programSeries, saleWindowMonth, sortBySaleWindowDesc } from '@/lib/bond-series';
 import { getErrorCode, getErrorMessage } from '@/lib/errors';
 import { investmentsApi } from '@/lib/investments';
 import type { InvestmentAction, Security } from '@/types/investment';
@@ -145,6 +146,7 @@ export function useBondSeriesOptions(
   const tSec = useTranslations('securities');
   const tDetail = useTranslations('securityDetail');
   const { formatShareQuantity } = useNumberFormat();
+  const { formatDate, formatMonth } = useDateFormat();
   const programId = security?.bondProgramId ?? null;
   const securityId = security?.id ?? null;
   const active = programId !== null && securityId !== null && kind !== null;
@@ -327,7 +329,24 @@ export function useBondSeriesOptions(
       }
       return list;
     }
-    const stored = (cat?.instruments ?? []).map((i) => ({ value: i.id, label: i.seriesCode }));
+    // The code and the period it was on sale, so a series is told by either.
+    const seriesLabel = (code: string, window: { from: string; to: string } | null | undefined) => {
+      if (window === null || window === undefined) return code;
+      const month = saleWindowMonth(window);
+      return month !== null
+        ? t('transactionForm.bondSeries.seriesOnSaleMonth', { code, month: formatMonth(month) })
+        : t('transactionForm.bondSeries.seriesOnSaleRange', {
+            code,
+            from: formatDate(window.from),
+            to: formatDate(window.to),
+          });
+    };
+    const windowOf = (code: string) =>
+      cat?.instruments.find((i) => i.seriesCode === code)?.saleWindow ?? null;
+    const stored = sortBySaleWindowDesc(cat?.instruments ?? []).map((i) => ({
+      value: i.id,
+      label: seriesLabel(i.seriesCode, i.saleWindow),
+    }));
     if (kind === 'select') {
       return [{ value: '', label: t('transactionForm.bondSeries.choose') }, ...stored];
     }
@@ -336,16 +355,19 @@ export function useBondSeriesOptions(
         ? t('transactionForm.bondSeries.fromDate')
         : onSale.onSale === null
           ? t('transactionForm.bondSeries.noneOnSale')
-          : t('transactionForm.bondSeries.fromDateCode', { code: onSale.onSale.seriesCode });
+          : t('transactionForm.bondSeries.fromDateCode', {
+              code: seriesLabel(onSale.onSale.seriesCode, windowOf(onSale.onSale.seriesCode)),
+            });
     const list = [{ value: '', label: defaultLabel }, ...stored];
     if (fetchCode !== null) {
       list.push({
         value: FETCH_VALUE,
+        // Never stored when offered, so its window is not known here.
         label: tSec('form.bondFetchAction', { code: fetchCode }),
       });
     }
     return list;
-  }, [kind, rem, cat, onSale, fetchCode, storedInstrumentId, formatShareQuantity, t, tSec]);
+  }, [kind, rem, cat, onSale, fetchCode, storedInstrumentId, formatShareQuantity, formatDate, formatMonth, t, tSec]);
 
   if (!active) return null;
   const catalogLoading = needsCatalog && cat === null && catalogFailedKey !== catalogKey;

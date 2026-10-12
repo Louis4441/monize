@@ -269,13 +269,23 @@ export class BondCatalogService implements OnApplicationBootstrap {
       series_code: string;
       currency_code: string;
       terms_provider: string;
+      sale_from: string | null;
+      sale_to: string | null;
     }> = await m.query(
       `SELECT i.id, i.issuer_country_code, i.issuer_code, i.program_code, i.series_code, i.currency_code,
               COALESCE((SELECT v.terms->'source'->>'provider'
                           FROM bond_terms_versions v
                          WHERE v.bond_instrument_id = i.id
-                         ORDER BY v.version DESC LIMIT 1), '') AS terms_provider
+                         ORDER BY v.version DESC LIMIT 1), '') AS terms_provider,
+              sw.sale_from, sw.sale_to
          FROM bond_instruments i
+         LEFT JOIN LATERAL (
+           SELECT TO_CHAR((v.terms->'saleWindow'->>'from')::date, 'YYYY-MM-DD') AS sale_from,
+                  TO_CHAR((v.terms->'saleWindow'->>'to')::date, 'YYYY-MM-DD') AS sale_to
+             FROM bond_terms_versions v
+            WHERE v.bond_instrument_id = i.id
+            ORDER BY v.version DESC LIMIT 1
+         ) sw ON TRUE
          ${where}
         ORDER BY i.issuer_country_code, i.issuer_code, i.series_code`,
       params,
@@ -288,6 +298,10 @@ export class BondCatalogService implements OnApplicationBootstrap {
       seriesCode: r.series_code,
       currencyCode: r.currency_code,
       termsProvider: r.terms_provider,
+      saleWindow:
+        r.sale_from != null && r.sale_to != null
+          ? { from: r.sale_from, to: r.sale_to }
+          : null,
     }));
   }
 
