@@ -318,7 +318,9 @@ describe("BondCatalogService", () => {
     // The origin of the newest terms version rides with every instrument.
     expect(statements[0]).toContain("terms->'source'->>'provider'");
     // The sale window is read from the newest version, dates as YYYY-MM-DD text.
-    expect(statements[0]).toContain("TO_CHAR((v.terms->'saleWindow'->>'from')::date");
+    expect(statements[0]).toContain(
+      "TO_CHAR((v.terms->'saleWindow'->>'from')::date",
+    );
   });
 
   it("finds a stored series by country and series code, compared without case, and only with version 1 stored", async () => {
