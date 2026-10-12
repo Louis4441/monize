@@ -467,6 +467,19 @@ satisfied exactly, and it is the cheapest form of idempotency available: the
 uniqueness is a property of the data, so no key has to be invented or
 remembered.
 
+**Which provider an FX row came from is part of the row.** Every provider
+question `ExchangeRateService` asks goes through `FxProviderChain`
+(`backend/src/currencies/providers/fx-provider-chain.ts`), which asks the
+adapters in `FX_PROVIDERS` order and hands back each observation with its
+provider's `source` slug; the upserts above write that slug, dated by the
+observation, so a repeated refresh converges on the row the first-configured
+provider answered and a reader can tell one provider's rate from another's.
+Nothing is undone at a provider -- the calls are reads -- and what a failure
+leaves is decided by the chain's two outcomes: a window the carrying providers
+answered with nothing may be remembered as empty for thirty minutes, a window
+a carrying provider never answered never is, because the provider that fell
+silent may hold what the others do not (INV-FX-005).
+
 Failures propagate as `null`, deliberately. `getRateForDate`'s own comment says
 it "returns null when no rate can be determined (so the caller can reject or flag
 the operation rather than silently assuming 1.0)". The provider layer is

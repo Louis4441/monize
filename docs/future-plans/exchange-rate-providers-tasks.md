@@ -26,7 +26,7 @@
 | **neutral** | Rewrites a live code path. Designed behaviour-preserving for every existing deployment, except where the task names a change; the full unit suite of the touched module is the gate. |
 | **change** | Changes what every deployment does by default. One task (R1), revertable by one env line. |
 
-No task adds a migration. Every task before R1 leaves a deployment with no `FX_PROVIDERS` set calling Yahoo exactly as today, except for the two named behaviour changes in B2 and B4.
+No task adds a migration. Every task before R1 leaves a deployment with no `FX_PROVIDERS` set calling Yahoo as today, except for the outcome changes named under B2 below and the placeholder cross-check in B4.
 
 ## Task graph
 
@@ -43,7 +43,7 @@ No task adds a migration. Every task before R1 leaves a deployment with no `FX_P
 | R1 | #1681 | Default `frankfurter,yahoo`; docs; release note | B2, B3, F1 | change | [ ] | -- |
 | Q | #1682 | Acceptance: all locales, INV-FX-005 enforced, verification-contract row | R1, B4, B5 | none | [ ] | -- |
 
-**Why B2 is neutral, not none:** it rewrites the live refresh, backfill, window and live-rate paths. With the default list `yahoo` the adapter makes the same Yahoo calls the service made, with one named change: the refresh now tries the reverse symbol when the direct one has no quote (`fillRateWindow` already did; the refresh did not).
+**Why B2 is neutral, not none:** it rewrites the live refresh, backfill, window and live-rate paths. With the default list `yahoo` the adapter asks the same Yahoo symbols the service asked and the stored rows are the same. The premise this paragraph first carried, that the refresh gained the reverse symbol, was stale: the refresh has asked the reverse symbol whenever the direct quote is absent or below 1 since `fetchFxQuote` landed for issue #1604, so B2 changes no symbol the refresh asks. What B2 does change, all of it in the server log or the admin-only backfill summary: pairs are asked in canonical (sorted) orientation rather than the query's row order, so the first symbol asked for a pair may differ and cost or save one call; a quote too coarse in both orientations is reported `No rate data available` with the warning moved to the adapter, and a batch no symbol answered is `No provider answered`; `getRateForDate`'s provider step gains the adapter's reverse-symbol fallback, which the direct-only window it used to fetch did not have; and a backfill window the providers answered as empty is `success: false, "No historical data available"` where a whole-history answer with no bar on or after the earliest date used to be `success: true, ratesLoaded: 0`.
 
 **Why B3 is inert:** `frankfurter` is a valid name the parser accepts, but the default list stays `yahoo` until R1, so no deployment calls Frankfurter unless its operator asks.
 
@@ -83,7 +83,7 @@ No task adds a migration. Every task before R1 leaves a deployment with no `FX_P
 - `getLiveRate`: `chain.live`, then the stored rate in `live` mode, as today.
 - `saveRate(observation, source)` and `persistRateSeries(points, source)` write the `source` they are given; `canonicalRateRow` orients each point from its own `from`/`to`. No `'yahoo_finance'` literal remains in the file.
 - `fx-provider-source.guard.spec.ts`: fails on a quoted source slug (`yahoo_finance`, `frankfurter`) anywhere under `backend/src/currencies/` outside the providers directory, and on an import of `yahoo-finance.service` under `backend/src/currencies/` outside `yahoo-fx.provider.ts`. It asserts its own subject exists first (a scan matching nothing is the failure mode of every guard).
-- Acceptance: `exchange-rate.service.spec.ts` green with the chain behind a typed fake whose answers are shapes the real adapter produces (`docs/backend/testing.md`), its Yahoo-specific expectations rewritten to chain expectations and the one named behaviour change (reverse symbol on refresh) covered; the "an empty answer is not a refusal" row in `docs/specs/provider-outage-alerts.md` still names this spec; `exchange-rate-history.service.spec.ts` green unchanged; the guard's own positive and negative cases.
+- Acceptance: `exchange-rate.service.spec.ts` green with the chain behind a typed fake whose answers are shapes the real adapter produces (`docs/backend/testing.md`), its Yahoo-specific expectations rewritten to chain expectations and an observation answered in the reverse orientation stored as one canonical row and reported as the rate asked for; the "an empty answer is not a refusal" row in `docs/specs/provider-outage-alerts.md` still names this spec; `exchange-rate-history.service.spec.ts` green unchanged; the guard's own positive and negative cases.
 
 ### B3 -- Frankfurter
 
