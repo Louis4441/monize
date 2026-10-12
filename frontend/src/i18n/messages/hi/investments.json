@@ -88,6 +88,14 @@
       "assetClass": "एसेट क्लास के अनुसार"
     }
   },
+  "assetClasses": {
+    "equity": "इक्विटी",
+    "fixedIncome": "फिक्स्ड इनकम",
+    "cash": "नकद",
+    "preferred": "प्रेफरेंस शेयर",
+    "convertible": "कन्वर्टिबल",
+    "crypto": "क्रिप्टो"
+  },
   "holdingsList": {
     "title": "होल्डिंग्स",
     "noHoldings": "इस पोर्टफोलियो में कोई होल्डिंग नहीं।",

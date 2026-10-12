@@ -88,6 +88,14 @@
       "assetClass": "По классу активов"
     }
   },
+  "assetClasses": {
+    "equity": "Акции",
+    "fixedIncome": "Облигации",
+    "cash": "Наличные",
+    "preferred": "Привилегированные акции",
+    "convertible": "Конвертируемые облигации",
+    "crypto": "Криптовалюта"
+  },
   "holdingsList": {
     "title": "Активы",
     "noHoldings": "Нет активов в этом портфеле.",

@@ -88,6 +88,14 @@
       "assetClass": "За класом активів"
     }
   },
+  "assetClasses": {
+    "equity": "Акції",
+    "fixedIncome": "Облігації",
+    "cash": "Готівка",
+    "preferred": "Привілейовані акції",
+    "convertible": "Конвертовані облігації",
+    "crypto": "Криптовалюта"
+  },
   "holdingsList": {
     "title": "Активи",
     "noHoldings": "Активів у цьому портфелі немає.",

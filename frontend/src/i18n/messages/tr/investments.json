@@ -88,6 +88,14 @@
       "assetClass": "Varlık sınıfına göre"
     }
   },
+  "assetClasses": {
+    "equity": "Hisse senetleri",
+    "fixedIncome": "Sabit getirili",
+    "cash": "Nakit",
+    "preferred": "İmtiyazlı hisseler",
+    "convertible": "Dönüştürülebilir tahviller",
+    "crypto": "Kripto"
+  },
   "holdingsList": {
     "title": "Pozisyonlar",
     "noHoldings": "Bu portföyde pozisyon yok.",

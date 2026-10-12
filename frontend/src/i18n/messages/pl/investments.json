@@ -88,6 +88,14 @@
       "assetClass": "Wg klasy aktywów"
     }
   },
+  "assetClasses": {
+    "equity": "Akcje",
+    "fixedIncome": "Instrumenty dłużne",
+    "cash": "Gotówka",
+    "preferred": "Akcje uprzywilejowane",
+    "convertible": "Obligacje zamienne",
+    "crypto": "Kryptowaluty"
+  },
   "holdingsList": {
     "title": "Pozycje",
     "noHoldings": "Brak pozycji w tym portfelu.",

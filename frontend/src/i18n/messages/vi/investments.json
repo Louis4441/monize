@@ -88,6 +88,14 @@
       "assetClass": "Theo loại tài sản"
     }
   },
+  "assetClasses": {
+    "equity": "Cổ phiếu",
+    "fixedIncome": "Thu nhập cố định",
+    "cash": "Tiền mặt",
+    "preferred": "Cổ phiếu ưu đãi",
+    "convertible": "Chứng khoán chuyển đổi",
+    "crypto": "Tiền mã hóa"
+  },
   "holdingsList": {
     "title": "Nắm giữ",
     "noHoldings": "Không có khoản nắm giữ trong danh mục này.",

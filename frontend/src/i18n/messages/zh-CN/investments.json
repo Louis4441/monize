@@ -88,6 +88,14 @@
       "assetClass": "按资产类别"
     }
   },
+  "assetClasses": {
+    "equity": "股票",
+    "fixedIncome": "固定收益",
+    "cash": "现金",
+    "preferred": "优先股",
+    "convertible": "可转换证券",
+    "crypto": "加密货币"
+  },
   "holdingsList": {
     "title": "持仓",
     "noHoldings": "此投资组合无持仓。",

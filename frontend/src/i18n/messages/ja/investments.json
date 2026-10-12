@@ -88,6 +88,14 @@
       "assetClass": "資産クラス別"
     }
   },
+  "assetClasses": {
+    "equity": "株式",
+    "fixedIncome": "債券",
+    "cash": "現金",
+    "preferred": "優先株",
+    "convertible": "転換社債",
+    "crypto": "暗号資産"
+  },
   "holdingsList": {
     "title": "保有銘柄",
     "noHoldings": "このポートフォリオに保有銘柄がありません。",
