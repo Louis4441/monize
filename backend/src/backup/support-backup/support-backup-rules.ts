@@ -309,6 +309,7 @@ export const RULES: Record<string, TableRules> = {
     parent_transaction_id: keep,
     is_transfer: keep,
     linked_transaction_id: keep,
+    external_id: drop, // the API caller's key, often a bank's own row id
     created_at: keep,
     updated_at: keep,
   },

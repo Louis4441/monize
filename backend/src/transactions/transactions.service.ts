@@ -34,6 +34,7 @@ import {
   TransactionRulesApplierService,
 } from "../transaction-rules/transaction-rules-applier.service";
 import { AccountsService } from "../accounts/accounts.service";
+import { Account } from "../accounts/entities/account.entity";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { TransactionSplitService } from "./transaction-split.service";
@@ -61,6 +62,7 @@ import {
   TransactionTransferService,
   TransferActor,
   TransferResult,
+  WrittenTransfer,
 } from "./transaction-transfer.service";
 import { CrossOwnerAccessService } from "../delegation/cross-owner-access.service";
 import {
@@ -103,7 +105,8 @@ import {
   bulkSkipReason,
 } from "../common/bulk-create.types";
 import { deletionBalanceEffect } from "../common/deletion-balance.util";
-import { withScopedDb } from "../common/db/scoped-db";
+import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
+import { isExternalIdConflict } from "./transaction-external-id";
 import { lockTransactionRow, lockTransactionRows } from "../common/db/locks";
 import { assertReconciledRowsMutable } from "./reconciled-lock.util";
 import { roundMoney } from "../common/round.util";
@@ -113,6 +116,33 @@ import {
   type FxEntry,
   type FxEntryInput,
 } from "../common/fx-entry.util";
+
+export interface CreateTransactionOptions {
+  createPayeeIfMissing?: boolean;
+  /**
+   * Set when the authenticated actor is not the row's owner (a joint
+   * grantee, or a delegate acting as the owner): the owner's structural
+   * rule actions (convert to transfer, split) are then skipped, since they
+   * would write, and move balances in, accounts the actor holds no grant
+   * on. Derived from the server-side identity, never read from a request.
+   */
+  actorIsNotOwner?: boolean;
+  /**
+   * Set by `ScheduledTransactionsService.post()` only, never read from a
+   * request: the row pays the occurrence `post()` just claimed, so a
+   * `settle_loan_installment` rule refuses it (`row_from_scheduled_posting`).
+   */
+  fromScheduledPosting?: boolean;
+}
+
+/**
+ * What a create did: `created` is false when the request's `externalId`
+ * already named a row in the account, which is then the `transaction`.
+ */
+export interface CreateTransactionOutcome {
+  transaction: Transaction;
+  created: boolean;
+}
 
 export interface TransactionWithInvestmentLink extends Transaction {
   linkedInvestmentTransactionId?: string | null;
@@ -149,6 +179,8 @@ export interface RegisterRowFilters {
   originalCurrencyCodes: string[] | undefined;
   hasAttachments: boolean | undefined;
   tagKeyFilter: TagKeyFilter | undefined;
+  /** The API caller's key for one row (`transaction-external-id.ts`). */
+  externalId: string | undefined;
   /** False -- the register's default -- hides investment brokerage accounts. */
   includeInvestmentBrokerage: boolean;
 }
@@ -182,7 +214,8 @@ function hasRegisterContentFilters(
     (filters?.originalCurrencyCodes &&
       filters.originalCurrencyCodes.length > 0) ||
     filters?.hasAttachments !== undefined ||
-    filters?.tagKeyFilter
+    filters?.tagKeyFilter ||
+    filters?.externalId !== undefined
   );
 }
 
@@ -392,29 +425,72 @@ export class TransactionsService {
   async create(
     userId: string,
     createTransactionDto: CreateTransactionDto,
-    options?: {
-      createPayeeIfMissing?: boolean;
-      /**
-       * Set when the authenticated actor is not the row's owner (a joint
-       * grantee, or a delegate acting as the owner): the owner's structural
-       * rule actions (convert to transfer, split) are then skipped, since they
-       * would write, and move balances in, accounts the actor holds no grant
-       * on. Derived from the server-side identity, never read from a request.
-       */
-      actorIsNotOwner?: boolean;
-      /**
-       * Set by `ScheduledTransactionsService.post()` only, never read from a
-       * request: the row pays the occurrence `post()` just claimed, so a
-       * `settle_loan_installment` rule refuses it (`row_from_scheduled_posting`).
-       */
-      fromScheduledPosting?: boolean;
-    },
+    options?: CreateTransactionOptions,
   ): Promise<Transaction> {
+    const outcome = await this.createWithOutcome(
+      userId,
+      createTransactionDto,
+      options,
+    );
+    return outcome.transaction;
+  }
+
+  /**
+   * `create`, saying whether the row was written by this call or already
+   * existed under the request's `externalId` (`transaction-external-id.ts`).
+   * An existing row is returned as it stands: the key names the row, so a
+   * retry carrying a different body does not edit it, and nothing else this
+   * create would do (rules, balance, history) runs a second time.
+   */
+  async createWithOutcome(
+    userId: string,
+    createTransactionDto: CreateTransactionDto,
+    options?: CreateTransactionOptions,
+  ): Promise<CreateTransactionOutcome> {
     const account = await this.accountsService.findOne(
       userId,
       createTransactionDto.accountId,
     );
 
+    // Advisory: the common retry answers here. The unique index is what holds
+    // the rule when two attempts race past this lookup (caught below).
+    const externalId = createTransactionDto.externalId;
+    if (externalId) {
+      const existing = await this.findByExternalId(
+        userId,
+        createTransactionDto.accountId,
+        externalId,
+      );
+      if (existing) return { transaction: existing, created: false };
+    }
+
+    return this.createNew(userId, createTransactionDto, account, options);
+  }
+
+  /**
+   * The row in `accountId` holding `externalId`, read back as `findOne` reads
+   * it, or null.
+   */
+  private async findByExternalId(
+    userId: string,
+    accountId: string,
+    externalId: string,
+  ): Promise<Transaction | null> {
+    const row = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Transaction).findOne({
+        where: { userId, accountId, externalId },
+        select: { id: true },
+      }),
+    );
+    return row ? this.findOne(userId, row.id) : null;
+  }
+
+  private async createNew(
+    userId: string,
+    createTransactionDto: CreateTransactionDto,
+    account: Account,
+    options?: CreateTransactionOptions,
+  ): Promise<CreateTransactionOutcome> {
     const { splits, tagIds, ...transactionData } = createTransactionDto;
     const hasSplits = splits && splits.length > 0;
 
@@ -512,9 +588,9 @@ export class TransactionsService {
     // One transaction: the row, its splits/tags, and the balance update
     // commit or roll back together. Nested service calls (split service, tags,
     // account balances) run their own withScopedDb and join this one.
-    const savedTransactionId = await withScopedDb(
-      this.dataSource,
-      async (m) => {
+    let savedTransactionId: string;
+    try {
+      savedTransactionId = await withScopedDb(this.dataSource, async (m) => {
         const transaction = m.create(Transaction, {
           ...transactionData,
           // Derived from the account, not taken from the request: `amount` is in
@@ -610,8 +686,27 @@ export class TransactionsService {
         }
 
         return savedTransaction.id;
-      },
-    );
+      });
+    } catch (error) {
+      // Another create holding the same key committed between the lookup and
+      // this insert: the index refused this one, and its row is the answer.
+      // Not inside a caller's transaction, which the violation has aborted.
+      const externalId = createTransactionDto.externalId;
+      if (
+        !externalId ||
+        !isExternalIdConflict(error) ||
+        getActiveScopedManager()
+      ) {
+        throw error;
+      }
+      const winner = await this.findByExternalId(
+        userId,
+        createTransactionDto.accountId,
+        externalId,
+      );
+      if (!winner) throw error;
+      return { transaction: winner, created: false };
+    }
 
     this.netWorthService.triggerDebouncedRecalc(
       createTransactionDto.accountId,
@@ -629,7 +724,7 @@ export class TransactionsService {
 
     const result = await this.findOne(userId, savedTransactionId);
     this.recordTransactionAction(userId, result, "create");
-    return result;
+    return { transaction: result, created: true };
   }
 
   /**
@@ -1166,6 +1261,7 @@ export class TransactionsService {
     originalCurrencyCodes?: string[],
     hasAttachments?: boolean,
     jointAccountIds: string[] = [],
+    externalId?: string,
   ): Promise<PaginatedTransactions> {
     // A page number for one row is counted by comparing that row against the
     // register's order, and only the date order has a comparison to make here
@@ -1208,6 +1304,7 @@ export class TransactionsService {
       originalCurrencyCodes,
       hasAttachments,
       tagKeyFilter,
+      externalId,
       includeInvestmentBrokerage,
     };
 
@@ -1317,6 +1414,12 @@ export class TransactionsService {
           "transaction.original_currency_code IN (:...originalCurrencyCodes)",
           { originalCurrencyCodes },
         );
+      }
+
+      if (externalId !== undefined) {
+        queryBuilder.andWhere("transaction.externalId = :externalId", {
+          externalId,
+        });
       }
 
       // Attachment presence filter. An EXISTS subquery against the separate
@@ -2187,6 +2290,12 @@ export class TransactionsService {
     ) {
       qb.andWhere("bf.original_currency_code IN (:...bfOriginalCurrencies)", {
         bfOriginalCurrencies: filters.originalCurrencyCodes,
+      });
+    }
+
+    if (filters.externalId !== undefined) {
+      qb.andWhere("bf.externalId = :bfExternalId", {
+        bfExternalId: filters.externalId,
       });
     }
 
@@ -3364,14 +3473,60 @@ export class TransactionsService {
     createTransferDto: CreateTransferDto,
     actor?: TransferActor,
   ): Promise<TransferResult> {
+    const outcome = await this.createTransferWithOutcome(
+      userId,
+      createTransferDto,
+      actor,
+    );
+    return outcome.transfer;
+  }
+
+  /**
+   * `createTransfer`, saying whether the legs were written by this call or
+   * already existed under the request's `externalId`. An existing transfer is
+   * read back as it stands, with no history entry, tags or recalculation.
+   */
+  async createTransferWithOutcome(
+    userId: string,
+    createTransferDto: CreateTransferDto,
+    actor?: TransferActor,
+  ): Promise<{ transfer: TransferResult; created: boolean }> {
+    const findOne = this.findOne.bind(this);
+    // A retry of a transfer from the caller's own account is answered before
+    // any validation or rate resolution; see findOwnTransferByExternalId.
+    const own = await this.transferService.findOwnTransferByExternalId(
+      userId,
+      createTransferDto,
+    );
+    if (own) {
+      return {
+        transfer: await this.transferService.readTransfer(own, findOne),
+        created: false,
+      };
+    }
     const prepared = await this.prepareTransfer(
       userId,
       createTransferDto,
       actor,
     );
-    const { savedFromId, savedToId } =
-      await this.transferService.writeTransferLegs(prepared);
-    return this.completeTransfer(prepared, savedFromId, savedToId);
+    const written = await this.transferService.writeTransferLegs(prepared);
+    if (written.existing) {
+      return {
+        transfer: await this.transferService.readTransfer(
+          { ...written, existing: written.existing },
+          findOne,
+        ),
+        created: false,
+      };
+    }
+    return {
+      transfer: await this.completeTransfer(
+        prepared,
+        written.savedFromId,
+        written.savedToId,
+      ),
+      created: true,
+    };
   }
 
   /**
@@ -3400,7 +3555,7 @@ export class TransactionsService {
   writeTransferLegs(
     prepared: PreparedTransfer,
     manager?: EntityManager,
-  ): Promise<{ savedFromId: string; savedToId: string }> {
+  ): Promise<WrittenTransfer> {
     return this.transferService.writeTransferLegs(prepared, manager);
   }
 

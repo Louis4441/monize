@@ -687,7 +687,8 @@
     "transferSameCurrencyRateMustBeOne": "兩個 {{ currency }} 帳戶之間的轉帳，匯率只能為 1",
     "transferRateUnavailable": "無法確定 {{ from }} -> {{ to }} 的匯率。請提供 exchangeRate 或目標金額，以便正確記錄該轉帳。",
     "transferAmountsMustAgreeOnZero": "轉帳必須在兩側移動非零金額，或兩側皆為零",
-    "transferImpliedRateInvalid": "目標金額相對於來源金額意味著無法使用的匯率"
+    "transferImpliedRateInvalid": "目標金額相對於來源金額意味著無法使用的匯率",
+    "externalIdNotThisTransfer": "此 externalId 已被來源科目中一筆並非轉帳至此目的科目的交易使用"
   },
   "users": {
     "userNotFound": "找不到使用者",

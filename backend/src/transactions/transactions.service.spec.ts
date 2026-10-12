@@ -1,6 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { NotFoundException, BadRequestException } from "@nestjs/common";
-import { Brackets, DataSource } from "typeorm";
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
+import { Brackets, DataSource, QueryFailedError } from "typeorm";
 import { TransactionsService } from "./transactions.service";
 import { primaryAttachmentSql } from "../attachments/primary-attachment.util";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
@@ -31,6 +35,8 @@ import {
   RuleFactsInput,
 } from "../transaction-rules/rule-facts";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { EXTERNAL_ID_INDEX } from "./transaction-external-id";
+import { getActiveScopedManager } from "../common/db/scoped-db";
 import { isTransactionInFuture } from "../common/date-utils";
 import { buildTransactionSearchClause } from "./transaction-search.util";
 import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
@@ -2957,6 +2963,70 @@ describe("TransactionsService", () => {
         "transaction.original_currency_code IN (:...originalCurrencyCodes)",
         { originalCurrencyCodes: ["EUR", "GBP"] },
       );
+    });
+
+    it("filters by externalId on the listing and on the rows its balance is summed over", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([
+        [
+          {
+            id: "tx-1",
+            userId: "user-1",
+            accountId: "account-1",
+            amount: -50,
+            status: TransactionStatus.UNRECONCILED,
+            splits: [],
+          },
+        ],
+        1,
+      ]);
+      const idsQb = createMockQueryBuilder();
+      const totalSumQb = createMockQueryBuilder({
+        setParameters: jest.fn().mockReturnThis(),
+      });
+      totalSumQb.getRawOne.mockResolvedValue({ totalSum: -50 });
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(mockQb)
+        .mockReturnValueOnce(idsQb)
+        .mockReturnValueOnce(totalSumQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+
+      const result = await service.findAll(
+        "user-1",
+        ["account-1"],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1,
+        50,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "date",
+        "DESC",
+        undefined,
+        undefined,
+        undefined,
+        [],
+        "bank-row-1",
+      );
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        "transaction.externalId = :externalId",
+        { externalId: "bank-row-1" },
+      );
+      // A content filter: the balance is summed over the matched rows only,
+      // so the subquery naming them must carry the same predicate.
+      expect(idsQb.andWhere).toHaveBeenCalledWith(
+        "bf.externalId = :bfExternalId",
+        { bfExternalId: "bank-row-1" },
+      );
+      expect(result.startingBalance).toBe(-50);
     });
 
     const findAllWith = (
@@ -8005,6 +8075,332 @@ describe("TransactionsService", () => {
       ).rejects.toThrow("DB save error");
 
       expect(mockDataSource.transaction).toHaveBeenCalled();
+    });
+  });
+
+  describe("externalId (idempotent create, issue #1713)", () => {
+    const dto = {
+      accountId: "account-1",
+      transactionDate: "2026-01-15",
+      amount: -50,
+      currencyCode: "USD",
+      externalId: "bank-row-1",
+    };
+    const existingRow = {
+      id: "tx-existing",
+      userId: "user-1",
+      accountId: "account-1",
+      amount: -50,
+      externalId: "bank-row-1",
+      status: TransactionStatus.UNRECONCILED,
+      splits: [],
+    };
+    const uniqueViolation = (constraint: string) =>
+      new QueryFailedError(
+        "INSERT INTO transactions",
+        [],
+        Object.assign(new Error("duplicate key value"), {
+          code: "23505",
+          constraint,
+        }),
+      );
+    /** Answer the key lookup with `byKey`, and a read by id with that row. */
+    const answerLookups = (
+      byKey: () => Record<string, unknown> | null,
+      byId: Record<string, Record<string, unknown>>,
+    ) =>
+      transactionsRepository.findOne.mockImplementation(
+        async (options: { where: unknown }) => {
+          const where = options.where as Record<string, unknown>;
+          if (!Array.isArray(where) && where.externalId !== undefined) {
+            return byKey();
+          }
+          const [first] = where as unknown as Array<{ id: string }>;
+          return byId[first.id] ?? null;
+        },
+      );
+
+    it("returns the row already holding the key without writing anything", async () => {
+      answerLookups(() => ({ id: "tx-existing" }), {
+        "tx-existing": existingRow,
+      });
+
+      const outcome = await service.createWithOutcome("user-1", dto as any);
+
+      expect(outcome).toEqual({ transaction: existingRow, created: false });
+      expect(transactionsRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId: "user-1",
+            accountId: "account-1",
+            externalId: "bank-row-1",
+          },
+        }),
+      );
+      expect(transactionsRepository.save).not.toHaveBeenCalled();
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
+      expect(rulesApplier.applyToNew).not.toHaveBeenCalled();
+      expect(netWorthService.triggerDebouncedRecalc).not.toHaveBeenCalled();
+    });
+
+    it("create() answers a repeated key with the existing row too", async () => {
+      answerLookups(() => ({ id: "tx-existing" }), {
+        "tx-existing": existingRow,
+      });
+
+      await expect(service.create("user-1", dto as any)).resolves.toBe(
+        existingRow,
+      );
+      expect(transactionsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("stores the key on a new row and reports it created", async () => {
+      answerLookups(() => null, { "tx-1": { ...existingRow, id: "tx-1" } });
+
+      const outcome = await service.createWithOutcome("user-1", dto as any);
+
+      expect(outcome.created).toBe(true);
+      expect(outcome.transaction.id).toBe("tx-1");
+      expect(transactionsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ externalId: "bank-row-1" }),
+      );
+      expect(accountsService.updateBalance).toHaveBeenCalledWith(
+        "account-1",
+        -50,
+      );
+    });
+
+    it("refuses an account the caller does not own before looking up the key", async () => {
+      accountsService.findOne.mockRejectedValueOnce(
+        new NotFoundException("Account not found"),
+      );
+
+      await expect(
+        service.createWithOutcome("user-1", dto as any),
+      ).rejects.toThrow(NotFoundException);
+      expect(transactionsRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it("makes no key lookup for a create without one", async () => {
+      answerLookups(
+        () => {
+          throw new Error("looked up a key the request did not carry");
+        },
+        { "tx-1": { ...existingRow, id: "tx-1", externalId: null } },
+      );
+      const { externalId: _omitted, ...withoutKey } = dto;
+
+      const outcome = await service.createWithOutcome(
+        "user-1",
+        withoutKey as any,
+      );
+
+      expect(outcome.created).toBe(true);
+    });
+
+    it("answers with the winner when a concurrent create took the key first", async () => {
+      // Both attempts missed the advisory lookup; the index refused this one.
+      let lookups = 0;
+      answerLookups(() => (lookups++ === 0 ? null : { id: "tx-existing" }), {
+        "tx-existing": existingRow,
+      });
+      transactionsRepository.save.mockRejectedValueOnce(
+        uniqueViolation(EXTERNAL_ID_INDEX),
+      );
+
+      const outcome = await service.createWithOutcome("user-1", dto as any);
+
+      expect(outcome).toEqual({ transaction: existingRow, created: false });
+      expect(accountsService.updateBalance).not.toHaveBeenCalled();
+      expect(netWorthService.triggerDebouncedRecalc).not.toHaveBeenCalled();
+    });
+
+    it("rethrows a unique violation of any other constraint", async () => {
+      answerLookups(() => null, {});
+      const other = uniqueViolation("some_other_unique_index");
+      transactionsRepository.save.mockRejectedValueOnce(other);
+
+      await expect(
+        service.createWithOutcome("user-1", dto as any),
+      ).rejects.toBe(other);
+    });
+
+    it("rethrows the violation inside a caller's transaction, which it aborted", async () => {
+      answerLookups(() => null, {});
+      const violation = uniqueViolation(EXTERNAL_ID_INDEX);
+      transactionsRepository.save.mockRejectedValueOnce(violation);
+      (getActiveScopedManager as jest.Mock).mockReturnValueOnce({});
+
+      await expect(
+        service.createWithOutcome("user-1", dto as any),
+      ).rejects.toBe(violation);
+    });
+
+    describe("on a transfer", () => {
+      const toAccount = { ...mockAccount, id: "account-2", name: "Savings" };
+      const transferDto = {
+        fromAccountId: "account-1",
+        toAccountId: "account-2",
+        transactionDate: "2026-01-15",
+        amount: 200,
+        externalId: "bank-xfer-1",
+      };
+      const fromLeg = {
+        id: "tx-from",
+        userId: "user-1",
+        accountId: "account-1",
+        amount: -200,
+        isTransfer: true,
+        splits: [],
+      };
+      const toLeg = {
+        id: "tx-to",
+        userId: "user-1",
+        accountId: "account-2",
+        amount: 200,
+        isTransfer: true,
+        splits: [],
+      };
+
+      beforeEach(() => {
+        accountsService.findOne.mockImplementation(
+          async (_userId: string, id: string) =>
+            id === "account-2" ? toAccount : mockAccount,
+        );
+      });
+
+      it("returns the existing pair without writing, recording or recalculating", async () => {
+        answerLookups(
+          () => ({
+            ...fromLeg,
+            linkedTransaction: toLeg,
+          }),
+          { "tx-from": fromLeg, "tx-to": toLeg },
+        );
+
+        const outcome = await service.createTransferWithOutcome(
+          "user-1",
+          transferDto as any,
+        );
+
+        expect(outcome).toEqual({
+          transfer: { fromTransaction: fromLeg, toTransaction: toLeg },
+          created: false,
+        });
+        // Answered from the caller's own rows before the transfer is
+        // prepared: no account read, no rate resolution, no write.
+        expect(transactionsRepository.findOne).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              accountId: "account-1",
+              externalId: "bank-xfer-1",
+              userId: "user-1",
+            },
+          }),
+        );
+        expect(accountsService.findOne).not.toHaveBeenCalled();
+        expect(transactionsRepository.save).not.toHaveBeenCalled();
+        expect(accountsService.updateBalance).not.toHaveBeenCalled();
+        expect(netWorthService.triggerDebouncedRecalc).not.toHaveBeenCalled();
+      });
+
+      it("stores the key on the source leg only", async () => {
+        transactionsRepository.save
+          .mockResolvedValueOnce({ id: "tx-from" })
+          .mockResolvedValueOnce({ id: "tx-to" });
+        answerLookups(() => null, { "tx-from": fromLeg, "tx-to": toLeg });
+
+        const outcome = await service.createTransferWithOutcome(
+          "user-1",
+          transferDto as any,
+        );
+
+        expect(outcome.created).toBe(true);
+        const [fromCreate, toCreate] = transactionsRepository.create.mock.calls;
+        expect(fromCreate[0]).toEqual(
+          expect.objectContaining({
+            accountId: "account-1",
+            externalId: "bank-xfer-1",
+          }),
+        );
+        expect(toCreate[0]).toEqual(
+          expect.objectContaining({ accountId: "account-2" }),
+        );
+        expect(toCreate[0].externalId).toBeUndefined();
+      });
+
+      it("refuses a key held by a row that is not a transfer to the same destination", async () => {
+        answerLookups(
+          () => ({
+            ...fromLeg,
+            linkedTransaction: { ...toLeg, accountId: "account-3" },
+          }),
+          {},
+        );
+
+        await expect(
+          service.createTransferWithOutcome("user-1", transferDto as any),
+        ).rejects.toThrow(ConflictException);
+        expect(transactionsRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("refuses a key held by an ordinary transaction", async () => {
+        answerLookups(
+          () => ({
+            ...existingRow,
+            isTransfer: false,
+            linkedTransaction: null,
+          }),
+          {},
+        );
+
+        await expect(
+          service.createTransferWithOutcome("user-1", transferDto as any),
+        ).rejects.toThrow(ConflictException);
+      });
+
+      it("finds the key inside the write when the early lookup missed it", async () => {
+        // A key on a source leg the caller does not own (a cross-owner
+        // transfer) is invisible to the early lookup; the in-write lookup,
+        // after authorization, answers it.
+        let lookups = 0;
+        answerLookups(
+          () =>
+            lookups++ === 0 ? null : { ...fromLeg, linkedTransaction: toLeg },
+          { "tx-from": fromLeg, "tx-to": toLeg },
+        );
+
+        const outcome = await service.createTransferWithOutcome(
+          "user-1",
+          transferDto as any,
+        );
+
+        expect(outcome.created).toBe(false);
+        expect(accountsService.findOne).toHaveBeenCalled();
+        expect(transactionsRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("answers with the winner when a concurrent transfer took the key first", async () => {
+        // Both lookups (before the prepare, and inside the write) missed it.
+        let lookups = 0;
+        answerLookups(
+          () =>
+            lookups++ < 2 ? null : { ...fromLeg, linkedTransaction: toLeg },
+          { "tx-from": fromLeg, "tx-to": toLeg },
+        );
+        transactionsRepository.save.mockRejectedValueOnce(
+          uniqueViolation(EXTERNAL_ID_INDEX),
+        );
+
+        const outcome = await service.createTransferWithOutcome(
+          "user-1",
+          transferDto as any,
+        );
+
+        expect(outcome.created).toBe(false);
+        expect(outcome.transfer.fromTransaction).toBe(fromLeg);
+        expect(accountsService.updateBalance).not.toHaveBeenCalled();
+      });
     });
   });
 

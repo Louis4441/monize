@@ -687,7 +687,8 @@
     "transferSameCurrencyRateMustBeOne": "{{ currency }} 口座間の振替に 1 以外の為替レートは指定できません",
     "transferRateUnavailable": "{{ from }} -> {{ to }} の為替レートを判定できませんでした。振替が正しく記録されるように exchangeRate または送金先金額を指定してください。",
     "transferAmountsMustAgreeOnZero": "送金は両側でゼロ以外の金額を動かすか、両側ともゼロである必要があります",
-    "transferImpliedRateInvalid": "送金先の金額は、送金元の金額に対して使用できない為替レートを意味します"
+    "transferImpliedRateInvalid": "送金先の金額は、送金元の金額に対して使用できない為替レートを意味します",
+    "externalIdNotThisTransfer": "この externalId は、この振替先口座への振替ではない取引によって、すでにソース口座で使用されています"
   },
   "users": {
     "userNotFound": "ユーザーが見つかりません",

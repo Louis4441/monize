@@ -48,7 +48,9 @@ describe("JointRegisterService", () => {
     ]);
     jointAccounts = { jointAccessFor: jest.fn().mockResolvedValue(access) };
     transactionsService = {
-      create: jest.fn().mockResolvedValue({ id: TX_ID }),
+      createWithOutcome: jest
+        .fn()
+        .mockResolvedValue({ transaction: { id: TX_ID }, created: true }),
       update: jest.fn().mockResolvedValue({ id: TX_ID }),
       remove: jest.fn().mockResolvedValue(undefined),
       markCleared: jest.fn().mockResolvedValue({ id: TX_ID }),
@@ -78,12 +80,32 @@ describe("JointRegisterService", () => {
       );
       // The reused operation runs AS THE OWNER -- the row, its balance
       // update and net-worth recalc all land on the owner's ledger.
-      expect(transactionsService.create).toHaveBeenCalledWith(OWNER, dto, {
-        createPayeeIfMissing: false,
-        // Set from the joint grant, never from the request: the owner's
-        // structural rules must not run on a grantee's row.
-        actorIsNotOwner: true,
+      expect(transactionsService.createWithOutcome).toHaveBeenCalledWith(
+        OWNER,
+        dto,
+        {
+          createPayeeIfMissing: false,
+          // Set from the joint grant, never from the request: the owner's
+          // structural rules must not run on a grantee's row.
+          actorIsNotOwner: true,
+        },
+      );
+    });
+
+    it("returns the created row, and passes on whether it already existed", async () => {
+      await expect(service.create(GRANTEE, dto as never)).resolves.toEqual({
+        id: TX_ID,
       });
+      transactionsService.createWithOutcome.mockResolvedValueOnce({
+        transaction: { id: TX_ID },
+        created: false,
+      });
+      await expect(
+        service.createWithOutcome(GRANTEE, {
+          ...dto,
+          externalId: "bank-1",
+        } as never),
+      ).resolves.toEqual({ transaction: { id: TX_ID }, created: false });
     });
 
     it("refuses before writing when the grant is missing", async () => {
@@ -91,7 +113,7 @@ describe("JointRegisterService", () => {
       await expect(
         service.create(GRANTEE, dto as never),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(transactionsService.create).not.toHaveBeenCalled();
+      expect(transactionsService.createWithOutcome).not.toHaveBeenCalled();
     });
 
     it("rejects grantee tagIds with no write (tags are per-user)", async () => {
@@ -99,7 +121,7 @@ describe("JointRegisterService", () => {
         service.create(GRANTEE, { ...dto, tagIds: ["t1"] } as never),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(jointAccounts.jointAccessFor).not.toHaveBeenCalled();
-      expect(transactionsService.create).not.toHaveBeenCalled();
+      expect(transactionsService.createWithOutcome).not.toHaveBeenCalled();
     });
 
     it("rejects splits with no write", async () => {
@@ -109,7 +131,7 @@ describe("JointRegisterService", () => {
           splits: [{ amount: -25 }],
         } as never),
       ).rejects.toBeInstanceOf(BadRequestException);
-      expect(transactionsService.create).not.toHaveBeenCalled();
+      expect(transactionsService.createWithOutcome).not.toHaveBeenCalled();
     });
 
     describe("free-text payee policy", () => {
@@ -126,7 +148,7 @@ describe("JointRegisterService", () => {
           payeesCanCreate: true,
         });
         await service.create(GRANTEE, freeText);
-        expect(transactionsService.create).toHaveBeenCalledWith(
+        expect(transactionsService.createWithOutcome).toHaveBeenCalledWith(
           OWNER,
           freeText,
           { createPayeeIfMissing: true, actorIsNotOwner: true },
@@ -141,7 +163,7 @@ describe("JointRegisterService", () => {
         await expect(service.create(GRANTEE, freeText)).rejects.toBeInstanceOf(
           ForbiddenException,
         );
-        expect(transactionsService.create).not.toHaveBeenCalled();
+        expect(transactionsService.createWithOutcome).not.toHaveBeenCalled();
       });
     });
   });

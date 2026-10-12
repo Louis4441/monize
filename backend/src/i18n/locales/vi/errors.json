@@ -687,7 +687,8 @@
     "transferSameCurrencyRateMustBeOne": "Giao dịch chuyển khoản giữa hai tài khoản {{ currency }} không thể có tỷ giá khác 1",
     "transferRateUnavailable": "Không thể xác định tỷ giá cho {{ from }} -> {{ to }}. Hãy cung cấp exchangeRate hoặc số tiền đích để giao dịch chuyển khoản được ghi nhận chính xác.",
     "transferAmountsMustAgreeOnZero": "Giao dịch chuyển tiền phải di chuyển một số tiền khác không ở cả hai bên, hoặc bằng không ở cả hai bên",
-    "transferImpliedRateInvalid": "Số tiền đích ngụ ý một tỷ giá không thể sử dụng so với số tiền nguồn"
+    "transferImpliedRateInvalid": "Số tiền đích ngụ ý một tỷ giá không thể sử dụng so với số tiền nguồn",
+    "externalIdNotThisTransfer": "externalId này đã được dùng trong tài khoản nguồn bởi một giao dịch không phải là chuyển khoản đến tài khoản đích này"
   },
   "users": {
     "userNotFound": "Không tìm thấy người dùng",

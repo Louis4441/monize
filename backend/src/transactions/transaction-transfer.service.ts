@@ -30,7 +30,8 @@ import {
 } from "../common/fx-entry.util";
 import { stripHtml } from "../common/sanitization.util";
 import { tr } from "../i18n/translate";
-import { withScopedDb } from "../common/db/scoped-db";
+import { getActiveScopedManager, withScopedDb } from "../common/db/scoped-db";
+import { isExternalIdConflict } from "./transaction-external-id";
 import { lockTransactionRow, lockTransactionRows } from "../common/db/locks";
 import { assertReconciledRowsMutable } from "./reconciled-lock.util";
 import { removeLockedTransactionLeg } from "./remove-transaction-leg";
@@ -44,6 +45,24 @@ import {
 export interface TransferResult {
   fromTransaction: Transaction;
   toTransaction: Transaction;
+}
+
+/** The legs `writeTransferLegs` wrote, or found. */
+export interface WrittenTransfer {
+  savedFromId: string;
+  savedToId: string;
+  /**
+   * Set when the request's `externalId` already named a transfer from the
+   * source account to the destination: nothing was written, and the ids are
+   * that transfer's legs, owned by these users (`transaction-external-id.ts`).
+   */
+  existing?: ExistingTransferOwners;
+}
+
+/** Who owns each leg of a transfer found under its `externalId`. */
+export interface ExistingTransferOwners {
+  fromOwnerId: string;
+  toOwnerId: string;
 }
 
 /**
@@ -500,13 +519,110 @@ export class TransactionTransferService {
     findOne: (userId: string, id: string) => Promise<Transaction>,
     actor?: TransferActor,
   ): Promise<TransferResult> {
+    const own = await this.findOwnTransferByExternalId(
+      userId,
+      createTransferDto,
+    );
+    if (own) return this.readTransfer(own, findOne);
     const prepared = await this.prepareTransfer(
       userId,
       createTransferDto,
       actor,
     );
-    const { savedFromId, savedToId } = await this.writeTransferLegs(prepared);
-    return this.completeTransfer(prepared, savedFromId, savedToId, findOne);
+    const written = await this.writeTransferLegs(prepared);
+    if (written.existing) {
+      return this.readTransfer(
+        { ...written, existing: written.existing },
+        findOne,
+      );
+    }
+    return this.completeTransfer(
+      prepared,
+      written.savedFromId,
+      written.savedToId,
+      findOne,
+    );
+  }
+
+  /**
+   * Read back a transfer `writeTransferLegs` found under the request's
+   * `externalId`. Nothing was written, so there is nothing to recalculate,
+   * tag or record in the history: those ran when the transfer was created.
+   */
+  async readTransfer(
+    written: WrittenTransfer & { existing: ExistingTransferOwners },
+    findOne: (userId: string, id: string) => Promise<Transaction>,
+  ): Promise<TransferResult> {
+    return {
+      fromTransaction: await findOne(
+        written.existing.fromOwnerId,
+        written.savedFromId,
+      ),
+      toTransaction: await findOne(
+        written.existing.toOwnerId,
+        written.savedToId,
+      ),
+    };
+  }
+
+  /**
+   * The transfer the caller's OWN source leg already holds under
+   * `dto.externalId`, looked up before `prepareTransfer`: a retry of a
+   * committed transfer is answered from the ledger, not re-validated, so it
+   * cannot fail on a rate the provider no longer serves or a precondition that
+   * has since changed, and it asks the provider nothing.
+   *
+   * Only the caller's own rows, under the caller's identity: what it finds is
+   * the caller's own data, so answering before authorization reveals nothing.
+   * A key on a source leg somebody else owns (a cross-owner transfer) is
+   * found inside the write, after authorization (`writeTransferLegs`).
+   */
+  async findOwnTransferByExternalId(
+    userId: string,
+    dto: CreateTransferDto,
+  ): Promise<(WrittenTransfer & { existing: ExistingTransferOwners }) | null> {
+    const externalId = dto.externalId;
+    if (!externalId) return null;
+    return withScopedDb(this.dataSource, (m) =>
+      this.findTransferByExternalId(m, dto, externalId, userId),
+    );
+  }
+
+  /**
+   * The transfer from the source account holding `dto.externalId`, or null.
+   * A key held by anything other than a transfer leg linked into the
+   * destination account is refused rather than answered: returning that row
+   * would tell the caller its transfer exists when it does not.
+   */
+  private async findTransferByExternalId(
+    m: EntityManager,
+    dto: CreateTransferDto,
+    externalId: string,
+    ownerId?: string,
+  ): Promise<(WrittenTransfer & { existing: ExistingTransferOwners }) | null> {
+    const row = await m.getRepository(Transaction).findOne({
+      where: {
+        accountId: dto.fromAccountId,
+        externalId,
+        ...(ownerId ? { userId: ownerId } : {}),
+      },
+      relations: { linkedTransaction: true },
+    });
+    if (!row) return null;
+    const linked = row.linkedTransaction;
+    if (!row.isTransfer || !linked || linked.accountId !== dto.toAccountId) {
+      throw new ConflictException(
+        tr(
+          "errors.transactions.externalIdNotThisTransfer",
+          "This externalId is already used in the source account by a transaction that is not a transfer to this destination account",
+        ),
+      );
+    }
+    return {
+      savedFromId: row.id,
+      savedToId: linked.id,
+      existing: { fromOwnerId: row.userId, toOwnerId: linked.userId },
+    };
   }
 
   /**
@@ -645,7 +761,7 @@ export class TransactionTransferService {
   async writeTransferLegs(
     prepared: PreparedTransfer,
     manager?: EntityManager,
-  ): Promise<{ savedFromId: string; savedToId: string }> {
+  ): Promise<WrittenTransfer> {
     const {
       effectiveUserId: userId,
       dto,
@@ -669,12 +785,26 @@ export class TransactionTransferService {
       referenceNumber,
       status = TransactionStatus.UNRECONCILED,
       categoryId,
+      externalId,
     } = dto;
 
     // Both legs, their linkage, and the balance updates commit atomically.
     // Each leg is owned by ITS account's owner; per-user reference data
     // (category, payee link) is only written onto effective-user legs.
-    const writeLegsAtomically = async (m: EntityManager) => {
+    const writeLegsAtomically = async (
+      m: EntityManager,
+    ): Promise<WrittenTransfer> => {
+      // Advisory, in the write's own transaction and identity: the unique
+      // index refuses a second leg holding the key (caught below).
+      if (externalId) {
+        const existing = await this.findTransferByExternalId(
+          m,
+          dto,
+          externalId,
+        );
+        if (existing) return existing;
+      }
+
       const fromTransaction = m.create(Transaction, {
         userId: fromOwnerId,
         accountId: fromAccountId,
@@ -689,6 +819,9 @@ export class TransactionTransferService {
         payeeId: fromOwnerId === userId ? payeeId || null : null,
         payeeName: fromPayeeName,
         categoryId: fromOwnerId === userId ? categoryId || null : null,
+        // The key lives on the source leg only: it is unique per account, and
+        // the request names the transfer from the source account's side.
+        externalId: externalId ?? null,
       });
 
       const toTransaction = m.create(Transaction, {
@@ -775,14 +908,35 @@ export class TransactionTransferService {
       return writeLegsAtomically(manager);
     }
 
-    return hasForeignLeg
-      ? // Cross-owner: the foreign leg insert and foreign balance update fail
-        // the owner-only policies, so the (already fully authorized) atomic
-        // block runs under the audited system bypass. No-op at RLS_MODE=off.
-        withSystemContext(() =>
-          withScopedDb(this.dataSource, writeLegsAtomically),
-        )
-      : withScopedDb(this.dataSource, writeLegsAtomically);
+    // Cross-owner: the foreign leg insert and foreign balance update fail
+    // the owner-only policies, so the (already fully authorized) atomic
+    // block runs under the audited system bypass. No-op at RLS_MODE=off.
+    const inWriteIdentity = <T>(fn: () => Promise<T>): Promise<T> =>
+      hasForeignLeg ? withSystemContext(fn) : fn();
+
+    try {
+      return await inWriteIdentity(() =>
+        withScopedDb(this.dataSource, writeLegsAtomically),
+      );
+    } catch (error) {
+      // Another transfer holding the same key committed between the lookup
+      // and this insert; the index refused this one, and the winner is the
+      // answer. Never inside a caller's transaction, which it has aborted.
+      if (
+        !externalId ||
+        !isExternalIdConflict(error) ||
+        getActiveScopedManager()
+      ) {
+        throw error;
+      }
+      const winner = await inWriteIdentity(() =>
+        withScopedDb(this.dataSource, (m) =>
+          this.findTransferByExternalId(m, dto, externalId),
+        ),
+      );
+      if (!winner) throw error;
+      return winner;
+    }
   }
 
   /**

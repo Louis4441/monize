@@ -687,7 +687,8 @@
     "transferSameCurrencyRateMustBeOne": "Un transfert entre deux comptes en {{ currency }} ne peut pas avoir un taux de change autre que 1",
     "transferRateUnavailable": "Impossible de déterminer un taux de change pour {{ from }} -> {{ to }}. Fournissez un exchangeRate ou un montant de destination pour que le transfert soit enregistré correctement.",
     "transferAmountsMustAgreeOnZero": "Un transfert doit déplacer un montant non nul des deux côtés, ou zéro des deux côtés",
-    "transferImpliedRateInvalid": "Le montant de destination implique un taux de change inutilisable par rapport au montant source"
+    "transferImpliedRateInvalid": "Le montant de destination implique un taux de change inutilisable par rapport au montant source",
+    "externalIdNotThisTransfer": "Cet externalId est déjà utilisé dans le compte source par une opération qui n'est pas un virement vers ce compte de destination"
   },
   "users": {
     "userNotFound": "Utilisateur introuvable",

@@ -9,6 +9,7 @@ import {
   OneToMany,
   JoinColumn,
   JoinTable,
+  Index,
 } from "typeorm";
 import { Account } from "../../accounts/entities/account.entity";
 import { Payee } from "../../payees/entities/payee.entity";
@@ -18,10 +19,18 @@ import { TransactionSplit } from "./transaction-split.entity";
 import { User } from "../../users/entities/user.entity";
 
 import { TransactionStatus } from "./transaction-status.enum";
+import { EXTERNAL_ID_INDEX } from "../transaction-external-id";
 
 export { TransactionStatus };
 
 @Entity("transactions")
+// Declared here as well as in the migration, because the database-backed suites
+// build their schema from the entities: an idempotent create's race is a
+// property of this index, and a suite without it would prove nothing.
+@Index(EXTERNAL_ID_INDEX, ["accountId", "externalId"], {
+  unique: true,
+  where: "external_id IS NOT NULL",
+})
 export class Transaction {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -187,6 +196,14 @@ export class Transaction {
   @ManyToOne(() => Transaction, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "linked_transaction_id" })
   linkedTransaction: Transaction | null;
+
+  /**
+   * The caller's own key for a row created through the API, unique per
+   * account (`idx_transactions_account_external_id`). A create that repeats a
+   * key returns the row that already holds it; see `transaction-external-id.ts`.
+   */
+  @Column({ type: "varchar", name: "external_id", length: 255, nullable: true })
+  externalId: string | null;
 
   @OneToMany(() => TransactionSplit, (split) => split.transaction)
   splits: TransactionSplit[];

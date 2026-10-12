@@ -376,6 +376,7 @@ CREATE TABLE transactions (
     parent_transaction_id UUID REFERENCES transactions(id) ON DELETE CASCADE, -- for split children
     is_transfer BOOLEAN DEFAULT false, -- indicates this is part of an account-to-account transfer
     linked_transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL, -- links the paired transfer transaction
+    external_id VARCHAR(255), -- caller-supplied idempotency key for an API create; unique per account (below)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -391,6 +392,11 @@ CREATE INDEX idx_transactions_original_currency ON transactions(original_currenc
 -- Trigram indexes accelerate the register/report search (ILIKE '%term%')
 CREATE INDEX idx_transactions_payee_name_trgm ON transactions USING gin (payee_name gin_trgm_ops);
 CREATE INDEX idx_transactions_description_trgm ON transactions USING gin (description gin_trgm_ops);
+-- At most one row per (account, external_id): an API create retried with the
+-- same key returns the row it already made instead of a second one.
+CREATE UNIQUE INDEX idx_transactions_account_external_id
+  ON transactions(account_id, external_id)
+  WHERE external_id IS NOT NULL;
 
 -- Transaction Splits (details for split transactions)
 CREATE TABLE transaction_splits (

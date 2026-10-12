@@ -598,13 +598,18 @@ describe("Joint accounts (integration)", () => {
         "SPLIT-0000 400,15/240,00",
       ]) {
         const created = await withUserContext(ownerId, () =>
-          controller.create(actingReq, {
-            accountId: jointAccountId,
-            amount: -640.15,
-            transactionDate: "2026-01-10",
-            currencyCode: "USD",
-            description,
-          } as never),
+          controller.create(
+            actingReq,
+            {
+              accountId: jointAccountId,
+              amount: -640.15,
+              transactionDate: "2026-01-10",
+              currencyCode: "USD",
+              description,
+            } as never,
+            // The passthrough response: only a repeated externalId sets a status.
+            { status: () => undefined } as never,
+          ),
         );
         const row = (await dataSource.manager.findOne(Transaction, {
           where: { id: created.id },
