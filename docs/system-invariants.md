@@ -74,7 +74,7 @@ implied.
 | INV-FX-002 | A row that carries its own exchange rate is converted at that rate on every surface | enforced |
 | INV-FX-003 | A currency pair is stored in one orientation | partial |
 | INV-FX-004 | A user-supplied rate never replaces a global exchange-rate observation | enforced |
-| INV-FX-005 | A provider-written rate names its provider, every provider question goes through the chain, and an outage is never remembered as an empty answer | partial |
+| INV-FX-005 | A provider-written rate names its provider, every provider question goes through the chain, and an outage is never remembered as an empty answer | enforced |
 | INV-TRADE-001 | The executed total is the fact; the per-share price is derived from it | enforced |
 | INV-PRICE-001 | A stored price is in the currency the security is recorded in | partial |
 | INV-PORTRESULT-001 | A period change is not a return: value change, external flows and investment result are three figures | enforced |
@@ -1125,11 +1125,13 @@ Test                The section 5 truth table of
                     faked (no global fetch reached by the lookup);
                     fx-provider-source.guard.spec.ts;
                     provider-call.guard.spec.ts over currencies.
-Status              partial -- the chain, the service on it, the source guard
-                    and the currency lookup on the chain are on main (tasks
-                    B1, B2 and B5 of
-                    docs/future-plans/exchange-rate-providers-tasks.md). Task Q
-                    moves this entry to enforced.
+Status              enforced -- the chain, the service on it, the source
+                    guard and the currency lookup on the chain are on main
+                    (tasks B1, B2 and B5 of
+                    docs/future-plans/exchange-rate-providers-tasks.md), the
+                    default order is frankfurter,yahoo (task R1), and the
+                    section 5 truth table cases are named in
+                    fx-provider-chain.spec.ts.
 ```
 
 ### INV-TRADE-001 -- the executed total is the fact, the price is derived

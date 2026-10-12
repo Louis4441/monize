@@ -9,7 +9,10 @@ task list is
 This plan carries its own contracts, truth tables and recorded fixtures
 (sections 4 to 7) because there is no separate spec for it.
 
-Status: **proposal**, for issue #1585. Not approved to build.
+Status: **done** (S1 and B1 to B6, F1, R1, and Q, the acceptance task, all
+merged); decisions agreed in the planning session and recorded on the
+tracking issue #1672. Each task was a sub-issue (#1673 to #1682), one PR
+each. The open questions in section 16 are answered below.
 
 ## 1. Goal
 
@@ -462,13 +465,22 @@ Unchanged in every case; listed so the tasks can check against it.
 ## 16. Open questions
 
 1. Default order (decision 2): confirm `frankfurter,yahoo` at R1, or keep
-   `yahoo` first and let operators opt in.
+   `yahoo` first and let operators opt in. **Answered**: `frankfurter,yahoo`
+   shipped at R1 (#1681); `FX_PROVIDERS=yahoo,frankfurter` restores the
+   previous order.
 2. Boot refusal on a bad `FX_PROVIDERS` (decision 11), or log and fall back
-   to the default as the numeric knobs do.
+   to the default as the numeric knobs do. **Answered**: boot refusal, via
+   `FxProviderConfigError` (B1, #1674).
 3. The placeholder value and tolerance in 7.3 rest on the reporter's account
    of Yahoo returning `0.01`; a captured response for one such pair would
-   make the fixture evidence rather than a reconstruction.
+   make the fixture evidence rather than a reconstruction. **Not resolved**:
+   no captured response was obtained; B4 (#1677) implemented the
+   cross-check against the reconstructed fixture from the reporter's
+   account, which is what shipped.
 4. Whether the provider line belongs on the Currencies page header or only in
-   the rate-history dialog.
+   the rate-history dialog. **Answered**: the header (F1, #1680); the
+   rate-history dialog separately labels each stored rate's source.
 5. Whether `verifyCurrency` should consult Frankfurter even when it is not in
-   `FX_PROVIDERS` (B5 uses the configured chain only).
+   `FX_PROVIDERS` (B5 uses the configured chain only). **Answered**: no,
+   `verifyCurrency` and the rest of currency lookup ask only the configured
+   chain (B5, #1678).

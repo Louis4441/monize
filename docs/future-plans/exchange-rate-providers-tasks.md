@@ -32,16 +32,16 @@ No task adds a migration. Every task before R1 leaves a deployment with no `FX_P
 
 | ID | Issue | Task | Depends on | Deploy class | Status | PR |
 |----|-------|------|-----------|--------------|--------|----|
-| S1 | #1673 | Plan pair in `docs/future-plans/`; INV-FX-005 registered `unenforced` | -- | none | [x] | closes #1673 |
-| B1 | #1674 | Provider contract, `FX_PROVIDERS` parser, the chain, the Yahoo adapter, module wiring; nothing calls them | S1 | none | [ ] | -- |
-| B2 | #1675 | `ExchangeRateService` on the chain: refresh by base, backfill by window, `fillRateWindow`, live rate, `source` from the provider; the source guard | B1 | neutral | [ ] | -- |
-| B3 | #1676 | Frankfurter adapter, tracked provider id, breaker guard over the providers directory, `FX_FRANKFURTER_BASE_URL` | B1 | inert | [ ] | -- |
-| B4 | #1677 | Yahoo adapter: placeholder cross-check against the reverse symbol, orientation memory | B1 | neutral | [ ] | -- |
-| B5 | #1678 | Currency lookup and verification through the chain; `currencies` under the breaker guard | B2, B3 | neutral | [ ] | -- |
-| B6 | #1679 | Status endpoint lists the configured providers | B2 | inert | [ ] | -- |
-| F1 | #1680 | Currencies page provider line, rate-history source label, all-failed refresh toast, en + pseudo | B6, B3 | inert | [ ] | -- |
-| R1 | #1681 | Default `frankfurter,yahoo`; docs; release note | B2, B3, F1 | change | [ ] | -- |
-| Q | #1682 | Acceptance: all locales, INV-FX-005 enforced, verification-contract row | R1, B4, B5 | none | [ ] | -- |
+| S1 | #1673 | Plan pair in `docs/future-plans/`; INV-FX-005 registered `unenforced` | -- | none | [x] | #1683 |
+| B1 | #1674 | Provider contract, `FX_PROVIDERS` parser, the chain, the Yahoo adapter, module wiring; nothing calls them | S1 | none | [x] | #1687 |
+| B2 | #1675 | `ExchangeRateService` on the chain: refresh by base, backfill by window, `fillRateWindow`, live rate, `source` from the provider; the source guard | B1 | neutral | [x] | #1688 |
+| B3 | #1676 | Frankfurter adapter, tracked provider id, breaker guard over the providers directory, `FX_FRANKFURTER_BASE_URL` | B1 | inert | [x] | #1689 |
+| B4 | #1677 | Yahoo adapter: placeholder cross-check against the reverse symbol, orientation memory | B1 | neutral | [x] | #1690 |
+| B5 | #1678 | Currency lookup and verification through the chain; `currencies` under the breaker guard | B2, B3 | neutral | [x] | #1691 |
+| B6 | #1679 | Status endpoint lists the configured providers | B2 | inert | [x] | #1692 |
+| F1 | #1680 | Currencies page provider line, rate-history source label, all-failed refresh toast, en + pseudo | B6, B3 | inert | [x] | #1693 |
+| R1 | #1681 | Default `frankfurter,yahoo`; docs; release note | B2, B3, F1 | change | [x] | #1694 |
+| Q | #1682 | Acceptance: all locales, INV-FX-005 enforced, verification-contract row | R1, B4, B5 | none | [x] | this PR |
 
 **Why B2 is neutral, not none:** it rewrites the live refresh, backfill, window and live-rate paths. With the default list `yahoo` the adapter asks the same Yahoo symbols the service asked and the stored rows are the same. The premise this paragraph first carried, that the refresh gained the reverse symbol, was stale: the refresh has asked the reverse symbol whenever the direct quote is absent or below 1 since `fetchFxQuote` landed for issue #1604, so B2 changes no symbol the refresh asks. What B2 does change, all of it in the server log or the admin-only backfill summary: pairs are asked in canonical (sorted) orientation rather than the query's row order, so the first symbol asked for a pair may differ and cost or save one call; a quote too coarse in both orientations is reported `No rate data available` with the warning moved to the adapter, and a batch no symbol answered is `No provider answered`; `getRateForDate`'s provider step gains the adapter's reverse-symbol fallback, which the direct-only window it used to fetch did not have; and a backfill window the providers answered as empty is `success: false, "No historical data available"` where a whole-history answer with no bar on or after the earliest date used to be `success: true, ratesLoaded: 0`.
 
