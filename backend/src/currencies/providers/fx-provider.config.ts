@@ -1,13 +1,15 @@
 import { FX_PROVIDER_NAMES, FxProviderName } from "./fx-provider.interface";
 
 /**
- * The providers asked when `FX_PROVIDERS` is unset or empty, in order. `yahoo`
- * alone until the Frankfurter adapter has shipped and the default is changed
- * in its own release (`docs/future-plans/exchange-rate-providers.md`,
- * decision 2), so every task before that leaves a deployment calling Yahoo as
- * it does today.
+ * The providers asked when `FX_PROVIDERS` is unset or empty, in order.
+ * Frankfurter (ECB reference rates) first, Yahoo second
+ * (`docs/future-plans/exchange-rate-providers.md`, decision 2). Set
+ * `FX_PROVIDERS=yahoo,frankfurter` to restore the previous order.
  */
-export const DEFAULT_FX_PROVIDERS: readonly FxProviderName[] = ["yahoo"];
+export const DEFAULT_FX_PROVIDERS: readonly FxProviderName[] = [
+  "frankfurter",
+  "yahoo",
+];
 
 /**
  * `FX_PROVIDERS` named something that is not a provider.

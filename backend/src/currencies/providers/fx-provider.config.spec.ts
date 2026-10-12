@@ -28,10 +28,9 @@ describe("resolveFxProviders", () => {
     }
   });
 
-  it("the default is Yahoo alone: a deployment that sets nothing never calls Frankfurter", () => {
-    // Decision 2 of the plan: the default moves to `frankfurter,yahoo` in its
-    // own release (task R1), not in the PR that adds the adapter.
-    expect(DEFAULT_FX_PROVIDERS).toEqual(["yahoo"]);
+  it("the default is frankfurter,yahoo: a deployment that sets nothing asks Frankfurter first", () => {
+    // Decision 2 of the plan, applied in task R1.
+    expect(DEFAULT_FX_PROVIDERS).toEqual(["frankfurter", "yahoo"]);
   });
 
   it("accepts frankfurter and keeps the order the operator wrote", () => {
