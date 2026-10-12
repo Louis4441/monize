@@ -4,6 +4,7 @@ import { TransactionsController } from "./transactions.controller";
 import { TransactionsService } from "./transactions.service";
 import { DelegateTransferMaskInterceptor } from "../delegation/interceptors/delegate-transfer-mask.interceptor";
 import { DelegationService } from "../delegation/delegation.service";
+import { TransactionBulkCreateService } from "./transaction-bulk-create.service";
 
 describe("TransactionsController", () => {
   let controller: TransactionsController;
@@ -12,12 +13,15 @@ describe("TransactionsController", () => {
   let mockJointRegister: Record<string, jest.Mock>;
   let mockCrossOwnerAccess: Record<string, jest.Mock>;
   let mockDelegationService: Record<string, jest.Mock>;
+  let mockBulkCreate: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   // Valid UUIDs for testing
   const uuid1 = "00000000-0000-0000-0000-000000000001";
   const uuid2 = "00000000-0000-0000-0000-000000000002";
   const uuid3 = "00000000-0000-0000-0000-000000000003";
+  /** Position of `jointAccountIds` among `TransactionsService.findAll`'s args. */
+  const JOINT_IDS_ARG = 20;
 
   beforeEach(async () => {
     mockService = {
@@ -73,6 +77,10 @@ describe("TransactionsController", () => {
       readableAccountIds: jest.fn().mockResolvedValue([]),
     };
 
+    mockBulkCreate = {
+      createMany: jest.fn(),
+    };
+
     mockCrossOwnerAccess = {
       readableAccountIdSetFor: jest.fn().mockResolvedValue(new Set()),
       // Own accounts by default, matching mockJointRegister.ownsRow above.
@@ -108,6 +116,7 @@ describe("TransactionsController", () => {
           provide: require("./joint-register.service").JointRegisterService,
           useValue: mockJointRegister,
         },
+        { provide: TransactionBulkCreateService, useValue: mockBulkCreate },
       ],
     }).compile();
 
@@ -296,6 +305,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 
@@ -332,6 +342,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 
@@ -362,6 +373,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 
@@ -404,6 +416,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 
@@ -447,6 +460,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 
@@ -492,6 +506,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 
@@ -507,9 +522,36 @@ describe("TransactionsController", () => {
 
       const calls = mockService.findAll.mock.calls as unknown[][];
       const lastCall = calls[calls.length - 1];
-      // hasAttachments sits just before the trailing jointAccountIds arg.
-      expect(lastCall[lastCall.length - 2]).toBe(true);
-      expect(lastCall[lastCall.length - 1]).toEqual([]);
+      // hasAttachments sits before the trailing jointAccountIds and
+      // externalId args.
+      expect(lastCall[lastCall.length - 3]).toBe(true);
+      expect(lastCall[lastCall.length - 2]).toEqual([]);
+      expect(lastCall[lastCall.length - 1]).toBeUndefined();
+    });
+
+    // externalId is the last query param, after sortBy and sortDirection.
+    const findAllWithExternalId = (externalId: unknown) =>
+      (controller.findAll as (...a: unknown[]) => Promise<unknown>)(
+        mockReq,
+        ...Array(24).fill(undefined),
+        externalId,
+      );
+
+    it("passes externalId through to the service unchanged", async () => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+
+      await findAllWithExternalId(" bank-row-1 ");
+
+      const calls = mockService.findAll.mock.calls as unknown[][];
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[lastCall.length - 1]).toBe(" bank-row-1 ");
+    });
+
+    it("rejects a repeated externalId key", async () => {
+      await expect(findAllWithExternalId(["a", "b"])).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockService.findAll).not.toHaveBeenCalled();
     });
 
     // ── Validation tests ────────────────────────────────────────
@@ -695,6 +737,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 
@@ -718,7 +761,7 @@ describe("TransactionsController", () => {
       const call = mockService.findAll.mock.calls[0];
       expect(call[0]).toBe("owner-9"); // the owner's register, byte-identical
       expect(call[1]).toEqual([uuid1]);
-      expect(call[call.length - 1]).toEqual([]); // no widened predicate
+      expect(call[JOINT_IDS_ARG]).toEqual([]); // no widened predicate
     });
 
     it("widens the register scope with authorized joint ids for mixed lists", async () => {
@@ -731,13 +774,13 @@ describe("TransactionsController", () => {
       await controller.findAll(mockReq);
       let call = mockService.findAll.mock.calls[0];
       expect(call[0]).toBe("user-1");
-      expect(call[call.length - 1]).toEqual([uuid2]);
+      expect(call[JOINT_IDS_ARG]).toEqual([uuid2]);
 
       // Mixed explicit filter: only requested ids that are joint pass.
       await controller.findAll(mockReq, undefined, `${uuid1},${uuid2}`);
       call = mockService.findAll.mock.calls[1];
       expect(call[1]).toEqual([uuid1, uuid2]);
-      expect(call[call.length - 1]).toEqual([uuid2]);
+      expect(call[JOINT_IDS_ARG]).toEqual([uuid2]);
       expect(mockJointAccounts.jointAccessFor).not.toHaveBeenCalled();
     });
 
@@ -1049,6 +1092,34 @@ describe("TransactionsController", () => {
         "user-1",
         "tx-1",
         "split-1",
+      );
+    });
+  });
+
+  describe("bulkCreate()", () => {
+    it("hands the items to the bulk service as the authenticated actor", async () => {
+      const dto = {
+        items: [{ transaction: { accountId: uuid1, amount: -5 } }],
+      };
+      const expected = {
+        created: 1,
+        existing: 0,
+        failed: 0,
+        results: [
+          { index: 0, kind: "transaction", status: "created", id: "tx-1" },
+        ],
+      };
+      mockBulkCreate.createMany.mockResolvedValue(expected);
+
+      const result = await controller.bulkCreate(
+        { user: { id: "user-1", realUserId: "user-1" } },
+        dto as never,
+      );
+
+      expect(result).toBe(expected);
+      expect(mockBulkCreate.createMany).toHaveBeenCalledWith(
+        { effectiveUserId: "user-1", realUserId: "user-1" },
+        dto,
       );
     });
   });
@@ -1803,6 +1874,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         [],
+        undefined,
       );
     });
 

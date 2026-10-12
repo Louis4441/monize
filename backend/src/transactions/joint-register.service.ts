@@ -9,7 +9,10 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
 import { tr } from "../i18n/translate";
 import { Transaction } from "./entities/transaction.entity";
-import { TransactionsService } from "./transactions.service";
+import {
+  CreateTransactionOutcome,
+  TransactionsService,
+} from "./transactions.service";
 import { JointAccountsService } from "../delegation/joint-accounts.service";
 import { AccountDelegate } from "../delegation/entities/account-delegate.entity";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
@@ -47,6 +50,15 @@ export class JointRegisterService {
     realUserId: string,
     dto: CreateTransactionDto,
   ): Promise<Transaction> {
+    const outcome = await this.createWithOutcome(realUserId, dto);
+    return outcome.transaction;
+  }
+
+  /** `create`, saying whether the row already existed under its `externalId`. */
+  async createWithOutcome(
+    realUserId: string,
+    dto: CreateTransactionDto,
+  ): Promise<CreateTransactionOutcome> {
     this.assertPlainDto(dto);
     const access = await this.jointAccounts.jointAccessFor(
       realUserId,
@@ -59,7 +71,7 @@ export class JointRegisterService {
       dto,
     );
     return withSystemContext(() =>
-      this.transactionsService.create(access.ownerUserId, dto, {
+      this.transactionsService.createWithOutcome(access.ownerUserId, dto, {
         createPayeeIfMissing,
         // The grantee is the actor and the owner the row's user: the owner's
         // structural rules (transfer, split) must not run on it, or the

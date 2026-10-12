@@ -50,6 +50,8 @@ import { TransferActor } from "./transaction-transfer.service";
 import { GetRecentTransactionsDto } from "./dto/get-recent-transactions.dto";
 import { BulkReconcileDto } from "./dto/bulk-reconcile.dto";
 import { BulkUpdateDto, BulkDeleteDto } from "./dto/bulk-update.dto";
+import { BulkCreateTransactionsDto } from "./dto/bulk-create.dto";
+import { TransactionBulkCreateService } from "./transaction-bulk-create.service";
 import { MarkClearedDto } from "./dto/mark-cleared.dto";
 import { UpdateTransactionStatusDto } from "./dto/update-transaction-status.dto";
 import {
@@ -174,6 +176,7 @@ export class TransactionsController {
     private readonly jointAccounts: JointAccountsService,
     private readonly crossOwnerAccess: CrossOwnerAccessService,
     private readonly jointRegister: JointRegisterService,
+    private readonly bulkCreateService: TransactionBulkCreateService,
   ) {}
 
   /**
@@ -378,6 +381,12 @@ export class TransactionsController {
     required: false,
     description: "Sort direction: asc or desc (default: desc)",
   })
+  @ApiQuery({
+    name: "externalId",
+    required: false,
+    description:
+      "Only the transaction created with this externalId (exact match). Combine with accountIds to name the account, since a key is unique per account; a row in an investment brokerage account also needs includeInvestmentBrokerage=true.",
+  })
   @ApiResponse({
     status: 200,
     description: "List of transactions retrieved successfully",
@@ -412,6 +421,7 @@ export class TransactionsController {
     hasAttachments?: boolean,
     @Query("sortBy") sortBy?: string,
     @Query("sortDirection") sortDirection?: string,
+    @Query("externalId") externalId?: string,
   ) {
     // Validate pagination parameters
     if (page !== undefined) {
@@ -459,6 +469,9 @@ export class TransactionsController {
     // Truncate search to prevent excessive ILIKE query length
     const searchStr = assertStringParam(search, "search");
     const sanitizedSearch = searchStr ? searchStr.slice(0, 200) : undefined;
+    // An exact match, so never trimmed or truncated: a key longer than any
+    // stored one simply matches nothing.
+    const externalIdFilter = assertStringParam(externalId, "externalId");
 
     const parsedAmountFrom =
       amountFrom !== undefined ? parseFloat(amountFrom) : undefined;
@@ -549,6 +562,7 @@ export class TransactionsController {
       parseCurrencyCodes(originalCurrencyCodes),
       hasAttachments,
       jointAccountIds,
+      externalIdFilter,
     );
   }
 
@@ -1381,6 +1395,22 @@ export class TransactionsController {
       createTransferDto,
       transferActorFrom(req),
     );
+  }
+
+  @Post("bulk")
+  @ApiOperation({
+    summary: "Create many transactions and transfers in one request",
+    description:
+      "Each item carries a `transaction` (the body POST /transactions takes) or a `transfer` (the body POST /transactions/transfer takes). Each row is created on its own and in date order; a row that fails does not undo the others. The response has one result per item, in the request's order: `created` or `existing` with the new id, or `failed` with the status and message the single-row route would have returned. A row whose `externalId` is already used in its account comes back `existing`, so a batch whose response was lost can be sent again.",
+  })
+  @ApiResponse({
+    status: 201,
+    description: "Every row was attempted; see each result's status",
+  })
+  @ApiResponse({ status: 400, description: "Bad request" })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  bulkCreate(@Request() req, @Body() dto: BulkCreateTransactionsDto) {
+    return this.bulkCreateService.createMany(transferActorFrom(req), dto);
   }
 
   @Post("bulk-update")

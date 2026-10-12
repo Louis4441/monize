@@ -14,6 +14,7 @@ import { TransactionAnalyticsService } from "./transaction-analytics.service";
 import { TransactionBulkUpdateService } from "./transaction-bulk-update.service";
 import { TransactionToolPrepService } from "./transaction-tool-prep.service";
 import { JointRegisterService } from "./joint-register.service";
+import { TransactionBulkCreateService } from "./transaction-bulk-create.service";
 import { TransactionsController } from "./transactions.controller";
 import { AccountsModule } from "../accounts/accounts.module";
 import { PayeesModule } from "../payees/payees.module";
@@ -63,6 +64,7 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     TransactionBulkUpdateService,
     TransactionToolPrepService,
     JointRegisterService,
+    TransactionBulkCreateService,
   ],
   controllers: [TransactionsController],
   exports: [
