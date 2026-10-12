@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId kan alleen worden gebruikt terwijl het register op datum is gesorteerd",
     "invalidTagKeyOp": "Ongeldige tagKeyOp: {{ op }}",
     "tagKeyRequired": "Een tagsleutel (1-100 tekens) is vereist",
+    "searchTooManyTerms": "Een zoekopdracht mag maximaal {{ max }} termen bevatten",
     "limitMustBePositive": "limit moet een positief getal zijn",
     "categoryNotFound": "Categorie niet gevonden",
     "categoriesNotFound": "Categorieën niet gevonden: {{ ids }}",

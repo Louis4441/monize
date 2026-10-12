@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId は取引明細が日付順に並んでいるときにのみ使用できます",
     "invalidTagKeyOp": "無効な tagKeyOp: {{ op }}",
     "tagKeyRequired": "タグキー（1〜100文字）が必要です",
+    "searchTooManyTerms": "検索に含められる語句は最大 {{ max }} 個です",
     "limitMustBePositive": "limit は正の数でなければなりません",
     "categoryNotFound": "カテゴリが見つかりません",
     "categoriesNotFound": "カテゴリが見つかりません：{{ ids }}",

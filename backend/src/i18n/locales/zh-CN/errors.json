@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId 仅可在交易明细按日期排序时使用",
     "invalidTagKeyOp": "无效的 tagKeyOp：{{ op }}",
     "tagKeyRequired": "需要标签键（1-100 个字符）",
+    "searchTooManyTerms": "搜索最多只能包含 {{ max }} 个词条",
     "limitMustBePositive": "limit 必须为正数",
     "categoryNotFound": "未找到分类",
     "categoriesNotFound": "未找到分类：{{ ids }}",

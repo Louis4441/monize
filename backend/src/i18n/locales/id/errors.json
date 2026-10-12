@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId hanya dapat digunakan saat register diurutkan berdasarkan tanggal",
     "invalidTagKeyOp": "tagKeyOp tidak valid: {{ op }}",
     "tagKeyRequired": "Kunci tag (1-100 karakter) diperlukan",
+    "searchTooManyTerms": "Pencarian dapat berisi paling banyak {{ max }} istilah",
     "limitMustBePositive": "limit harus berupa angka positif",
     "categoryNotFound": "Kategori tidak ditemukan",
     "categoriesNotFound": "Kategori tidak ditemukan: {{ ids }}",

@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId solo puede usarse mientras el registro esté ordenado por fecha",
     "invalidTagKeyOp": "tagKeyOp no válido: {{ op }}",
     "tagKeyRequired": "Se requiere una clave de etiqueta (1-100 caracteres)",
+    "searchTooManyTerms": "Una búsqueda puede contener como máximo {{ max }} términos",
     "limitMustBePositive": "limit debe ser un número positivo",
     "categoryNotFound": "Categoría no encontrada",
     "categoriesNotFound": "Categorías no encontradas: {{ ids }}",

@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "targetTransactionId yalnızca kayıt tarihe göre sıralıyken kullanılabilir",
     "invalidTagKeyOp": "Geçersiz tagKeyOp: {{ op }}",
     "tagKeyRequired": "Bir etiket anahtarı (1-100 karakter) gereklidir",
+    "searchTooManyTerms": "Bir arama en fazla {{ max }} terim içerebilir",
     "limitMustBePositive": "limit pozitif bir sayı olmalıdır",
     "categoryNotFound": "Kategori bulunamadı",
     "categoriesNotFound": "Kategoriler bulunamadı: {{ ids }}",

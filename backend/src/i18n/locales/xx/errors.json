@@ -639,6 +639,7 @@
     "targetRequiresDateSort": "[XX-targetTransactionId can only be used while the register is sorted by date-XX]",
     "invalidTagKeyOp": "[XX-Invalid tagKeyOp: {{ op }}-XX]",
     "tagKeyRequired": "[XX-A tag key (1-100 characters) is required-XX]",
+    "searchTooManyTerms": "[XX-A search can hold at most {{ max }} terms-XX]",
     "limitMustBePositive": "[XX-limit must be a positive number-XX]",
     "categoryNotFound": "[XX-Category not found-XX]",
     "categoriesNotFound": "[XX-Categories not found: {{ ids }}-XX]",
