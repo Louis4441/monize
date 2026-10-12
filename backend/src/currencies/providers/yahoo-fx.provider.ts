@@ -41,8 +41,10 @@ export const PLACEHOLDER_TOLERANCE = 0.01;
 
 /**
  * How many pairs the adapter remembers as "ask the reverse symbol first". The
- * oldest is forgotten first; a forgotten pair costs one extra call the next
- * time and is remembered again (issue #1677).
+ * order is insertion, not last use: a remembered pair never asks the direct
+ * symbol first again, so it is not re-inserted, and the first remembered is
+ * the first forgotten. A forgotten pair costs one extra call the next time and
+ * is remembered again (issue #1677).
  */
 export const REVERSE_FIRST_MEMORY_LIMIT = 256;
 
@@ -101,8 +103,12 @@ function usable(rate: number | null | undefined): rate is number {
  * The reverse-first memory is a cost saving, not a correctness rule: a
  * remembered pair asks the reverse symbol first on later `fetchLatest`,
  * `fetchLive` and `fetchDailySeries` calls, which saves the placeholder call,
- * but every answer still goes through the same choice, so forgetting a pair
- * (the map is bounded and process-local) changes the calls, never the rate.
+ * but every latest quote still goes through the same choice, so forgetting a
+ * pair (the map is bounded and process-local) changes the calls, never the
+ * quoted rate. For a daily window the order can decide which symbol's answer
+ * is primary on a tie in density. Daily bars are not checked for the
+ * placeholder: a pair not yet remembered asks the direct window first, as
+ * before this check existed.
  *
  * Observations come back in the orientation that answered; the writer orients
  * them. A quote is dated `todayYMD()`, as the refresh dates it today, so no
@@ -249,7 +255,7 @@ export class YahooFxProvider implements FxRateProvider {
     }
     if (reverse === null || !usable(reverse.rate)) {
       this.logger.warn(
-        `Yahoo quoted ${fxSymbol(from, to)} at the placeholder ${YAHOO_FX_PLACEHOLDER_RATE} and ${fxSymbol(to, from)} did not answer to check it; no rate for ${from}/${to}`,
+        `Yahoo quoted ${fxSymbol(from, to)} at the placeholder ${YAHOO_FX_PLACEHOLDER_RATE} and ${fxSymbol(to, from)} did not answer with a usable rate to check it; no rate for ${from}/${to}`,
       );
       return { observation: null, reason: "unavailable" };
     }

@@ -379,6 +379,8 @@ describe("YahooFxProvider", () => {
         rate: 17871,
       });
       expect(warn).not.toHaveBeenCalled();
+      // What this check adds over chooseFxQuote: the placeholder is named.
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("IDRUSD=X"));
     });
 
     it("a placeholder whose reverse is itself too coarse is no rate, never the placeholder", async () => {
@@ -528,7 +530,8 @@ describe("YahooFxProvider", () => {
       }
       yahoo.fetchQuote.mockClear();
 
-      // The first pair remembered was pushed out by the last; the second stays.
+      // codes[0] was evicted by the last pair; re-remembering it evicts
+      // codes[1], so codes[2] is the oldest pair still remembered.
       await provider.fetchLatest("IDR", [codes[0]]);
       await provider.fetchLatest("IDR", [codes[2]]);
 
