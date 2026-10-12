@@ -229,6 +229,13 @@ const ALLOWED = new Map<string, string>([
       "and a cold replica costs one extra fetch behind the same upsert",
   ],
   [
+    "currencies/providers/yahoo-fx.provider.ts#reverseFirst",
+    "Yahoo pairs whose direct symbol answered the 0.01 placeholder, asked " +
+      "reverse-first; a call-order hint that changes no rate (every answer " +
+      "still passes the same cross-check), bounded, and a cold replica costs " +
+      "one extra quote call",
+  ],
+  [
     "currencies/exchange-rate-history.service.ts#inFlight",
     "a coalescer, not a guard: a double-clicked button costs one provider " +
       "call instead of two, and a replica that has not seen the first click " +

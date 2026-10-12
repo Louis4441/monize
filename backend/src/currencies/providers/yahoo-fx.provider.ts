@@ -6,6 +6,7 @@ import { todayYMD } from "../../common/date-utils";
 import { isSparseRateSeries } from "../rate-gap-plan";
 import {
   FxQuote,
+  FxQuoteChoice,
   FxQuoteObservation,
   chooseFxQuote,
   quoteNeedsInverse,
@@ -23,6 +24,30 @@ import {
  */
 export const FX_FETCH_CONCURRENCY = 6;
 
+/**
+ * The quote Yahoo answers for a pair it has no real price for (plan section
+ * 7.3, issue #1677): `IDRUSD=X` was seen quoting exactly `0.01` while
+ * `USDIDR=X` quoted 17871. A real rate can be 0.01 too, so an exact match is
+ * only a suspicion until the reverse symbol is asked.
+ */
+export const YAHOO_FX_PLACEHOLDER_RATE = 0.01;
+
+/**
+ * How far the placeholder may sit from the rate the reverse symbol implies
+ * and still be read as a real rate, as a fraction of the placeholder (1 %,
+ * issue #1677).
+ */
+export const PLACEHOLDER_TOLERANCE = 0.01;
+
+/**
+ * How many pairs the adapter remembers as "ask the reverse symbol first". The
+ * order is insertion, not last use: a remembered pair never asks the direct
+ * symbol first again, so it is not re-inserted, and the first remembered is
+ * the first forgotten. A forgotten pair costs one extra call the next time and
+ * is remembered again (issue #1677).
+ */
+export const REVERSE_FIRST_MEMORY_LIMIT = 256;
+
 /** Yahoo's symbol for the `from -> to` rate. */
 function fxSymbol(from: string, to: string): string {
   return `${from}${to}=X`;
@@ -31,6 +56,26 @@ function fxSymbol(from: string, to: string): string {
 /** The unique days a series carries a usable rate for. */
 function observationDays(series: readonly FxObservation[]): string[] {
   return [...new Set(series.map((point) => point.date))];
+}
+
+/** The key the reverse-first memory holds a `from -> to` question under. */
+function pairKey(from: string, to: string): string {
+  return `${from}/${to}`;
+}
+
+/**
+ * Whether the reverse symbol's quote contradicts a direct quote of exactly the
+ * placeholder: the rate it implies is more than the tolerance away from it.
+ * `|1/r - p| / p > t` is written as `|1 - p*r| > t*p*r` (both positive), so no
+ * rate is reciprocated to decide it.
+ */
+function contradictsPlaceholder(reverse: number): boolean {
+  const product = YAHOO_FX_PLACEHOLDER_RATE * reverse;
+  return Math.abs(1 - product) > PLACEHOLDER_TOLERANCE * product;
+}
+
+function usable(rate: number | null | undefined): rate is number {
+  return rate != null && Number.isFinite(rate) && rate > 0;
 }
 
 /**
@@ -49,6 +94,21 @@ function observationDays(series: readonly FxObservation[]): string[] {
  *   direct answer is sparse, and the two are merged densest first; the window
  *   is "not answered" only when nothing was found and a symbol did not answer,
  *   the rule `fillRateWindow` holds today.
+ * - A direct quote of exactly `YAHOO_FX_PLACEHOLDER_RATE` whose reverse
+ *   disagrees by more than `PLACEHOLDER_TOLERANCE` is Yahoo's placeholder: it
+ *   is discarded, the reverse is the observation, and the pair is remembered
+ *   as reverse-first (issue #1677). A placeholder whose reverse does not
+ *   answer is never stored; it is below `MIN_PRECISE_QUOTED_RATE` anyway.
+ *
+ * The reverse-first memory is a cost saving, not a correctness rule: a
+ * remembered pair asks the reverse symbol first on later `fetchLatest`,
+ * `fetchLive` and `fetchDailySeries` calls, which saves the placeholder call,
+ * but every latest quote still goes through the same choice, so forgetting a
+ * pair (the map is bounded and process-local) changes the calls, never the
+ * quoted rate. For a daily window the order can decide which symbol's answer
+ * is primary on a tie in density. Daily bars are not checked for the
+ * placeholder: a pair not yet remembered asks the direct window first, as
+ * before this check existed.
  *
  * Observations come back in the orientation that answered; the writer orients
  * them. A quote is dated `todayYMD()`, as the refresh dates it today, so no
@@ -61,6 +121,8 @@ export class YahooFxProvider implements FxRateProvider {
   readonly name: FxProviderName = "yahoo";
   readonly source = "yahoo_finance";
   private readonly logger = new Logger(YahooFxProvider.name);
+  /** Pairs whose direct symbol answered the placeholder; insertion-ordered, oldest first. */
+  private readonly reverseFirst = new Set<string>();
 
   constructor(private readonly yahoo: YahooFinanceService) {}
 
@@ -97,31 +159,35 @@ export class YahooFxProvider implements FxRateProvider {
     start: string,
     end: string,
   ): Promise<FxObservation[] | null> {
-    const direct = await this.fetchWindow(from, to, start, end);
+    // A pair remembered as reverse-first asks the reverse symbol first; the
+    // rule is otherwise the same with the two symbols' roles swapped.
+    const [askFrom, askTo] = this.reverseFirst.has(pairKey(from, to))
+      ? [to, from]
+      : [from, to];
+    const first = await this.fetchWindow(askFrom, askTo, start, end);
     if (
-      direct !== null &&
-      !isSparseRateSeries(observationDays(direct), start, end)
+      first !== null &&
+      !isSparseRateSeries(observationDays(first), start, end)
     ) {
-      return direct;
+      return first;
     }
 
-    const reverse = await this.fetchWindow(to, from, start, end);
-    const directPoints = direct ?? [];
-    const reversePoints = reverse ?? [];
-    if (directPoints.length === 0 && reversePoints.length === 0) {
+    const second = await this.fetchWindow(askTo, askFrom, start, end);
+    const firstPoints = first ?? [];
+    const secondPoints = second ?? [];
+    if (firstPoints.length === 0 && secondPoints.length === 0) {
       // Both symbols, not either: "this pair has no rates in this window" is
       // only known when both answered. One of them answering `[]` while the
       // other failed is half-knowledge, and is reported as no answer.
-      return direct !== null && reverse !== null ? [] : null;
+      return first !== null && second !== null ? [] : null;
     }
 
-    // The denser answer first, the direct one on a tie; the other contributes
-    // only the days the first has no bar for.
+    // The denser answer first, the one asked first on a tie; the other
+    // contributes only the days the first has no bar for.
     const [primary, secondary] =
-      observationDays(reversePoints).length >
-      observationDays(directPoints).length
-        ? [reversePoints, directPoints]
-        : [directPoints, reversePoints];
+      observationDays(secondPoints).length > observationDays(firstPoints).length
+        ? [secondPoints, firstPoints]
+        : [firstPoints, secondPoints];
     const covered = new Set(observationDays(primary));
     return [
       ...primary,
@@ -136,7 +202,8 @@ export class YahooFxProvider implements FxRateProvider {
 
   /**
    * One pair's latest quote: the direct symbol, then the reverse when the
-   * direct quote is absent or below 1, and `chooseFxQuote` between them.
+   * direct quote is absent or below 1, and `chooseFxQuote` between them; a
+   * pair remembered as reverse-first asks the two the other way round.
    * `answered` is whether either symbol answered at all, with or without a
    * usable rate.
    */
@@ -144,25 +211,73 @@ export class YahooFxProvider implements FxRateProvider {
     from: string,
     to: string,
   ): Promise<{ observation: FxQuoteObservation | null; answered: boolean }> {
-    const directQuote = await this.fetchRate(from, to);
-    const direct: FxQuote = { from, to, rate: directQuote.rate };
-    const reverseQuote = quoteNeedsInverse(direct.rate)
-      ? await this.fetchRate(to, from)
-      : null;
-    const reverse: FxQuote | null = reverseQuote
-      ? { from: to, to: from, rate: reverseQuote.rate }
-      : null;
+    const reverseFirst = this.reverseFirst.has(pairKey(from, to));
+    const [askFrom, askTo] = reverseFirst ? [to, from] : [from, to];
 
-    const choice = chooseFxQuote(direct, reverse);
+    const firstQuote = await this.fetchRate(askFrom, askTo);
+    const first: FxQuote = { from: askFrom, to: askTo, rate: firstQuote.rate };
+    const secondQuote = quoteNeedsInverse(first.rate)
+      ? await this.fetchRate(askTo, askFrom)
+      : null;
+    const second: FxQuote | null = secondQuote
+      ? { from: askTo, to: askFrom, rate: secondQuote.rate }
+      : null;
+    const answered = firstQuote.answered || (secondQuote?.answered ?? false);
+
+    const [direct, reverse] = reverseFirst ? [second, first] : [first, second];
+    const choice = this.choose(from, to, direct, reverse, first, second);
     if (choice.reason === "imprecise") {
       this.logger.warn(
         `Provider quotes for ${from}/${to} are rounded too coarsely to use in either direction`,
       );
     }
-    return {
-      observation: choice.observation,
-      answered: directQuote.answered || (reverseQuote?.answered ?? false),
-    };
+    return { observation: choice.observation, answered };
+  }
+
+  /**
+   * The placeholder cross-check in front of `chooseFxQuote` (issue #1677). A
+   * direct quote of exactly the placeholder that its reverse contradicts is
+   * dropped and the pair remembered as reverse-first; one the reverse could
+   * not check is reported here, once, and left to `chooseFxQuote`, which
+   * refuses it as too coarse to store. Anything else is `chooseFxQuote`
+   * between the two quotes in the order they were asked.
+   */
+  private choose(
+    from: string,
+    to: string,
+    direct: FxQuote | null,
+    reverse: FxQuote | null,
+    first: FxQuote,
+    second: FxQuote | null,
+  ): FxQuoteChoice {
+    if (direct?.rate !== YAHOO_FX_PLACEHOLDER_RATE) {
+      return chooseFxQuote(first, second);
+    }
+    if (reverse === null || !usable(reverse.rate)) {
+      this.logger.warn(
+        `Yahoo quoted ${fxSymbol(from, to)} at the placeholder ${YAHOO_FX_PLACEHOLDER_RATE} and ${fxSymbol(to, from)} did not answer with a usable rate to check it; no rate for ${from}/${to}`,
+      );
+      return { observation: null, reason: "unavailable" };
+    }
+    if (!contradictsPlaceholder(reverse.rate)) {
+      return chooseFxQuote(first, second);
+    }
+    this.rememberReverseFirst(from, to);
+    this.logger.log(
+      `Yahoo quoted ${fxSymbol(from, to)} at the placeholder ${YAHOO_FX_PLACEHOLDER_RATE} against ${fxSymbol(to, from)} at ${reverse.rate}; using the reverse and asking it first from now on`,
+    );
+    return chooseFxQuote(reverse, null);
+  }
+
+  /** Remember a pair as reverse-first, forgetting the oldest past the limit. */
+  private rememberReverseFirst(from: string, to: string): void {
+    const key = pairKey(from, to);
+    this.reverseFirst.delete(key);
+    this.reverseFirst.add(key);
+    while (this.reverseFirst.size > REVERSE_FIRST_MEMORY_LIMIT) {
+      const oldest = this.reverseFirst.values().next().value as string;
+      this.reverseFirst.delete(oldest);
+    }
   }
 
   /** The `from -> to` quote; `answered` is whether Yahoo returned anything for the symbol. */
