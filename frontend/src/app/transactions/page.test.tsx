@@ -146,11 +146,25 @@ vi.mock('@/store/authStore', () => ({
   ),
 }));
 
-// Mock preferences store
+// Mock preferences store. `mockPreferences.value` is what the store answers
+// with; a test that needs another row (a hidden column) swaps it and puts it
+// back.
+const DEFAULT_MOCK_PREFERENCES = {
+  twoFactorEnabled: true,
+  theme: 'system',
+  defaultCurrency: 'USD',
+} as Record<string, unknown>;
+const { mockPreferences } = vi.hoisted(() => ({
+  mockPreferences: { value: undefined as Record<string, unknown> | undefined },
+}));
 vi.mock('@/store/preferencesStore', () => ({
   usePreferencesStore: (selector?: any) => {
     const state = {
-      preferences: { twoFactorEnabled: true, theme: 'system', defaultCurrency: 'USD' },
+      preferences: mockPreferences.value ?? {
+        twoFactorEnabled: true,
+        theme: 'system',
+        defaultCurrency: 'USD',
+      },
       isLoaded: true,
       _hasHydrated: true,
     };
@@ -2801,6 +2815,34 @@ describe('TransactionsPage register sorting', () => {
       expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'asc' });
     });
     expect(screen.getByTestId('sort')).toHaveTextContent('date:asc');
+  });
+
+  it('falls back to the date sort while the remembered column is hidden', async () => {
+    // A column the reader has hidden has no header at any width, so a
+    // remembered sort on it is resolved away like the account sort on a
+    // single account's page: this render only, storage untouched. The request
+    // goes out by date, and the header shows the default.
+    mockPreferences.value = {
+      ...DEFAULT_MOCK_PREFERENCES,
+      hiddenTableColumns: { transactions: ['status'] },
+    };
+    mockUseLocalStorage.mockImplementation((key: string, defaultValue: any) => {
+      const [value, setValue] = React.useState(
+        key === TRANSACTION_SORT_STORAGE_KEY
+          ? { field: 'status', direction: 'asc' }
+          : defaultValue,
+      );
+      return [value, setValue];
+    });
+
+    try {
+      render(<TransactionsPage />);
+      await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+      expect(screen.getByTestId('sort')).toHaveTextContent('date:desc');
+      expect(lastGetAllParams()).toMatchObject({ sortBy: 'date', sortDirection: 'desc' });
+    } finally {
+      mockPreferences.value = undefined;
+    }
   });
 
   it('reads the register once for a deep link that arrives in the URL', async () => {

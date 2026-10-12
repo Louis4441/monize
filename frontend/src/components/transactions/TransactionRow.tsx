@@ -30,6 +30,12 @@ import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
 import type { StaleUnreconciledReason } from '@/lib/stale-reconciliation';
 import { LinkifiedText } from '@/components/ui/LinkifiedText';
 
+/**
+ * The default for `hidden`: nothing hidden. A module constant so a caller
+ * that omits the prop hands the memoised row the same reference every render.
+ */
+const NO_HIDDEN_COLUMNS: ReadonlySet<string> = new Set();
+
 const INVESTMENT_ACTION_LABELS: Record<string, string> = {
   BUY: 'Buy',
   SELL: 'Sell',
@@ -232,6 +238,16 @@ export interface TransactionRowProps {
   /** Render the foreign-currency columns (paid currency, paid amount, fee paid). */
   showFxColumns?: boolean;
   /**
+   * The register's hidden columns (`useHiddenColumns('transactions').hidden`,
+   * read once by the list and passed down as the set itself, which keeps its
+   * reference while the preference is unchanged so this memoised row is not
+   * re-rendered by a fresh callback). A hidden column's cell is absent from
+   * the DOM at every width -- never hidden by a class -- in the tier row and
+   * the phone card alike; the width tiers go on deciding whether what is left
+   * fits. Omitted means nothing hidden.
+   */
+  hidden?: ReadonlySet<string>;
+  /**
    * Why this row is overdue for reconciliation, from `classifyStaleRow`.
    * Undefined means either "not stale" or "no information" -- the caller only
    * supplies it for accounts the user actually reconciles, and a page that
@@ -281,9 +297,13 @@ export const TransactionRow = memo(function TransactionRow({
   isFuture,
   isHighlighted,
   showFxColumns = false,
+  hidden = NO_HIDDEN_COLUMNS,
   staleReason,
 }: TransactionRowProps) {
   const compactPadding = registerDateColumnPadding(compactDates);
+  // True for every column not hidden, structural ones included; the register
+  // column guard reads the `isVisible('<id>') &&` gates out of this file.
+  const isVisible = (id: string) => !hidden.has(id);
   const payeeLayout = registerPayeeLayout(density);
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -448,7 +468,7 @@ export const TransactionRow = memo(function TransactionRow({
                   column does. A row with none renders nothing here -- not the
                   tier cell's dash, and no empty element either -- so the
                   category stays flush to the card's left edge. */}
-              {transaction.attachmentCount && transaction.attachmentCount > 0 ? (
+              {isVisible('attachments') && transaction.attachmentCount && transaction.attachmentCount > 0 ? (
                 <AttachmentBadge count={transaction.attachmentCount} />
               ) : null}
               {transaction.linkedInvestmentTransactionId ? (
@@ -532,11 +552,13 @@ export const TransactionRow = memo(function TransactionRow({
               <span className="ml-auto flex items-center gap-2">
                 {/* StatusCellButton stops the click itself, so it needs no
                     wrapper here -- the tier branch mounts it bare too. */}
-                <StatusCellButton
-                  status={transaction.status}
-                  dense={false}
-                  onCycle={() => onCycleStatus(transaction)}
-                />
+                {isVisible('status') && (
+                  <StatusCellButton
+                    status={transaction.status}
+                    dense={false}
+                    onCycle={() => onCycleStatus(transaction)}
+                  />
+                )}
                 {showRunningBalance && (
                   <span className="text-right whitespace-nowrap text-sm font-medium">
                     <span className="block text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500 leading-tight">
@@ -555,7 +577,7 @@ export const TransactionRow = memo(function TransactionRow({
                 own, so the card grew a line anyway -- with the pills and the
                 figures interleaved. On their own line the tags wrap among
                 themselves and line 2 keeps its shape. */}
-            {transaction.tags && transaction.tags.length > 0 && (
+            {isVisible('tags') && transaction.tags && transaction.tags.length > 0 && (
               <div className="col-span-3 flex flex-wrap items-center gap-1.5">
                 {transaction.tags.map((tag) => onTagClick ? (
                   <button
@@ -849,26 +871,31 @@ export const TransactionRow = memo(function TransactionRow({
       {/* The column that yields: it takes whatever width the content-sized
           columns leave and shrinks first when there is none, so its arrival
           can never push Status off the visible edge of the register. */}
-      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('description')} ${REGISTER_DESCRIPTION_CELL_FLEX}`}>
-        <div
-          className={`truncate ${isVoid ? 'line-through' : ''}`}
-          title={transaction.description || undefined}
-        >
-          {transaction.description ? (
-            <LinkifiedText text={transaction.description} />
-          ) : (
-            '-'
-          )}
-        </div>
-      </td>
-      <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('refNumber')}`}>
-        <div
-          className={`truncate max-w-[160px] ${isVoid ? 'line-through' : ''}`}
-          title={transaction.referenceNumber || undefined}
-        >
-          {transaction.referenceNumber || '-'}
-        </div>
-      </td>
+      {isVisible('description') && (
+        <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('description')} ${REGISTER_DESCRIPTION_CELL_FLEX}`}>
+          <div
+            className={`truncate ${isVoid ? 'line-through' : ''}`}
+            title={transaction.description || undefined}
+          >
+            {transaction.description ? (
+              <LinkifiedText text={transaction.description} />
+            ) : (
+              '-'
+            )}
+          </div>
+        </td>
+      )}
+      {isVisible('refNumber') && (
+        <td className={`${cellPadding} text-sm text-gray-500 dark:text-gray-400 ${registerColumnClass('refNumber')}`}>
+          <div
+            className={`truncate max-w-[160px] ${isVoid ? 'line-through' : ''}`}
+            title={transaction.referenceNumber || undefined}
+          >
+            {transaction.referenceNumber || '-'}
+          </div>
+        </td>
+      )}
+      {isVisible('tags') && (
       <td className={`${cellPadding} text-sm ${registerColumnClass('tags')}`}>
         {transaction.tags && transaction.tags.length > 0 ? (
           <div className="flex flex-wrap gap-1">
@@ -913,13 +940,16 @@ export const TransactionRow = memo(function TransactionRow({
           <span className="text-gray-400 dark:text-gray-500">-</span>
         )}
       </td>
-      <td className={`${cellPadding} whitespace-nowrap text-center text-sm ${registerColumnClass('attachments')}`}>
-        {transaction.attachmentCount && transaction.attachmentCount > 0 ? (
-          <AttachmentBadge count={transaction.attachmentCount} />
-        ) : (
-          <span className="text-gray-400 dark:text-gray-500">-</span>
-        )}
-      </td>
+      )}
+      {isVisible('attachments') && (
+        <td className={`${cellPadding} whitespace-nowrap text-center text-sm ${registerColumnClass('attachments')}`}>
+          {transaction.attachmentCount && transaction.attachmentCount > 0 ? (
+            <AttachmentBadge count={transaction.attachmentCount} />
+          ) : (
+            <span className="text-gray-400 dark:text-gray-500">-</span>
+          )}
+        </td>
+      )}
       <td className={`${cellPadding} whitespace-nowrap text-sm font-medium text-right ${isVoid ? 'line-through' : ''}`}>
         {displayAmount !== undefined ? (
           <span
@@ -975,13 +1005,15 @@ export const TransactionRow = memo(function TransactionRow({
             : '-'}
         </td>
       )}
-      <td className={`${cellPadding} whitespace-nowrap text-center ${registerColumnClass('status')}`}>
-        <StatusCellButton
-          status={transaction.status}
-          dense={density === 'dense'}
-          onCycle={() => onCycleStatus(transaction)}
-        />
-      </td>
+      {isVisible('status') && (
+        <td className={`${cellPadding} whitespace-nowrap text-center ${registerColumnClass('status')}`}>
+          <StatusCellButton
+            status={transaction.status}
+            dense={density === 'dense'}
+            onCycle={() => onCycleStatus(transaction)}
+          />
+        </td>
+      )}
       <td className={`${cellPadding} whitespace-nowrap text-right text-sm font-medium space-x-2 ${registerColumnClass('actions')} sticky right-0 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'} group-hover:bg-gray-100 dark:group-hover:bg-gray-800 ${isHighlighted ? HIGHLIGHT_FLASH_CELL : ''}`}>
         {onEdit && (
           <button

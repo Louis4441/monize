@@ -1217,3 +1217,75 @@ describe('TransactionRow compact dates (the day/month view)', () => {
     });
   });
 });
+
+describe('TransactionRow hidden columns', () => {
+  // The register's hidden set reaches the row as a prop; a hidden column's
+  // cell is absent from the DOM at every width, in the tier row and the phone
+  // card alike (lib/hidden-columns.ts, decision 4 of the plan).
+  const tags = [{ id: 'tag1', name: 'work', color: null, icon: null }] as Transaction['tags'];
+
+  it('renders every column with nothing hidden, as before', () => {
+    const { container } = renderRow({ hidden: new Set() }, { referenceNumber: 'CHK-1', tags, attachmentCount: 2 });
+    expect(screen.getByText('Latte')).toBeInTheDocument();
+    expect(screen.getByText('CHK-1')).toBeInTheDocument();
+    expect(screen.getByText('work')).toBeInTheDocument();
+    expect(screen.getByTestId('attachment-badge')).toBeInTheDocument();
+    expect(screen.getByTitle('Click to cycle status')).toBeInTheDocument();
+    // Date, payee, category, the five hideable, amount, balance, actions.
+    expect(container.querySelectorAll('td')).toHaveLength(11);
+  });
+
+  it('omits a hidden tier cell from the DOM', () => {
+    const { container } = renderRow(
+      { hidden: new Set(['description', 'refNumber', 'tags', 'attachments', 'status']) },
+      { referenceNumber: 'CHK-1', tags, attachmentCount: 2 },
+    );
+    expect(screen.queryByText('Latte')).not.toBeInTheDocument();
+    expect(screen.queryByText('CHK-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('work')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('attachment-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Click to cycle status')).not.toBeInTheDocument();
+    // Date, payee, category, amount, balance (single-account view), actions.
+    expect(container.querySelectorAll('td')).toHaveLength(4 + 1 + 1);
+    // The structural columns are untouched.
+    expect(screen.getByText('Coffee Co')).toBeInTheDocument();
+    expect(screen.getByText('Food')).toBeInTheDocument();
+  });
+
+  it('hides one column without moving the others', () => {
+    const { container } = renderRow({ hidden: new Set(['status']) }, { referenceNumber: 'CHK-1' });
+    expect(screen.queryByTitle('Click to cycle status')).not.toBeInTheDocument();
+    expect(screen.getByText('Latte')).toBeInTheDocument();
+    expect(screen.getByText('CHK-1')).toBeInTheDocument();
+    expect(container.querySelectorAll('td')).toHaveLength(10);
+  });
+
+  it('gates the phone card: the status pill', () => {
+    renderRow({ wrapped: true, hidden: new Set(['status']) });
+    expect(screen.queryByTitle('Click to cycle status')).not.toBeInTheDocument();
+    expect(screen.getByText('Coffee Co')).toBeInTheDocument();
+  });
+
+  it('gates the phone card: the attachment badge', () => {
+    renderRow({ wrapped: true, hidden: new Set(['attachments']) }, { attachmentCount: 2 });
+    expect(screen.queryByTestId('attachment-badge')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Click to cycle status')).toBeInTheDocument();
+  });
+
+  it('gates the phone card: the tags line', () => {
+    const { container } = renderRow({ wrapped: true, hidden: new Set(['tags']) }, { tags });
+    expect(screen.queryByText('work')).not.toBeInTheDocument();
+    // The card is back to two lines: no third `col-span-3` block after line 2.
+    const grid = container.querySelector('td > div')!;
+    expect(grid.querySelectorAll(':scope > .col-span-3')).toHaveLength(1);
+  });
+
+  it('keeps the card as it was with nothing hidden', () => {
+    const { container } = renderRow({ wrapped: true, hidden: new Set() }, { tags, attachmentCount: 2 });
+    expect(screen.getByText('work')).toBeInTheDocument();
+    expect(screen.getByTestId('attachment-badge')).toBeInTheDocument();
+    expect(screen.getByTitle('Click to cycle status')).toBeInTheDocument();
+    const grid = container.querySelector('td > div')!;
+    expect(grid.querySelectorAll(':scope > .col-span-3')).toHaveLength(2);
+  });
+});
