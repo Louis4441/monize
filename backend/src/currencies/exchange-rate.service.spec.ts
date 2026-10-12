@@ -1045,8 +1045,9 @@ describe("ExchangeRateService", () => {
       chain.dailySeries.mockResolvedValue(
         seriesAnswer([
           point("GBP", "USD", "2025-07-01", 1.25),
-          // The same day again, the other way round: one row, this value.
-          point("USD", "GBP", "2025-07-01", 0.8),
+          // The same day again, the other way round, at a rate whose
+          // reciprocal is not the first point's: one row, this value.
+          point("USD", "GBP", "2025-07-01", 0.79),
           point("GBP", "USD", "2025-07-02", 1.27),
         ]),
       );
@@ -1059,7 +1060,7 @@ describe("ExchangeRateService", () => {
           from: "GBP",
           to: "USD",
           date: "2025-07-01",
-          rate: roundFxRate(1 / 0.8),
+          rate: roundFxRate(1 / 0.79),
           source: YAHOO_SOURCE,
         },
         {

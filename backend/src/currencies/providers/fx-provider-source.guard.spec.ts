@@ -47,11 +47,61 @@ const ADAPTER_SOURCE_DECLARATION = /readonly\s+source\s*=\s*["']([\w-]+)["']/;
  * Comments blanked, line count preserved, so the prose above -- which has to
  * name the very slugs this scan looks for -- cannot trip it, and an offender
  * report still points at the right line.
+ *
+ * String-aware: a `//` inside a quoted string (a URL literal, say) is code,
+ * not a comment, so a slug later on the same line is still read. A regex
+ * literal containing `//` is read as a comment start, which can only hide an
+ * offender on that one line, never invent one.
  */
 export function stripComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-    .replace(/\/\/[^\n]*/g, "");
+  let out = "";
+  let state: "code" | "line" | "block" | "'" | '"' | "`" = "code";
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (state === "code") {
+      if (ch === "/" && next === "/") {
+        state = "line";
+        i++;
+        continue;
+      }
+      if (ch === "/" && next === "*") {
+        state = "block";
+        out += "  ";
+        i++;
+        continue;
+      }
+      if (ch === "'" || ch === '"' || ch === "`") state = ch;
+      out += ch;
+      continue;
+    }
+    if (state === "line") {
+      if (ch === "\n") {
+        state = "code";
+        out += ch;
+      }
+      continue;
+    }
+    if (state === "block") {
+      if (ch === "*" && next === "/") {
+        state = "code";
+        out += "  ";
+        i++;
+        continue;
+      }
+      out += ch === "\n" ? ch : " ";
+      continue;
+    }
+    // Inside a string: an escaped character never closes it.
+    if (ch === "\\" && next !== undefined) {
+      out += ch + next;
+      i++;
+      continue;
+    }
+    if (ch === state) state = "code";
+    out += ch;
+  }
+  return out;
 }
 
 function sourceFiles(dir: string): string[] {
@@ -217,5 +267,21 @@ describe("a stored exchange rate names its provider, and only the adapter knows 
     // Line numbers survive the blanking, so an offender report stays accurate.
     expect(stripped.split("\n")).toHaveLength(3);
     expect(stripComments("/* a\nb */\ncode").split("\n")).toHaveLength(3);
+  });
+
+  it("does not read a // inside a string as a comment", () => {
+    // A URL literal earlier on the line used to hide everything after it.
+    const line = `const u = "https://x.test/"; const s = "yahoo_finance";`;
+    const stripped = stripComments(line);
+
+    expect(stripped).toBe(line);
+    expect(SOURCE_LITERAL.test(stripped)).toBe(true);
+    // An escaped quote does not close the string either, and the real comment
+    // after the string is still blanked.
+    const escaped = `const q = "say \\"hi\\" // not a comment"; // 'frankfurter'`;
+    expect(stripComments(escaped)).toBe(
+      `const q = "say \\"hi\\" // not a comment"; `,
+    );
+    expect(SOURCE_LITERAL.test(stripComments(escaped))).toBe(false);
   });
 });
