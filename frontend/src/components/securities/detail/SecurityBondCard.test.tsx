@@ -1413,6 +1413,7 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
     saleWindow: { from: '2027-04-01', to: '2027-04-30' },
     periodMonths: 12,
     periodCount: 3,
+    lengthDays: null,
     rateRule: { type: 'FIXED', benchmarkId: null, annualRate: '0.0500', firstPeriodRate: null, addend: null, benchmarkFloor: null },
     capitalization: 'NONE',
     redemption: {
@@ -1545,6 +1546,51 @@ describe('SecurityBondCard: a program-linked security (spec bond-program-securit
     // The newest held series is the one bought last.
     expect(within(program).getByText('Terms of the newest series, TOS1130.')).toBeInTheDocument();
     expect(within(program).getByText('Fixed 4.4% for the whole term')).toBeInTheDocument();
+  });
+
+  it('reads the offer for the program\'s own country, and shows a day-counted term in days', async () => {
+    get.mockResolvedValue(
+      response({
+        program: {
+          id: 'prog-1',
+          programCode: 'RETAIL',
+          issuerCountryCode: 'US',
+          issuerCode: 'US_TREASURY',
+          currency: 'USD',
+        },
+      }),
+    );
+    getOffer.mockResolvedValue({
+      countryCode: 'US',
+      today: '2027-04-15',
+      series: [offerSeries({ periodMonths: 0, periodCount: 0, lengthDays: 28 })],
+    });
+    await mountCollapsed();
+    expect(getOffer).toHaveBeenCalledWith('US', []);
+    expect(getOffer).not.toHaveBeenCalledWith('PL', expect.anything());
+    const onSale = screen.getByRole('region', { name: 'On sale now' });
+    expect(within(onSale).getByText('28 days')).toBeInTheDocument();
+  });
+
+  it('shows a month-counted term in months', async () => {
+    getOffer.mockResolvedValue(offerOf([offerSeries()]));
+    await mountCollapsed();
+    const onSale = screen.getByRole('region', { name: 'On sale now' });
+    expect(within(onSale).getByText('36 months')).toBeInTheDocument();
+  });
+
+  it('says a discount bond\'s rule as a discount to face value', async () => {
+    getOffer.mockResolvedValue(
+      offerOf([
+        offerSeries({
+          lengthDays: 28,
+          rateRule: { type: 'ZERO_COUPON_DISCOUNT', benchmarkId: null, annualRate: null, firstPeriodRate: null, addend: null, benchmarkFloor: null },
+        }),
+      ]),
+    );
+    await mountCollapsed();
+    const onSale = screen.getByRole('region', { name: 'On sale now' });
+    expect(within(onSale).getByText('Discount to face value')).toBeInTheDocument();
   });
 
   it('lists only the series on sale of this program, with nothing to add', async () => {

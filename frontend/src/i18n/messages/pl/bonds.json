@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from} do {to}",
     "lengthValue": "{months, plural, one {# miesiąc} few {# miesiące} many {# miesięcy} other {# miesiąca}}",
+    "lengthDaysValue": "{days, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}}",
     "rule": {
       "fixed": "Stałe {rate} rocznie",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Dolna granica wskaźnika {floor}"
+      "floor": "Dolna granica wskaźnika {floor}",
+      "discount": "Dyskonto względem wartości nominalnej"
     },
     "capitalization": {
       "NONE": "Wypłacane w każdym okresie",

@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from} bis {to}",
     "lengthValue": "{months, plural, one {# Monat} other {# Monate}}",
+    "lengthDaysValue": "{days, plural, one {# Tag} other {# Tage}}",
     "rule": {
       "fixed": "Fest {rate} pro Jahr",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Untergrenze des Referenzwerts {floor}"
+      "floor": "Untergrenze des Referenzwerts {floor}",
+      "discount": "Abschlag auf den Nennwert"
     },
     "capitalization": {
       "NONE": "In jeder Periode ausgezahlt",

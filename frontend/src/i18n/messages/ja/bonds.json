@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from}から{to}まで",
     "lengthValue": "{months, plural, other {#か月}}",
+    "lengthDaysValue": "{days, plural, other {#日}}",
     "rule": {
       "fixed": "年{rate}の固定",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "指標の下限 {floor}"
+      "floor": "指標の下限 {floor}",
+      "discount": "額面からの割引"
     },
     "capitalization": {
       "NONE": "各期間に支払い",

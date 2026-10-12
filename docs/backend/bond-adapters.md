@@ -170,8 +170,6 @@ The adapter itself is the usual set: `adapters/us/` with its calendar, the bench
 
 Check each when a country is added; they are not guarded.
 
-- `frontend/src/lib/bond-offer.ts` `BOND_OFFER_COUNTRY` is `PL`, and the On sale card (`BondOfferTab`) and the Terms history tab (`BondHistoryBody`) request that country whatever the security's program is.
-- `frontend/src/lib/bond-series.ts` `BOND_PROGRAM_TENOR_MONTHS` and `expectedSeriesCode` are the Polish series-code grammar; the purchase form's "Fetch the series from the official source" action works only for a program listed there.
-- `frontend/src/types/bond.ts` `BondRateRule` has no `ZERO_COUPON_DISCOUNT`, `rateRuleLines` (`components/securities/detail/bond-labels.ts`) states no discount rule and the Breakdown card has no `weightings.bond.rateType` label for it.
+- `frontend/src/lib/bond-offer.ts` `BOND_OFFER_COUNTRY` (`PL`) is requested only by the Breakdown card and the Documents tab until the valuation names the program's own country; the On sale card, the Terms history tab and the program card read `issuerCountryCode`, and the purchase form's fetch action reads `GET /bonds/securities/:securityId/expected-series`, so no Polish series-code grammar is left in the client.
 - The program, issuer and benchmark names are labels in the frontend catalog; a code with no label is shown as the code.
 - The three crons run at fixed Europe/Warsaw times (`docs/cron-jobs.md`); each adapter's `timezone` decides its freshness, not the trigger time.

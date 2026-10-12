@@ -46,6 +46,12 @@ describe('rateRuleLines', () => {
     ...over,
   });
 
+  it('says a discount bond\'s rule as a discount, whatever else the rule carries', () => {
+    expect(
+      rateRuleLines(t, rule({ type: 'ZERO_COUPON_DISCOUNT', benchmarkId: null, addend: null }), pct),
+    ).toEqual(['bond.rate.rule.discount']);
+  });
+
   it('says a fixed rule as one sentence, and nothing for a fixed rule with no rate', () => {
     expect(rateRuleLines(t, rule({ type: 'FIXED', benchmarkId: null, annualRate: '0.0500', addend: null }), pct)).toEqual([
       'bond.rate.rule.fixed{"rate":"pct(0.0500)"}',

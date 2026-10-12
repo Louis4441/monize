@@ -7,11 +7,12 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select } from '@/components/ui/Select';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { baseInvestmentAction } from '@/lib/investment-actions';
-import { expectedSeriesCode, programSeries } from '@/lib/bond-series';
+import { programSeries } from '@/lib/bond-series';
 import { getErrorCode, getErrorMessage } from '@/lib/errors';
 import { investmentsApi } from '@/lib/investments';
 import type { InvestmentAction, Security } from '@/types/investment';
 import type {
+  BondExpectedSeries,
   BondInstrumentSummary,
   BondLotsRefusalCode,
   BondProgramSummary,
@@ -82,6 +83,11 @@ interface OnSaleData {
   onSale: BondSeriesOnSale | null;
 }
 
+interface ExpectedData {
+  key: string;
+  expected: BondExpectedSeries;
+}
+
 interface RemovalData {
   key: string;
   holdings: BondSeriesHolding[];
@@ -113,7 +119,7 @@ export interface BondSeriesOptions {
   retry: () => void;
   /** The series to offer to fetch: the date's code, when no stored series is on sale. */
   fetchCode: string | null;
-  /** The issuing country the fetch is addressed to. */
+  /** The issuing country the fetch is addressed to, as the server names it. */
   fetchCountryCode: string | null;
   /** Adds a just-fetched series to the list and re-reads the catalog. */
   addInstrument: (instrument: BondInstrumentSummary) => void;
@@ -147,6 +153,7 @@ export function useBondSeriesOptions(
 
   const [catalog, setCatalog] = useState<CatalogData | null>(null);
   const [onSaleData, setOnSaleData] = useState<OnSaleData | null>(null);
+  const [expectedData, setExpectedData] = useState<ExpectedData | null>(null);
   const [removal, setRemoval] = useState<RemovalData | null>(null);
   const [catalogFailedKey, setCatalogFailedKey] = useState<string | null>(null);
   const [removalFailedKey, setRemovalFailedKey] = useState<string | null>(null);
@@ -157,9 +164,12 @@ export function useBondSeriesOptions(
   const catalogKey = `${securityId}|${programId}`;
   // One request per (security, date); a fetched series re-asks.
   const onSaleKey = `${securityId}|${date}|${attempt}`;
+  // One request per (security, date); the server names the code, never this client.
+  const expectedKey = `${securityId}|${date}`;
   const removalKey = `${securityId}|${accountId ?? ''}|${date}|${excludeTransactionId ?? ''}|${storedInstrumentId ?? ''}`;
   const catalogActive = active && needsCatalog;
   const onSaleActive = active && kind === 'acquire' && validDate;
+  const expectedActive = onSaleActive;
   const removalActive = active && kind === 'remove' && validDate && !!accountId;
 
   useEffect(() => {
@@ -211,6 +221,24 @@ export function useBondSeriesOptions(
   }, [onSaleActive, onSaleKey, securityId, date]);
 
   useEffect(() => {
+    if (!expectedActive) return;
+    let cancelled = false;
+    investmentsApi
+      .getExpectedBondSeries(securityId as string, date)
+      .then((expected) => {
+        if (cancelled) return;
+        setExpectedData({ key: expectedKey, expected });
+      })
+      .catch(() => {
+        // No answer, no fetch action: a wrong code is never proposed. The
+        // answer kept belongs to another key and is not shown.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expectedActive, expectedKey, securityId, date]);
+
+  useEffect(() => {
     if (!removalActive) return;
     let cancelled = false;
     const storedCodeOf = async (): Promise<string | null> => {
@@ -260,14 +288,18 @@ export function useBondSeriesOptions(
   const onSale = onSaleData?.key === onSaleKey ? onSaleData : null;
   const rem = removal?.key === removalKey ? removal : null;
   // Only to propose which code to fetch; the value sent is never derived from it.
+  const expectedAnswer = expectedData?.key === expectedKey ? expectedData.expected : null;
   const expected =
-    kind === 'acquire' && cat?.program != null && validDate
-      ? expectedSeriesCode(cat.program.programCode, date)
+    kind === 'acquire' && expectedAnswer !== null && expectedAnswer.fetchable
+      ? expectedAnswer.seriesCode
       : null;
   const expectedStored =
     expected === null ? undefined : cat?.instruments.find((i) => i.seriesCode === expected);
   const noneOnSale = onSale !== null && onSale.onSale === null;
-  const fetchCode = noneOnSale && expected !== null && expectedStored === undefined ? expected : null;
+  const fetchCode =
+    noneOnSale && cat !== null && expected !== null && expectedStored === undefined
+      ? expected
+      : null;
 
   const options = useMemo(() => {
     if (kind === 'remove') {
@@ -334,7 +366,7 @@ export function useBondSeriesOptions(
       setAttempt((n) => n + 1);
     },
     fetchCode,
-    fetchCountryCode: cat?.program?.issuerCountryCode ?? null,
+    fetchCountryCode: expected === null ? null : (expectedAnswer?.countryCode ?? null),
     addInstrument: (instrument) => {
       // Shown at once, then the catalog and the date's series are re-read so
       // they are the server's.

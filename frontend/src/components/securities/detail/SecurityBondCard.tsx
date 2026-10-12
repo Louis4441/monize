@@ -498,6 +498,7 @@ export function SecurityBondCard({
               {t('bond.onSale.title')}
             </h3>
             <BondOfferTab
+              countryCode={latest.program.issuerCountryCode}
               programCode={latest.program.programCode}
               refreshVersion={refreshVersion}
             />

@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "स्थिर",
         "BENCHMARK_PLUS_SPREAD": "परिवर्तनशील (बेंचमार्क + स्प्रेड)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "मुद्रास्फीति-सूचकांकित (बेंचमार्क + मार्जिन)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "मुद्रास्फीति-सूचकांकित (बेंचमार्क + मार्जिन)",
+        "ZERO_COUPON_DISCOUNT": "जीरो-कूपन (छूट)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "पूरी अवधि के लिए स्थिर {rate}",
         "firstThen": "अवधि 1: {firstRate}। उसके बाद {benchmark} + {addend}",
         "every": "हर अवधि: {benchmark} + {addend}",
-        "floorZero": "{benchmark} का ऋणात्मक मान 0 गिना जाता है"
+        "floorZero": "{benchmark} का ऋणात्मक मान 0 गिना जाता है",
+        "discount": "अंकित मूल्य पर छूट"
       },
       "lotHeading": "{date} को खरीदा गया लॉट",
       "range": "{start} से {end}",

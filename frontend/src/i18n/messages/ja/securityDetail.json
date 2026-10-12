@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "固定",
         "BENCHMARK_PLUS_SPREAD": "変動(基準 + スプレッド)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "物価連動(基準 + マージン)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "物価連動(基準 + マージン)",
+        "ZERO_COUPON_DISCOUNT": "ゼロクーポン（割引）"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "全期間固定 {rate}",
         "firstThen": "第1期: {firstRate}。以降は {benchmark} + {addend}",
         "every": "毎期: {benchmark} + {addend}",
-        "floorZero": "{benchmark} がマイナスの場合は 0 として扱います"
+        "floorZero": "{benchmark} がマイナスの場合は 0 として扱います",
+        "discount": "額面からの割引"
       },
       "lotHeading": "{date} に購入したロット",
       "range": "{start} から {end}",

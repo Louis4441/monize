@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "고정",
         "BENCHMARK_PLUS_SPREAD": "변동(기준 + 스프레드)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "물가연동(기준 + 마진)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "물가연동(기준 + 마진)",
+        "ZERO_COUPON_DISCOUNT": "제로쿠폰(할인)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "전체 기간 동안 고정 {rate}",
         "firstThen": "1회차: {firstRate}. 이후 {benchmark} + {addend}",
         "every": "매 회차: {benchmark} + {addend}",
-        "floorZero": "{benchmark}가 음수이면 0으로 계산합니다"
+        "floorZero": "{benchmark}가 음수이면 0으로 계산합니다",
+        "discount": "액면가 대비 할인"
       },
       "lotHeading": "{date}에 매수한 로트",
       "range": "{start}부터 {end}까지",

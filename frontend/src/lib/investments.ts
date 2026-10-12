@@ -43,6 +43,7 @@ import type {
   BondProgramSummary,
   BondRedemptionSplit,
   BondSeriesHoldings,
+  BondExpectedSeries,
   BondSeriesOnSale,
   FetchBondSeriesResult,
   BondAssumption,
@@ -1051,6 +1052,19 @@ export const investmentsApi = {
       { params: { date } },
     );
     return response.data ?? null;
+  },
+
+  // The series code a purchase on `date` would carry, by the grammar of the
+  // security's program's country; nothing is fetched or stored.
+  getExpectedBondSeries: async (
+    securityId: string,
+    date: string,
+  ): Promise<BondExpectedSeries> => {
+    const response = await apiClient.get<BondExpectedSeries>(
+      `/bonds/securities/${securityId}/expected-series`,
+      { params: { date } },
+    );
+    return response.data;
   },
 
   // What redeeming `quantity` bonds of a series out of an account on `date` pays,

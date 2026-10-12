@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from} tot {to}",
     "lengthValue": "{months, plural, one {# maand} other {# maanden}}",
+    "lengthDaysValue": "{days, plural, one {# dag} other {# dagen}}",
     "rule": {
       "fixed": "Vast {rate} per jaar",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Ondergrens van de referentie {floor}"
+      "floor": "Ondergrens van de referentie {floor}",
+      "discount": "Korting op de nominale waarde"
     },
     "capitalization": {
       "NONE": "Elke periode uitgekeerd",

@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "С {from} по {to}",
     "lengthValue": "{months, plural, one {# месяц} few {# месяца} many {# месяцев} other {# месяца}}",
+    "lengthDaysValue": "{days, plural, one {# день} few {# дня} many {# дней} other {# дня}}",
     "rule": {
       "fixed": "Фиксированная {rate} годовых",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Нижний предел показателя {floor}"
+      "floor": "Нижний предел показателя {floor}",
+      "discount": "Дисконт к номинальной стоимости"
     },
     "capitalization": {
       "NONE": "Выплачиваются в каждом периоде",

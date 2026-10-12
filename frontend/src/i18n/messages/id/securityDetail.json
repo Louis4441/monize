@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Tetap",
         "BENCHMARK_PLUS_SPREAD": "Mengambang (acuan + selisih)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Terindeks inflasi (acuan + margin)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Terindeks inflasi (acuan + margin)",
+        "ZERO_COUPON_DISCOUNT": "Kupon nol (diskon)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "Tetap {rate} selama seluruh masa berlaku",
         "firstThen": "Periode 1: {firstRate}. Setelah itu {benchmark} + {addend}",
         "every": "Setiap periode: {benchmark} + {addend}",
-        "floorZero": "Nilai {benchmark} yang negatif dihitung sebagai 0"
+        "floorZero": "Nilai {benchmark} yang negatif dihitung sebagai 0",
+        "discount": "Diskon dari nilai nominal"
       },
       "lotHeading": "Lot dibeli pada {date}",
       "range": "{start} sampai {end}",

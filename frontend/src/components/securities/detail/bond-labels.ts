@@ -42,6 +42,7 @@ export function rateRuleLines(
   rule: BondRateRule,
   pct: (fraction: string) => string,
 ): string[] {
+  if (rule.type === 'ZERO_COUPON_DISCOUNT') return [t('bond.rate.rule.discount')];
   if (rule.type === 'FIXED') {
     return rule.annualRate === null
       ? []

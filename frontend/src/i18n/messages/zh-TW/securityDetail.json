@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "固定",
         "BENCHMARK_PLUS_SPREAD": "浮動(基準 + 利差)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "通膨連動(基準 + 加碼)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "通膨連動(基準 + 加碼)",
+        "ZERO_COUPON_DISCOUNT": "零息（折價）"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "整個期間固定 {rate}",
         "firstThen": "第 1 期：{firstRate}。之後為 {benchmark} + {addend}",
         "every": "每期：{benchmark} + {addend}",
-        "floorZero": "{benchmark} 為負數時以 0 計算"
+        "floorZero": "{benchmark} 為負數時以 0 計算",
+        "discount": "相對面值的折價"
       },
       "lotHeading": "{date} 購入的部位",
       "range": "{start} 至 {end}",

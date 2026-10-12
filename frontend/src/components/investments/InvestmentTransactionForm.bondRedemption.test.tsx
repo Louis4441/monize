@@ -40,6 +40,7 @@ vi.mock('@/lib/investments', () => ({
     listBondInstruments: vi.fn(),
     fetchBondSeries: vi.fn(),
     getBondSeriesOnSale: vi.fn(),
+    getExpectedBondSeries: vi.fn(),
     getBondSeriesHoldings: vi.fn(),
     getBondRedemptionSplit: vi.fn(),
   },
@@ -153,6 +154,7 @@ beforeEach(() => {
   api.listBondPrograms.mockResolvedValue(programs);
   api.listBondInstruments.mockResolvedValue(instruments);
   api.getBondSeriesOnSale.mockResolvedValue({ instrumentId: 'i-1036', seriesCode: 'EDO1036' });
+  api.getExpectedBondSeries.mockResolvedValue({ seriesCode: 'EDO1036', countryCode: 'PL', fetchable: true });
   api.getBondSeriesHoldings.mockResolvedValue({
     holdings: [held('i-0936', 'EDO0936', 5), held('i-1036', 'EDO1036', 25)],
   });

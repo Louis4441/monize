@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Fixa",
         "BENCHMARK_PLUS_SPREAD": "Variável (referência + spread)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Indexada à inflação (referência + margem)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Indexada à inflação (referência + margem)",
+        "ZERO_COUPON_DISCOUNT": "Cupom zero (desconto)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "{rate} fixa durante todo o prazo",
         "firstThen": "Período 1: {firstRate}. Depois {benchmark} + {addend}",
         "every": "Cada período: {benchmark} + {addend}",
-        "floorZero": "Um valor negativo de {benchmark} conta como 0"
+        "floorZero": "Um valor negativo de {benchmark} conta como 0",
+        "discount": "Desconto sobre o valor de face"
       },
       "lotHeading": "Lote comprado em {date}",
       "range": "{start} a {end}",

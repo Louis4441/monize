@@ -37,6 +37,7 @@ vi.mock('@/lib/investments', () => ({
     listBondInstruments: vi.fn(),
     fetchBondSeries: vi.fn(),
     getBondSeriesOnSale: vi.fn(),
+    getExpectedBondSeries: vi.fn(),
     getBondSeriesHoldings: vi.fn(),
   },
 }));
@@ -129,6 +130,12 @@ beforeEach(() => {
       ? { instrumentId: 'i-tos', seriesCode: 'TOS1029' }
       : { instrumentId: 'i-1036', seriesCode: 'EDO1036' };
   });
+  // The code the server's grammar names: the series maturing a decade on, fetchable.
+  api.getExpectedBondSeries.mockImplementation(async (_securityId: string, date: string) => ({
+    seriesCode: date === '2026-11-05' ? 'EDO1136' : 'EDO1036',
+    countryCode: 'PL',
+    fetchable: true,
+  }));
   api.getBondSeriesHoldings.mockResolvedValue({
     holdings: [held('i-0936', 'EDO0936', 5), held('i-1036', 'EDO1036', 25)],
   });
@@ -261,7 +268,8 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       expect(optionLabels(select)).toContain(fetchLabel);
     });
 
-    it('offers no fetch for a program whose series codes it cannot derive', async () => {
+    it('offers no fetch when the server names no series code', async () => {
+      api.getExpectedBondSeries.mockResolvedValue({ seriesCode: null, countryCode: 'PL', fetchable: false });
       api.listBondPrograms.mockResolvedValue([{ ...programs[0], programCode: 'ZZZ' }]);
       api.listBondInstruments.mockResolvedValue([inst('i-z', 'ZZZ0136', 'ZZZ')]);
       await openForm({ defaultDate: '2026-11-05' });
@@ -269,7 +277,42 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       const select = await seriesSelect();
       await waitFor(() => expect(optionLabels(select)).toContain('ZZZ0136'));
       await waitFor(() => expect(optionLabels(select)).toContain('No series on sale on this date'));
+      await waitFor(() => expect(api.getExpectedBondSeries).toHaveBeenCalledWith('sec-edo', '2026-11-05'));
       expect(optionLabels(select).some((l) => /Fetch/.test(l ?? ''))).toBe(false);
+    });
+
+    it('offers no fetch when the country cannot fetch the named series', async () => {
+      api.getExpectedBondSeries.mockResolvedValue({ seriesCode: 'EDO1136', countryCode: 'PL', fetchable: false });
+      await openForm({ defaultDate: '2026-11-05' });
+      await pickSecurity('sec-edo');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toContain('No series on sale on this date'));
+      await waitFor(() => expect(api.getExpectedBondSeries).toHaveBeenCalled());
+      expect(optionLabels(select).some((l) => /Fetch/.test(l ?? ''))).toBe(false);
+    });
+
+    it('offers no fetch, rather than a guessed code, when the expected series could not be read', async () => {
+      api.getExpectedBondSeries.mockRejectedValue(new Error('down'));
+      await openForm({ defaultDate: '2026-11-05' });
+      await pickSecurity('sec-edo');
+      const select = await seriesSelect();
+      await waitFor(() => expect(optionLabels(select)).toContain('No series on sale on this date'));
+      await waitFor(() => expect(api.getExpectedBondSeries).toHaveBeenCalled());
+      expect(optionLabels(select).some((l) => /Fetch/.test(l ?? ''))).toBe(false);
+    });
+
+    it('fetches with the country the server names, not a fixed one', async () => {
+      api.getExpectedBondSeries.mockResolvedValue({ seriesCode: 'EDO1136', countryCode: 'US', fetchable: true });
+      api.fetchBondSeries.mockResolvedValue({ ...inst('i-1136', 'EDO1136'), created: true } as any);
+      await openForm({ defaultDate: '2026-11-05' });
+      await pickSecurity('sec-edo');
+      const select = await seriesSelect();
+      const fetchLabel = 'Fetch EDO1136 from the official source';
+      await waitFor(() => expect(optionLabels(select)).toContain(fetchLabel));
+      await act(async () => {
+        fireEvent.change(select, { target: { value: within(select).getByText(fetchLabel).getAttribute('value') } });
+      });
+      expect(api.fetchBondSeries).toHaveBeenCalledWith('US', 'EDO1136');
     });
 
     it('keeps the generic default when the date\'s series could not be read, and sends null', async () => {

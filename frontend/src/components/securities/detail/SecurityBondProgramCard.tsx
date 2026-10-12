@@ -7,7 +7,6 @@ import { Card } from '@/components/ui/Card';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
-import { BOND_OFFER_COUNTRY } from '@/lib/bond-offer';
 import { programFacts, type HeldSeries } from '@/lib/bond-series';
 import { getErrorMessage } from '@/lib/errors';
 import { investmentsApi } from '@/lib/investments';
@@ -18,8 +17,8 @@ import { rateRuleLines } from './bond-labels';
 interface SecurityBondProgramCardProps {
   security: Security;
   programCode: string;
-  /** The country the program is offered in; the catalog's one country when unknown. */
-  countryCode?: string;
+  /** The issuing country of the program. */
+  countryCode: string;
   /** The series the reader holds, the fallback source of the terms. */
   held: HeldSeries[];
   /** The switch as the server last reported it. */
@@ -40,7 +39,7 @@ interface SecurityBondProgramCardProps {
 export function SecurityBondProgramCard({
   security,
   programCode,
-  countryCode = BOND_OFFER_COUNTRY,
+  countryCode,
   held,
   autoFetch,
   refreshVersion = 0,

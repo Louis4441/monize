@@ -24,13 +24,12 @@ import { useReportData } from '@/hooks/useReportData';
 import { CHART_SERIES, chartColors } from '@/lib/chart-colors';
 import { getErrorMessage } from '@/lib/errors';
 import { investmentsApi } from '@/lib/investments';
-import {
-  BOND_OFFER_COUNTRY,
-  buildHistoryPoints,
-} from '@/lib/bond-offer';
+import { buildHistoryPoints } from '@/lib/bond-offer';
 import type { BondHistory } from '@/types/bond';
 
 interface BondHistoryBodyProps {
+  /** The issuing country of the bond's program; the history is read for it. */
+  countryCode: string;
   program: string;
   /** The currency the product issues in; null when the catalog does not say. */
   currency: string | null;
@@ -48,15 +47,21 @@ interface BondHistoryBodyProps {
  * every stored series. Used by the page of a program-linked security, with the
  * product fixed and the series held marked.
  */
-export function BondHistoryBody({ program, currency, heldSeries = [], refreshVersion = 0 }: BondHistoryBodyProps) {
+export function BondHistoryBody({
+  countryCode,
+  program,
+  currency,
+  heldSeries = [],
+  refreshVersion = 0,
+}: BondHistoryBodyProps) {
   const t = useTranslations('bonds');
   const formatChartMonth = useChartMonthFormat();
   const { formatCurrency, formatCurrencyAxis, formatNumber, formatPercentTrimmed } =
     useNumberFormat();
 
-  const requestKey = `${BOND_OFFER_COUNTRY}|${program}`;
+  const requestKey = `${countryCode}|${program}`;
   const history = useReportData<BondHistory>(
-    () => investmentsApi.getBondHistory(BOND_OFFER_COUNTRY, program),
+    () => investmentsApi.getBondHistory(countryCode, program),
     [requestKey, refreshVersion],
     { requestKey },
   );

@@ -125,6 +125,7 @@ const offerSeries = {
   saleWindow: { from: '2027-04-01', to: '2027-04-30' },
   periodMonths: 12,
   periodCount: 10,
+  lengthDays: null,
   rateRule: {
     type: 'INFLATION_PLUS_MARGIN_AS_RATE',
     benchmarkId: 'PL_CPI_GUS_YOY',
@@ -231,6 +232,29 @@ describe('SecurityBondBreakdownCard', () => {
     expect(screen.getByText('Interest')).toBeInTheDocument();
     expect(screen.getByText('Compounded at each period end, period: 12 months')).toBeInTheDocument();
     expect(screen.getByText('120 months')).toBeInTheDocument();
+  });
+
+  it('labels a zero-coupon discount rule and says it as a discount to face value', async () => {
+    getOffer.mockResolvedValue({
+      countryCode: 'PL',
+      today: '2027-04-15',
+      series: [
+        {
+          ...offerSeries,
+          rateRule: {
+            type: 'ZERO_COUPON_DISCOUNT',
+            benchmarkId: null,
+            annualRate: null,
+            firstPeriodRate: null,
+            addend: null,
+            benchmarkFloor: null,
+          },
+        } as OfferSeries,
+      ],
+    });
+    await mount();
+    expect(screen.getByText('Zero-coupon (discount)')).toBeInTheDocument();
+    expect(screen.getByText('Discount to face value')).toBeInTheDocument();
   });
 
   it('says so, and still shows the facts, when no series is held', async () => {

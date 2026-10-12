@@ -102,7 +102,11 @@ export interface BondCurrentPeriod {
 
 /** The terms' rate rule as stated; every rate is a fraction string. */
 export interface BondRateRule {
-  type: 'FIXED' | 'BENCHMARK_PLUS_SPREAD' | 'INFLATION_PLUS_MARGIN_AS_RATE';
+  type:
+    | 'FIXED'
+    | 'BENCHMARK_PLUS_SPREAD'
+    | 'INFLATION_PLUS_MARGIN_AS_RATE'
+    | 'ZERO_COUPON_DISCOUNT';
   benchmarkId: string | null;
   /** FIXED only. */
   annualRate: string | null;
@@ -314,6 +318,15 @@ export interface SecurityBondValuation {
   benchmarkCoverage?: BondBenchmarkCoverage[];
 }
 
+/** `GET /bonds/securities/:securityId/expected-series`: the code a purchase on the date would carry, by the program's country's grammar. */
+export interface BondExpectedSeries {
+  /** Null when the adapter cannot name one. */
+  seriesCode: string | null;
+  countryCode: string;
+  /** True when the country can fetch a series from its official source. */
+  fetchable: boolean;
+}
+
 /** `GET /bonds/securities/:securityId/series-on-sale`: the series the server infers for a BUY/REINVEST on the date; null when none is stored. */
 export interface BondSeriesOnSale {
   instrumentId: string;
@@ -415,6 +428,8 @@ export interface OfferSeries {
   saleWindow: { from: string; to: string };
   periodMonths: number;
   periodCount: number;
+  /** Term in days for a bond whose schedule is dated from the issue; null when it is counted in months. */
+  lengthDays: number | null;
   rateRule: BondRateRule;
   capitalization: 'NONE' | 'COMPOUND_AT_PERIOD_END';
   redemption: BondRedemptionTerms | null;

@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Stałe",
         "BENCHMARK_PLUS_SPREAD": "Zmienne (wskaźnik + marża)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Indeksowane inflacją (wskaźnik + marża)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Indeksowane inflacją (wskaźnik + marża)",
+        "ZERO_COUPON_DISCOUNT": "Zerokuponowe (dyskontowe)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "Stałe {rate} przez cały okres",
         "firstThen": "Okres 1: {firstRate}. Następnie {benchmark} + marża {addend}",
         "every": "Każdy okres: {benchmark} + marża {addend}",
-        "floorZero": "Ujemna wartość wskaźnika „{benchmark}” jest liczona jako 0"
+        "floorZero": "Ujemna wartość wskaźnika „{benchmark}” jest liczona jako 0",
+        "discount": "Dyskonto względem wartości nominalnej"
       },
       "lotHeading": "Partia kupiona {date}",
       "range": "{start} do {end}",

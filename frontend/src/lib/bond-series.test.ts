@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  BOND_PROGRAM_TENOR_MONTHS,
-  expectedSeriesCode,
   groupLotsBySeries,
   programFacts,
   programSeries,
@@ -14,45 +12,6 @@ import type {
   OfferSeries,
   SecurityBondValuation,
 } from '@/types/bond';
-
-describe('expectedSeriesCode', () => {
-  it('names the program, then the month and year of the MATURITY', () => {
-    expect(expectedSeriesCode('EDO', '2026-10-12')).toBe('EDO1036');
-    expect(expectedSeriesCode('EDO', '2026-11-30')).toBe('EDO1136');
-    expect(expectedSeriesCode('TOS', '2026-10-01')).toBe('TOS1029');
-    expect(expectedSeriesCode('COI', '2026-01-15')).toBe('COI0130');
-  });
-
-  it('rolls the year over for a short tenor', () => {
-    expect(expectedSeriesCode('OTS', '2026-10-12')).toBe('OTS0127');
-    expect(expectedSeriesCode('ROR', '2026-12-31')).toBe('ROR1227');
-    expect(expectedSeriesCode('DOR', '2026-12-31')).toBe('DOR1228');
-  });
-
-  it('keeps a two-digit year across the century', () => {
-    expect(expectedSeriesCode('EDO', '2095-06-01')).toBe('EDO0605');
-  });
-
-  it('knows the tenor of every Polish retail program', () => {
-    expect(BOND_PROGRAM_TENOR_MONTHS).toEqual({
-      OTS: 3,
-      ROR: 12,
-      DOR: 24,
-      TOS: 36,
-      COI: 48,
-      EDO: 120,
-      ROS: 72,
-      ROD: 144,
-    });
-  });
-
-  it('is null for an unknown program or something that is not a calendar date', () => {
-    expect(expectedSeriesCode('XYZ', '2026-10-12')).toBeNull();
-    expect(expectedSeriesCode('EDO', '')).toBeNull();
-    expect(expectedSeriesCode('EDO', '2026-13-01')).toBeNull();
-    expect(expectedSeriesCode('EDO', '12/10/2026')).toBeNull();
-  });
-});
 
 const inst = (
   id: string,
@@ -226,6 +185,7 @@ describe('programFacts', () => {
     saleWindow: { from: '2026-10-01', to: '2026-10-31' },
     periodMonths: 12,
     periodCount: 10,
+    lengthDays: null,
     rateRule: { type: 'INFLATION_PLUS_MARGIN_AS_RATE', benchmarkId: 'CPI', annualRate: null, firstPeriodRate: '0.0560', addend: '0.0200', benchmarkFloor: '0' },
     capitalization: 'COMPOUND_AT_PERIOD_END',
     redemption: {

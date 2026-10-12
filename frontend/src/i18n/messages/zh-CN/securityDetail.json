@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "固定",
         "BENCHMARK_PLUS_SPREAD": "浮动(基准 + 利差)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "通胀挂钩(基准 + 加点)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "通胀挂钩(基准 + 加点)",
+        "ZERO_COUPON_DISCOUNT": "零息（折价）"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "整个期限内固定 {rate}",
         "firstThen": "第 1 期：{firstRate}。之后为 {benchmark} + {addend}",
         "every": "每期：{benchmark} + {addend}",
-        "floorZero": "{benchmark} 为负数时按 0 计算"
+        "floorZero": "{benchmark} 为负数时按 0 计算",
+        "discount": "相对面值的折价"
       },
       "lotHeading": "{date} 购入的份额",
       "range": "{start} 至 {end}",

@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Cố định",
         "BENCHMARK_PLUS_SPREAD": "Thả nổi (chuẩn + biên độ)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Gắn với lạm phát (chuẩn + biên)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Gắn với lạm phát (chuẩn + biên)",
+        "ZERO_COUPON_DISCOUNT": "Không phiếu lãi (chiết khấu)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "Cố định {rate} trong toàn bộ kỳ hạn",
         "firstThen": "Kỳ 1: {firstRate}. Sau đó {benchmark} + {addend}",
         "every": "Mỗi kỳ: {benchmark} + {addend}",
-        "floorZero": "Giá trị âm của {benchmark} được tính là 0"
+        "floorZero": "Giá trị âm của {benchmark} được tính là 0",
+        "discount": "Chiết khấu so với mệnh giá"
       },
       "lotHeading": "Lô mua ngày {date}",
       "range": "{start} đến {end}",

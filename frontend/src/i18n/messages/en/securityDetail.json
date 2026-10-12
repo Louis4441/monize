@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Fixed",
         "BENCHMARK_PLUS_SPREAD": "Floating (benchmark + spread)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Inflation-indexed (benchmark + margin)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Inflation-indexed (benchmark + margin)",
+        "ZERO_COUPON_DISCOUNT": "Zero-coupon (discount)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "Fixed {rate} for the whole term",
         "firstThen": "Period 1: {firstRate}. Then {benchmark} + {addend}",
         "every": "Every period: {benchmark} + {addend}",
-        "floorZero": "A negative {benchmark} counts as 0"
+        "floorZero": "A negative {benchmark} counts as 0",
+        "discount": "Discount to face value"
       },
       "lotHeading": "Lot purchased {date}",
       "range": "{start} to {end}",

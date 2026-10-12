@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "З {from} по {to}",
     "lengthValue": "{months, plural, one {# місяць} few {# місяці} many {# місяців} other {# місяця}}",
+    "lengthDaysValue": "{days, plural, one {# день} few {# дні} many {# днів} other {# дня}}",
     "rule": {
       "fixed": "Фіксована {rate} річних",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Нижня межа показника {floor}"
+      "floor": "Нижня межа показника {floor}",
+      "discount": "Дисконт до номінальної вартості"
     },
     "capitalization": {
       "NONE": "Виплачуються в кожному періоді",

@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Фіксована",
         "BENCHMARK_PLUS_SPREAD": "Плаваюча (базовий показник + спред)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Індексована за інфляцією (базовий показник + маржа)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Індексована за інфляцією (базовий показник + маржа)",
+        "ZERO_COUPON_DISCOUNT": "Безкупонна (дисконтна)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "Фіксована {rate} на весь строк",
         "firstThen": "Період 1: {firstRate}. Далі {benchmark} + {addend}",
         "every": "Кожен період: {benchmark} + {addend}",
-        "floorZero": "Від’ємне значення {benchmark} вважається за 0"
+        "floorZero": "Від’ємне значення {benchmark} вважається за 0",
+        "discount": "Дисконт до номінальної вартості"
       },
       "lotHeading": "Лот, придбаний {date}",
       "range": "з {start} по {end}",

@@ -1,7 +1,11 @@
 import { percentToFraction } from '@/components/securities/detail/SecurityBondScenarioPanel';
 import type { BondAssumption, HistorySeries, OfferSeries } from '@/types/bond';
 
-/** The one issuing country the catalog is read for (spec `bond-offer-and-history.md` 5). */
+/**
+ * The country requested only while a security's valuation, which names its
+ * program's own country, has not arrived. A bond's offer and history always ask
+ * for the program's `issuerCountryCode`.
+ */
 export const BOND_OFFER_COUNTRY = 'PL';
 
 /** The bounds, in percent, an assumed benchmark value may take; the server's own. */
@@ -14,6 +18,16 @@ export type OfferSortDirection = 'asc' | 'desc';
 /** Length of the term in months: period length times the number of periods. */
 export function offerLengthMonths(series: OfferSeries): number {
   return series.periodMonths * series.periodCount;
+}
+
+/** Days in an average month, to put a term counted in days beside one counted in months. */
+const DAYS_PER_MONTH = 365 / 12;
+
+/** The term in months for ordering, from the days when the series is counted in days. */
+function offerLengthForSort(series: OfferSeries): number {
+  return series.lengthDays !== null
+    ? series.lengthDays / DAYS_PER_MONTH
+    : offerLengthMonths(series);
 }
 
 /**
@@ -31,7 +45,7 @@ function sortValue(series: OfferSeries, field: OfferSortField): number | null {
         ? null
         : Number(series.projection.annualizedReturn);
     case 'length':
-      return offerLengthMonths(series);
+      return offerLengthForSort(series);
     case 'firstPeriodRate': {
       const rate = offerFirstPeriodRate(series);
       return rate === null ? null : Number(rate);

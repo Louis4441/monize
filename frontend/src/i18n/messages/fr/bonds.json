@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "Du {from} au {to}",
     "lengthValue": "{months, plural, one {# mois} other {# mois}}",
+    "lengthDaysValue": "{days, plural, one {# jour} other {# jours}}",
     "rule": {
       "fixed": "Fixe {rate} par an",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Plancher de la référence {floor}"
+      "floor": "Plancher de la référence {floor}",
+      "discount": "Décote par rapport à la valeur nominale"
     },
     "capitalization": {
       "NONE": "Versés à chaque période",

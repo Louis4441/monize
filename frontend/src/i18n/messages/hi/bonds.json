@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from} से {to} तक",
     "lengthValue": "{months, plural, one {# महीना} other {# महीने}}",
+    "lengthDaysValue": "{days, plural, one {# दिन} other {# दिन}}",
     "rule": {
       "fixed": "स्थिर {rate} प्रति वर्ष",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "बेंचमार्क की न्यूनतम सीमा {floor}"
+      "floor": "बेंचमार्क की न्यूनतम सीमा {floor}",
+      "discount": "अंकित मूल्य पर छूट"
     },
     "capitalization": {
       "NONE": "हर अवधि में भुगतान",

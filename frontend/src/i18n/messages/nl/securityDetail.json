@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Vast",
         "BENCHMARK_PLUS_SPREAD": "Variabel (referentie + opslag)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Inflatiegekoppeld (referentie + marge)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Inflatiegekoppeld (referentie + marge)",
+        "ZERO_COUPON_DISCOUNT": "Nulcoupon (disconto)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "Vast {rate} voor de hele looptijd",
         "firstThen": "Periode 1: {firstRate}. Daarna {benchmark} + {addend}",
         "every": "Elke periode: {benchmark} + {addend}",
-        "floorZero": "Een negatieve waarde van {benchmark} telt als 0"
+        "floorZero": "Een negatieve waarde van {benchmark} telt als 0",
+        "discount": "Korting op de nominale waarde"
       },
       "lotHeading": "Lot gekocht op {date}",
       "range": "{start} tot {end}",

@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from} ile {to} arası",
     "lengthValue": "{months, plural, one {# ay} other {# ay}}",
+    "lengthDaysValue": "{days, plural, one {# gün} other {# gün}}",
     "rule": {
       "fixed": "Yıllık sabit {rate}",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Gösterge tabanı {floor}"
+      "floor": "Gösterge tabanı {floor}",
+      "discount": "Nominal değerden iskonto"
     },
     "capitalization": {
       "NONE": "Her dönem ödenir",

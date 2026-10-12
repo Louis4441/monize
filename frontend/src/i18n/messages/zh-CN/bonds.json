@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from}至{to}",
     "lengthValue": "{months, plural, other {#个月}}",
+    "lengthDaysValue": "{days, plural, other {#天}}",
     "rule": {
       "fixed": "固定年利率 {rate}",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "基准下限 {floor}"
+      "floor": "基准下限 {floor}",
+      "discount": "相对面值的折价"
     },
     "capitalization": {
       "NONE": "每期支付",

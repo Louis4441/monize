@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "[XX-{from} to {to}-XX]",
     "lengthValue": "[XX-{months, plural, one {# month} other {# months}}-XX]",
+    "lengthDaysValue": "[XX-{days, plural, one {# day} other {# days}}-XX]",
     "rule": {
       "fixed": "[XX-Fixed {rate} a year-XX]",
       "benchmark": "[XX-{benchmark} + {addend}-XX]",
-      "floor": "[XX-Benchmark floor {floor}-XX]"
+      "floor": "[XX-Benchmark floor {floor}-XX]",
+      "discount": "[XX-Discount to face value-XX]"
     },
     "capitalization": {
       "NONE": "[XX-Paid out each period-XX]",

@@ -108,6 +108,16 @@ describe('SecurityBondTermsTab', () => {
     expect(within(region).getByRole('button', { name: /2025/ })).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('reads the history for the program\'s own country', async () => {
+    getValuation.mockResolvedValue({
+      ...valuation,
+      program: { ...valuation.program, issuerCountryCode: 'US' },
+    });
+    await mount();
+    expect(getHistory).toHaveBeenCalledWith('US', 'RETAIL');
+    expect(getHistory).not.toHaveBeenCalledWith('PL', expect.anything());
+  });
+
   it('marks the series the reader holds', async () => {
     await mount();
     const dots = screen.getAllByTestId('held-dot');

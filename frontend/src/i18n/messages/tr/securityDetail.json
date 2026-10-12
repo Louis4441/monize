@@ -181,7 +181,8 @@
       "rateType": {
         "FIXED": "Sabit",
         "BENCHMARK_PLUS_SPREAD": "Değişken (gösterge + marj)",
-        "INFLATION_PLUS_MARGIN_AS_RATE": "Enflasyona endeksli (gösterge + marj)"
+        "INFLATION_PLUS_MARGIN_AS_RATE": "Enflasyona endeksli (gösterge + marj)",
+        "ZERO_COUPON_DISCOUNT": "Sıfır kuponlu (iskontolu)"
       }
     }
   },
@@ -363,7 +364,8 @@
         "fixed": "Tüm vade boyunca sabit {rate}",
         "firstThen": "Dönem 1: {firstRate}. Sonrasında {benchmark} + {addend}",
         "every": "Her dönem: {benchmark} + {addend}",
-        "floorZero": "{benchmark} değeri negatifse 0 sayılır"
+        "floorZero": "{benchmark} değeri negatifse 0 sayılır",
+        "discount": "Nominal değerden iskonto"
       },
       "lotHeading": "{date} tarihinde alınan lot",
       "range": "{start} - {end}",

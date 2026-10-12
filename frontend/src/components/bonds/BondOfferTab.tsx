@@ -19,7 +19,6 @@ import { investmentsApi } from '@/lib/investments';
 import {
   ASSUMPTION_MAX_PERCENT,
   ASSUMPTION_MIN_PERCENT,
-  BOND_OFFER_COUNTRY,
   buildAssumptions,
   fractionToPercent,
   isHttpUrl,
@@ -33,6 +32,8 @@ import {
 import type { BondOffer, OfferSeries } from '@/types/bond';
 
 interface BondOfferTabProps {
+  /** The issuing country of the bond's program; the offer is read for it. */
+  countryCode: string;
   /** Only the series of this program are listed; every program when omitted. */
   programCode?: string;
   /** Bumped by the page when a price refresh completes: re-reads in place. */
@@ -60,7 +61,7 @@ const ASSUMPTION_DEBOUNCE_MS = 500;
  * assumption wears the "Projected" badge; one the engine cannot value is
  * unknown, with the reason beside it, never a zero.
  */
-export function BondOfferTab({ programCode, refreshVersion = 0 }: BondOfferTabProps) {
+export function BondOfferTab({ countryCode, programCode, refreshVersion = 0 }: BondOfferTabProps) {
   const t = useTranslations('bonds');
   const tSec = useTranslations('securityDetail');
   const { formatDate, formatMonth } = useDateFormat();
@@ -82,11 +83,11 @@ export function BondOfferTab({ programCode, refreshVersion = 0 }: BondOfferTabPr
   const wanted = useMemo(() => buildAssumptions(typed), [typed]);
   const keyOf = (list: ReadonlyArray<{ benchmarkId: string; value: string }>) =>
     list.map((a) => `${a.benchmarkId}:${a.value}`).join(',');
-  const requestKey = `${BOND_OFFER_COUNTRY}|${keyOf(sent)}`;
+  const requestKey = `${countryCode}|${keyOf(sent)}`;
   const isPending = keyOf(wanted) !== keyOf(sent);
 
   const { data, dataKey, isLoading, error, reload } = useReportData<BondOffer>(
-    () => investmentsApi.getBondOffer(BOND_OFFER_COUNTRY, sent),
+    () => investmentsApi.getBondOffer(countryCode, sent),
     [requestKey, refreshVersion],
     { requestKey },
   );
@@ -160,6 +161,7 @@ export function BondOfferTab({ programCode, refreshVersion = 0 }: BondOfferTabPr
 
   const renderRule = (series: OfferSeries): ReactNode => {
     const { rateRule } = series;
+    if (rateRule.type === 'ZERO_COUPON_DISCOUNT') return t('offer.rule.discount');
     if (rateRule.type === 'FIXED') {
       return rateRule.annualRate === null
         ? unknown
@@ -353,7 +355,9 @@ export function BondOfferTab({ programCode, refreshVersion = 0 }: BondOfferTabPr
                   })}
                 </Td>
                 <Td className="whitespace-nowrap">
-                  {t('offer.lengthValue', { months: offerLengthMonths(series) })}
+                  {series.lengthDays !== null
+                    ? t('offer.lengthDaysValue', { days: series.lengthDays })
+                    : t('offer.lengthValue', { months: offerLengthMonths(series) })}
                 </Td>
                 <Td className="whitespace-nowrap">{rate(offerFirstPeriodRate(series))}</Td>
                 <Td>{renderRule(series)}</Td>

@@ -80,6 +80,7 @@ export function SecurityBondTermsTab({
         {title}
       </h3>
       <BondHistoryBody
+        countryCode={valuation.program.issuerCountryCode}
         program={valuation.program.programCode}
         currency={valuation.program.currency}
         heldSeries={held.map((h) => h.seriesCode)}

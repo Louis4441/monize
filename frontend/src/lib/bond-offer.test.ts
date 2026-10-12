@@ -27,6 +27,7 @@ function offer(
     saleWindow: { from: '2026-10-01', to: '2026-10-31' },
     periodMonths,
     periodCount,
+    lengthDays: null,
     rateRule: {
       type: 'FIXED',
       benchmarkId: null,
@@ -49,6 +50,19 @@ function offer(
     },
   };
 }
+
+describe('sortOffer by length', () => {
+  it('orders a term counted in days beside one counted in months', () => {
+    const months = offer('M', 1, 1, '0.0300');
+    const days = { ...offer('D', 0, 0, '0.0300'), lengthDays: 28 };
+    const long = { ...offer('L', 0, 0, '0.0300'), lengthDays: 120 };
+    expect(sortOffer([long, months, days], 'length', 'asc').map((s) => s.seriesCode)).toEqual([
+      'D',
+      'M',
+      'L',
+    ]);
+  });
+});
 
 describe('sortOffer', () => {
   const a = offer('A', 12, 3, '0.0440');

@@ -9,39 +9,6 @@ import type {
   SecurityBondValuation,
 } from '@/types/bond';
 
-/**
- * Months from the sale to the maturity of each Polish retail program. A series
- * code is the program, then the month and the two-digit year of the MATURITY
- * (EDO1036 is sold in October 2026 and matures in October 2036).
- */
-export const BOND_PROGRAM_TENOR_MONTHS: Readonly<Record<string, number>> = {
-  OTS: 3,
-  ROR: 12,
-  DOR: 24,
-  TOS: 36,
-  COI: 48,
-  EDO: 120,
-  ROS: 72,
-  ROD: 144,
-};
-
-/**
- * The code of the series sold on `date` (YYYY-MM-DD); null when the program's
- * tenor is not known or the date is not a calendar date. Used to prefill an
- * acquisition and to name the series to fetch when it is not stored.
- */
-export function expectedSeriesCode(programCode: string, date: string): string | null {
-  const tenor = BOND_PROGRAM_TENOR_MONTHS[programCode];
-  const m = /^(\d{4})-(\d{2})-\d{2}$/.exec(date);
-  if (tenor === undefined || m === null) return null;
-  const month = Number(m[2]);
-  if (month < 1 || month > 12) return null;
-  const index = Number(m[1]) * 12 + (month - 1) + tenor;
-  const maturityYear = Math.floor(index / 12);
-  const maturityMonth = (index % 12) + 1;
-  return `${programCode}${String(maturityMonth).padStart(2, '0')}${String(maturityYear % 100).padStart(2, '0')}`;
-}
-
 /** The stored series of one program in one currency, ordered by code. */
 export function programSeries(
   instruments: readonly BondInstrumentSummary[],

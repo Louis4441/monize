@@ -35,10 +35,12 @@
     },
     "saleWindowValue": "{from} sampai {to}",
     "lengthValue": "{months, plural, other {# bulan}}",
+    "lengthDaysValue": "{days, plural, other {# hari}}",
     "rule": {
       "fixed": "Tetap {rate} per tahun",
       "benchmark": "{benchmark} + {addend}",
-      "floor": "Batas bawah acuan {floor}"
+      "floor": "Batas bawah acuan {floor}",
+      "discount": "Diskon dari nilai nominal"
     },
     "capitalization": {
       "NONE": "Dibayarkan setiap periode",
