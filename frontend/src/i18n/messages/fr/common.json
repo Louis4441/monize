@@ -39,6 +39,12 @@
     "more": "Plus d'actions"
   },
   "columns": {
+    "button": "Colonnes",
+    "buttonWithHidden": "Colonnes, {count} masquées",
+    "menuLabel": "Afficher ou masquer des colonnes",
+    "showAll": "Tout afficher",
+    "hideColumn": "Masquer la colonne",
+    "sheetSubtitle": "Réaffichez-la depuis le menu Colonnes.",
     "saveFailed": "Impossible d'enregistrer les paramètres des colonnes. Veuillez réessayer."
   },
   "loading": "Chargement...",

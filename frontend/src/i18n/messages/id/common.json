@@ -39,6 +39,12 @@
     "more": "Tindakan Lainnya"
   },
   "columns": {
+    "button": "Kolom",
+    "buttonWithHidden": "Kolom, {count} disembunyikan",
+    "menuLabel": "Tampilkan atau sembunyikan kolom",
+    "showAll": "Tampilkan semua",
+    "hideColumn": "Sembunyikan kolom",
+    "sheetSubtitle": "Tampilkan kembali dari menu Kolom.",
     "saveFailed": "Tidak dapat menyimpan pengaturan kolom. Silakan coba lagi."
   },
   "loading": "Memuat...",

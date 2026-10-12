@@ -39,6 +39,12 @@
     "more": "Meer acties"
   },
   "columns": {
+    "button": "Kolommen",
+    "buttonWithHidden": "Kolommen, {count} verborgen",
+    "menuLabel": "Kolommen tonen of verbergen",
+    "showAll": "Alles tonen",
+    "hideColumn": "Kolom verbergen",
+    "sheetSubtitle": "Zet hem terug via het menu Kolommen.",
     "saveFailed": "Kon de kolominstellingen niet opslaan. Probeer het opnieuw."
   },
   "loading": "Laden...",
