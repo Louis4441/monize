@@ -14,6 +14,7 @@ import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Modal } from '@/components/ui/Modal';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SecurityLookupPicker, LookupCandidate } from './SecurityLookupPicker';
@@ -692,17 +693,18 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       </div>
 
       <div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            aria-describedby="skip-price-updates-help"
-            {...register('skipPriceUpdates', {
-              onChange: () => setSkipSwitchTouched(true),
-            })}
+        <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
+          <ToggleSwitch
+            checked={!!watch('skipPriceUpdates')}
+            onChange={(next) => {
+              setValue('skipPriceUpdates', next, { shouldDirty: true });
+              setSkipSwitchTouched(true);
+            }}
+            label={t('form.skipPriceUpdatesLabel')}
           />
           {t('form.skipPriceUpdatesLabel')}
         </label>
-        <p id="skip-price-updates-help" className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           {t('form.skipPriceUpdatesHelp')}
         </p>
       </div>
@@ -748,8 +750,12 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
 
       <p id="price-alert-help" className="text-sm text-gray-500 dark:text-gray-400">{t('priceAlert.help')}</p>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" {...register('priceChartEnabled')} />
+      <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
+        <ToggleSwitch
+          checked={!!watch('priceChartEnabled')}
+          onChange={(next) => setValue('priceChartEnabled', next, { shouldDirty: true })}
+          label={t('priceAlert.chartLabel')}
+        />
         {t('priceAlert.chartLabel')}
       </label>
 
