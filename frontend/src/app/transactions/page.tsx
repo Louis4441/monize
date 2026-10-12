@@ -53,6 +53,7 @@ import {
   type TransactionSortField,
 } from '@/lib/transaction-sort';
 import { useStaleReconciliation } from '@/hooks/useStaleReconciliation';
+import { useHiddenColumns } from '@/hooks/useHiddenColumns';
 import { BulkSelectionBanner } from '@/components/transactions/BulkSelectionBanner';
 import { Account, isLiabilityAccountType } from '@/types/account';
 import { Institution } from '@/types/institution';
@@ -260,10 +261,13 @@ function TransactionsContent() {
   );
   // The Account column is not drawn on a single account's page, so a
   // remembered account sort would order the register by a header nobody can
-  // reach. Storage is left alone: widening the filter brings it back.
+  // reach. Storage is left alone: widening the filter brings it back. A column
+  // the reader has hidden is the same shape (the register reads the same
+  // stored set), and showing it again brings that sort back.
+  const { hidden: hiddenColumns } = useHiddenColumns('transactions');
   const registerSort = useMemo(
-    () => resolveRegisterSort(storedSort, isSingleAccountView),
-    [storedSort, isSingleAccountView],
+    () => resolveRegisterSort(storedSort, isSingleAccountView, hiddenColumns),
+    [storedSort, isSingleAccountView, hiddenColumns],
   );
   // The loader reads the sort from here rather than closing over it, so
   // remembering a deep link's fallback order does not re-run the reload effect

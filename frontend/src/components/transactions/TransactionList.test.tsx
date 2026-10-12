@@ -51,6 +51,15 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
+// The hidden-column preference's write (`useHiddenColumns`), so toggling a
+// column from the toolbar menu reaches a mock rather than the network.
+const mockUpdatePreferences = vi.fn();
+vi.mock('@/lib/user-settings', () => ({
+  userSettingsApi: {
+    updatePreferences: (...args: unknown[]) => mockUpdatePreferences(...args),
+  },
+}));
+
 function createTransaction(overrides: Partial<Transaction> = {}): Transaction {
   return {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -3699,5 +3708,161 @@ describe('TransactionList today divider', () => {
       expect(screen.getByRole('columnheader', { name: /payee/i })).toBeInTheDocument();
     });
     expect(screen.queryByText('Today')).not.toBeInTheDocument();
+  });
+});
+
+describe('TransactionList hidden columns', () => {
+  // The stored `hiddenTableColumns.transactions` set (one per table kind, read
+  // everywhere the register is mounted) removes a hideable column from the
+  // DOM at every width: no header, no cell, and the today divider spans one
+  // column less. Restoring is the toolbar's Columns menu alone.
+  const past = createTransaction({ id: 'past', transactionDate: '2020-01-01' });
+  const future = createTransaction({ id: 'future', transactionDate: '2099-01-01' });
+
+  const seed = (transactions: string[] | undefined) =>
+    usePreferencesStore.setState({
+      preferences: (transactions
+        ? { hiddenTableColumns: { transactions } }
+        : { hiddenTableColumns: {} }) as any,
+    });
+
+  const renderRegister = () =>
+    render(
+      <TransactionList
+        transactions={[future, past]}
+        onEdit={vi.fn()}
+        onRefresh={vi.fn()}
+        onExport={vi.fn()}
+        sort={{ field: 'date', direction: 'desc' }}
+        onSortChange={vi.fn()}
+      />,
+    );
+
+  const dividerSpan = () => Number(screen.getByText('Today').closest('td')!.getAttribute('colspan'));
+
+  beforeEach(() => {
+    mockUpdatePreferences.mockReset();
+    mockUpdatePreferences.mockImplementation(async (patch: Record<string, unknown>) => patch);
+  });
+
+  afterEach(() => {
+    cleanup();
+    usePreferencesStore.setState({ preferences: null });
+  });
+
+  it('renders every column with the default empty set, as before', async () => {
+    seed(undefined);
+    renderRegister();
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
+    });
+    expect(screen.getAllByTitle('Click to cycle status')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    // Ten unconditional columns plus Account on a multi-account register.
+    expect(dividerSpan()).toBe(11);
+  });
+
+  it('removes a hidden column from the header, the rows and the divider span', async () => {
+    seed(['status']);
+    renderRegister();
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /payee/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('columnheader', { name: /status/i })).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Click to cycle status')).not.toBeInTheDocument();
+    expect(dividerSpan()).toBe(10);
+    // The menu's trigger says where the column went.
+    expect(screen.getByRole('button', { name: 'Columns, 1 hidden' })).toBeInTheDocument();
+    // The structural columns and the other hideable ones are untouched.
+    for (const name of [/date/i, /payee/i, /category/i, /description/i, /ref #/i, /amount/i]) {
+      expect(screen.getByRole('columnheader', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('hides every hideable column at once and keeps what a register is', async () => {
+    seed(['description', 'refNumber', 'tags', 'attachments', 'status']);
+    renderRegister();
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /payee/i })).toBeInTheDocument();
+    });
+    // The sort icon's glyph trails each sortable label; the labels are the point.
+    const headers = screen
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent?.replace(/[^A-Za-z #]/g, '').trim());
+    expect(headers).toEqual(['Date', 'Account', 'Payee', 'Category', 'Amount', 'Actions']);
+    expect(dividerSpan()).toBe(6);
+    expect(screen.getByRole('button', { name: 'Columns, 5 hidden' })).toBeInTheDocument();
+  });
+
+  it('hides a column from the toolbar menu and shows it again from there', async () => {
+    seed(undefined);
+    renderRegister();
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Status' }));
+    });
+    await waitFor(() => {
+      expect(mockUpdatePreferences).toHaveBeenCalledWith({
+        hiddenTableColumns: { transactions: ['status'] },
+      });
+    });
+    expect(screen.queryByRole('columnheader', { name: /status/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Status' })).toHaveAttribute('aria-checked', 'false');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Status' }));
+    });
+    await waitFor(() => {
+      expect(mockUpdatePreferences).toHaveBeenLastCalledWith({
+        hiddenTableColumns: { transactions: [] },
+      });
+    });
+    expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
+  });
+
+  it('hides a column from its header by right-click, through the sheet', async () => {
+    seed(undefined);
+    renderRegister();
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
+    });
+
+    fireEvent.contextMenu(screen.getByRole('columnheader', { name: /status/i }));
+    const hide = await screen.findByRole('button', { name: /hide column/i });
+    await act(async () => {
+      fireEvent.click(hide);
+    });
+    await waitFor(() => {
+      expect(mockUpdatePreferences).toHaveBeenCalledWith({
+        hiddenTableColumns: { transactions: ['status'] },
+      });
+    });
+    expect(screen.queryByRole('columnheader', { name: /status/i })).not.toBeInTheDocument();
+  });
+
+  it('still sorts from a plain click on a hideable header', async () => {
+    seed(undefined);
+    const onSortChange = vi.fn();
+    render(
+      <TransactionList
+        transactions={[past]}
+        onEdit={vi.fn()}
+        onRefresh={vi.fn()}
+        sort={{ field: 'date', direction: 'desc' }}
+        onSortChange={onSortChange}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('columnheader', { name: /status/i }));
+    expect(onSortChange).toHaveBeenCalledWith('status');
+    // Tags and Attachments sort nowhere, so their click sorts nothing.
+    fireEvent.click(screen.getByRole('columnheader', { name: /tags/i }));
+    expect(onSortChange).toHaveBeenCalledTimes(1);
   });
 });
