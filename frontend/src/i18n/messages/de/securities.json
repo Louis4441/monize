@@ -119,6 +119,8 @@
     "currencyLabel": "Währung",
     "currencyNotConfigured": "{code} — nicht in Ihren Währungen",
     "quoteProviderLabel": "Kursanbieter",
+    "skipPriceUpdatesLabel": "Automatische Kursaktualisierungen deaktivieren",
+    "skipPriceUpdatesHelp": "Monize ruft für dieses Wertpapier keine Kurse ab. Verwenden Sie dies für ein Wertpapier, für das kein Anbieter Kurse liefert; selbst eingegebene Kurse zählen weiterhin. Die Wahl eines anderen Kursanbieters oder einer MSN-Instrument-ID schaltet die Aktualisierungen wieder ein.",
     "msnIdLabel": "MSN Instrument ID (erweitert)",
     "lookupProviderAriaLabel": "Anbieter suchen",
     "lookupButton": "Suchen",

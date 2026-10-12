@@ -158,6 +158,58 @@ describe('SecurityForm', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({priceChartEnabled: !enabled})));
   });
 
+  it.each([false, true])('saves a changed price-update switch (initial %s)', async (skipped) => {
+    render(<SecurityForm security={createSecurity({ skipPriceUpdates: skipped })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const checkbox = await screen.findByLabelText('Disable automatic price updates');
+    expect((checkbox as HTMLInputElement).checked).toBe(skipped);
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ skipPriceUpdates: !skipped })));
+  });
+
+  // Left untouched, the switch is not sent, so the backend's rule applies: a
+  // newly chosen provider turns updates back on for a flagged security.
+  // The checkbox shows what the save will store: the backend clears the flag
+  // when a new provider is picked, so the form unticks it, and still omits it.
+  it('unticks the switch when a new quote provider is picked', async () => {
+    render(<SecurityForm security={createSecurity({ skipPriceUpdates: true, quoteProvider: null })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const checkbox = (await screen.findByLabelText('Disable automatic price updates')) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    fireEvent.change(screen.getByLabelText('Quote Provider'), { target: { value: 'yahoo' } });
+    await waitFor(() => expect(checkbox.checked).toBe(false));
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('skipPriceUpdates');
+  });
+
+  it('keeps a stored provider from unticking the switch', async () => {
+    render(<SecurityForm security={createSecurity({ skipPriceUpdates: true, quoteProvider: 'msn' })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const checkbox = (await screen.findByLabelText('Disable automatic price updates')) as HTMLInputElement;
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Renamed' } });
+    expect(checkbox.checked).toBe(true);
+  });
+
+  // Re-ticking after the provider change is back at the stored value, so RHF
+  // calls it clean; it is still the user's explicit choice and must be sent.
+  it('sends a switch re-ticked after a new provider is picked', async () => {
+    render(<SecurityForm security={createSecurity({ skipPriceUpdates: true, quoteProvider: null })} onSubmit={onSubmit} onCancel={onCancel} />);
+    const checkbox = (await screen.findByLabelText('Disable automatic price updates')) as HTMLInputElement;
+    fireEvent.change(screen.getByLabelText('Quote Provider'), { target: { value: 'yahoo' } });
+    await waitFor(() => expect(checkbox.checked).toBe(false));
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ skipPriceUpdates: true, quoteProvider: 'yahoo' })));
+  });
+
+  it('omits an untouched price-update switch', async () => {
+    render(<SecurityForm security={createSecurity({ skipPriceUpdates: true })} onSubmit={onSubmit} onCancel={onCancel} />);
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByText('Update Security'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('skipPriceUpdates');
+  });
+
   it('calls onCancel when cancel is clicked', async () => {
     render(<SecurityForm onSubmit={onSubmit} onCancel={onCancel} />);
     fireEvent.click(screen.getByText('Cancel'));

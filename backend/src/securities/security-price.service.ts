@@ -185,20 +185,16 @@ function orderProvidersByDefault(
 }
 
 /**
- * A security is eligible for price refresh when skipPriceUpdates is false,
- * OR the user has explicitly opted in by setting a per-security provider
- * override or supplying an MSN Instrument ID. The latter exists because
- * QIF/OFX imports auto-flag securities with skipPriceUpdates=true (since the
- * symbol is auto-generated and may not be a real ticker), and we don't want
- * the user to also have to manually clear that flag after picking a provider.
+ * A security is eligible for scheduled price refresh when skipPriceUpdates is
+ * false. The flag is the user's own switch (the security form's "disable
+ * automatic price updates"), and imports set it on the securities whose symbol
+ * they invented. A per-security provider override or MSN Instrument ID does
+ * not override it: choosing one clears the flag at write time
+ * (`SecuritiesService.update`), so a security that still carries the flag is
+ * one the user has asked not to be fetched.
  */
-function isRefreshEligible(s: {
-  skipPriceUpdates: boolean;
-  quoteProvider: string | null;
-  msnInstrumentId: string | null;
-}): boolean {
-  if (!s.skipPriceUpdates) return true;
-  return Boolean(s.quoteProvider) || Boolean(s.msnInstrumentId);
+function isRefreshEligible(s: { skipPriceUpdates: boolean }): boolean {
+  return !s.skipPriceUpdates;
 }
 
 export interface PriceUpdateResult {
@@ -862,7 +858,7 @@ export class SecurityPriceService {
         .map((s) => s.symbol)
         .join(", ");
       this.logger.log(
-        `Skipping ${skipped} security/securities flagged with skipPriceUpdates and no explicit provider override: ${skippedSymbols}`,
+        `Skipping ${skipped} security/securities with price updates disabled: ${skippedSymbols}`,
       );
     }
     securities.length = 0;
@@ -1904,9 +1900,9 @@ export class SecurityPriceService {
    * the total null -- rather than failing the request. Nothing here invents a
    * price.
    *
-   * `skipPriceUpdates` is honoured (via `isRefreshEligible`): an import that
-   * auto-generated a symbol marked it precisely because fetching against it is
-   * pointless.
+   * `skipPriceUpdates` is honoured (via `isRefreshEligible`): the user turned
+   * updates off for the security, or an import that auto-generated a symbol
+   * marked it precisely because fetching against it is pointless.
    *
    * Returns the number of daily bars persisted.
    */

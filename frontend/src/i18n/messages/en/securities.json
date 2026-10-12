@@ -119,6 +119,8 @@
     "currencyLabel": "Currency",
     "currencyNotConfigured": "{code} — not in your currencies",
     "quoteProviderLabel": "Quote Provider",
+    "skipPriceUpdatesLabel": "Disable automatic price updates",
+    "skipPriceUpdatesHelp": "Monize will not fetch prices for this security. Use this for a security no provider can price; prices you enter yourself still count. Choosing a different quote provider or MSN Instrument ID turns updates back on.",
     "msnIdLabel": "MSN Instrument ID (advanced)",
     "lookupProviderAriaLabel": "Lookup provider",
     "lookupButton": "Lookup",

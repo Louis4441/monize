@@ -119,6 +119,8 @@
     "currencyLabel": "Devise",
     "currencyNotConfigured": "{code} — absente de vos devises",
     "quoteProviderLabel": "Fournisseur de cours",
+    "skipPriceUpdatesLabel": "Désactiver les mises à jour automatiques des cours",
+    "skipPriceUpdatesHelp": "Monize ne récupérera pas de cours pour ce titre. Utilisez cette option pour un titre qu'aucun fournisseur ne peut coter ; les cours que vous saisissez vous-même restent pris en compte. Choisir un autre fournisseur de cotations ou un autre identifiant d'instrument MSN réactive les mises à jour.",
     "msnIdLabel": "Identifiant instrument MSN (avancé)",
     "lookupProviderAriaLabel": "Rechercher le fournisseur",
     "lookupButton": "Rechercher",

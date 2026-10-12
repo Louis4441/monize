@@ -119,6 +119,8 @@
     "currencyLabel": "Tiền tệ",
     "currencyNotConfigured": "{code} — không có trong tiền tệ của bạn",
     "quoteProviderLabel": "Nhà cung cấp báo giá",
+    "skipPriceUpdatesLabel": "Tắt cập nhật giá tự động",
+    "skipPriceUpdatesHelp": "Monize sẽ không lấy giá cho chứng khoán này. Dùng tùy chọn này cho chứng khoán mà không nhà cung cấp nào định giá được; giá bạn tự nhập vẫn được tính. Chọn một nhà cung cấp báo giá hoặc ID công cụ MSN khác sẽ bật lại cập nhật.",
     "msnIdLabel": "ID công cụ MSN (nâng cao)",
     "lookupProviderAriaLabel": "Tra cứu nhà cung cấp",
     "lookupButton": "Tra cứu",

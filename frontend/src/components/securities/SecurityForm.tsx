@@ -68,6 +68,7 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   quoteProvider: z.enum(['', 'yahoo', 'msn', 'lse', 'deutsche_boerse']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
   priceChartEnabled: z.boolean().optional(),
+  skipPriceUpdates: z.boolean().optional(),
   priceAlertPercent: z.string().optional().refine((v) => !v?.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0.1 && Number(v) <= 1000), t('priceAlert.range')),
   isFavourite: z.boolean().optional(),
 });
@@ -244,6 +245,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       msnInstrumentId: security?.msnInstrumentId || '',
       isFavourite: security?.isFavourite || false,
       priceChartEnabled: security?.priceChartEnabled ?? false,
+      skipPriceUpdates: security?.skipPriceUpdates ?? false,
       priceAlertPercent: security?.priceAlertPercent == null ? '' : String(security.priceAlertPercent),
     },
   });
@@ -281,6 +283,39 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     }
     return options;
   }, [currencies, defaultCurrency, selectedCurrency, t]);
+
+  /**
+   * Whether the user clicked the "disable price updates" switch. Only then is
+   * it sent; left alone, the backend decides, and a newly picked provider or
+   * MSN Instrument ID turns updates back on. RHF's dirty state cannot stand in
+   * for this: re-ticking a box the effect below unticked is back at its
+   * default, so it reads as clean, yet it is the user's explicit choice.
+   */
+  const [skipSwitchTouched, setSkipSwitchTouched] = useState(false);
+  const watchedQuoteProvider = watch('quoteProvider') || '';
+  const watchedMsnInstrumentId = watch('msnInstrumentId')?.trim() || '';
+
+  // Show what the save will store: the same rule as `SecuritiesService.update`,
+  // a provider or MSN id that differs from the stored one clears the flag.
+  useEffect(() => {
+    if (skipSwitchTouched || !getValues('skipPriceUpdates')) return;
+    const newProvider =
+      watchedQuoteProvider !== '' &&
+      watchedQuoteProvider !== (defaultValues?.quoteProvider || '');
+    const newMsnId =
+      watchedMsnInstrumentId !== '' &&
+      watchedMsnInstrumentId !== (defaultValues?.msnInstrumentId?.trim() || '');
+    if (newProvider || newMsnId) {
+      setValue('skipPriceUpdates', false);
+    }
+  }, [
+    watchedQuoteProvider,
+    watchedMsnInstrumentId,
+    skipSwitchTouched,
+    defaultValues,
+    getValues,
+    setValue,
+  ]);
 
   const isFavourite = watch('isFavourite') ?? false;
   const toggleFavourite = () =>
@@ -378,6 +413,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   // In edit mode, revert to the original security values. In create mode,
   // blank everything out (keeping the user's default currency).
   const handleClear = useCallback(() => {
+    setSkipSwitchTouched(false);
     if (security) {
       reset();
       setSelectedTagIds(security.tags?.map((tag) => tag.id) || []);
@@ -395,6 +431,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         msnInstrumentId: '',
         isFavourite: false,
         priceChartEnabled: false,
+        skipPriceUpdates: false,
         priceAlertPercent: '',
       });
       setSelectedTagIds([]);
@@ -482,6 +519,10 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
       isFavourite: data.isFavourite ?? false,
       priceChartEnabled: data.priceChartEnabled ?? false,
+      // Sent only when the user clicked it (see `skipSwitchTouched`).
+      ...(skipSwitchTouched
+        ? { skipPriceUpdates: data.skipPriceUpdates ?? false }
+        : {}),
       priceAlertPercent: data.priceAlertPercent?.trim() ? Number(data.priceAlertPercent) : null,
       // Only ETFs/funds carry the manual breakdowns; send [] to clear them.
       ...(isFund
@@ -648,6 +689,22 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
             {t('form.msnNotConfigured')}
           </p>
         )}
+      </div>
+
+      <div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            aria-describedby="skip-price-updates-help"
+            {...register('skipPriceUpdates', {
+              onChange: () => setSkipSwitchTouched(true),
+            })}
+          />
+          {t('form.skipPriceUpdatesLabel')}
+        </label>
+        <p id="skip-price-updates-help" className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          {t('form.skipPriceUpdatesHelp')}
+        </p>
       </div>
 
       {/*
