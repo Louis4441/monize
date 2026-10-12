@@ -109,6 +109,7 @@ implied.
 | INV-BOND-006 | Bond terms enter the catalog only from an adapter's fetch of its official source or an administrator's manual entry on the adapter's template; a person who is not an administrator supplies only a country and a series code | enforced |
 | INV-BOND-007 | A program-linked security's acquisitions with a date of their own are inferred, TRANSFER_IN and ADD_SHARES name their series, a removal the account cannot cover is refused at write time, and an import may store NULL which the lots name | enforced |
 | INV-BOND-008 | No country's bond data (series, terms version, benchmark observation) is fetched or stored without a person's action | enforced |
+| INV-BOND-009 | A bond redemption's cash splits into returned principal and interest, never into a capital gain | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3746,6 +3747,45 @@ Required tests      bond-series-resolver.spec.ts (every branch: inferred,
                     bond-valuation.integration.spec.ts (real PostgreSQL),
                     backup-restore.integration.spec.ts (the series follow the
                     program).
+Status              enforced
+```
+
+### INV-BOND-009 -- a redemption's cash is returned principal plus interest
+
+```text
+Statement           The split of a bond-linked redemption satisfies
+                    payout = principalReturned + interest exactly, interest >= 0
+                    and principalReturned <= principal; at maturity the
+                    deduction is 0. What a bond pays above the principal it was
+                    bought at is interest (a discount instrument's discount
+                    included), net of an early-redemption deduction taken from
+                    it, never a capital gain.
+Source of truth     the lot's terms, rates and redemption date, through the same
+                    schedule, rate, penalty, floor and rounding code as the
+                    valuation (spec docs/specs/bond-redemption-interest.md
+                    sections 2 and 3)
+Enforcement         redemptionSplit (backend/src/bonds/engine/bond-engine.ts,
+                    redemption-split.ts): every figure is rounded per bond by
+                    the terms and then multiplied by the quantity, so the three
+                    sums hold to the last digit; interest is
+                    max(0, grossInterest - deduction) and principalReturned is
+                    payout - interest. A refused day or an unknown rate gives a
+                    refusal and null figures, never 0.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    a refusal (NOT_REDEEMABLE, TOO_EARLY, TOO_LATE, RECORD_DAY,
+                    TERMS_INCOMPLETE, RATE_UNKNOWN, PURCHASE_OUTSIDE_SALE_WINDOW)
+                    and null figures
+Required tests      backend/src/bonds/engine/redemption-split.spec.ts (the
+                    table of the spec, a day-by-day sweep of the identity for a
+                    compounding bond, a coupon bond and a discount bill, refusals,
+                    unknown rates, per-bond rounding) and
+                    backend/src/bonds/adapters/pl/redemption-split.golden.spec.ts
+                    (the maturity value of EDO0423 stated by the Ministry, early
+                    redemptions of EDO and COI worked by hand from the letters).
+                    The endpoint and the form that use the split are owed their
+                    own entries when they ship.
 Status              enforced
 ```
 

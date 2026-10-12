@@ -74,7 +74,10 @@ export interface CashFlow {
 /** The terms' rate rule as stated, in plain fields; fractions are strings. */
 export interface RateRuleDescription {
   readonly type:
-    "FIXED" | "BENCHMARK_PLUS_SPREAD" | "INFLATION_PLUS_MARGIN_AS_RATE";
+    | "FIXED"
+    | "BENCHMARK_PLUS_SPREAD"
+    | "INFLATION_PLUS_MARGIN_AS_RATE"
+    | "ZERO_COUPON_DISCOUNT";
   readonly benchmarkId: string | null;
   /** FIXED only. */
   readonly annualRate: string | null;

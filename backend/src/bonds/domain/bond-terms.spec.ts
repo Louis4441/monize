@@ -328,9 +328,8 @@ describe("parseBondTerms", () => {
       "terms.schedule.periodMonths",
     );
     expect(
-      parseBondTerms(mutated("ror1027", (d) => (d.schedule.periodMonths = 3)))
-        .schedule.periodMonths,
-    ).toBe(3);
+      parseBondTerms(mutated("ror1027", (d) => (d.schedule.periodMonths = 3))),
+    ).toMatchObject({ schedule: { periodMonths: 3 } });
   });
 
   it("refuses bad schedule, rounding and source values", () => {
@@ -450,5 +449,143 @@ describe("parseBondTerms", () => {
       }),
     );
     expect(terms.schedule.calendarId).toBe("XX");
+  });
+});
+
+describe("parseBondTerms: a discount instrument", () => {
+  /** A country-neutral discount bill; the terms of the engine's spec 3. */
+  function discountDoc(change: (doc: Doc) => void = () => undefined): Doc {
+    const doc = manifestDocument("tos1029");
+    doc.instrument.faceValue = "24000.00";
+    doc.instrument.issuePrice = "23530.00";
+    doc.schedule = {
+      anchor: "ISSUE_DATE",
+      issueDate: "2026-01-01",
+      maturityDate: "2026-01-27",
+      periodCount: 1,
+      calendarId: "PL",
+    };
+    doc.rateRule = { type: "ZERO_COUPON_DISCOUNT" };
+    doc.capitalization = { type: "NONE" };
+    doc.redemption = { type: "MATURITY_ONLY" };
+    change(doc);
+    return doc;
+  }
+
+  it("accepts the discount rule, the issue price and the issue-date schedule unchanged", () => {
+    expect(parseBondTerms(discountDoc())).toEqual(discountDoc());
+  });
+
+  it.each([
+    [
+      "an issue price missing",
+      (d: Doc) => delete d.instrument.issuePrice,
+      "terms.instrument.issuePrice",
+    ],
+    [
+      "an issue price at the face value",
+      (d: Doc) => (d.instrument.issuePrice = "24000.00"),
+      "terms.instrument.issuePrice",
+    ],
+    [
+      "an issue price above the face value",
+      (d: Doc) => (d.instrument.issuePrice = "24000.01"),
+      "terms.instrument.issuePrice",
+    ],
+    [
+      "a zero issue price",
+      (d: Doc) => (d.instrument.issuePrice = "0"),
+      "terms.instrument.issuePrice",
+    ],
+    [
+      "a negative issue price",
+      (d: Doc) => (d.instrument.issuePrice = "-1"),
+      "terms.instrument.issuePrice",
+    ],
+    [
+      "an issue price as a JSON number",
+      (d: Doc) => (d.instrument.issuePrice = 23530),
+      "terms.instrument.issuePrice",
+    ],
+    [
+      "early redemption",
+      (d: Doc) => {
+        d.redemption = manifestDocument("tos1029").redemption;
+      },
+      "terms.redemption",
+    ],
+    [
+      "capitalisation",
+      (d: Doc) =>
+        (d.capitalization = {
+          type: "COMPOUND_AT_PERIOD_END",
+          baseRounding: "NONE",
+        }),
+      "terms.capitalization",
+    ],
+    [
+      "a schedule counted from the purchase date",
+      (d: Doc) => {
+        d.schedule = manifestDocument("tos1029").schedule;
+      },
+      "terms.schedule.anchor",
+    ],
+    [
+      "a maturity on the issue date",
+      (d: Doc) => (d.schedule.maturityDate = "2026-01-01"),
+      "terms.schedule.maturityDate",
+    ],
+    [
+      "a maturity before the issue date",
+      (d: Doc) => (d.schedule.maturityDate = "2025-12-31"),
+      "terms.schedule.maturityDate",
+    ],
+    [
+      "an impossible issue date",
+      (d: Doc) => (d.schedule.issueDate = "2026-02-30"),
+      "terms.schedule.issueDate",
+    ],
+    [
+      "more than one period",
+      (d: Doc) => (d.schedule.periodCount = 2),
+      "terms.schedule.periodCount",
+    ],
+    [
+      "a period length in months",
+      (d: Doc) => (d.schedule.periodMonths = 12),
+      "terms.schedule.periodMonths",
+    ],
+    [
+      "a rate beside the rule",
+      (d: Doc) => (d.rateRule.annualRate = "0.01"),
+      "terms.rateRule.annualRate",
+    ],
+  ])("refuses %s", (_name, change, field) => {
+    expect(refusal(discountDoc(change)).field).toBe(field);
+  });
+
+  it("refuses an issue price on an instrument that is not a discount", () => {
+    expect(refusalOf((d) => (d.instrument.issuePrice = "99.00")).field).toBe(
+      "terms.instrument.issuePrice",
+    );
+  });
+
+  it("refuses an issue-date schedule on an instrument that is not a discount", () => {
+    expect(
+      refusalOf((d) => {
+        d.schedule = discountDoc().schedule;
+      }).field,
+    ).toBe("terms.schedule.anchor");
+  });
+
+  it("refuses an unknown field of the issue-date schedule and an unknown anchor", () => {
+    expect(
+      refusal(discountDoc((d) => (d.schedule.rollDay = "ANCHOR_DAY_CLAMPED")))
+        .field,
+    ).toBe("terms.schedule.rollDay");
+    expect(
+      refusal(discountDoc((d) => (d.schedule.anchor = "SETTLEMENT_DATE")))
+        .field,
+    ).toBe("terms.schedule.anchor");
   });
 });

@@ -10,6 +10,7 @@ import {
   BondTerms,
   parseBondTerms,
   Redemption,
+  scheduleMonthsOf,
 } from "./domain/bond-terms";
 import { enumerateMonthKeys } from "./domain/calendar-date";
 import { ExactDecimal } from "./domain/exact-decimal";
@@ -266,8 +267,7 @@ export class BondOfferService {
       currency: instrument.currencyCode,
       // The id query admitted the series by this window.
       saleWindow: terms.saleWindow as { from: string; to: string },
-      periodMonths: terms.schedule.periodMonths,
-      periodCount: terms.schedule.periodCount,
+      ...scheduleMonthsOf(terms.schedule),
       rateRule: valuation.rateRule,
       capitalization: terms.capitalization.type,
       redemption:
@@ -326,7 +326,8 @@ function projectionOf(
     };
   }
   const face = ExactDecimal.parse(terms.instrument.faceValue);
-  const months = terms.schedule.periodMonths * terms.schedule.periodCount;
+  const length = scheduleMonthsOf(terms.schedule);
+  const months = length.periodMonths * length.periodCount;
   const positiveFace = face.cmp(ExactDecimal.ZERO) > 0;
   return {
     ...base,

@@ -366,6 +366,10 @@ export function planPeriodRates(
     switch (rule.type) {
       case "FIXED":
         return known(parseDecimal(rule.annualRate, "annualRate"), "TERMS");
+      case "ZERO_COUPON_DISCOUNT":
+        // States no rate; zero is the placeholder that keeps the period known,
+        // and the discount arithmetic never reads it.
+        return known(ExactDecimal.ZERO, "TERMS");
       case "BENCHMARK_PLUS_SPREAD":
       case "INFLATION_PLUS_MARGIN_AS_RATE":
         return benchmarkPeriod(rule);

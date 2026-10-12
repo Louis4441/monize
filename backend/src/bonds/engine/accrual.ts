@@ -30,7 +30,23 @@ export interface PricedPeriod {
   readonly rate: ExactDecimal;
 }
 
-/** One bond's principal on `ctx.date`. */
+/** True for a discount instrument: the value rises from its issue price to the face value, no rate is stated. */
+export function isDiscount(terms: BondTerms): boolean {
+  return terms.rateRule.type === "ZERO_COUPON_DISCOUNT";
+}
+
+/** The issue price of a discount instrument; the terms parser guarantees it is there. */
+function issuePriceOf(terms: BondTerms): ExactDecimal {
+  if (terms.instrument.issuePrice === undefined) {
+    throw new RangeError("A discount instrument has no issue price");
+  }
+  return ExactDecimal.parse(terms.instrument.issuePrice);
+}
+
+/**
+ * One bond's principal on `ctx.date`: the nominal, or for a discount instrument
+ * the issue price it was bought at.
+ */
 export function principalAt(
   terms: BondTerms,
   ctx: PrincipalContext,
@@ -38,7 +54,9 @@ export function principalAt(
   switch (terms.principalRule.type) {
     case "FIXED_NOMINAL":
       void ctx;
-      return ExactDecimal.parse(terms.instrument.faceValue);
+      return isDiscount(terms)
+        ? issuePriceOf(terms)
+        : ExactDecimal.parse(terms.instrument.faceValue);
     default:
       return assertNever(terms.principalRule.type);
   }
@@ -63,9 +81,17 @@ export function compounds(terms: BondTerms): boolean {
   }
 }
 
-/** Periods per year, F = 12 / periodMonths. */
+/** Periods per year, F = 12 / periodMonths; only a schedule counted in months has one. */
 function periodsPerYear(terms: BondTerms): ExactDecimal {
-  return ExactDecimal.fromInt(12 / terms.schedule.periodMonths);
+  const { schedule } = terms;
+  switch (schedule.anchor) {
+    case "LOT_PURCHASE_DATE":
+      return ExactDecimal.fromInt(12 / schedule.periodMonths);
+    case "ISSUE_DATE":
+      throw new RangeError("A single-period schedule has no periods per year");
+    default:
+      return assertNever(schedule);
+  }
 }
 
 /**
@@ -143,6 +169,29 @@ export function baseAt(
   }
 }
 
+/**
+ * A discount instrument's value on day k of the N days of its period: the issue
+ * price plus k/N of the discount (the ratable accrual method), unrounded.
+ */
+function discountValueAt(
+  terms: BondTerms,
+  period: AccrualPeriod,
+  asOf: string,
+): ExactDecimal {
+  const issuePrice = issuePriceOf(terms);
+  const discount = ExactDecimal.parse(terms.instrument.faceValue).sub(
+    issuePrice,
+  );
+  return issuePrice.add(
+    discount.mul(
+      ExactDecimal.ratio(
+        daysBetween(period.start, asOf),
+        daysBetween(period.start, period.end),
+      ),
+    ),
+  );
+}
+
 /** Value on the day `asOf` inside `current` before any penalty, unrounded. */
 export function valueAt(
   terms: BondTerms,
@@ -150,6 +199,7 @@ export function valueAt(
   current: PricedPeriod,
   asOf: string,
 ): ExactDecimal {
+  if (isDiscount(terms)) return discountValueAt(terms, current.period, asOf);
   const accrual = current.rate.mul(
     yearFraction(terms, current.period, current.period.start, asOf),
   );
@@ -158,13 +208,23 @@ export function valueAt(
   );
 }
 
-/** The coupon paid at a period end, rounded; null when interest is capitalised instead. */
+/**
+ * The coupon paid at a period end, rounded; null when interest is capitalised
+ * instead. A discount instrument's "coupon" is its whole discount, paid inside
+ * the face value at maturity.
+ */
 export function couponOf(
   terms: BondTerms,
   period: PricedPeriod,
 ): ExactDecimal | null {
   switch (terms.capitalization.type) {
     case "NONE": {
+      if (isDiscount(terms)) {
+        return roundMoney(
+          terms,
+          ExactDecimal.parse(terms.instrument.faceValue),
+        ).sub(roundMoney(terms, issuePriceOf(terms)));
+      }
       const base = principalAt(terms, { date: period.period.end });
       return roundMoney(
         terms,
@@ -185,6 +245,9 @@ export function maturityValue(
   last: PricedPeriod,
 ): ExactDecimal {
   const date = last.period.end;
+  if (isDiscount(terms)) {
+    return roundMoney(terms, ExactDecimal.parse(terms.instrument.faceValue));
+  }
   const coupon = couponOf(terms, last);
   return coupon === null
     ? roundMoney(terms, compoundedNominal(terms, [...prior, last], { date }))

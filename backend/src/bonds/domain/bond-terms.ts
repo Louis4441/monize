@@ -1,4 +1,4 @@
-import { isValidYMD } from "./calendar-date";
+import { isValidYMD, parseYMD } from "./calendar-date";
 import { assertNever } from "./assert-never";
 import { ExactDecimal, RoundingMode } from "./exact-decimal";
 
@@ -25,6 +25,11 @@ export interface BenchmarkRuleFields {
 
 export type RateRule =
   | { readonly type: "FIXED"; readonly annualRate: string }
+  /**
+   * A discount instrument: bought below its face value, it pays the face value
+   * at maturity and states no rate. Needs `instrument.issuePrice`.
+   */
+  | { readonly type: "ZERO_COUPON_DISCOUNT" }
   | ({
       readonly type: "BENCHMARK_PLUS_SPREAD";
       readonly spread: string;
@@ -34,12 +39,16 @@ export type RateRule =
       readonly margin: string;
     } & BenchmarkRuleFields);
 
-export type BenchmarkRule = Exclude<RateRule, { readonly type: "FIXED" }>;
+export type BenchmarkRule = Exclude<
+  RateRule,
+  { readonly type: "FIXED" } | { readonly type: "ZERO_COUPON_DISCOUNT" }
+>;
 
-/** The rule when it reads a benchmark, null for a fixed rate; exhaustive over the rule types. */
+/** The rule when it reads a benchmark, null for a rule that reads none; exhaustive over the rule types. */
 export function benchmarkRuleOf(rule: RateRule): BenchmarkRule | null {
   switch (rule.type) {
     case "FIXED":
+    case "ZERO_COUPON_DISCOUNT":
       return null;
     case "BENCHMARK_PLUS_SPREAD":
     case "INFLATION_PLUS_MARGIN_AS_RATE":
@@ -49,7 +58,7 @@ export function benchmarkRuleOf(rule: RateRule): BenchmarkRule | null {
   }
 }
 
-/** The benchmark fields of a rule that reads a benchmark, null for a fixed rate. */
+/** The benchmark fields of a rule that reads a benchmark, null for a rule that reads none. */
 export function benchmarkFieldsOf(rule: RateRule): BenchmarkRuleFields | null {
   return benchmarkRuleOf(rule);
 }
@@ -98,6 +107,54 @@ export type Redemption =
       readonly proceedsFloor: ProceedsFloor | null;
     };
 
+/** Periods counted from each lot's purchase date. */
+export interface LotAnchoredSchedule {
+  readonly anchor: "LOT_PURCHASE_DATE";
+  readonly periodMonths: number;
+  readonly periodCount: number;
+  readonly rollDay: "ANCHOR_DAY_CLAMPED";
+  readonly calendarId: string;
+}
+
+/** One period from the series' issue date to its maturity date, whatever the lot's purchase date. */
+export interface IssueDateSchedule {
+  readonly anchor: "ISSUE_DATE";
+  readonly issueDate: string;
+  readonly maturityDate: string;
+  readonly periodCount: 1;
+  readonly calendarId: string;
+}
+
+export type BondSchedule = LotAnchoredSchedule | IssueDateSchedule;
+
+/**
+ * The length of the schedule in whole months of `periodMonths` and a period
+ * count; a single issue-to-maturity period is its whole months, at least one.
+ */
+export function scheduleMonthsOf(schedule: BondSchedule): {
+  readonly periodMonths: number;
+  readonly periodCount: number;
+} {
+  switch (schedule.anchor) {
+    case "LOT_PURCHASE_DATE":
+      return {
+        periodMonths: schedule.periodMonths,
+        periodCount: schedule.periodCount,
+      };
+    case "ISSUE_DATE": {
+      const from = parseYMD(schedule.issueDate);
+      const to = parseYMD(schedule.maturityDate);
+      const whole =
+        (to.year - from.year) * 12 +
+        (to.month - from.month) -
+        (to.day < from.day ? 1 : 0);
+      return { periodMonths: whole < 1 ? 1 : whole, periodCount: 1 };
+    }
+    default:
+      return assertNever(schedule);
+  }
+}
+
 export interface BondTerms {
   readonly schemaVersion: 1;
   readonly instrument: {
@@ -108,15 +165,14 @@ export interface BondTerms {
     readonly currency: string;
     readonly marketability: "RETAIL_REDEEMABLE";
     readonly faceValue: string;
+    /**
+     * The price of one face value at issue, exact decimal, above zero and below
+     * `faceValue`. Present exactly when the rate rule is ZERO_COUPON_DISCOUNT.
+     */
+    readonly issuePrice?: string;
   };
   readonly saleWindow: { readonly from: string; readonly to: string } | null;
-  readonly schedule: {
-    readonly anchor: "LOT_PURCHASE_DATE";
-    readonly periodMonths: number;
-    readonly periodCount: number;
-    readonly rollDay: "ANCHOR_DAY_CLAMPED";
-    readonly calendarId: string;
-  };
+  readonly schedule: BondSchedule;
   readonly accrual: { readonly type: "ACTUAL_DAYS_IN_PERIOD" };
   readonly principalRule: { readonly type: "FIXED_NOMINAL" };
   readonly rateRule: RateRule;
@@ -152,13 +208,14 @@ function object(
   value: unknown,
   path: string,
   allowed: readonly string[],
+  optional: readonly string[] = [],
 ): Json {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new BondTermsError(path, "must be an object");
   }
   const record = value as Json;
   for (const key of Object.keys(record)) {
-    if (!allowed.includes(key))
+    if (!allowed.includes(key) && !optional.includes(key))
       throw new BondTermsError(`${path}.${key}`, "unknown field");
   }
   for (const key of allowed) {
@@ -298,7 +355,12 @@ function parseRateRule(value: unknown, path: string): RateRule {
     "FIXED",
     "BENCHMARK_PLUS_SPREAD",
     "INFLATION_PLUS_MARGIN_AS_RATE",
+    "ZERO_COUPON_DISCOUNT",
   ] as const);
+  if (type === "ZERO_COUPON_DISCOUNT") {
+    object(value, path, ["type"]);
+    return { type };
+  }
   if (type === "FIXED") {
     const r = object(value, path, ["type", "annualRate"]);
     return { type, annualRate: decimal(r.annualRate, `${path}.annualRate`) };
@@ -417,6 +479,60 @@ function parseRedemption(value: unknown, path: string): Redemption {
   };
 }
 
+function parseSchedule(value: unknown, path: string): BondSchedule {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new BondTermsError(path, "must be an object");
+  }
+  const anchor = oneOf((value as Json).anchor, `${path}.anchor`, [
+    "LOT_PURCHASE_DATE",
+    "ISSUE_DATE",
+  ] as const);
+  if (anchor === "ISSUE_DATE") {
+    const s = object(value, path, [
+      "anchor",
+      "issueDate",
+      "maturityDate",
+      "periodCount",
+      "calendarId",
+    ]);
+    const issueDate = date(s.issueDate, `${path}.issueDate`);
+    const maturityDate = date(s.maturityDate, `${path}.maturityDate`);
+    if (issueDate >= maturityDate) {
+      throw new BondTermsError(
+        `${path}.maturityDate`,
+        "must be after the issue date",
+      );
+    }
+    return {
+      anchor,
+      issueDate,
+      maturityDate,
+      periodCount: exact(s.periodCount, `${path}.periodCount`, 1),
+      calendarId: text(s.calendarId, `${path}.calendarId`),
+    };
+  }
+  const s = object(value, path, [
+    "anchor",
+    "periodMonths",
+    "periodCount",
+    "rollDay",
+    "calendarId",
+  ]);
+  const periodMonths = integer(s.periodMonths, `${path}.periodMonths`, 1);
+  if (periodMonths > 12 || 12 % periodMonths !== 0) {
+    throw new BondTermsError(`${path}.periodMonths`, "must divide 12");
+  }
+  return {
+    anchor,
+    periodMonths,
+    periodCount: integer(s.periodCount, `${path}.periodCount`, 1),
+    rollDay: oneOf(s.rollDay, `${path}.rollDay`, [
+      "ANCHOR_DAY_CLAMPED",
+    ] as const),
+    calendarId: text(s.calendarId, `${path}.calendarId`),
+  };
+}
+
 const FIELDS = [
   "schemaVersion",
   "instrument",
@@ -436,34 +552,23 @@ export function parseBondTerms(json: unknown): BondTerms {
   const t = object(json, "terms", FIELDS);
   exact(t.schemaVersion, "terms.schemaVersion", 1);
 
-  const i = object(t.instrument, "terms.instrument", [
-    "issuerCountryCode",
-    "issuerCode",
-    "programCode",
-    "seriesCode",
-    "currency",
-    "marketability",
-    "faceValue",
-  ]);
+  const i = object(
+    t.instrument,
+    "terms.instrument",
+    [
+      "issuerCountryCode",
+      "issuerCode",
+      "programCode",
+      "seriesCode",
+      "currency",
+      "marketability",
+      "faceValue",
+    ],
+    ["issuePrice"],
+  );
   const faceValue = decimal(i.faceValue, "terms.instrument.faceValue");
   if (ExactDecimal.parse(faceValue).isZero()) {
     throw new BondTermsError("terms.instrument.faceValue", "must be positive");
-  }
-
-  const s = object(t.schedule, "terms.schedule", [
-    "anchor",
-    "periodMonths",
-    "periodCount",
-    "rollDay",
-    "calendarId",
-  ]);
-  const periodMonths = integer(
-    s.periodMonths,
-    "terms.schedule.periodMonths",
-    1,
-  );
-  if (periodMonths > 12 || 12 % periodMonths !== 0) {
-    throw new BondTermsError("terms.schedule.periodMonths", "must divide 12");
   }
 
   const rounding = object(t.rounding, "terms.rounding", [
@@ -492,6 +597,9 @@ export function parseBondTerms(json: unknown): BondTerms {
         "RETAIL_REDEEMABLE",
       ] as const),
       faceValue,
+      ...(i.issuePrice === undefined
+        ? {}
+        : { issuePrice: decimal(i.issuePrice, "terms.instrument.issuePrice") }),
     },
     saleWindow: nullable(t.saleWindow, (v) => {
       const w = object(v, "terms.saleWindow", ["from", "to"]);
@@ -501,17 +609,7 @@ export function parseBondTerms(json: unknown): BondTerms {
         throw new BondTermsError("terms.saleWindow", "from is after to");
       return { from, to };
     }),
-    schedule: {
-      anchor: oneOf(s.anchor, "terms.schedule.anchor", [
-        "LOT_PURCHASE_DATE",
-      ] as const),
-      periodMonths,
-      periodCount: integer(s.periodCount, "terms.schedule.periodCount", 1),
-      rollDay: oneOf(s.rollDay, "terms.schedule.rollDay", [
-        "ANCHOR_DAY_CLAMPED",
-      ] as const),
-      calendarId: text(s.calendarId, "terms.schedule.calendarId"),
-    },
+    schedule: parseSchedule(t.schedule, "terms.schedule"),
     accrual: {
       type: primitive(t.accrual, "terms.accrual", [
         "ACTUAL_DAYS_IN_PERIOD",
@@ -550,6 +648,7 @@ export function parseBondTerms(json: unknown): BondTerms {
 /** Generic consistency between primitives, never a per-product rule. */
 function assertConsistent(terms: BondTerms): void {
   const { redemption, capitalization } = terms;
+  assertDiscountConsistent(terms);
   if (
     redemption.type === "ON_DEMAND" &&
     capitalization.type !== "NONE" &&
@@ -558,6 +657,61 @@ function assertConsistent(terms: BondTerms): void {
     throw new BondTermsError(
       "terms.redemption.blackouts",
       "a record day exists only for a bond that pays a coupon (capitalization NONE)",
+    );
+  }
+}
+
+/** A discount instrument has an issue price, one issue-to-maturity period, no coupon and no early redemption. */
+function assertDiscountConsistent(terms: BondTerms): void {
+  const { instrument, schedule, rateRule, capitalization, redemption } = terms;
+  const discount = rateRule.type === "ZERO_COUPON_DISCOUNT";
+  if (!discount) {
+    if (instrument.issuePrice !== undefined) {
+      throw new BondTermsError(
+        "terms.instrument.issuePrice",
+        "only a ZERO_COUPON_DISCOUNT instrument has an issue price",
+      );
+    }
+    if (schedule.anchor === "ISSUE_DATE") {
+      throw new BondTermsError(
+        "terms.schedule.anchor",
+        "an ISSUE_DATE schedule is only for a ZERO_COUPON_DISCOUNT instrument",
+      );
+    }
+    return;
+  }
+  if (instrument.issuePrice === undefined) {
+    throw new BondTermsError(
+      "terms.instrument.issuePrice",
+      "required for a ZERO_COUPON_DISCOUNT instrument",
+    );
+  }
+  const price = ExactDecimal.parse(instrument.issuePrice);
+  if (
+    price.isZero() ||
+    price.cmp(ExactDecimal.parse(instrument.faceValue)) >= 0
+  ) {
+    throw new BondTermsError(
+      "terms.instrument.issuePrice",
+      "must be above zero and below the face value",
+    );
+  }
+  if (schedule.anchor !== "ISSUE_DATE") {
+    throw new BondTermsError(
+      "terms.schedule.anchor",
+      "a ZERO_COUPON_DISCOUNT instrument needs an ISSUE_DATE schedule",
+    );
+  }
+  if (capitalization.type !== "NONE") {
+    throw new BondTermsError(
+      "terms.capitalization",
+      "a ZERO_COUPON_DISCOUNT instrument does not capitalise (NONE)",
+    );
+  }
+  if (redemption.type !== "MATURITY_ONLY") {
+    throw new BondTermsError(
+      "terms.redemption",
+      "a ZERO_COUPON_DISCOUNT instrument is redeemed at maturity only (MATURITY_ONLY)",
     );
   }
 }

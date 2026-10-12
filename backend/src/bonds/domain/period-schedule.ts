@@ -31,3 +31,11 @@ export function buildSchedule(
     return { index: i + 1, start, end, days: daysBetween(start, end) };
   });
 }
+
+/** A single period from `start` to `end`, for a schedule that does not depend on the lot. */
+export function singlePeriodSchedule(
+  start: string,
+  end: string,
+): readonly SchedulePeriod[] {
+  return [{ index: 1, start, end, days: daysBetween(start, end) }];
+}

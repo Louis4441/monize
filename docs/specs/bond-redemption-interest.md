@@ -117,12 +117,19 @@ A new rate rule and schedule, for any adapter (none installed uses them yet):
 
 | Case | Inputs | principal | grossInterest | deduction | interest | principalReturned | payout |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| US bill held to maturity | face 24,000, issue price 98.041667 %, `q` 240 (face 100) | 23,530.00 | 470.00 | 0 | 470.00 | 23,530.00 | 24,000.00 |
+| US bill held to maturity | one bill, face 24,000.00, issue price 23,530.00, `q` 1 | 23,530.00 | 470.00 | 0 | 470.00 | 23,530.00 | 24,000.00 |
 | Same bill, half way (value only, no split) | day 13 of 26 | 23,530.00 | 235.00 | n/a | n/a | n/a | value 23,765.00 |
+| Same money as 240 units of face 100 | issue price 98.041667, `q` 240, 2 decimals per unit | 23,529.60 | 470.40 | 0 | 470.40 | 23,529.60 | 24,000.00 |
 | EDO0423 at maturity | 147.05 per bond (Ministry), `q` 1 | 100.00 | 47.05 | 0 | 47.05 | 100.00 | 147.05 |
 | EDO early, interest above the fee | accrued 10.20, fee 3.00, floor face | 100.00 | 10.20 | 3.00 | 7.20 | 100.00 | 107.20 |
 | EDO early, interest below the fee | accrued 1.50, fee 3.00, floor face | 100.00 | 1.50 | 1.50 | 0.00 | 100.00 | 100.00 |
 | COI early, period 2 | accrued 1.20, flat fee 2.00, no floor | 100.00 | 1.20 | 2.00 | 0.00 | 99.20 | 99.20 |
+
+The last row is the per-bond rounding of section 2 at work: an issuer that
+prices a unit to six decimals and rounds only the holding (as Treasury
+auctions do) is modelled as one unit of the whole face value, or with
+`moneyDecimals` the issuer uses; that choice belongs to the adapter that
+defines such a series, not to the engine.
 
 ## 4. Invariants
 

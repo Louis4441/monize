@@ -1,12 +1,17 @@
 import { assertNever } from "../domain/assert-never";
-import { benchmarkFieldsOf } from "../domain/bond-terms";
+import { BenchmarkRule, benchmarkFieldsOf } from "../domain/bond-terms";
 import { compareYMD, isValidYMD } from "../domain/calendar-date";
 import { ExactDecimal } from "../domain/exact-decimal";
-import { buildSchedule, SchedulePeriod } from "../domain/period-schedule";
+import {
+  buildSchedule,
+  SchedulePeriod,
+  singlePeriodSchedule,
+} from "../domain/period-schedule";
 import {
   baseAt,
   compounds,
   couponOf,
+  isDiscount,
   maturityValue,
   principalAt,
   PricedPeriod,
@@ -27,6 +32,12 @@ import {
 } from "./bond-engine-types";
 import { attributeInterest } from "./attribution";
 import {
+  RedemptionSplit,
+  RedemptionSplitRefusal,
+  refusedSplit,
+  splitOf,
+} from "./redemption-split";
+import {
   PeriodRate,
   RatePlan,
   RateResolution,
@@ -41,6 +52,7 @@ import {
 } from "./redemption";
 
 export * from "./bond-engine-types";
+export * from "./redemption-split";
 
 interface RateInputs {
   readonly prior: readonly PricedPeriod[];
@@ -128,7 +140,7 @@ function neededMissing(
 }
 
 function benchmarkDescription(
-  rule: Exclude<BondEngineInput["terms"]["rateRule"], { type: "FIXED" }>,
+  rule: BenchmarkRule,
   addend: string,
 ): RateRuleDescription {
   return {
@@ -154,6 +166,15 @@ function describeRule(
         addend: null,
         benchmarkFloor: null,
       };
+    case "ZERO_COUPON_DISCOUNT":
+      return {
+        type: rule.type,
+        benchmarkId: null,
+        annualRate: null,
+        firstPeriodRate: null,
+        addend: null,
+        benchmarkFloor: null,
+      };
     case "BENCHMARK_PLUS_SPREAD":
       return benchmarkDescription(rule, rule.spread);
     case "INFLATION_PLUS_MARGIN_AS_RATE":
@@ -167,12 +188,14 @@ function describeSchedule(
   terms: BondEngineInput["terms"],
   rates: readonly PeriodRate[],
 ): RateScheduleEntry[] {
+  // A discount instrument states no rate: its placeholder is never shown.
+  const stated = !isDiscount(terms);
   return rates.map((r) => ({
     index: r.period.index,
     start: r.period.start,
     end: r.period.end,
-    annualRate: r.rate ? r.rate.toTrimmedString(10, 4) : null,
-    rateSource: r.source,
+    annualRate: r.rate && stated ? r.rate.toTrimmedString(10, 4) : null,
+    rateSource: stated ? r.source : null,
     benchmark: r.benchmark,
     addend: r.addend,
     ...attributeInterest(terms, rates, r.period.index),
@@ -232,8 +255,10 @@ function scheduleOf(input: LotInput): readonly SchedulePeriod[] {
         schedule.periodCount,
         schedule.periodMonths,
       );
+    case "ISSUE_DATE":
+      return singlePeriodSchedule(schedule.issueDate, schedule.maturityDate);
     default:
-      return assertNever(schedule.anchor);
+      return assertNever(schedule);
   }
 }
 
@@ -286,6 +311,9 @@ interface DayFigures {
   readonly accrued: string | null;
   readonly gross: string | null;
   readonly early: string | null;
+  /** Per bond, rounded: the exact figures `gross` and `early` are the lot's multiples of. */
+  readonly grossBond: ExactDecimal | null;
+  readonly earlyBond: ExactDecimal | null;
   readonly refusal: EarlyRedemptionRefusal | null;
 }
 
@@ -307,6 +335,8 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
   let accrued: string | null = null;
   let gross: string | null = null;
   let early: string | null = null;
+  let grossBond: ExactDecimal | null = null;
+  let earlyBond: ExactDecimal | null = null;
   let refusal: EarlyRedemptionRefusal | null = windowRefusal(
     terms,
     calendars,
@@ -317,12 +347,13 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
   );
 
   if (matured) {
-    if (!compounding) {
+    if (!compounding && !isDiscount(terms)) {
       // A coupon bond redeems at its nominal whatever the rates were; its last
       // coupon is a past cash flow, so no rate is needed for the value.
       const nominal = principalAt(terms, { date: p.maturity });
       principal = nominal.toFixed(places);
       gross = lot(nominal);
+      grossBond = nominal;
       accrued = lot(nominal.sub(nominal));
     } else {
       const inputs = inputsFor(compounding, rates, lastPeriod.index);
@@ -331,6 +362,7 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
         const nominal = principalAt(terms, { date: p.maturity });
         principal = perBond.toFixed(places);
         gross = lot(perBond);
+        grossBond = perBond;
         accrued = lot(perBond.sub(nominal));
       }
     }
@@ -340,12 +372,14 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
       const value = valueAt(terms, inputs.prior, inputs.current, asOf);
       const base = baseAt(terms, inputs.prior, { date: current.start });
       const nominal = principalAt(terms, { date: asOf });
-      const grossBond = roundMoney(terms, value);
+      grossBond = roundMoney(terms, value);
       principal = roundMoney(terms, base).toFixed(places);
       gross = lot(grossBond);
       accrued = lot(grossBond.sub(nominal));
-      if (refusal === null)
-        early = lot(proceedsPerBond(terms, value, base, current.index, asOf));
+      if (refusal === null) {
+        earlyBond = proceedsPerBond(terms, value, base, current.index, asOf);
+        early = lot(earlyBond);
+      }
     } else if (refusal === null) {
       refusal = "RATE_UNKNOWN";
     }
@@ -360,6 +394,8 @@ function figuresOn(p: PreparedLot, asOf: string): DayFigures {
     accrued,
     gross,
     early,
+    grossBond,
+    earlyBond,
     refusal,
   };
 }
@@ -439,7 +475,8 @@ function valueOn(p: PreparedLot, asOf: string): BondValuation {
   const { compounding, lastPeriod } = p;
   const lot = (perBond: ExactDecimal) =>
     perBond.mul(p.quantity).toFixed(p.places);
-  const currentRate = current ? rates[current.index - 1] : null;
+  const currentRate =
+    current && !isDiscount(terms) ? rates[current.index - 1] : null;
 
   const cashflows: CashFlow[] = [];
   const flow = (
@@ -550,6 +587,72 @@ export function valueBondLot(input: BondEngineInput): BondValuation {
   validateLot(input, String(input.asOf));
   validateDay(input.lot.purchaseDate, input.asOf);
   return valueOn(prepare(input), input.asOf);
+}
+
+/**
+ * What a redemption on `date` pays, as returned principal and interest (spec
+ * `bond-redemption-interest.md` section 2), through the same schedule, rates,
+ * penalties, floor and rounding as `valueBondLot`: one bond's figures are
+ * rounded by the terms, the lot's are those times the quantity.
+ *
+ * Before maturity the day must be allowed (`windowRefusal`): the value before
+ * deduction is the gross value, the payout the early-redemption proceeds. On or
+ * after maturity the payout is the principal plus the last period's interest
+ * (`maturityValue`) and the deduction is 0. A refused day, a purchase outside
+ * the sale window and an unknown rate give the refusal and null figures (the
+ * principal stays known for an unknown rate).
+ */
+export function redemptionSplit(
+  input: Omit<BondEngineInput, "asOf">,
+  date: string,
+): RedemptionSplit {
+  validateLot(input, String(date));
+  validateDay(input.lot.purchaseDate, date);
+  const p = prepare(input);
+  const { terms } = input;
+  const { quantity } = input.lot;
+  const refused = (refusal: RedemptionSplitRefusal, principal?: ExactDecimal) =>
+    refusedSplit(
+      date,
+      quantity,
+      p.places,
+      refusal,
+      principal === undefined ? null : roundMoney(terms, principal),
+    );
+  if (p.saleRefusal) return refused("PURCHASE_OUTSIDE_SALE_WINDOW");
+
+  const matured = compareYMD(date, p.maturity) >= 0;
+  const day = matured ? p.maturity : date;
+  const principal = principalAt(terms, { date: day });
+  if (matured) {
+    const { rates } = resolvedFor(p, startedPeriods(p.schedule, day));
+    const inputs = inputsFor(p.compounding, rates, p.lastPeriod.index);
+    if (!inputs) return refused("RATE_UNKNOWN", principal);
+    const paid = maturityValue(terms, inputs.prior, inputs.current);
+    return splitOf(date, quantity, p.places, {
+      principal: roundMoney(terms, principal),
+      gross: paid,
+      payout: paid,
+    });
+  }
+
+  const figures = figuresOn(p, day);
+  if (figures.refusal === "RATE_UNKNOWN")
+    return refused("RATE_UNKNOWN", principal);
+  if (figures.refusal !== null) {
+    // No open period (before the first one starts) is not a day to redeem on.
+    return refused(
+      figures.refusal === "MATURED" ? "NOT_REDEEMABLE" : figures.refusal,
+    );
+  }
+  if (figures.grossBond === null || figures.earlyBond === null) {
+    return refused("RATE_UNKNOWN", principal);
+  }
+  return splitOf(date, quantity, p.places, {
+    principal: roundMoney(terms, principal),
+    gross: figures.grossBond,
+    payout: figures.earlyBond,
+  });
 }
 
 export type BondLotSeriesInput = Omit<BondEngineInput, "asOf"> & {
