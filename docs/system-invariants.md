@@ -179,6 +179,11 @@ implied.
 | INV-RECEIPT-005 | A mailbox password or OAuth token is encrypted at rest and never returned | enforced |
 | INV-RECEIPT-006 | One poll per mailbox at a time across replicas | enforced |
 | INV-RECEIPT-007 | An OAuth callback completes only the flow the same user started, once | enforced |
+| INV-SEARCH-001 | A transaction search string has one door: one parser, one clause builder, escaped once | enforced |
+| INV-SEARCH-002 | A single bare search term finds exactly what it found before the search syntax | enforced |
+| INV-SEARCH-003 | Every term of a search holds on the row the query counts; every call site searches at split grain | enforced |
+| INV-SEARCH-004 | Matching a search never multiplies a counted row | enforced |
+| INV-SEARCH-005 | The assistant's totals and rows read the search string alike | enforced |
 
 ## Imports
 
@@ -6630,6 +6635,119 @@ Crash semantics     --
 Failure response    400
 Required tests      Present: oauth-state.spec.ts, email-receipt-mailbox
                     integration (replay and foreign user against the real table).
+Status              enforced
+```
+
+## Transaction search
+
+Design: `docs/future-plans/advanced-search.md` (sections 4 and 5). The
+syntax is one string read the same way by the register, its totals, bulk
+update and the AI tools.
+
+### INV-SEARCH-001 -- a search string has one door
+
+```text
+Statement           Every surface that takes a transaction search string reads
+                    it through one parser and one clause builder, and escapes it
+                    exactly once, inside the builder.
+Source of truth     backend/src/transactions/apply-transaction-search.ts
+                    (applyTransactionSearch, or resolveTransactionSearch plus
+                    applyParsedSearch where one parse feeds several queries).
+Enforcement         transaction-search.guard.spec.ts fails an import of the
+                    parser or the builder outside the door's three files, and a
+                    hand-built `%${...search...}%` pattern in the
+                    transactions module.
+                    The controller reads `search` through one searchParam
+                    (string check, cut at MAX_SEARCH_LENGTH) on every endpoint.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    A non-string `search` is a 400; more than 12 terms is a 400
+                    (errors.transactions.searchTooManyTerms).
+Required tests      Source scan (the guard); unit cases for the controller cap.
+Status              enforced
+```
+
+### INV-SEARCH-002 -- a single bare term finds what it always found
+
+```text
+Statement           A search of one bare word, with no qualifier, quote or
+                    operator, matches exactly the rows the single-term search
+                    matched before the syntax existed, on every surface.
+Source of truth     The `any` arm of buildTransactionSearchWhere, which is the
+                    former single-term clause's arms, moved.
+Enforcement         test/integration/transaction-search.integration.spec.ts:
+                    sixteen terms (LIKE metacharacters, signed and locale
+                    amounts, a date) with their match sets recorded on
+                    2026-10-12 against the former clause while both existed.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    --
+Required tests      PG integration.
+Status              enforced
+```
+
+### INV-SEARCH-003 -- a term is evaluated against the row the query counts
+
+```text
+Statement           Every term of a search must hold on the same row the query
+                    counts. Every call site searches at split grain: a split
+                    transaction matches line by line, the register draws only
+                    the matching lines with a filtered total, bulk update acts
+                    on matching lines, and a negated term drops only the lines
+                    it matches.
+Source of truth     The `grain` each call passes to the builder, correlated to
+                    the split alias that call site already joins.
+Enforcement         SearchClauseOptions.grain is required, so no call site can
+                    omit it; the integration spec runs both truth tables of the
+                    plan at both grains and the register, analytics and
+                    bulk-update call sites at split grain.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    --
+Required tests      PG integration.
+Status              enforced
+```
+
+### INV-SEARCH-004 -- search never inflates an aggregate
+
+```text
+Statement           Matching a search never multiplies a counted row: a
+                    transaction with two matching tags, categories or payee
+                    names is counted once.
+Source of truth     The builder: every relational arm is an EXISTS subquery and
+                    every split condition of a term is one correlated subquery,
+                    never a join.
+Enforcement         Integration case: a transaction carrying two tags that both
+                    match is one row in the register and one transaction, at its
+                    own amount, in the assistant's totals.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    --
+Required tests      PG integration.
+Status              enforced
+```
+
+### INV-SEARCH-005 -- the assistant's totals and rows read the search alike
+
+```text
+Statement           The AI and MCP list and query tools compute their totals
+                    and their rows from the same reading of the search string,
+                    including one holding `%`, `_` or `\`.
+Source of truth     INV-SEARCH-001's door: the totals path (getSummary through
+                    createFilteredAnalyticsQuery, and getLlmGroupedBreakdown)
+                    and the rows path (findAll) both pass the raw string.
+Enforcement         The pre-escaping sanitizeLikePattern was deleted and the
+                    guard bans a hand-built pattern; integration case: a search
+                    for `50%` gives a total equal to its single matching row.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    --
+Required tests      Source scan; PG integration.
 Status              enforced
 ```
 

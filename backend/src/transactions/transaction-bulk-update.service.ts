@@ -22,7 +22,6 @@ import {
   investmentLinkedTransactionExclusion,
 } from "../common/investment-filter.util";
 import { Payee } from "../payees/entities/payee.entity";
-import { UserPreference } from "../users/entities/user-preference.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { TagsService } from "../tags/tags.service";
@@ -37,14 +36,7 @@ import {
   isTransactionInFuture,
   formatDateYMDLocal,
 } from "../common/date-utils";
-import {
-  buildTransactionSearchClause,
-  escapeLikePattern,
-} from "./transaction-search.util";
-import {
-  parseSearchTerm,
-  ParsedSearchTerm,
-} from "./transaction-search-parse.util";
+import { applyTransactionSearch } from "./apply-transaction-search";
 import { tr } from "../i18n/translate";
 import { withScopedDb } from "../common/db/scoped-db";
 import { lockTransactionRows } from "../common/db/locks";
@@ -110,26 +102,6 @@ export class TransactionBulkUpdateService {
     private actionHistoryService: ActionHistoryService,
     private dataSource: DataSource,
   ) {}
-
-  /**
-   * Interprets the search term as an exact amount and/or date using the user's
-   * number/date-format preferences, so locale-formatted values also match.
-   */
-  private async resolveSearchTerm(
-    userId: string,
-    term?: string,
-  ): Promise<ParsedSearchTerm> {
-    if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(UserPreference).findOne({
-        where: { userId },
-      }),
-    );
-    return parseSearchTerm(term, {
-      numberFormat: prefs?.numberFormat,
-      dateFormat: prefs?.dateFormat,
-    });
-  }
 
   async bulkUpdate(
     userId: string,
@@ -1429,8 +1401,9 @@ export class TransactionBulkUpdateService {
       });
     }
 
+    let categorySplitsJoined = false;
     if (filters.categoryIds && filters.categoryIds.length > 0) {
-      await this.applyCategoryFilters(
+      categorySplitsJoined = await this.applyCategoryFilters(
         m,
         queryBuilder,
         userId,
@@ -1445,34 +1418,20 @@ export class TransactionBulkUpdateService {
     }
 
     if (filters.search && filters.search.trim()) {
-      const searchPattern = `%${escapeLikePattern(filters.search.trim())}%`;
-      const parsedSearch = await this.resolveSearchTerm(userId, filters.search);
-      if (!filters.categoryIds || filters.categoryIds.length === 0) {
+      // Split grain: bulk update acts on the matching lines, as the register
+      // draws them. The category filter joins `filterSplits` only for real
+      // category ids; with none (no filter, or only the uncategorized and
+      // transfer pseudo-ids) the search joins its own alias.
+      if (!categorySplitsJoined) {
         queryBuilder.leftJoin("transaction.splits", "searchSplits");
-        queryBuilder.andWhere(
-          buildTransactionSearchClause({
-            transaction: "transaction",
-            splits: "searchSplits",
-          }),
-          {
-            search: searchPattern,
-            searchAmount: parsedSearch.amount,
-            searchDate: parsedSearch.date,
-          },
-        );
-      } else {
-        queryBuilder.andWhere(
-          buildTransactionSearchClause({
-            transaction: "transaction",
-            splits: "filterSplits",
-          }),
-          {
-            search: searchPattern,
-            searchAmount: parsedSearch.amount,
-            searchDate: parsedSearch.date,
-          },
-        );
       }
+      await applyTransactionSearch(m, queryBuilder, filters.search, {
+        userId,
+        transaction: "transaction",
+        splits: categorySplitsJoined ? "filterSplits" : "searchSplits",
+        grain: "split",
+        paramPrefix: "srch",
+      });
     }
 
     if (filters.amountFrom !== undefined) {
@@ -1528,12 +1487,17 @@ export class TransactionBulkUpdateService {
     );
   }
 
+  /**
+   * Applies the category filter. Returns whether it joined `filterSplits`,
+   * which it does only for real category ids; the search reuses that alias
+   * so both filters read the same split line.
+   */
   private async applyCategoryFilters(
     m: EntityManager,
     queryBuilder: SelectQueryBuilder<Transaction>,
     userId: string,
     categoryIds: string[],
-  ): Promise<void> {
+  ): Promise<boolean> {
     const hasUncategorized = categoryIds.includes("uncategorized");
     const hasTransfer = categoryIds.includes("transfer");
 
@@ -1591,5 +1555,6 @@ export class TransactionBulkUpdateService {
         }),
       );
     }
+    return uniqueCategoryIds.length > 0;
   }
 }

@@ -196,6 +196,11 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-RECEIPT-005 a mailbox secret is encrypted and never returned | required | -- | **required** | -- | -- | -- | -- | -- |
 | INV-RECEIPT-006 one poll per mailbox at a time | supporting | -- | required | optional | **required** | -- | -- | -- |
 | INV-RECEIPT-007 an OAuth callback completes its own flow once | **required** | -- | required | -- | -- | -- | -- | -- |
+| INV-SEARCH-001 one search door | supporting | **required** | -- | -- | -- | -- | -- | -- |
+| INV-SEARCH-002 a bare term finds what it found | supporting | -- | **required** | -- | -- | -- | -- | -- |
+| INV-SEARCH-003 terms hold on the counted row | supporting | -- | **required** | -- | -- | -- | -- | optional |
+| INV-SEARCH-004 search never inflates an aggregate | -- | -- | **required** | -- | -- | -- | -- | -- |
+| INV-SEARCH-005 assistant totals and rows agree | -- | required | **required** | -- | -- | -- | -- | -- |
 
 Bold marks the kind that is load-bearing -- the one whose absence means the
 invariant is unverified no matter how many others pass. `INV-PROFILE-001`'s is a

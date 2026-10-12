@@ -2224,4 +2224,103 @@ describe("TransactionsController", () => {
       expect(mockService.getFxFeeSummary).not.toHaveBeenCalled();
     });
   });
+
+  describe("search on the totals endpoints", () => {
+    // Each endpoint the Transactions page reads beside the register takes the
+    // same `search`, so each refuses a non-string and cuts at the parser's
+    // cap, as `findAll` does; otherwise the totals could read a longer string
+    // than the rows they sit beside.
+    const long = "x".repeat(250);
+    const endpoints: Array<
+      [string, (search: unknown) => unknown, () => unknown]
+    > = [
+      [
+        "getSummary",
+        (search) =>
+          controller.getSummary(
+            mockReq,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            search as string,
+          ),
+        () => mockService.getSummary.mock.calls[0][6],
+      ],
+      [
+        "getGroupedTotals",
+        (search) =>
+          controller.getGroupedTotals(
+            mockReq,
+            "payee",
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            search as string,
+          ),
+        () => mockService.getGroupedTotals.mock.calls[0][1].search,
+      ],
+      [
+        "getTagKeyBreakdown",
+        (search) =>
+          controller.getTagKeyBreakdown(
+            mockReq,
+            "country",
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            search as string,
+          ),
+        () => mockService.getTagKeyBreakdown.mock.calls[0][2].search,
+      ],
+      [
+        "getMonthlyTotals",
+        (search) =>
+          controller.getMonthlyTotals(
+            mockReq,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            search as string,
+          ),
+        () => mockService.getMonthlyTotals.mock.calls[0][6],
+      ],
+    ];
+
+    beforeEach(() => {
+      mockService.getSummary.mockResolvedValue({});
+      mockService.getGroupedTotals.mockResolvedValue([]);
+      mockService.getTagKeyBreakdown.mockResolvedValue([]);
+      mockService.getMonthlyTotals.mockResolvedValue([]);
+    });
+
+    it.each(endpoints)(
+      "%s cuts the search at 200 characters",
+      async (_name, call, searchSent) => {
+        await call(long);
+        expect(searchSent()).toBe("x".repeat(200));
+      },
+    );
+
+    it.each(endpoints)(
+      "%s refuses a repeated search key",
+      async (_name, call) => {
+        await expect(
+          Promise.resolve().then(() => call(["a", "b"])),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+  });
 });

@@ -1,7 +1,11 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException } from "@nestjs/common";
 import { TransactionBulkUpdateService } from "./transaction-bulk-update.service";
-import { buildTransactionSearchClause } from "./transaction-search.util";
+import { buildTransactionSearchWhere } from "./transaction-search.util";
+import {
+  parseTransactionSearch,
+  SearchFormats,
+} from "./transaction-search-query.util";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
@@ -22,6 +26,23 @@ import {
   createScopedDbMocks,
   DataSourceMock,
 } from "../test-helpers/scoped-db-testing";
+
+/**
+ * The condition and parameters the search helper adds for `raw`, at the
+ * split grain every call site uses (advanced-search plan, question 5).
+ */
+function expectedSearch(
+  raw: string,
+  aliases: { transaction: string; splits: string; paramPrefix?: string },
+  formats: SearchFormats = {},
+): [string, Record<string, unknown>] {
+  const clause = buildTransactionSearchWhere(
+    parseTransactionSearch(raw, formats).terms,
+    { paramPrefix: "srch", ...aliases, grain: "split" },
+  );
+  if (!clause) throw new Error(`no search clause for ${raw}`);
+  return [clause.sql, clause.params];
+}
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -3112,11 +3133,10 @@ describe("TransactionBulkUpdateService", () => {
         "searchSplits",
       );
       expect(resolveQb.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
+        ...expectedSearch("groceries", {
           transaction: "transaction",
           splits: "searchSplits",
         }),
-        { search: "%groceries%", searchAmount: null, searchDate: null },
       );
     });
 
@@ -3158,11 +3178,59 @@ describe("TransactionBulkUpdateService", () => {
       expect(result.updated).toBe(1);
       // Search should use filterSplits alias (already joined by category filter)
       expect(resolveQb.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
+        ...expectedSearch("food", {
           transaction: "transaction",
           splits: "filterSplits",
         }),
-        { search: "%food%", searchAmount: null, searchDate: null },
+      );
+    });
+
+    it("joins its own split alias when the category filter holds only pseudo-ids", async () => {
+      // The category filter joins `filterSplits` only for real category ids,
+      // so a search beside `uncategorized` alone must not name that alias.
+      const tx = makeTransaction({ id: "tx-1" });
+
+      const resolveQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([{ id: "tx-1" }]),
+        leftJoin: jest.fn().mockReturnThis(),
+      });
+      const exclusionsQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([tx]),
+      });
+
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(exclusionsQb);
+
+      const updateQb = createMockQueryBuilder({
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      });
+      mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
+
+      const dto: BulkUpdateDto = {
+        mode: "filter",
+        filters: {
+          categoryIds: ["uncategorized"],
+          search: "food",
+        },
+        description: "test",
+      };
+
+      await service.bulkUpdate(userId, dto);
+
+      expect(resolveQb.leftJoin).not.toHaveBeenCalledWith(
+        "transaction.splits",
+        "filterSplits",
+      );
+      expect(resolveQb.leftJoin).toHaveBeenCalledWith(
+        "transaction.splits",
+        "searchSplits",
+      );
+      expect(resolveQb.andWhere).toHaveBeenCalledWith(
+        ...expectedSearch("food", {
+          transaction: "transaction",
+          splits: "searchSplits",
+        }),
       );
     });
 
@@ -3388,17 +3456,16 @@ describe("TransactionBulkUpdateService", () => {
 
       await service.bulkUpdate(userId, dto);
 
-      expect(resolveQb.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
-          transaction: "transaction",
-          splits: "searchSplits",
-        }),
-        {
-          search: "%100\\% off\\_sale\\\\deal%",
-          searchAmount: null,
-          searchDate: null,
-        },
-      );
+      const expected = expectedSearch("100% off_sale\\deal", {
+        transaction: "transaction",
+        splits: "searchSplits",
+      });
+      expect(resolveQb.andWhere).toHaveBeenCalledWith(...expected);
+      // Two words now; each escaped once, inside the builder.
+      expect(Object.values(expected[1])).toEqual([
+        "%100\\%%",
+        "%off\\_sale\\\\deal%",
+      ]);
     });
 
     it("skips balance delta rows with zero amount", async () => {

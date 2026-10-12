@@ -2,14 +2,17 @@ import { TestingModule } from "@nestjs/testing";
 import { DataSource, SelectQueryBuilder } from "typeorm";
 
 import { Account } from "@/accounts/entities/account.entity";
+import { Tag } from "@/tags/entities/tag.entity";
 import { Transaction } from "@/transactions/entities/transaction.entity";
 import { TransactionSplit } from "@/transactions/entities/transaction-split.entity";
+import { withUserContext } from "@/common/db/with-context";
+import { TransactionsModule } from "@/transactions/transactions.module";
+import { TransactionsService } from "@/transactions/transactions.service";
+import { TransactionAnalyticsService } from "@/transactions/transaction-analytics.service";
+import { TransactionBulkUpdateService } from "@/transactions/transaction-bulk-update.service";
 import { applyParsedSearch } from "@/transactions/apply-transaction-search";
-import { parseSearchTerm } from "@/transactions/transaction-search-parse.util";
 import { parseTransactionSearch } from "@/transactions/transaction-search-query.util";
 import {
-  buildTransactionSearchClause,
-  escapeLikePattern,
   referenceKey,
   referenceKeySql,
   SearchGrain,
@@ -31,10 +34,9 @@ import {
  * a single bare term finds exactly the transactions the single-term clause
  * every call site uses today finds.
  *
- * The queries here are plain query builders shaped like the two grains the
- * call sites use (a transaction query; a transaction joined to its splits),
- * not the call sites themselves; task B3 adds the call-site cases when it
- * moves them onto the helper.
+ * The truth tables run through plain query builders shaped like the two
+ * grains; the call-site cases at the end run the register, the LLM summary
+ * and bulk update themselves, all of which search at split grain.
  */
 describe("transaction search (integration)", () => {
   const EN = { numberFormat: "en-US", dateFormat: "YYYY-MM-DD" };
@@ -44,13 +46,15 @@ describe("transaction search (integration)", () => {
   let userId: string;
   let refAccount: Account;
   let splitAccount: Account;
+  let promoAccount: Account;
+  let taggedAccount: Account;
   /** Transaction id -> fixture label. */
   const labels = new Map<string, string>();
   /** Split id -> fixture label ("S/Gas"). */
   const splitLabels = new Map<string, string>();
 
   beforeAll(async () => {
-    module = await createIntegrationModule([]);
+    module = await createIntegrationModule([TransactionsModule]);
     dataSource = module.get(DataSource);
 
     await cleanTables(dataSource, [
@@ -68,6 +72,14 @@ describe("transaction search (integration)", () => {
     });
     splitAccount = await createTestAccount(dataSource, userId, {
       name: "Visa",
+      currencyCode: "USD",
+    });
+    promoAccount = await createTestAccount(dataSource, userId, {
+      name: "Promo",
+      currencyCode: "USD",
+    });
+    taggedAccount = await createTestAccount(dataSource, userId, {
+      name: "Tagged",
       currencyCode: "USD",
     });
     const groceries = await createTestCategory(dataSource, userId, {
@@ -127,15 +139,16 @@ describe("transaction search (integration)", () => {
       amount: -100,
       isSplit: true,
     });
-    for (const [label, categoryId, amount] of [
-      ["S/Groceries", groceries.id, -80],
-      ["S/Gas", gas.id, -20],
+    for (const [label, categoryId, amount, memo] of [
+      ["S/Groceries", groceries.id, -80, "Lunch run"],
+      ["S/Gas", gas.id, -20, null],
     ] as const) {
       const split = await dataSource.manager.save(
         dataSource.manager.create(TransactionSplit, {
           transactionId: s.id,
           categoryId,
           amount,
+          memo,
         }),
       );
       splitLabels.set(split.id, label);
@@ -145,6 +158,33 @@ describe("transaction search (integration)", () => {
       payeeName: "Costco Gas Bar",
       categoryId: gas.id,
       amount: -60,
+    });
+
+    // LIKE metacharacters in the text itself (INV-SEARCH-005).
+    await save("Q50", {
+      accountId: promoAccount.id,
+      description: "50% off",
+      amount: -5,
+    });
+    // Two tags that both match "fuel", for INV-SEARCH-004.
+    const fuelRow = await save("T", {
+      accountId: taggedAccount.id,
+      amount: -60,
+    });
+    for (const name of ["fuel", "fuel card"]) {
+      const tag = await dataSource.manager.save(
+        dataSource.manager.create(Tag, { userId, name }),
+      );
+      await dataSource.query(
+        "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ($1, $2)",
+        [fuelRow.id, tag.id],
+      );
+    }
+
+    await save("Q500", {
+      accountId: promoAccount.id,
+      description: "500 off",
+      amount: -7,
     });
   });
 
@@ -277,53 +317,140 @@ describe("transaction search (integration)", () => {
     },
   );
 
-  describe("INV-SEARCH-002: a single bare term matches what it matches today", () => {
-    async function legacyMatching(
-      term: string,
-      accountId: string,
-    ): Promise<string[]> {
-      const parsed = parseSearchTerm(term, EN);
-      const qb = transactionQuery("transaction", accountId)
-        .leftJoin("transaction.splits", "splits")
-        .distinct(true)
-        .andWhere(
-          buildTransactionSearchClause({
-            transaction: "transaction",
-            splits: "splits",
-          }),
-          {
-            search: `%${escapeLikePattern(term.trim())}%`,
-            searchAmount: parsed.amount,
-            searchDate: parsed.date,
-          },
-        );
-      const rows: Array<{ id: string }> = await qb.getRawMany();
-      return rows.map((row) => labels.get(row.id) as string).sort();
+  describe("INV-SEARCH-002: a single bare term matches what it matched before the syntax", () => {
+    // Recorded 2026-10-12 against the single-term `buildTransactionSearchClause`
+    // (task B2's spec compared the two live; B3 removed the old clause). Each
+    // row is [term, reference account, split account].
+    it.each<[string, string[], string[]]>([
+      ["10", ["A", "B", "C", "D", "E", "F"], ["S"]],
+      ["0010", ["C", "E"], []],
+      ["100", ["B"], ["S"]],
+      ["-10", ["E"], ["S"]],
+      ["20", ["C"], ["S"]],
+      ["80.00", [], ["S"]],
+      ["costco", [], ["P", "S"]],
+      ["gas", [], ["P", "S"]],
+      ["groceries", [], ["S"]],
+      ["invoice", ["F"], []],
+      ["2026-03-15", ["A"], []],
+      ["%", [], []],
+      ["_", [], []],
+      ["co_tco", [], []],
+      ["\\", [], []],
+      ["nothing-matches", [], []],
+    ])("%j", async (term, refRows, splitRows) => {
+      await expect(transactionsMatching(term, refAccount.id)).resolves.toEqual(
+        refRows,
+      );
+      await expect(
+        transactionsMatching(term, splitAccount.id),
+      ).resolves.toEqual(splitRows);
+    });
+  });
+
+  describe("call sites", () => {
+    async function register(accountId: string, search: string) {
+      return withUserContext(userId, () =>
+        module
+          .get(TransactionsService)
+          .findAll(
+            userId,
+            [accountId],
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            1,
+            50,
+            false,
+            search,
+          ),
+      );
     }
 
-    it.each([
-      "10",
-      "0010",
-      "100",
-      "-10",
-      "20",
-      "80.00",
-      "costco",
-      "gas",
-      "groceries",
-      "invoice",
-      "2026-03-15",
-      "%",
-      "_",
-      "co_tco",
-      "\\",
-      "nothing-matches",
-    ])("%j", async (term) => {
-      for (const account of [refAccount, splitAccount]) {
-        await expect(transactionsMatching(term, account.id)).resolves.toEqual(
-          await legacyMatching(term, account.id),
-        );
-      }
+    it("the register finds cheque 10 by #10", async () => {
+      const page = await register(refAccount.id, "#10");
+      expect(page.data.map((row) => labels.get(row.id)).sort()).toEqual([
+        "A",
+        "C",
+      ]);
+      expect(page.pagination.total).toBe(2);
+    });
+
+    it("the register draws only the matching line of a split (split grain)", async () => {
+      const page = await register(splitAccount.id, "memo:lunch");
+      expect(page.data.map((row) => labels.get(row.id))).toEqual(["S"]);
+      expect(
+        page.data[0].splits.map((split) => splitLabels.get(split.id)),
+      ).toEqual(["S/Groceries"]);
+    });
+
+    it("every term must hold on the same line of the register", async () => {
+      const page = await register(splitAccount.id, "costco gas");
+      const byLabel = new Map(
+        page.data.map((row) => [labels.get(row.id), row]),
+      );
+      expect([...byLabel.keys()].sort()).toEqual(["P", "S"]);
+      expect(
+        byLabel.get("S")?.splits.map((split) => splitLabels.get(split.id)),
+      ).toEqual(["S/Gas"]);
+    });
+
+    it("the LLM totals and the register agree on a LIKE metacharacter (INV-SEARCH-005)", async () => {
+      const totals = await withUserContext(userId, () =>
+        module.get(TransactionAnalyticsService).getLlmListTransactions(userId, {
+          startDate: "2026-01-01",
+          endDate: "2026-12-31",
+          accountIds: [promoAccount.id],
+          searchText: "50%",
+        }),
+      );
+      const page = await register(promoAccount.id, "50%");
+      expect(page.data.map((row) => labels.get(row.id))).toEqual(["Q50"]);
+      expect(totals.transactionCount).toBe(1);
+      expect(totals.totalExpenses).toBe(5);
+    });
+
+    it("two matching tags do not count a transaction twice (INV-SEARCH-004)", async () => {
+      const totals = await withUserContext(userId, () =>
+        module.get(TransactionAnalyticsService).getLlmListTransactions(userId, {
+          startDate: "2026-01-01",
+          endDate: "2026-12-31",
+          accountIds: [taggedAccount.id],
+          searchText: "fuel",
+        }),
+      );
+      const page = await register(taggedAccount.id, "tag:fuel");
+      expect(page.pagination.total).toBe(1);
+      expect(totals.transactionCount).toBe(1);
+      expect(totals.totalExpenses).toBe(60);
+    });
+
+    it("bulk update searches with an uncategorized-only category filter", async () => {
+      // The category filter joins no split alias for the pseudo-ids alone, so
+      // the search joins its own; before B3 this query named an alias that
+      // was never joined.
+      const result = await withUserContext(userId, () =>
+        module.get(TransactionBulkUpdateService).bulkUpdate(userId, {
+          mode: "filter",
+          filters: {
+            accountIds: [promoAccount.id],
+            categoryIds: ["uncategorized"],
+            search: "off -memo:50%",
+          },
+          payeeName: "Promo Shop",
+        }),
+      );
+      expect(result.updated).toBe(1);
+      const rows = await dataSource.manager.find(Transaction, {
+        where: { accountId: promoAccount.id },
+      });
+      expect(
+        rows.map((row) => [labels.get(row.id), row.payeeName]).sort(),
+      ).toEqual([
+        ["Q50", null],
+        ["Q500", "Promo Shop"],
+      ]);
     });
   });
 
