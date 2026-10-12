@@ -8,8 +8,8 @@ today. The task list is
 [`hideable-columns-tasks.md`](./hideable-columns-tasks.md).
 
 Status: **approved-to-build**; decisions agreed in the planning session of
-2026-10-12 and recorded on the tracking issue. Each task is a sub-issue, one
-PR each.
+2026-10-12 and recorded on the tracking issue #1700. Each task is a sub-issue
+(#1701 to #1709), one PR each.
 
 ## 1. Goal
 
