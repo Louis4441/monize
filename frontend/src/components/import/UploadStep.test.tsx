@@ -301,6 +301,30 @@ describe('UploadStep', () => {
       );
     });
 
+    it('still claims a file drag while loading so the browser cannot open the file', () => {
+      // Without preventDefault on dragover the browser never fires drop and
+      // instead navigates the tab to the released file, mid-upload.
+      renderStep(true);
+      const zone = screen.getByTestId('import-drop-zone');
+      const drag = fileDrag([new File(['a'], 'bank.qif')]);
+
+      const enterAllowed = fireEvent.dragEnter(zone, drag);
+      const overAllowed = fireEvent.dragOver(zone, drag);
+
+      // fireEvent returns false when the handler called preventDefault.
+      expect(enterAllowed).toBe(false);
+      expect(overAllowed).toBe(false);
+    });
+
+    it('offers a copy drop when idle', () => {
+      renderStep();
+      const zone = screen.getByTestId('import-drop-zone');
+
+      expect(
+        fireEvent.dragOver(zone, fileDrag([new File(['a'], 'bank.qif')])),
+      ).toBe(false);
+    });
+
     it('ignores a drop while a file is already being processed', () => {
       renderStep(true);
       const zone = screen.getByTestId('import-drop-zone');

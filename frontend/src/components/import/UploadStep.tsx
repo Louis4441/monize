@@ -70,17 +70,22 @@ export function UploadStep({
   // them keeps the highlight from flickering while it moves over the icon.
   const dragDepth = useRef(0);
 
+  // A file drag is always claimed, even while loading: a zone that does not
+  // call preventDefault lets the browser open the released file in the tab,
+  // leaving the wizard mid-upload. Only the highlight and the drop effect
+  // depend on whether a drop would be taken.
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isLoading || !carriesFiles(e)) return;
+    if (!carriesFiles(e)) return;
     e.preventDefault();
+    if (isLoading) return;
     dragDepth.current += 1;
     setIsDragging(true);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    if (isLoading || !carriesFiles(e)) return;
+    if (!carriesFiles(e)) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
+    e.dataTransfer.dropEffect = isLoading ? 'none' : 'copy';
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
