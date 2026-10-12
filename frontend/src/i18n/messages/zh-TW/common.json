@@ -38,6 +38,9 @@
     "scheduleRecurring": "設為固定排程",
     "more": "更多操作"
   },
+  "columns": {
+    "saveFailed": "無法儲存欄位設定。請再試一次。"
+  },
   "loading": "載入中...",
   "pagination": {
     "showing": "顯示",

@@ -38,6 +38,9 @@
     "scheduleRecurring": "Tornar recorrente",
     "more": "Mais ações"
   },
+  "columns": {
+    "saveFailed": "Não foi possível guardar as definições das colunas. Tente novamente."
+  },
   "loading": "A carregar...",
   "pagination": {
     "showing": "A mostrar",

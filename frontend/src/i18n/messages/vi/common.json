@@ -38,6 +38,9 @@
     "scheduleRecurring": "Lên lịch định kỳ",
     "more": "Thêm thao tác"
   },
+  "columns": {
+    "saveFailed": "Không thể lưu cài đặt cột. Vui lòng thử lại."
+  },
   "loading": "Đang tải...",
   "pagination": {
     "showing": "Hiển thị",

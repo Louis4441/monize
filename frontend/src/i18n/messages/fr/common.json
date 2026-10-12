@@ -38,6 +38,9 @@
     "scheduleRecurring": "Rendre récurrent",
     "more": "Plus d'actions"
   },
+  "columns": {
+    "saveFailed": "Impossible d'enregistrer les paramètres des colonnes. Veuillez réessayer."
+  },
   "loading": "Chargement...",
   "pagination": {
     "showing": "Affichage",

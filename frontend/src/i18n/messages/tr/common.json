@@ -38,6 +38,9 @@
     "scheduleRecurring": "Tekrarlayan Olarak Zamanla",
     "more": "Daha Fazla İşlem"
   },
+  "columns": {
+    "saveFailed": "Sütun ayarları kaydedilemedi. Lütfen tekrar deneyin."
+  },
   "loading": "Yükleniyor...",
   "pagination": {
     "showing": "Gösterilen",

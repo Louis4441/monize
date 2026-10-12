@@ -38,6 +38,9 @@
     "scheduleRecurring": "Wiederkehrend machen",
     "more": "Weitere Aktionen"
   },
+  "columns": {
+    "saveFailed": "Spalteneinstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut."
+  },
   "loading": "Wird geladen...",
   "pagination": {
     "showing": "Angezeigt",
