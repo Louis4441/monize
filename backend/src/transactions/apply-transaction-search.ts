@@ -52,6 +52,15 @@ export async function resolveTransactionSearch(
   return parseTransactionSearch(raw, await loadSearchFormats(m, userId));
 }
 
+/**
+ * Whether the parsed search narrows the rows at all: a search holding only
+ * empty terms (`ref:`) adds no condition, so it must not count as a content
+ * filter either (the register's balance regime reads this).
+ */
+export function searchNarrows(parsed: ParsedSearch | undefined): boolean {
+  return !!parsed && parsed.terms.some((term) => term.ignored !== "empty");
+}
+
 /** Applies already-parsed terms to `qb` as one AND-ed condition. */
 export function applyParsedSearch<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,

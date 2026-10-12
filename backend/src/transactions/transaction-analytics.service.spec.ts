@@ -4,8 +4,29 @@ import { TransactionAnalyticsService } from "./transaction-analytics.service";
 import { Transaction } from "./entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { buildTransactionSearchClause } from "./transaction-search.util";
+import { buildTransactionSearchWhere } from "./transaction-search.util";
+import {
+  parseTransactionSearch,
+  SearchFormats,
+} from "./transaction-search-query.util";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+/**
+ * The condition and parameters the search helper adds for `raw`, at the
+ * split grain every call site uses (advanced-search plan, question 5).
+ */
+function expectedSearch(
+  raw: string,
+  aliases: { transaction: string; splits: string; paramPrefix?: string },
+  formats: SearchFormats = {},
+): [string, Record<string, unknown>] {
+  const clause = buildTransactionSearchWhere(
+    parseTransactionSearch(raw, formats).terms,
+    { paramPrefix: "srch", ...aliases, grain: "split" },
+  );
+  if (!clause) throw new Error(`no search clause for ${raw}`);
+  return [clause.sql, clause.params];
+}
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -929,11 +950,10 @@ describe("TransactionAnalyticsService", () => {
         );
 
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-          buildTransactionSearchClause({
+          ...expectedSearch("grocery", {
             transaction: "transaction",
             splits: "splits",
           }),
-          { search: "%grocery%", searchAmount: null, searchDate: null },
         );
       });
 
@@ -949,11 +969,10 @@ describe("TransactionAnalyticsService", () => {
         );
 
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-          buildTransactionSearchClause({
+          ...expectedSearch("coffee", {
             transaction: "transaction",
             splits: "splits",
           }),
-          { search: "%coffee%", searchAmount: null, searchDate: null },
         );
       });
 
@@ -1069,8 +1088,10 @@ describe("TransactionAnalyticsService", () => {
           { payeeIds: ["payee-1"] },
         );
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-          expect.stringContaining("ILIKE"),
-          { search: "%rent%", searchAmount: null, searchDate: null },
+          ...expectedSearch("rent", {
+            transaction: "transaction",
+            splits: "splits",
+          }),
         );
       });
 
@@ -1523,11 +1544,10 @@ describe("TransactionAnalyticsService", () => {
       );
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
+        ...expectedSearch("grocery", {
           transaction: "transaction",
           splits: "splits",
         }),
-        { search: "%grocery%", searchAmount: null, searchDate: null },
       );
     });
 
@@ -2213,11 +2233,10 @@ describe("TransactionAnalyticsService", () => {
         { amountTo: -10 },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
+        ...expectedSearch("coffee", {
           transaction: "transaction",
           splits: "splits",
         }),
-        { search: "%coffee%", searchAmount: null, searchDate: null },
       );
     });
 

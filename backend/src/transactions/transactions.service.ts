@@ -19,7 +19,6 @@ import { TransactionSplit } from "./entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
 import { repriceSettledLoanTemplates } from "../loan-installments/reprice-template";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
-import { UserPreference } from "../users/entities/user-preference.entity";
 import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import { primaryAttachmentSql } from "../attachments/primary-attachment.util";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
@@ -88,13 +87,11 @@ import {
   PaginatedResult,
 } from "../common/dto/pagination-query.dto";
 import {
-  buildTransactionSearchClause,
-  escapeLikePattern,
-} from "./transaction-search.util";
-import {
-  parseSearchTerm,
-  ParsedSearchTerm,
-} from "./transaction-search-parse.util";
+  applyParsedSearch,
+  resolveTransactionSearch,
+  searchNarrows,
+} from "./apply-transaction-search";
+import { ParsedSearch } from "./transaction-search-query.util";
 import { buildTagKeyFilterClause, TagKeyFilter } from "./tag-key-filter.util";
 import { onlyBalanceAffecting } from "./balance-affecting.util";
 import { tr } from "../i18n/translate";
@@ -170,9 +167,8 @@ export interface RegisterRowFilters {
   categoryIds: string[] | undefined;
   payeeIds: string[] | undefined;
   tagIds: string[] | undefined;
-  search: string | undefined;
-  searchAmount: number | null | undefined;
-  searchDate: string | null | undefined;
+  /** Parsed once by `findAll`, so every query reads the string identically. */
+  search: ParsedSearch | undefined;
   amountFrom: number | undefined;
   amountTo: number | undefined;
   statuses: TransactionStatus[] | undefined;
@@ -207,7 +203,7 @@ function hasRegisterContentFilters(
     (filters?.categoryIds && filters.categoryIds.length > 0) ||
     (filters?.payeeIds && filters.payeeIds.length > 0) ||
     (filters?.tagIds && filters.tagIds.length > 0) ||
-    filters?.search?.trim() ||
+    searchNarrows(filters?.search) ||
     filters?.amountFrom !== undefined ||
     filters?.amountTo !== undefined ||
     (filters?.statuses && filters.statuses.length > 0) ||
@@ -386,28 +382,6 @@ export class TransactionsService {
     @Inject(forwardRef(() => TransactionRulesApplierService))
     private rulesApplier: TransactionRulesApplierService,
   ) {}
-
-  /**
-   * Interprets the search box term as an exact amount and/or date using the
-   * user's number/date-format preferences, so a value typed in the user's own
-   * locale format (e.g. "1 234,56" or "02.07.2026") also matches. Returns
-   * `{ amount: null, date: null }` for a blank/non-parseable term.
-   */
-  private async resolveSearchTerm(
-    userId: string,
-    term?: string,
-  ): Promise<ParsedSearchTerm> {
-    if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await withScopedDb(this.dataSource, (m) =>
-      m.getRepository(UserPreference).findOne({
-        where: { userId },
-      }),
-    );
-    return parseSearchTerm(term, {
-      numberFormat: prefs?.numberFormat,
-      dateFormat: prefs?.dateFormat,
-    });
-  }
 
   /**
    * Validate and normalize the foreign-currency entry fields against the
@@ -1281,10 +1255,12 @@ export class TransactionsService {
     const safeLimit = clamped.limit;
     let safePage = clamped.page;
 
-    // Interpret the search term once (amount/date in the user's locale format)
-    // and thread it through the query, the target-page count, and the running
-    // balance so all three match the same rows.
-    const parsedSearch = await this.resolveSearchTerm(userId, search);
+    // Parse the search string once, in the user's number and date formats,
+    // and thread the terms through the query, the target-page count and the
+    // running balance so all three match the same rows.
+    const parsedSearch = await withScopedDb(this.dataSource, (m) =>
+      resolveTransactionSearch(m, userId, search),
+    );
 
     // What the register is showing, in one object, so neither the page a deep
     // link lands on nor any of the three balance regimes can be handed a
@@ -1295,9 +1271,7 @@ export class TransactionsService {
       categoryIds,
       payeeIds,
       tagIds,
-      search,
-      searchAmount: parsedSearch.amount,
-      searchDate: parsedSearch.date,
+      search: parsedSearch,
       amountFrom,
       amountTo,
       statuses,
@@ -1356,20 +1330,15 @@ export class TransactionsService {
         });
       }
 
-      if (search && search.trim()) {
-        const searchPattern = `%${escapeLikePattern(search.trim())}%`;
-        queryBuilder.andWhere(
-          buildTransactionSearchClause({
-            transaction: "transaction",
-            splits: "splits",
-          }),
-          {
-            search: searchPattern,
-            searchAmount: parsedSearch.amount,
-            searchDate: parsedSearch.date,
-          },
-        );
-      }
+      // Split grain on the hydrated `splits` alias: a split transaction is
+      // drawn with only its matching lines and a filtered total, as the
+      // category filter draws it (advanced-search plan, question 5).
+      applyParsedSearch(queryBuilder, parsedSearch, {
+        transaction: "transaction",
+        splits: "splits",
+        grain: "split",
+        paramPrefix: "srch",
+      });
 
       if (amountFrom !== undefined) {
         queryBuilder.andWhere("transaction.amount >= :amountFrom", {
@@ -2328,7 +2297,7 @@ export class TransactionsService {
     // and the uncategorised pseudo-category, whose listing arm asks about a
     // split parent's children).
     const needsSplitsJoin = !!(
-      filters.search ||
+      searchNarrows(filters.search) ||
       (filters.categoryIds &&
         filters.categoryIds.some((id) => id !== "transfer")) ||
       (filters.tagIds && filters.tagIds.length > 0)
@@ -2338,21 +2307,14 @@ export class TransactionsService {
       qb.leftJoin("bf.splits", "bfSplits");
     }
 
-    if (filters.search) {
-      const searchPattern = `%${escapeLikePattern(filters.search.trim())}%`;
-      qb.andWhere(
-        buildTransactionSearchClause({
-          transaction: "bf",
-          splits: "bfSplits",
-          paramName: "bfSearch",
-        }),
-        {
-          bfSearch: searchPattern,
-          bfSearchAmount: filters.searchAmount ?? null,
-          bfSearchDate: filters.searchDate ?? null,
-        },
-      );
-    }
+    // The same terms and grain as the listing, under this subquery's own
+    // parameter prefix (its parameters are copied onto the embedding query).
+    applyParsedSearch(qb, filters.search, {
+      transaction: "bf",
+      splits: "bfSplits",
+      grain: "split",
+      paramPrefix: "bfSrch",
+    });
 
     if (filters.categoryIds && filters.categoryIds.length > 0) {
       const hasUncategorized = filters.categoryIds.includes("uncategorized");

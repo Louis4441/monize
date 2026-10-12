@@ -68,6 +68,7 @@ import {
   DATE_REGEX,
 } from "../common/query-param-utils";
 import { tr } from "../i18n/translate";
+import { MAX_SEARCH_LENGTH } from "./transaction-search-query.util";
 import {
   TagKeyFilter,
   TagKeyFilterOp,
@@ -80,6 +81,16 @@ import { TRANSACTION_SORT_FIELDS } from "./register-order";
 const ALL_TRANSACTION_STATUSES = new Set<string>(
   Object.values(TransactionStatus),
 );
+
+/**
+ * The `search` query value: refused when not a string (a repeated key arrives
+ * as an array) and cut at the parser's length cap, on every endpoint that
+ * takes one, so the register and its totals read the same string.
+ */
+function searchParam(search: unknown): string | undefined {
+  const value = assertStringParam(search, "search");
+  return value ? value.slice(0, MAX_SEARCH_LENGTH) : undefined;
+}
 
 /**
  * Build a KEY:VALUE tag filter from the `tagKey` / `tagKeyOp` / `tagKeyValue`
@@ -480,9 +491,7 @@ export class TransactionsController {
       );
     }
 
-    // Truncate search to prevent excessive ILIKE query length
-    const searchStr = assertStringParam(search, "search");
-    const sanitizedSearch = searchStr ? searchStr.slice(0, 200) : undefined;
+    const sanitizedSearch = searchParam(search);
     // An exact match, so never trimmed or truncated: a key longer than any
     // stored one simply matches nothing. An empty one is refused, as a create
     // refuses it, rather than read as a filter no row can satisfy.
@@ -708,7 +717,7 @@ export class TransactionsController {
       endDate,
       parseCategoryIds(categoryIds ?? categoryId),
       parseIds(payeeIds, payeeId),
-      search,
+      searchParam(search),
       parsedAmountFrom,
       parsedAmountTo,
       parseUuids(tagIdsParam),
@@ -868,7 +877,7 @@ export class TransactionsController {
       categoryIds: parseCategoryIds(categoryIds),
       payeeIds: parseUuids(payeeIds),
       tagIds: parseUuids(tagIdsParam),
-      search,
+      search: searchParam(search),
       amountFrom: parsedAmountFrom,
       amountTo: parsedAmountTo,
       limit: parsedLimit,
@@ -972,7 +981,7 @@ export class TransactionsController {
         categoryIds: parseCategoryIds(categoryIds),
         payeeIds: parseUuids(payeeIds),
         tagIds: parseUuids(tagIdsParam),
-        search,
+        search: searchParam(search),
         amountFrom: parsedAmountFrom,
         amountTo: parsedAmountTo,
         limit: parsedLimit,
@@ -1190,7 +1199,7 @@ export class TransactionsController {
       endDate,
       parseCategoryIds(categoryIds),
       parseUuids(payeeIds),
-      search,
+      searchParam(search),
       parsedAmountFrom,
       parsedAmountTo,
       parseUuids(tagIdsParam),

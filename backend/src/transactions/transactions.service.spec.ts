@@ -38,7 +38,11 @@ import { ActionHistoryService } from "../action-history/action-history.service";
 import { EXTERNAL_ID_INDEX } from "./transaction-external-id";
 import { getActiveScopedManager } from "../common/db/scoped-db";
 import { isTransactionInFuture } from "../common/date-utils";
-import { buildTransactionSearchClause } from "./transaction-search.util";
+import { buildTransactionSearchWhere } from "./transaction-search.util";
+import {
+  parseTransactionSearch,
+  SearchFormats,
+} from "./transaction-search-query.util";
 import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import { lockTransactionRow, lockTransactionRows } from "../common/db/locks";
 import { lockedTransactionRow } from "../test-helpers/locks-testing";
@@ -46,6 +50,23 @@ import {
   createScopedDbMocks,
   DataSourceMock,
 } from "../test-helpers/scoped-db-testing";
+
+/**
+ * The condition and parameters the search helper adds for `raw`, at the
+ * split grain every call site uses (advanced-search plan, question 5).
+ */
+function expectedSearch(
+  raw: string,
+  aliases: { transaction: string; splits: string; paramPrefix?: string },
+  formats: SearchFormats = {},
+): [string, Record<string, unknown>] {
+  const clause = buildTransactionSearchWhere(
+    parseTransactionSearch(raw, formats).terms,
+    { paramPrefix: "srch", ...aliases, grain: "split" },
+  );
+  if (!clause) throw new Error(`no search clause for ${raw}`);
+  return [clause.sql, clause.params];
+}
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -3407,11 +3428,10 @@ describe("TransactionsService", () => {
       );
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
+        ...expectedSearch("groceries", {
           transaction: "transaction",
           splits: "splits",
         }),
-        { search: "%groceries%", searchAmount: null, searchDate: null },
       );
     });
 
@@ -3440,15 +3460,11 @@ describe("TransactionsService", () => {
       );
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
-          transaction: "transaction",
-          splits: "splits",
-        }),
-        {
-          search: "%1.234,56%",
-          searchAmount: 1234.56,
-          searchDate: null,
-        },
+        ...expectedSearch(
+          "1.234,56",
+          { transaction: "transaction", splits: "splits" },
+          { numberFormat: "de-DE", dateFormat: "DD.MM.YYYY" },
+        ),
       );
     });
 
@@ -3476,15 +3492,11 @@ describe("TransactionsService", () => {
       );
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
-          transaction: "transaction",
-          splits: "splits",
-        }),
-        {
-          search: "%02.07.2026%",
-          searchAmount: null,
-          searchDate: "2026-07-02",
-        },
+        ...expectedSearch(
+          "02.07.2026",
+          { transaction: "transaction", splits: "splits" },
+          { numberFormat: "de-DE", dateFormat: "DD.MM.YYYY" },
+        ),
       );
     });
 
@@ -4485,16 +4497,11 @@ describe("TransactionsService", () => {
         // Should join splits for search
         expect(idsQb.leftJoin).toHaveBeenCalledWith("bf.splits", "bfSplits");
         expect(idsQb.andWhere).toHaveBeenCalledWith(
-          buildTransactionSearchClause({
+          ...expectedSearch("grocery", {
             transaction: "bf",
             splits: "bfSplits",
-            paramName: "bfSearch",
+            paramPrefix: "bfSrch",
           }),
-          {
-            bfSearch: "%grocery%",
-            bfSearchAmount: null,
-            bfSearchDate: null,
-          },
         );
       });
 
@@ -5817,11 +5824,10 @@ describe("TransactionsService", () => {
         "splits",
       );
       expect(mockQb.andWhere).toHaveBeenCalledWith(
-        buildTransactionSearchClause({
+        ...expectedSearch("test search", {
           transaction: "transaction",
           splits: "splits",
         }),
-        { search: "%test search%", searchAmount: null, searchDate: null },
       );
     });
 

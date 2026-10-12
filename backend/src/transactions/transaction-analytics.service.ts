@@ -3,7 +3,6 @@ import { Brackets, DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
-import { UserPreference } from "../users/entities/user-preference.entity";
 import { getAllCategoryIdsWithChildren } from "../common/category-tree.util";
 import {
   applyInvestmentTransactionFilters,
@@ -17,14 +16,7 @@ import {
   SPLIT_AMOUNT,
   SPLIT_CATEGORY_ID,
 } from "../common/transaction-split-query.util";
-import {
-  buildTransactionSearchClause,
-  escapeLikePattern,
-} from "./transaction-search.util";
-import {
-  parseSearchTerm,
-  ParsedSearchTerm,
-} from "./transaction-search-parse.util";
+import { applyTransactionSearch } from "./apply-transaction-search";
 import { RecurringCharge, detectFrequency } from "./recurring-charges.util";
 import {
   loadQualifiedCategoryNames,
@@ -199,37 +191,9 @@ export interface LlmPeriodComparisonResult {
   }>;
 }
 
-function sanitizeLikePattern(input: string | undefined): string | undefined {
-  if (!input) return undefined;
-  return input
-    .substring(0, 200)
-    .replace(/\\/g, "\\\\")
-    .replace(/[%_]/g, "\\$&");
-}
-
 @Injectable()
 export class TransactionAnalyticsService {
   constructor(private dataSource: DataSource) {}
-
-  /**
-   * Interprets the search term as an exact amount and/or date using the user's
-   * number/date-format preferences, so locale-formatted values also match.
-   */
-  private async resolveSearchTerm(
-    userId: string,
-    term?: string,
-  ): Promise<ParsedSearchTerm> {
-    if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await withScopedDb(this.dataSource, (mgr) =>
-      mgr.getRepository(UserPreference).findOne({
-        where: { userId },
-      }),
-    );
-    return parseSearchTerm(term, {
-      numberFormat: prefs?.numberFormat,
-      dateFormat: prefs?.dateFormat,
-    });
-  }
 
   /**
    * Per-account transfer activity between the user's own accounts for a date
@@ -761,21 +725,15 @@ export class TransactionAnalyticsService {
       });
     }
 
-    if (search && search.trim()) {
-      const searchPattern = `%${escapeLikePattern(search.trim())}%`;
-      const parsedSearch = await this.resolveSearchTerm(userId, search);
-      queryBuilder.andWhere(
-        buildTransactionSearchClause({
-          transaction: "transaction",
-          splits: "splits",
-        }),
-        {
-          search: searchPattern,
-          searchAmount: parsedSearch.amount,
-          searchDate: parsedSearch.date,
-        },
-      );
-    }
+    // Split grain on the joined `splits` alias: the totals count the
+    // matching lines, as the register draws them.
+    await applyTransactionSearch(m, queryBuilder, search, {
+      userId,
+      transaction: "transaction",
+      splits: "splits",
+      grain: "split",
+      paramPrefix: "srch",
+    });
 
     if (amountFrom !== undefined) {
       queryBuilder.andWhere("transaction.amount >= :amountFrom", {
@@ -1177,8 +1135,6 @@ export class TransactionAnalyticsService {
     userId: string,
     input: LlmQueryTransactionsInput,
   ): Promise<LlmQueryTransactionsResult> {
-    const safeSearch = sanitizeLikePattern(input.searchText);
-
     const summary = await this.getSummary(
       userId,
       input.accountIds,
@@ -1186,7 +1142,7 @@ export class TransactionAnalyticsService {
       input.endDate,
       input.categoryIds,
       undefined,
-      safeSearch,
+      input.searchText,
       undefined,
       undefined,
       true,
@@ -1203,7 +1159,7 @@ export class TransactionAnalyticsService {
         input.direction,
         input.accountIds,
         input.categoryIds,
-        safeSearch,
+        input.searchText,
       );
     }
 
@@ -1245,7 +1201,6 @@ export class TransactionAnalyticsService {
     userId: string,
     input: LlmListTransactionsInput,
   ): Promise<LlmListTransactionsResult> {
-    const safeSearch = sanitizeLikePattern(input.searchText);
     const groupBy: LlmListGroupBy = input.groupBy ?? "none";
 
     const summary = await this.getSummary(
@@ -1255,7 +1210,7 @@ export class TransactionAnalyticsService {
       input.endDate,
       input.categoryIds,
       input.payeeIds,
-      safeSearch,
+      input.searchText,
       input.minAmount,
       input.maxAmount,
       true,
@@ -1283,7 +1238,7 @@ export class TransactionAnalyticsService {
         input.direction,
         input.accountIds,
         input.categoryIds,
-        safeSearch,
+        input.searchText,
         input.payeeIds,
         input.minAmount,
         input.maxAmount,
@@ -1310,7 +1265,7 @@ export class TransactionAnalyticsService {
     direction: LlmQueryDirection | undefined,
     accountIds?: string[],
     categoryIds?: string[],
-    safeSearchText?: string,
+    searchText?: string,
     payeeIds?: string[],
     minAmount?: number,
     maxAmount?: number,
@@ -1359,20 +1314,15 @@ export class TransactionAnalyticsService {
         qb.andWhere(`${SPLIT_AMOUNT} <= :maxAmount`, { maxAmount });
       }
 
-      if (safeSearchText) {
-        const parsedSearch = await this.resolveSearchTerm(
-          userId,
-          safeSearchText,
-        );
-        qb.andWhere(
-          buildTransactionSearchClause({ transaction: "t", splits: "ts" }),
-          {
-            search: `%${safeSearchText}%`,
-            searchAmount: parsedSearch.amount,
-            searchDate: parsedSearch.date,
-          },
-        );
-      }
+      // The raw string, escaped once inside the builder, so these rows and
+      // the summary above read the search identically (INV-SEARCH-005).
+      await applyTransactionSearch(m, qb, searchText, {
+        userId,
+        transaction: "t",
+        splits: "ts",
+        grain: "split",
+        paramPrefix: "srch",
+      });
 
       switch (groupBy) {
         case "category": {

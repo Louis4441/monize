@@ -379,6 +379,11 @@ task Q.
 - A trigram index on `reference_number` or `transaction_splits.memo`. Add
   one only if `EXPLAIN` on a realistic account shows a regression.
 - Searching scheduled transactions, payees or the investment register.
+- Folding the category filter's three inline `uncategorized` predicates
+  (`transactions.service.ts`, `transaction-analytics.service.ts`,
+  `transaction-bulk-update.service.ts`) and the inline attachment-presence
+  predicates onto `uncategorizedSql` / `hasAttachmentSql`. The search uses
+  the helpers; moving the filters is its own change.
 
 ## 12. Deploy and compatibility
 
