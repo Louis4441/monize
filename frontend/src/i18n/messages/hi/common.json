@@ -40,7 +40,7 @@
   },
   "columns": {
     "button": "कॉलम",
-    "buttonWithHidden": "कॉलम, {count} छिपे हुए",
+    "buttonWithHidden": "कॉलम, छिपे हुए: {count}",
     "menuLabel": "कॉलम दिखाएँ या छिपाएँ",
     "showAll": "सभी दिखाएँ",
     "hideColumn": "कॉलम छिपाएँ",

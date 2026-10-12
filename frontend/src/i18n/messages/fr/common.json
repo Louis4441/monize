@@ -40,7 +40,7 @@
   },
   "columns": {
     "button": "Colonnes",
-    "buttonWithHidden": "Colonnes, {count} masquées",
+    "buttonWithHidden": "Colonnes, masquées : {count}",
     "menuLabel": "Afficher ou masquer des colonnes",
     "showAll": "Tout afficher",
     "hideColumn": "Masquer la colonne",
