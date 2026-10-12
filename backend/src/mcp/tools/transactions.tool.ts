@@ -79,6 +79,7 @@ import {
   itemsArray,
 } from "./schema-fragments";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
+import { SEARCH_SYNTAX_SUMMARY } from "../../transactions/transaction-search-query.util";
 
 type ManageOperation = "create" | "update" | "delete";
 
@@ -159,7 +160,7 @@ export class McpTransactionsTools {
             .string()
             .max(200)
             .optional()
-            .describe("Substring of a payee name or description."),
+            .describe(SEARCH_SYNTAX_SUMMARY),
           startDate: z
             .string()
             .max(10)

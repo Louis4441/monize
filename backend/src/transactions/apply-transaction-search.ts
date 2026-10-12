@@ -4,7 +4,10 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   ParsedSearch,
   parseTransactionSearch,
+  SearchField,
   SearchFormats,
+  SearchIgnoredReason,
+  SearchOp,
 } from "./transaction-search-query.util";
 import {
   buildTransactionSearchWhere,
@@ -86,4 +89,43 @@ export async function applyTransactionSearch<T extends ObjectLiteral>(
   const parsed = await resolveTransactionSearch(m, userId, raw);
   applyParsedSearch(qb, parsed, clauseOptions);
   return parsed;
+}
+
+/** One term of the echo: how the server read it (plan section 6). */
+export interface SearchTermEcho {
+  field: SearchField | "any";
+  op: SearchOp;
+  value: string;
+  valueTo?: string;
+  negated: boolean;
+  raw: string;
+  ignored?: SearchIgnoredReason;
+}
+
+/**
+ * How the server read a search string, returned beside the register's rows so
+ * the client can show it without a second parser. Every term is echoed,
+ * including an ignored one, so a typo in a qualifier is visible.
+ */
+export interface SearchInterpretation {
+  terms: SearchTermEcho[];
+}
+
+export function searchInterpretation(
+  parsed: ParsedSearch,
+): SearchInterpretation {
+  return {
+    terms: parsed.terms.map((term) => {
+      const echo: SearchTermEcho = {
+        field: term.field,
+        op: term.op,
+        value: term.value,
+        negated: term.negated,
+        raw: term.raw,
+      };
+      if (term.valueTo !== undefined) echo.valueTo = term.valueTo;
+      if (term.ignored !== undefined) echo.ignored = term.ignored;
+      return echo;
+    }),
+  };
 }

@@ -89,6 +89,8 @@ import {
 import {
   applyParsedSearch,
   resolveTransactionSearch,
+  SearchInterpretation,
+  searchInterpretation,
   searchNarrows,
 } from "./apply-transaction-search";
 import { ParsedSearch } from "./transaction-search-query.util";
@@ -225,6 +227,11 @@ export interface PaginatedTransactions extends PaginatedResult<TransactionWithIn
    * balance to withhold.
    */
   startingBalanceWithheld?: "sort";
+  /**
+   * How the search string was read, term by term (advanced-search plan,
+   * section 6). Present exactly when a non-blank search was sent.
+   */
+  searchInterpretation?: SearchInterpretation;
 }
 
 export interface LlmTransactionRow {
@@ -1507,6 +1514,9 @@ export class TransactionsService {
         pagination: buildPaginationMeta(safePage, safeLimit, total),
         startingBalance,
         startingBalanceWithheld,
+        ...(parsedSearch && {
+          searchInterpretation: searchInterpretation(parsedSearch),
+        }),
       };
     });
   }

@@ -7,6 +7,9 @@ import { CLIENT_CAPABILITIES_META_KEY } from "@modelcontextprotocol/server";
 import { installConfirmSupport } from "../mcp-confirm";
 import { McpRequestStateCodec } from "../mcp-request-state";
 import { mcpTestCtx, McpTestContext } from "../testing/mcp-test-context";
+import { collectToolConfigs } from "../testing/collect-tool-configs";
+import { FINANCIAL_TOOLS } from "../../ai/query/tool-definitions";
+import { SEARCH_SYNTAX_SUMMARY } from "../../transactions/transaction-search-query.util";
 
 /**
  * A builder double that mints a FRESH envelope per call, exactly as the real
@@ -2495,5 +2498,26 @@ describe("McpTransactionsTools", () => {
       expect(result.content[0].text).toContain("transfer");
       expect(attachmentsService.create).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("list_transactions searchText", () => {
+  // Both adapters teach a model the same search syntax, from one constant
+  // (docs/backend/ai-and-payees.md, "Transaction search syntax").
+  it("describes the search syntax identically in the MCP tool and the assistant", () => {
+    const mcp = collectToolConfigs().find(
+      (tool) => tool.name === "list_transactions",
+    );
+    const assistant = FINANCIAL_TOOLS.find(
+      (tool) => tool.name === "list_transactions",
+    );
+    const assistantProps = assistant?.inputSchema.properties as Record<
+      string,
+      { description?: string }
+    >;
+    expect(mcp?.config.inputSchema.shape.searchText.description).toBe(
+      SEARCH_SYNTAX_SUMMARY,
+    );
+    expect(assistantProps.searchText.description).toBe(SEARCH_SYNTAX_SUMMARY);
   });
 });

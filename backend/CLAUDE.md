@@ -70,6 +70,7 @@ Each module holds `{feature}.module.ts`, controller, service, their specs, `enti
 | Storing a provider price | `refuseForeignCurrency` / `verifyProviderCurrency` (`src/securities/providers/quote-currency.util.ts`) before the write | writing a quote or a historical series whose currency was never compared with the security's |
 | A literal inside a regular expression | `escapeRegExp` | a hand-written character class |
 | A text filter offered to a person or a model | `ILike` or a case-insensitive comparison | `Like` |
+| A transaction search string | `applyTransactionSearch` (`src/transactions/apply-transaction-search.ts`), raw | escaping it or wrapping it in `%...%` yourself |
 | A predicate that decides which row counts | one named helper called from every site | the clauses spelled out per site |
 | A folded investment action | `applyActionToQuantity` / `acquisitionCost` | a hand-rolled replay |
 | A calendar date stepped over a range | `enumerateDaysYMD` / `addDaysYMD` | a local-midnight `Date` read back with `toISOString()` |
