@@ -72,6 +72,21 @@ export class CreateSecurityDto {
   @Max(1000)
   priceAlertPercent?: number | null;
 
+  /**
+   * Turns off every scheduled and background price fetch for this security
+   * (`isRefreshEligible` in `security-price.service.ts`). Imports set it on a
+   * symbol they had to invent; the user sets it for anything a provider cannot
+   * price. Prices entered by hand or carried by transactions still count.
+   */
+  @ApiProperty({
+    required: false,
+    default: false,
+    description: "Disable automatic price updates for this security",
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsBoolean()
+  skipPriceUpdates?: boolean;
+
   @ApiProperty({ example: "AAPL", description: "Stock symbol or ticker" })
   @IsString()
   @MaxLength(20)

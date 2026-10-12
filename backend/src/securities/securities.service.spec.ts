@@ -736,6 +736,89 @@ describe("SecuritiesService", () => {
       expect(saved.msnInstrumentId).toBe("a1u3p2");
     });
 
+    describe("skipPriceUpdates", () => {
+      it.each([true, false])(
+        "persists an explicit choice of %s",
+        async (value) => {
+          securitiesRepository.findOne.mockResolvedValue({
+            ...mockSecurity,
+            skipPriceUpdates: !value,
+          });
+
+          await service.update("user-1", "sec-1", { skipPriceUpdates: value });
+
+          const saved = queryRunnerManager.save.mock.calls[0][1];
+          expect(saved.skipPriceUpdates).toBe(value);
+        },
+      );
+
+      it("turns updates back on when a new provider override is picked", async () => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...mockSecurity,
+          skipPriceUpdates: true,
+          quoteProvider: null,
+        });
+
+        await service.update("user-1", "sec-1", { quoteProvider: "msn" });
+
+        const saved = queryRunnerManager.save.mock.calls[0][1];
+        expect(saved.skipPriceUpdates).toBe(false);
+      });
+
+      it("turns updates back on when a new MSN instrument id is entered", async () => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...mockSecurity,
+          skipPriceUpdates: true,
+          quoteProvider: "msn",
+          msnInstrumentId: null,
+        });
+
+        await service.update("user-1", "sec-1", {
+          quoteProvider: "msn",
+          msnInstrumentId: "a1u3p2",
+        });
+
+        const saved = queryRunnerManager.save.mock.calls[0][1];
+        expect(saved.skipPriceUpdates).toBe(false);
+      });
+
+      // The form resends every field; an override the row already had is not
+      // a new choice and must not undo the user's switch.
+      it("keeps updates off when the resent override is unchanged", async () => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...mockSecurity,
+          skipPriceUpdates: true,
+          quoteProvider: "msn",
+          msnInstrumentId: "a1u3p2",
+        });
+
+        await service.update("user-1", "sec-1", {
+          name: "Renamed",
+          quoteProvider: "msn",
+          msnInstrumentId: "a1u3p2",
+        });
+
+        const saved = queryRunnerManager.save.mock.calls[0][1];
+        expect(saved.skipPriceUpdates).toBe(true);
+      });
+
+      it("lets an explicit choice win over a newly picked provider", async () => {
+        securitiesRepository.findOne.mockResolvedValue({
+          ...mockSecurity,
+          skipPriceUpdates: false,
+          quoteProvider: null,
+        });
+
+        await service.update("user-1", "sec-1", {
+          quoteProvider: "yahoo",
+          skipPriceUpdates: true,
+        });
+
+        const saved = queryRunnerManager.save.mock.calls[0][1];
+        expect(saved.skipPriceUpdates).toBe(true);
+      });
+    });
+
     it("clears quoteProvider when explicitly set to null (Use Default)", async () => {
       securitiesRepository.findOne.mockResolvedValue({
         ...mockSecurity,

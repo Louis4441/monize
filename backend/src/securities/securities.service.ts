@@ -667,10 +667,20 @@ export class SecuritiesService {
         updateSecurityDto.assetWeightings,
       );
 
-    // The user explicitly opted into a quote source — auto-clear the
-    // skipPriceUpdates flag that QIF/OFX import sets on auto-generated
-    // symbols so refresh actually picks them up afterwards.
-    if (security.quoteProvider || security.msnInstrumentId) {
+    // An explicit choice of the "disable price updates" switch wins. Otherwise
+    // a quote source the user has just picked -- a provider override or MSN
+    // Instrument ID that differs from the stored one -- turns updates back on,
+    // so a symbol an import invented and flagged is fetched once corrected.
+    // Compared against the row, not the field's presence: the form resends
+    // every field, and an unchanged override must not undo the switch.
+    if (updateSecurityDto.skipPriceUpdates !== undefined) {
+      security.skipPriceUpdates = updateSecurityDto.skipPriceUpdates;
+    } else if (
+      (security.quoteProvider &&
+        security.quoteProvider !== beforeData.quoteProvider) ||
+      (security.msnInstrumentId &&
+        security.msnInstrumentId !== beforeData.msnInstrumentId)
+    ) {
       security.skipPriceUpdates = false;
     }
 

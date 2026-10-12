@@ -2078,6 +2078,25 @@ describe("SecurityPriceService", () => {
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
+    // The flag is the user's "disable price updates" switch; a provider
+    // override or MSN instrument id saved beside it must not turn it back on.
+    it("skips a flagged security even when it carries a provider override", async () => {
+      securitiesRepository.find.mockResolvedValue([
+        {
+          ...mockSecurity,
+          skipPriceUpdates: true,
+          quoteProvider: "msn",
+          msnInstrumentId: "MSN-123",
+        },
+      ]);
+      global.fetch = jest.fn() as jest.Mock;
+
+      const result = await service.settleDailyBars();
+
+      expect(result.totalSecurities).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
     it("runs under a system context: prices are global, not the caller's", async () => {
       let ctx: ReturnType<typeof getRequestContext>;
       securitiesRepository.find.mockImplementation(() => {
