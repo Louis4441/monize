@@ -32,16 +32,16 @@ No task adds a migration. Every task before R1 leaves a deployment with no `FX_P
 
 | ID | Issue | Task | Depends on | Deploy class | Status | PR |
 |----|-------|------|-----------|--------------|--------|----|
-| S1 | -- | Plan pair in `docs/future-plans/`; INV-FX-005 registered `unenforced` | -- | none | [ ] | -- |
-| B1 | -- | Provider contract, `FX_PROVIDERS` parser, the chain, the Yahoo adapter, module wiring; nothing calls them | S1 | none | [ ] | -- |
-| B2 | -- | `ExchangeRateService` on the chain: refresh by base, backfill by window, `fillRateWindow`, live rate, `source` from the provider; the source guard | B1 | neutral | [ ] | -- |
-| B3 | -- | Frankfurter adapter, tracked provider id, breaker guard over the providers directory, `FX_FRANKFURTER_BASE_URL` | B1 | inert | [ ] | -- |
-| B4 | -- | Yahoo adapter: placeholder cross-check against the reverse symbol, orientation memory | B1 | neutral | [ ] | -- |
-| B5 | -- | Currency lookup and verification through the chain; `currencies` under the breaker guard | B2, B3 | neutral | [ ] | -- |
-| B6 | -- | Status endpoint lists the configured providers | B2 | inert | [ ] | -- |
-| F1 | -- | Currencies page provider line, rate-history source label, all-failed refresh toast, en + pseudo | B6, B3 | inert | [ ] | -- |
-| R1 | -- | Default `frankfurter,yahoo`; docs; release note | B2, B3, F1 | change | [ ] | -- |
-| Q | -- | Acceptance: all locales, INV-FX-005 enforced, verification-contract row | R1, B4, B5 | none | [ ] | -- |
+| S1 | #1673 | Plan pair in `docs/future-plans/`; INV-FX-005 registered `unenforced` | -- | none | [x] | closes #1673 |
+| B1 | #1674 | Provider contract, `FX_PROVIDERS` parser, the chain, the Yahoo adapter, module wiring; nothing calls them | S1 | none | [ ] | -- |
+| B2 | #1675 | `ExchangeRateService` on the chain: refresh by base, backfill by window, `fillRateWindow`, live rate, `source` from the provider; the source guard | B1 | neutral | [ ] | -- |
+| B3 | #1676 | Frankfurter adapter, tracked provider id, breaker guard over the providers directory, `FX_FRANKFURTER_BASE_URL` | B1 | inert | [ ] | -- |
+| B4 | #1677 | Yahoo adapter: placeholder cross-check against the reverse symbol, orientation memory | B1 | neutral | [ ] | -- |
+| B5 | #1678 | Currency lookup and verification through the chain; `currencies` under the breaker guard | B2, B3 | neutral | [ ] | -- |
+| B6 | #1679 | Status endpoint lists the configured providers | B2 | inert | [ ] | -- |
+| F1 | #1680 | Currencies page provider line, rate-history source label, all-failed refresh toast, en + pseudo | B6, B3 | inert | [ ] | -- |
+| R1 | #1681 | Default `frankfurter,yahoo`; docs; release note | B2, B3, F1 | change | [ ] | -- |
+| Q | #1682 | Acceptance: all locales, INV-FX-005 enforced, verification-contract row | R1, B4, B5 | none | [ ] | -- |
 
 **Why B2 is neutral, not none:** it rewrites the live refresh, backfill, window and live-rate paths. With the default list `yahoo` the adapter makes the same Yahoo calls the service made, with one named change: the refresh now tries the reverse symbol when the direct one has no quote (`fillRateWindow` already did; the refresh did not).
 
