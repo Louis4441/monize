@@ -112,6 +112,13 @@ constraint name, and returning the same `409` the advisory pre-check would have
 returned. The pre-check is kept for a good error message and is documented as
 advisory only -- it "answers the question a moment before the answer can change."
 
+The API create's `externalId` is the same shape one level up:
+`idx_transactions_account_external_id` holds one row per account and key, the
+lookup before the insert is advisory, and the create whose insert loses the race
+matches the violation by the index's name (`isExternalIdConflict`) and answers
+with the winner's row rather than a 409, because a repeated create is a retry,
+not a conflict (INV-API-001).
+
 ### 3 -- conditional update as the claim
 
 ```typescript
