@@ -88,6 +88,14 @@
       "assetClass": "자산군별"
     }
   },
+  "assetClasses": {
+    "equity": "주식",
+    "fixedIncome": "채권",
+    "cash": "현금",
+    "preferred": "우선주",
+    "convertible": "전환사채",
+    "crypto": "암호화폐"
+  },
   "holdingsList": {
     "title": "보유 자산",
     "noHoldings": "이 포트폴리오에 보유 자산이 없습니다.",

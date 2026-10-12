@@ -88,6 +88,14 @@
       "assetClass": "Op beleggingscategorie"
     }
   },
+  "assetClasses": {
+    "equity": "Aandelen",
+    "fixedIncome": "Vastrentende waarden",
+    "cash": "Kas",
+    "preferred": "Preferente aandelen",
+    "convertible": "Converteerbare obligaties",
+    "crypto": "Crypto"
+  },
   "holdingsList": {
     "title": "Posities",
     "noHoldings": "Geen posities in deze portefeuille.",

@@ -88,6 +88,14 @@
       "assetClass": "Por clase de activo"
     }
   },
+  "assetClasses": {
+    "equity": "Renta variable",
+    "fixedIncome": "Renta fija",
+    "cash": "Efectivo",
+    "preferred": "Acciones preferentes",
+    "convertible": "Convertibles",
+    "crypto": "Cripto"
+  },
   "holdingsList": {
     "title": "Posiciones",
     "noHoldings": "No hay posiciones en esta cartera.",

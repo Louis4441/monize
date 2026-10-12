@@ -88,6 +88,14 @@
       "assetClass": "按資產類別"
     }
   },
+  "assetClasses": {
+    "equity": "股票",
+    "fixedIncome": "固定收益",
+    "cash": "現金",
+    "preferred": "特別股",
+    "convertible": "可轉換證券",
+    "crypto": "加密貨幣"
+  },
   "holdingsList": {
     "title": "持倉",
     "noHoldings": "此投資組合中無持倉。",

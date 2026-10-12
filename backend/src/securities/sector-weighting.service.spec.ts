@@ -866,10 +866,10 @@ describe("SectorWeightingService", () => {
 
       // 10 x $100 = $1,000: equity 600, fixed income 300, Other 100.
       expect(
-        result.items.find((i) => i.assetClass === "Equity")?.etfValue,
+        result.items.find((i) => i.assetClassKey === "equity")?.etfValue,
       ).toBe(600);
       expect(
-        result.items.find((i) => i.assetClass === "Fixed Income")?.etfValue,
+        result.items.find((i) => i.assetClassKey === "fixedIncome")?.etfValue,
       ).toBe(300);
       expect(result.unclassifiedValue).toBe(100);
       expect(result.totalPortfolioValue).toBe(1000);
@@ -892,13 +892,17 @@ describe("SectorWeightingService", () => {
 
       const result = await service.getAssetClassWeightings("user-1");
 
-      expect(
-        result.items.find((i) => i.assetClass === "Equity")?.directValue,
-      ).toBe(18000);
+      expect(result.items).toEqual([
+        expect.objectContaining({
+          assetClass: "Equities",
+          assetClassKey: "equity",
+          directValue: 18000,
+        }),
+      ]);
       expect(result.unclassifiedValue).toBe(0);
     });
 
-    it("merges class names that differ only by case under the first spelling", async () => {
+    it("merges a lower-case canonical name with the type default under the canonical label", async () => {
       withAccount();
       holdingsRepo.find.mockResolvedValue([
         {
@@ -927,11 +931,144 @@ describe("SectorWeightingService", () => {
       const result = await service.getAssetClassWeightings("user-1");
 
       expect(result.items).toHaveLength(1);
-      // The fund's own spelling wins; the stock's default folds into it.
-      expect(result.items[0].assetClass).toBe("equity");
+      // Both are the canonical equity class, named by its label.
+      expect(result.items[0].assetClass).toBe("Equities");
+      expect(result.items[0].assetClassKey).toBe("equity");
       expect(result.items[0].etfValue).toBe(1000);
       expect(result.items[0].directValue).toBe(200);
       expect(result.items[0].totalValue).toBe(1200);
+    });
+
+    it("merges a held stock and a fund's Yahoo 'Stocks' slice into one equity bucket", async () => {
+      withAccount();
+      holdingsRepo.find.mockResolvedValue([
+        {
+          id: "h1",
+          accountId: "acct-1",
+          securityId: "sec-stock-1",
+          quantity: 1,
+          security: mockStockSecurity,
+        },
+        {
+          id: "h2",
+          accountId: "acct-1",
+          securityId: "sec-etf-1",
+          quantity: 10,
+          security: {
+            ...mockEtfSecurity,
+            assetWeightings: [{ name: "Stocks", weight: 1 }],
+          },
+        },
+      ]);
+      manager.query.mockResolvedValue([
+        { security_id: "sec-stock-1", close_price: "200" },
+        { security_id: "sec-etf-1", close_price: "100" },
+      ]);
+
+      const result = await service.getAssetClassWeightings("user-1");
+
+      expect(result.items).toEqual([
+        {
+          assetClass: "Equities",
+          assetClassKey: "equity",
+          directValue: 200,
+          etfValue: 1000,
+          totalValue: 1200,
+          percentage: 100,
+        },
+      ]);
+    });
+
+    it("merges a held bond and a fund's Yahoo 'Bonds' slice into one fixed income bucket", async () => {
+      withAccount();
+      holdingsRepo.find.mockResolvedValue([
+        {
+          id: "h1",
+          accountId: "acct-1",
+          securityId: "sec-bond-1",
+          quantity: 5,
+          security: {
+            ...mockStockSecurity,
+            id: "sec-bond-1",
+            symbol: "BOND1",
+            securityType: "BOND",
+          },
+        },
+        {
+          id: "h2",
+          accountId: "acct-1",
+          securityId: "sec-etf-1",
+          quantity: 10,
+          security: {
+            ...mockEtfSecurity,
+            assetWeightings: [
+              { name: "Bonds", weight: 0.9 },
+              { name: "Cash", weight: 0.1 },
+            ],
+          },
+        },
+      ]);
+      manager.query.mockResolvedValue([
+        { security_id: "sec-bond-1", close_price: "100" },
+        { security_id: "sec-etf-1", close_price: "100" },
+      ]);
+
+      const result = await service.getAssetClassWeightings("user-1");
+
+      expect(result.items).toEqual([
+        {
+          assetClass: "Fixed Income",
+          assetClassKey: "fixedIncome",
+          directValue: 500,
+          etfValue: 900,
+          totalValue: 1400,
+          percentage: 93.33,
+        },
+        {
+          assetClass: "Cash",
+          assetClassKey: "cash",
+          directValue: 0,
+          etfValue: 100,
+          totalValue: 100,
+          percentage: 6.67,
+        },
+      ]);
+    });
+
+    it("passes a user-typed class that maps to no canonical class through as typed", async () => {
+      withAccount();
+      holdingsRepo.find.mockResolvedValue([
+        {
+          id: "h1",
+          accountId: "acct-1",
+          securityId: "sec-etf-1",
+          quantity: 10,
+          security: {
+            ...mockEtfSecurity,
+            assetWeightings: [
+              { name: "Real Estate", weight: 0.5 },
+              { name: "real estate", weight: 0.25 },
+              { name: "Stocks", weight: 0.25 },
+            ],
+          },
+        },
+      ]);
+      manager.query.mockResolvedValue([
+        { security_id: "sec-etf-1", close_price: "100" },
+      ]);
+
+      const result = await service.getAssetClassWeightings("user-1");
+
+      expect(
+        result.items.map(({ assetClass, assetClassKey, totalValue }) => ({
+          assetClass,
+          assetClassKey,
+          totalValue,
+        })),
+      ).toEqual([
+        { assetClass: "Real Estate", assetClassKey: null, totalValue: 750 },
+        { assetClass: "Equities", assetClassKey: "equity", totalValue: 250 },
+      ]);
     });
 
     it("filters by the requested accounts and securities", async () => {
@@ -976,7 +1113,7 @@ describe("SectorWeightingService", () => {
       });
       // ...and the excluded security contributes nothing.
       expect(result.items).toHaveLength(1);
-      expect(result.items[0].assetClass).toBe("Equity");
+      expect(result.items[0].assetClassKey).toBe("equity");
       expect(result.totalPortfolioValue).toBe(1000);
     });
 
@@ -1047,7 +1184,7 @@ describe("SectorWeightingService", () => {
       expect(result.byCountry.unclassifiedValue).toBe(250);
       expect(result.byCountry.unclassifiedPercentage).toBe(25);
       expect(result.byAssetClass.items).toEqual([
-        { name: "Equity", value: 500, percentage: 50 },
+        { name: "Equities", value: 500, percentage: 50 },
       ]);
       expect(result.byAssetClass.unclassifiedValue).toBe(500);
       expect(result.byAssetClass.unclassifiedPercentage).toBe(50);

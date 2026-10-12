@@ -88,6 +88,14 @@
       "assetClass": "Par classe d'actifs"
     }
   },
+  "assetClasses": {
+    "equity": "Actions",
+    "fixedIncome": "Obligations",
+    "cash": "Trésorerie",
+    "preferred": "Actions privilégiées",
+    "convertible": "Convertibles",
+    "crypto": "Crypto"
+  },
   "holdingsList": {
     "title": "Positions",
     "noHoldings": "Aucune position dans ce portefeuille.",

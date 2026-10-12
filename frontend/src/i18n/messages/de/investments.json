@@ -88,6 +88,14 @@
       "assetClass": "Nach Anlageklasse"
     }
   },
+  "assetClasses": {
+    "equity": "Aktien",
+    "fixedIncome": "Anleihen",
+    "cash": "Barmittel",
+    "preferred": "Vorzugsaktien",
+    "convertible": "Wandelanleihen",
+    "crypto": "Krypto"
+  },
   "holdingsList": {
     "title": "Depotbestand",
     "noHoldings": "Keine Positionen in diesem Portfolio.",

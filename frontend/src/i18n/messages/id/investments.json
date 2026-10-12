@@ -88,6 +88,14 @@
       "assetClass": "Menurut kelas aset"
     }
   },
+  "assetClasses": {
+    "equity": "Saham",
+    "fixedIncome": "Pendapatan tetap",
+    "cash": "Tunai",
+    "preferred": "Saham preferen",
+    "convertible": "Konvertibel",
+    "crypto": "Kripto"
+  },
   "holdingsList": {
     "title": "Kepemilikan",
     "noHoldings": "Tidak ada kepemilikan dalam portofolio ini.",

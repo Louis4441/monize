@@ -88,6 +88,14 @@
       "assetClass": "Per classe di attivo"
     }
   },
+  "assetClasses": {
+    "equity": "Azioni",
+    "fixedIncome": "Reddito fisso",
+    "cash": "Cassa",
+    "preferred": "Azioni privilegiate",
+    "convertible": "Convertibili",
+    "crypto": "Cripto"
+  },
   "holdingsList": {
     "title": "Posizioni",
     "noHoldings": "Nessuna posizione in questo portafoglio.",

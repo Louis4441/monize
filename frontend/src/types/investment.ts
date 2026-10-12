@@ -1,6 +1,7 @@
 import { Tag } from './tag';
 import { TransactionStatus } from './transaction';
 import type { PeriodResultReason } from './net-worth';
+import type { AssetClassKey } from '@/lib/asset-classes';
 
 export type InvestmentAction =
   | 'BUY'
@@ -116,7 +117,10 @@ export interface CountryWeightingResult {
 }
 
 export interface AssetClassWeightingItem {
+  /** English name of a canonical class, or the user's own spelling. */
   assetClass: string;
+  /** The canonical class, translated by `useAssetClassLabel`; null for a typed name. */
+  assetClassKey: AssetClassKey | null;
   directValue: number;
   etfValue: number;
   totalValue: number;

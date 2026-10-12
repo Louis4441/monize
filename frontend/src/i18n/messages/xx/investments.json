@@ -121,6 +121,14 @@
       "assetClass": "[XX-By asset class-XX]"
     }
   },
+  "assetClasses": {
+    "equity": "[XX-Equities-XX]",
+    "fixedIncome": "[XX-Fixed Income-XX]",
+    "cash": "[XX-Cash-XX]",
+    "preferred": "[XX-Preferred Shares-XX]",
+    "convertible": "[XX-Convertibles-XX]",
+    "crypto": "[XX-Crypto-XX]"
+  },
   "holdingsList": {
     "title": "[XX-Holdings-XX]",
     "noHoldings": "[XX-No holdings in this portfolio.-XX]",
