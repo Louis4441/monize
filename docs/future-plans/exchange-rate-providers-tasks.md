@@ -101,6 +101,7 @@ No task adds a migration. Every task before R1 leaves a deployment with no `FX_P
 - `YAHOO_FX_PLACEHOLDER_RATE = 0.01` and `PLACEHOLDER_TOLERANCE = 0.01` (1 %), both named with the issue number. When a direct quote equals the placeholder exactly, fetch the reverse; when `1 / reverse` differs from the direct quote by more than the tolerance, return the reverse observation and remember the pair as reverse-first in a bounded process-local map; otherwise return the direct quote (a real rate can be 0.01).
 - A remembered pair asks the reverse symbol first on later `fetchLatest` and `fetchDailySeries` calls; the memory is a cost saving, not a correctness rule, and is documented as such.
 - Acceptance: plan section 7.3 as a case (IDR against USD, 0.01 against 17871); the agreeing case keeps the direct quote; the memory's effect on the next call; a reverse that does not answer leaves the direct quote in place with a `warn`.
+- As built (maintainer decision on the issue): the adapter already checks every quote below 1 against the reverse and refuses one below `MIN_PRECISE_QUOTED_RATE` (`quoted-rate.util.ts`), so an agreeing placeholder is chosen by that rule (the side with more digits, the same rate) and is not remembered, and a placeholder whose reverse does not answer is no rate with one `warn`, never stored. The memory is `REVERSE_FIRST_MEMORY_LIMIT` pairs, allowlisted in `process-local-state.guard.spec.ts`.
 
 ### B5 -- Currency lookup through the chain
 
