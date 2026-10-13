@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
+import { HOVER_ROW_ON_CARD } from '@/components/ui/Card';
 import { placePopover } from '@/components/ui/InfoTooltip';
 import { useClickOutside } from '@/hooks/useClickOutside';
 
@@ -124,7 +125,7 @@ export function SearchSyntaxHelp({ onExample, popoverRef }: SearchSyntaxHelpProp
         aria-label={t('searchSyntax.open')}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:text-gray-200 ${HOVER_ROW_ON_CARD}`}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
