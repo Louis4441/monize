@@ -244,7 +244,7 @@ export class CreateAccountDto {
 
   @ApiPropertyOptional({
     description:
-      'Category ID for interest portion of payments (defaults to "Loan Interest")',
+      "Category ID for the interest portion of payments; required for a LOAN or MORTGAGE",
   })
   @IsOptional()
   @IsUUID()

@@ -1683,56 +1683,6 @@ describe("CategoriesService", () => {
     });
   });
 
-  describe("findLoanCategories", () => {
-    it("returns loan principal and interest categories", async () => {
-      const loanParent = { ...mockCategory, id: "loan-parent", name: "Loan" };
-      const principal = {
-        ...mockCategory,
-        id: "loan-p",
-        name: "Loan Principal",
-        parentId: "loan-parent",
-      };
-      const interest = {
-        ...mockCategory,
-        id: "loan-i",
-        name: "Loan Interest",
-        parentId: "loan-parent",
-      };
-
-      categoriesRepository.findOne
-        .mockResolvedValueOnce(loanParent)
-        .mockResolvedValueOnce(principal)
-        .mockResolvedValueOnce(interest);
-
-      const result = await service.findLoanCategories("user-1");
-
-      expect(result.principalCategory).toEqual(principal);
-      expect(result.interestCategory).toEqual(interest);
-    });
-
-    it("returns nulls when Loan parent does not exist", async () => {
-      categoriesRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.findLoanCategories("user-1");
-
-      expect(result.principalCategory).toBeNull();
-      expect(result.interestCategory).toBeNull();
-    });
-
-    it("returns null for missing child categories under existing Loan parent", async () => {
-      const loanParent = { ...mockCategory, id: "loan-parent", name: "Loan" };
-      categoriesRepository.findOne
-        .mockResolvedValueOnce(loanParent)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
-
-      const result = await service.findLoanCategories("user-1");
-
-      expect(result.principalCategory).toBeNull();
-      expect(result.interestCategory).toBeNull();
-    });
-  });
-
   describe("importDefaults", () => {
     it("imports default categories when user has none", async () => {
       categoriesRepository.count.mockResolvedValue(0);

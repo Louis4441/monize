@@ -12,7 +12,7 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { Holding } from "../securities/entities/holding.entity";
 import { Institution } from "../institutions/entities/institution.entity";
-import { CategoriesService } from "../categories/categories.service";
+import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService } from "../securities/portfolio.service";
@@ -44,7 +44,7 @@ describe("AccountsService", () => {
   let investmentTxRepository: Record<string, jest.Mock>;
   let institutionsRepository: Record<string, jest.Mock>;
   let scheduledTransactionsService: Record<string, jest.Mock>;
-  let categoriesService: Record<string, jest.Mock>;
+  let categoriesRepository: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: DataSourceMock;
@@ -135,10 +135,13 @@ describe("AccountsService", () => {
       ),
     };
 
-    categoriesService = {
-      findLoanCategories: jest.fn().mockResolvedValue({
-        interestCategory: { id: "interest-cat-1" },
-      }),
+    // The interest category is the caller's unless a case says otherwise.
+    categoriesRepository = {
+      findOne: jest
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          Promise.resolve({ id: where.id, userId: where.userId }),
+        ),
     };
 
     netWorthService = {
@@ -175,6 +178,7 @@ describe("AccountsService", () => {
       [UserPreference, userPreferenceRepository],
       [ScheduledTransaction, scheduleRepository],
       [LoanRateChange, rateChangeRepository],
+      [Category, categoriesRepository],
     ]);
     mockDataSource = dataSource;
     txManager.save.mockImplementation((data) => data);
@@ -201,7 +205,6 @@ describe("AccountsService", () => {
           provide: getRepositoryToken(Institution),
           useValue: institutionsRepository,
         },
-        { provide: CategoriesService, useValue: categoriesService },
         {
           provide: ScheduledTransactionsService,
           useValue: scheduledTransactionsService,
@@ -1895,6 +1898,7 @@ describe("AccountsService", () => {
         sourceAccountId: "source-1",
         interestRate: 5.5,
         institution: "Bank of Test",
+        interestCategoryId: "interest-cat-1",
       } as any);
 
       // Should have created the account with negative balance (liability)
@@ -1930,6 +1934,7 @@ describe("AccountsService", () => {
         amortizationMonths: 300,
         interestRate: 4.5,
         institution: "Mortgage Bank",
+        interestCategoryId: "interest-cat-1",
       } as any);
 
       const createCall = accountsRepository.create.mock.calls[0][0];
@@ -1952,6 +1957,7 @@ describe("AccountsService", () => {
       sourceAccountId: "source-1",
       interestRate: 6.0,
       institution: "Test Bank",
+      interestCategoryId: "interest-cat-1",
     };
 
     beforeEach(() => {
@@ -2029,12 +2035,12 @@ describe("AccountsService", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it("fetches loan categories when interestCategoryId not provided", async () => {
-      await service.createLoanAccount("user-1", baseLoanDto as any);
-
-      expect(categoriesService.findLoanCategories).toHaveBeenCalledWith(
-        "user-1",
-      );
+    it("refuses a loan without an interest category, writing nothing", async () => {
+      const { interestCategoryId: _omit, ...withoutCategory } = baseLoanDto;
+      await expect(
+        service.createLoanAccount("user-1", withoutCategory as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(accountsRepository.create).not.toHaveBeenCalled();
     });
 
     it("uses provided interestCategoryId when given", async () => {
@@ -2043,7 +2049,9 @@ describe("AccountsService", () => {
         interestCategoryId: "custom-cat-1",
       } as any);
 
-      expect(categoriesService.findLoanCategories).not.toHaveBeenCalled();
+      expect(categoriesRepository.findOne).toHaveBeenCalledWith({
+        where: { id: "custom-cat-1", userId: "user-1" },
+      });
       const createCall = accountsRepository.create.mock.calls[0][0];
       expect(createCall.interestCategoryId).toBe("custom-cat-1");
     });
@@ -2113,6 +2121,7 @@ describe("AccountsService", () => {
       amortizationMonths: 300,
       interestRate: 5.0,
       institution: "Big Bank",
+      interestCategoryId: "interest-cat-1",
     };
 
     beforeEach(() => {
@@ -2190,12 +2199,12 @@ describe("AccountsService", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it("fetches loan categories when interestCategoryId not provided", async () => {
-      await service.createMortgageAccount("user-1", baseMortgageDto as any);
-
-      expect(categoriesService.findLoanCategories).toHaveBeenCalledWith(
-        "user-1",
-      );
+    it("refuses a mortgage without an interest category, writing nothing", async () => {
+      const { interestCategoryId: _omit, ...withoutCategory } = baseMortgageDto;
+      await expect(
+        service.createMortgageAccount("user-1", withoutCategory as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(accountsRepository.create).not.toHaveBeenCalled();
     });
 
     it("uses provided interestCategoryId when given", async () => {
@@ -2204,7 +2213,8 @@ describe("AccountsService", () => {
         interestCategoryId: "custom-interest-cat",
       } as any);
 
-      expect(categoriesService.findLoanCategories).not.toHaveBeenCalled();
+      const createCall = accountsRepository.create.mock.calls[0][0];
+      expect(createCall.interestCategoryId).toBe("custom-interest-cat");
     });
 
     it("stores mortgage balance as negative (liability)", async () => {

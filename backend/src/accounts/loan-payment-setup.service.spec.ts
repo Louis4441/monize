@@ -9,13 +9,13 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { LoanPaymentSetupService } from "./loan-payment-setup.service";
 import { LoanPaymentMatchingService } from "./loan-payment-matching.service";
 import { Account, AccountType } from "./entities/account.entity";
-import { CategoriesService } from "../categories/categories.service";
+import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 
 describe("LoanPaymentSetupService", () => {
   let service: LoanPaymentSetupService;
   let accountsRepository: Record<string, jest.Mock>;
-  let categoriesService: Record<string, jest.Mock>;
+  let categoriesRepository: Record<string, jest.Mock>;
   let scheduledTransactionsService: Record<string, jest.Mock>;
   let paymentMatching: jest.Mocked<
     Pick<
@@ -63,27 +63,28 @@ describe("LoanPaymentSetupService", () => {
       update: jest.fn().mockResolvedValue(undefined),
     };
 
-    categoriesService = {
-      findLoanCategories: jest.fn().mockResolvedValue({
-        principalCategory: null,
-        interestCategory: { id: "interest-cat-1", name: "Loan Interest" },
-      }),
+    // The interest category is the caller's unless a case says otherwise.
+    categoriesRepository = {
+      findOne: jest
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          Promise.resolve({ id: where.id, userId: where.userId }),
+        ),
     };
 
     scheduledTransactionsService = {
       create: jest.fn().mockResolvedValue(mockScheduledTx),
     };
 
-    const { dataSource } = createScopedDbMocks([[Account, accountsRepository]]);
+    const { dataSource } = createScopedDbMocks([
+      [Account, accountsRepository],
+      [Category, categoriesRepository],
+    ]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LoanPaymentSetupService,
         { provide: DataSource, useValue: dataSource },
-        {
-          provide: CategoriesService,
-          useValue: categoriesService,
-        },
         {
           provide: ScheduledTransactionsService,
           useValue: scheduledTransactionsService,
@@ -100,6 +101,7 @@ describe("LoanPaymentSetupService", () => {
       accountsRepository.findOne.mockResolvedValue(null);
       await expect(
         service.setupLoanPayments("user-1", "nonexistent", {
+          interestCategoryId: "interest-cat-1",
           paymentAmount: 500,
           paymentFrequency: "MONTHLY",
           sourceAccountId: "source-1",
@@ -115,6 +117,7 @@ describe("LoanPaymentSetupService", () => {
       });
       await expect(
         service.setupLoanPayments("user-1", "source-1", {
+          interestCategoryId: "interest-cat-1",
           paymentAmount: 500,
           paymentFrequency: "MONTHLY",
           sourceAccountId: "source-1",
@@ -130,6 +133,7 @@ describe("LoanPaymentSetupService", () => {
       });
       await expect(
         service.setupLoanPayments("user-1", "loan-1", {
+          interestCategoryId: "interest-cat-1",
           paymentAmount: 500,
           paymentFrequency: "MONTHLY",
           sourceAccountId: "source-1",
@@ -144,6 +148,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(null); // source account lookup
       await expect(
         service.setupLoanPayments("user-1", "loan-1", {
+          interestCategoryId: "interest-cat-1",
           paymentAmount: 500,
           paymentFrequency: "MONTHLY",
           sourceAccountId: "bad-source",
@@ -158,6 +163,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       const result = await service.setupLoanPayments("user-1", "loan-1", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -203,6 +209,7 @@ describe("LoanPaymentSetupService", () => {
         sourceAccountId: "source-1",
         nextDueDate: "2026-04-01",
         interestRate: 5.5,
+        interestCategoryId: "interest-cat-1",
         autoPost: true,
       };
       const matching = { payeePattern: "BANK OF TEST*" };
@@ -215,6 +222,7 @@ describe("LoanPaymentSetupService", () => {
 
       it("checks the patterns before the schedule, keeps auto-post off and creates the rule after the account points at it", async () => {
         const result = await service.setupLoanPayments("user-1", "loan-1", {
+          interestCategoryId: "interest-cat-1",
           ...setupDto,
           paymentMatching: matching,
         });
@@ -261,6 +269,7 @@ describe("LoanPaymentSetupService", () => {
         });
 
         const result = await service.setupLoanPayments("user-1", "loan-1", {
+          interestCategoryId: "interest-cat-1",
           ...setupDto,
           paymentMatching: matching,
         });
@@ -305,6 +314,7 @@ describe("LoanPaymentSetupService", () => {
 
         await expect(
           service.setupLoanPayments("user-1", "loan-1", {
+            interestCategoryId: "interest-cat-1",
             ...setupDto,
             paymentMatching: matching,
           }),
@@ -320,6 +330,7 @@ describe("LoanPaymentSetupService", () => {
 
         await expect(
           service.setupLoanPayments("user-1", "loan-1", {
+            interestCategoryId: "interest-cat-1",
             ...setupDto,
             paymentMatching: { payeePattern: "A|B*" },
           }),
@@ -330,6 +341,7 @@ describe("LoanPaymentSetupService", () => {
 
       it("stores a loan's originalPrincipal apart from its opening balance", async () => {
         await service.setupLoanPayments("user-1", "loan-1", {
+          interestCategoryId: "interest-cat-1",
           ...setupDto,
           originalPrincipal: 24000,
         });
@@ -380,30 +392,46 @@ describe("LoanPaymentSetupService", () => {
       ).toBeCloseTo(500, 1);
     });
 
-    it("uses default loan interest category when none provided", async () => {
+    it("refuses a setup without an interest category before writing anything", async () => {
       accountsRepository.findOne
         .mockResolvedValueOnce(mockLoanAccount)
         .mockResolvedValueOnce(mockSourceAccount);
 
-      await service.setupLoanPayments("user-1", "loan-1", {
-        paymentAmount: 500,
-        paymentFrequency: "MONTHLY",
-        sourceAccountId: "source-1",
-        nextDueDate: "2026-04-01",
-        interestRate: 5.5,
-      });
+      await expect(
+        service.setupLoanPayments("user-1", "loan-1", {
+          paymentAmount: 500,
+          paymentFrequency: "MONTHLY",
+          sourceAccountId: "source-1",
+          nextDueDate: "2026-04-01",
+          interestRate: 5.5,
+        } as any),
+      ).rejects.toThrow("Loan accounts require an interest category");
+      expect(categoriesRepository.findOne).not.toHaveBeenCalled();
+      expect(scheduledTransactionsService.create).not.toHaveBeenCalled();
+      expect(accountsRepository.update).not.toHaveBeenCalled();
+    });
 
-      expect(categoriesService.findLoanCategories).toHaveBeenCalledWith(
-        "user-1",
-      );
+    it("refuses an interest category the caller does not own before writing anything", async () => {
+      accountsRepository.findOne
+        .mockResolvedValueOnce(mockLoanAccount)
+        .mockResolvedValueOnce(mockSourceAccount);
+      categoriesRepository.findOne.mockResolvedValue(null);
 
-      // Verify the default interest category was used
-      expect(accountsRepository.update).toHaveBeenCalledWith(
-        "loan-1",
-        expect.objectContaining({
-          interestCategoryId: "interest-cat-1",
+      await expect(
+        service.setupLoanPayments("user-1", "loan-1", {
+          paymentAmount: 500,
+          paymentFrequency: "MONTHLY",
+          sourceAccountId: "source-1",
+          nextDueDate: "2026-04-01",
+          interestRate: 5.5,
+          interestCategoryId: "someone-elses-cat",
         }),
-      );
+      ).rejects.toThrow(BadRequestException);
+      expect(categoriesRepository.findOne).toHaveBeenCalledWith({
+        where: { id: "someone-elses-cat", userId: "user-1" },
+      });
+      expect(scheduledTransactionsService.create).not.toHaveBeenCalled();
+      expect(accountsRepository.update).not.toHaveBeenCalled();
     });
 
     it("handles zero interest rate (entire payment to principal)", async () => {
@@ -412,6 +440,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       await service.setupLoanPayments("user-1", "loan-1", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -437,6 +466,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       await service.setupLoanPayments("user-1", "loan-1", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -474,6 +504,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       const response = await service.setupLoanPayments("user-1", "loan-1", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -518,6 +549,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       await service.setupLoanPayments("user-1", "loan-1", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -559,6 +591,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       await service.setupLoanPayments("user-1", "mortgage-1", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 1500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -606,6 +639,7 @@ describe("LoanPaymentSetupService", () => {
 
         await expect(
           service.setupLoanPayments("user-1", "mortgage-2", {
+            interestCategoryId: "interest-cat-1",
             paymentAmount: 1500,
             paymentFrequency,
             sourceAccountId: "source-1",
@@ -640,6 +674,7 @@ describe("LoanPaymentSetupService", () => {
       scheduledTransactionsService.create.mockClear();
 
       await service.setupLoanPayments("user-1", "mortgage-3", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 1500,
         paymentFrequency: "QUARTERLY",
         sourceAccountId: "source-1",
@@ -671,6 +706,7 @@ describe("LoanPaymentSetupService", () => {
         sourceAccountId: "source-1",
         nextDueDate: "2026-04-01",
         interestRate: 4.25,
+        interestCategoryId: "interest-cat-1",
       };
       const lastUpdate = () => {
         const calls = accountsRepository.update.mock.calls;
@@ -737,6 +773,7 @@ describe("LoanPaymentSetupService", () => {
         scheduledTransactionsService.create.mockClear();
 
         await service.setupLoanPayments("user-1", "mortgage-5", {
+          interestCategoryId: "interest-cat-1",
           paymentAmount: 1500,
           paymentFrequency,
           sourceAccountId: "source-1",
@@ -767,6 +804,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       await service.setupLoanPayments("user-1", "mortgage-6", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 1500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -796,6 +834,7 @@ describe("LoanPaymentSetupService", () => {
         .mockResolvedValueOnce(mockSourceAccount);
 
       await service.setupLoanPayments("user-1", "mortgage-7", {
+        interestCategoryId: "interest-cat-1",
         paymentAmount: 1500,
         paymentFrequency: "MONTHLY",
         sourceAccountId: "source-1",
@@ -823,6 +862,7 @@ describe("LoanPaymentSetupService", () => {
 
       await expect(
         service.setupLoanPayments("user-1", "loan-1", {
+          interestCategoryId: "interest-cat-1",
           paymentAmount: 500,
           paymentFrequency: "FORTNIGHTLY_ISH",
           sourceAccountId: "source-1",

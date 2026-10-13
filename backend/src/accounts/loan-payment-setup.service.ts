@@ -16,7 +16,7 @@ import {
   SetupLoanPaymentsResponseDto,
 } from "./dto/setup-loan-payments.dto";
 import { roundMoney } from "../common/round.util";
-import { CategoriesService } from "../categories/categories.service";
+import { assertLoanInterestCategory } from "./loan-interest-category";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import {
   calculatePaymentSplit,
@@ -62,8 +62,6 @@ export class LoanPaymentSetupService {
 
   constructor(
     private dataSource: DataSource,
-    @Inject(forwardRef(() => CategoriesService))
-    private categoriesService: CategoriesService,
     @Inject(forwardRef(() => ScheduledTransactionsService))
     private scheduledTransactionsService: ScheduledTransactionsService,
     private loanPaymentMatchingService: LoanPaymentMatchingService,
@@ -256,15 +254,20 @@ export class LoanPaymentSetupService {
       );
     }
 
-    // Resolve interest category
-    let interestCategoryId = dto.interestCategoryId || null;
+    // Required by the DTO and checked again here: an undefined id in a
+    // TypeORM `where` matches any row. Owned by the caller, before any write.
+    const interestCategoryId = dto.interestCategoryId;
     if (!interestCategoryId) {
-      const { interestCategory } =
-        await this.categoriesService.findLoanCategories(userId);
-      if (interestCategory) {
-        interestCategoryId = interestCategory.id;
-      }
+      throw new BadRequestException(
+        tr(
+          "errors.accounts.loanRequiresInterestCategory",
+          "Loan accounts require an interest category",
+        ),
+      );
     }
+    await withScopedDb(this.dataSource, (m) =>
+      assertLoanInterestCategory(m, userId, interestCategoryId),
+    );
 
     // The type this request leaves the mortgage with: its own type or flags,
     // else the stored type. Null for any other account type.
@@ -462,7 +465,7 @@ export class LoanPaymentSetupService {
 
     if (interestPayment > 0) {
       splits.push({
-        categoryId: interestCategoryId || undefined,
+        categoryId: interestCategoryId,
         amount: -interestPayment,
         memo: "Interest",
       });
