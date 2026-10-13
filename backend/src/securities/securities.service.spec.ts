@@ -820,7 +820,10 @@ describe("SecuritiesService", () => {
         serve({ ...pln });
         const order: string[] = [];
         world({
-          onQuery: (sql) => /bond_programs/.test(sql) && order.push("check"),
+          onQuery: (sql) =>
+            /bond_programs/.test(sql) &&
+            !order.includes("check") &&
+            order.push("check"),
         });
         queryRunnerManager.save.mockImplementation(async (a, b) => {
           order.push("save");
@@ -1153,8 +1156,12 @@ describe("SecuritiesService", () => {
           });
           expect(sql).toMatch(/faceValue/);
           expect(sql).toMatch(/ORDER BY version DESC/);
-          expect(sql).toMatch(/t\.price < f\.face \* 0\.5/);
-          expect(sql).toMatch(/t\.price > f\.face \* 2/);
+          expect(sql).toMatch(
+            /t\.price < COALESCE\(f\.face, \$4::numeric\) \* 0\.5/,
+          );
+          expect(sql).toMatch(
+            /t\.price > COALESCE\(f\.face, \$4::numeric\) \* 2/,
+          );
           expect(sql).toMatch(/t\.status != 'VOID'/);
           expect(sql).toMatch(/t\.price IS NOT NULL/);
         });

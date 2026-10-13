@@ -29,6 +29,13 @@ export interface BondProgramDefinition {
   readonly programCode: string;
   readonly currency: string;
   /**
+   * The nominal of one bond of the program, from the adapter's product template
+   * (an exact decimal string, "100.00"). The write-time check of a bond-linked
+   * security's quantities reads it for a row that names, or can be given, no
+   * stored series (INV-BOND-005); a stored series' own terms win when it has one.
+   */
+  readonly faceValue: string;
+  /**
    * The issuer's own page describing the product, for a reader to follow; an
    * https address on the issuer's site, or absent when the adapter has none.
    */
@@ -120,6 +127,11 @@ export type SeriesFetchErrorCode =
   | "SERIES_CODE_INVALID"
   | "SERIES_NOT_PUBLISHED"
   | "SOURCE_UNAVAILABLE"
+  // A document of this series (its page or letter) answers a permanent 4xx: a
+  // refusal of this series only, never a reason to stop a pass.
+  | "SOURCE_DOCUMENT_MISSING"
+  // An administrator's manual entry has a value that is not acceptable.
+  | "MANUAL_ENTRY_INVALID"
   | "SOURCE_FORMAT_CHANGED"
   | "SOURCE_INCONSISTENT"
   | "TEMPLATE_NOT_VALIDATED"

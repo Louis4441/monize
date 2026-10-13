@@ -27,6 +27,10 @@ export const SERIES_ERROR_FALLBACKS: Readonly<
     `Series ${p.series} is not published on the official source`,
   SOURCE_UNAVAILABLE: (p) =>
     `The official source for series ${p.series} could not be read right now; try again later`,
+  SOURCE_DOCUMENT_MISSING: (p) =>
+    `The ${p.document} of series ${p.series} cannot be read from the official source (it answered ${p.status}); the series cannot be fetched, and an administrator may enter it by hand`,
+  MANUAL_ENTRY_INVALID: (p) =>
+    `The value entered for ${p.field} of series ${p.series} is not acceptable`,
   SOURCE_FORMAT_CHANGED: (p) =>
     `The terms of series ${p.series} have no usable ${p.field}: the official source may have changed its format, or the value is not acceptable`,
   SOURCE_INCONSISTENT: (p) =>
@@ -82,6 +86,8 @@ export function seriesHttpException(
       return manual
         ? new UnprocessableEntityException(message)
         : new BadGatewayException(message);
+    case "SOURCE_DOCUMENT_MISSING":
+    case "MANUAL_ENTRY_INVALID":
     case "SOURCE_INCONSISTENT":
     case "TEMPLATE_NOT_VALIDATED":
       return new UnprocessableEntityException(message);

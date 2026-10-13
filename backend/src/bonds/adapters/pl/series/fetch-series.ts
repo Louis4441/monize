@@ -134,7 +134,7 @@ export async function fetchSeries(
     get,
     letterUrl,
     MAX_PDF_BYTES,
-    "SOURCE_UNAVAILABLE",
+    "SOURCE_DOCUMENT_MISSING",
   );
   const letter = await readLetter(pdf);
 

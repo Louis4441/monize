@@ -178,10 +178,26 @@ same template, bounds and parser apply; the sale window must match the code.
 ## 6. Errors
 
 `SERIES_CODE_INVALID`, `SERIES_FETCH_UNSUPPORTED`, `SERIES_NOT_PUBLISHED`,
-`SOURCE_UNAVAILABLE` (network, timeout, breaker open), `SOURCE_FORMAT_CHANGED`,
-`SOURCE_INCONSISTENT`, `TEMPLATE_NOT_VALIDATED`, `SERIES_TERMS_CONFLICT` (a
-stored version 1 differs). Each has `params` and an `errors.bonds.<code>`
-message in every locale.
+`SOURCE_UNAVAILABLE` (network, timeout, breaker open, a 5xx or 429 answer: all
+transient), `SOURCE_DOCUMENT_MISSING` (422: a document of this one series, its
+page or its letter, answers a permanent 4xx other than the page's 404, which is
+`SERIES_NOT_PUBLISHED`; params `document` and `status`), `SOURCE_FORMAT_CHANGED`,
+`SOURCE_INCONSISTENT`, `TEMPLATE_NOT_VALIDATED`, `MANUAL_ENTRY_INVALID` (422: a
+value of an administrator's manual entry is malformed; names the `field` the
+administrator entered, never "the source changed its format"),
+`SERIES_TERMS_CONFLICT` (a stored version 1 differs). Each has `params` and an
+`errors.bonds.<code>` message in every locale.
+
+Transient and permanent are told apart because the backfill pass ends on
+`SOURCE_UNAVAILABLE` only (the source is down, the next run resumes): one series
+whose letter is gone is `SOURCE_DOCUMENT_MISSING`, counted as failed, and the
+pass goes on to the next series.
+
+After a fetch that stored a series, the benchmark refresh and the engine-price
+recompute of every linked security run after the commit and are not awaited by
+the person's fetch (REST, AI, MCP): a failure is logged, never thrown to the
+caller. The Refresh of a linked security, the passes and the manual entry still
+await them, because their callers read the result straight after.
 
 ## 7. Test matrix
 
@@ -197,4 +213,6 @@ message in every locale.
 | Write | integration | fetch inserts one instrument and version 1; a repeat writes nothing; a differing repeat is `SERIES_TERMS_CONFLICT`; a refused fetch leaves no row; two concurrent fetches insert once |
 | Manual | integration | non-administrator refused (403); administrator entry stored with `provider: manual`; out-of-bounds values refused |
 | Tools | unit | AI and MCP tool call the service; MCP manual tool requires the administrator role |
+| Backfill | unit | a series whose letter answers 404 is refused as its own series and the pass stores the next; `SOURCE_UNAVAILABLE` still stops it |
+| Fetch dispatch | unit | the fetch answers while the recompute never resolves; a failed recompute is logged, not thrown |
 | Cron | unit | lease held; only the programs switched on; only missing series fetched; one failing series does not stop the others |

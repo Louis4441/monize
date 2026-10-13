@@ -127,6 +127,7 @@ INV-LOAN-002's entry names the missing source scan while its row said `--`.
 | INV-BOND-007 a program-linked security's rows name a series (dated acquisitions inferred, transfers and grants explicit, removals checked at write time, imports may store NULL) | **required** | **required** | **required** | **required** | -- | -- | -- | -- |
 | INV-BOND-008 no country's bond data is fetched or stored without a person's action | **required** | **required** | **required** | -- | -- | -- | -- | -- |
 | INV-BOND-009 a redemption's cash is returned principal plus interest | **required** | -- | required | -- | -- | -- | -- | -- |
+| INV-BOND-010 a bond holding's current value is its own account's lots | **required** | **required** | -- | -- | -- | -- | -- | -- |
 | INV-BONDNOTIFY-001 the bond notification producer fetches nothing | supporting | -- | **required** | -- | -- | -- | -- | -- |
 | INV-BONDNOTIFY-002 one row per bond event, a state-keyed one while its state lasts | **required** | **required** | -- | -- | -- | -- | -- | -- |
 | INV-BONDNOTIFY-003 a bond notification carries the engine's figures | **required** | -- | -- | -- | -- | -- | -- | -- |

@@ -110,6 +110,7 @@ implied.
 | INV-BOND-007 | A program-linked security's acquisitions with a date of their own are inferred, TRANSFER_IN and ADD_SHARES name their series, a removal the account cannot cover is refused at write time, and an import may store NULL which the lots name | enforced |
 | INV-BOND-008 | No country's bond data (series, terms version, benchmark observation) is fetched or stored without a person's action | enforced |
 | INV-BOND-009 | A bond redemption's cash splits into returned principal and interest, never into a capital gain | enforced |
+| INV-BOND-010 | A bond-linked holding's current value is its own account's lots' value, never quantity times the security's blended price | partial |
 | INV-BONDNOTIFY-001 | The bond notification producer reads stored terms, observations and the ledger, fetches nothing and writes nothing but notification rows | enforced |
 | INV-BONDNOTIFY-002 | Each bond notification event has one row per person: a re-run, a second replica or a restart raises nothing new, and a state-keyed event is raised once while its state lasts | enforced |
 | INV-BONDNOTIFY-003 | Every amount, rate and date in a bond notification is the engine's | enforced |
@@ -3384,13 +3385,43 @@ Enforcement         Three mechanisms.
                        security away from BOND is refused unless the same
                        request unlinks it); the link is refused (code
                        LINK_QUANTITY_NOT_BONDS) when the link is being set
-                       and the security has priced trades (BUY, SELL,
+                       and the security has priced acquisitions (BUY,
                        REINVEST and its variants, not void) whose price is
                        not within [0.5, 2] x the face value of the row's own
                        series
                        (its stored series, or the one on sale on its date)
                        per bond, because the quantity is then not a number of
-                       bonds; bondProgramId is canonicalized to lowercase
+                       bonds. The same band is the rule of every WRITE of a
+                       linked security, not only of the link:
+                       BondWriteGuard.verify (backend/src/bonds/
+                       bond-write-guard.ts), in the transaction of every
+                       write path (create, update, updateLinkedTransfer,
+                       transferSecurity, an embedded split row, remove, void,
+                       undo, redo and once per file in the imports), reads the
+                       stored price and series of the rows just written
+                       (findQuantitiesNotBonds, backend/src/securities/
+                       bond-link.util.ts) and refuses a BUY or REINVEST*
+                       priced outside the band with errorCode
+                       QUANTITY_NOT_BONDS before anything commits. Only
+                       acquisitions are read: a SELL or REDEEM of a long-held
+                       bond may be worth more than twice its face value, and a
+                       removal counted in currency units is refused by the lot
+                       derivation. The face value is the row's series' (newest
+                       terms version, instrument.faceValue) and, for a row with
+                       no series of the program, the program's product
+                       template's (BondProgramDefinition.faceValue,
+                       templateFaceValueOf, backend/src/bonds/
+                       bond-adapters.ts): an empty catalog is never a way past
+                       the band. A row already outside the band when the guard
+                       began does not block an unrelated write or a delete.
+                       After the commit of a split parent's create, edit, void
+                       or delete, the embedded rows' securities are repriced
+                       (recomputeBondPricesAfterWrite via
+                       TransactionSplitService, never inside the transaction;
+                       INV-CACHE-001) on every route: TransactionsService
+                       create/update/remove, updateSplits/removeSplit, the
+                       reconciliation status endpoints and the bulk status
+                       update; bondProgramId is canonicalized to lowercase
                        before comparing and storing; a link that changes
                        (unlink, another program) also clears, in the same
                        transaction, the series its transactions name outside
@@ -3691,8 +3722,16 @@ Enforcement         One resolver, resolveTransactionSeries
                     transaction, after the mutation, in create, update,
                     updateLinkedTransfer, transferSecurity,
                     createEmbeddedForSplit, remove (so bulk, AI and MCP
-                    deletes), updateStatus (void), undo and redo, and once per file in
-                    the imports: it derives the lots over the security's whole
+                    deletes), updateStatus (void), reverseAndRemoveEmbedded and
+                    applyParentStatusToEmbeddedRows (a split parent's delete,
+                    void, and, through deleteSplitSideEffects, replacement),
+                    undo and redo, and once per file in the imports. A split
+                    parent's delete is guarded once over all its embedded rows,
+                    so a parent holding a BUY and the SELL it covers is not
+                    refused half way; a replacement of the splits tracks one
+                    guard before the teardown and verifies it after the
+                    successors are written. The guard derives the lots over the
+                    security's whole
                     ledger (bondLotsFromTransactions over loadBondLedger, the
                     derivation the valuation reads) and throws when OVER_REMOVAL
                     or REMOVAL_EXCEEDS_SERIES refuses it now and it was
@@ -3811,6 +3850,39 @@ Required tests      backend/src/bonds/engine/redemption-split.spec.ts (the
                     interest from it by
                     InvestmentTransactionForm.bondRedemption.test.tsx.
 Status              enforced
+```
+
+### INV-BOND-010 -- a bond holding's current value is its own account's lots
+
+```text
+Statement           The current market value of a bond-linked holding (one
+                    account, one security) is the sum of the engine's grossValue
+                    of that account's open and matured lots on the person's
+                    financial today, never quantity x the security's daily
+                    bond_engine price, which blends the lots of every account.
+                    An unknown lot makes the holding unpriced (marketValue null,
+                    pricesComplete false), never the blend.
+Source of truth     the account's lots (bondLotsAsOf over the ledger) valued by
+                    the engine (BondValuationService.valueByAccount)
+Enforcement         PortfolioCalculationService.valueBondHoldings, used by
+                    calculateHoldingsWithValues and getAccountMarketValues; the
+                    account balances report (valuePositions), sector weightings
+                    and GEM positions call valueByAccount once per linked
+                    security. Not enforced for historical per-account series
+                    (net worth by account, an account's value chart): they
+                    still read the daily blend, so their per-account split is
+                    approximate for a security held in several accounts while
+                    their total is exact (spec
+                    docs/specs/bond-program-securities.md 2.4).
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    the holding is unpriced and named in unpricedSecurityIds
+Required tests      backend/src/securities/portfolio-calculation.service.spec.ts
+                    (two accounts holding different series of one program, an
+                    unknown lot, a valuation that throws);
+                    backend/test/integration/bond-holding-value.integration.spec.ts
+Status              partial (historical per-account series)
 ```
 
 ### INV-BONDNOTIFY-001 -- the bond notification producer fetches nothing

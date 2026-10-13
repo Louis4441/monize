@@ -235,6 +235,11 @@ describe("TransactionSplitService", () => {
     const investmentTransactionsService = {
       createEmbeddedForSplit: jest.fn().mockResolvedValue({}),
       reverseAndRemoveEmbedded: jest.fn().mockResolvedValue(undefined),
+      // The post-commit bond price recompute of the securities the embedded
+      // rows touched (INV-BOND-005).
+      recomputeBondPricesAfterSplitWrite: jest
+        .fn()
+        .mockResolvedValue(undefined),
       // The parent's status propagation asks the investment service to carry
       // the boundary onto embedded rows; an empty set means none were touched.
       applyParentStatusToEmbeddedRows: jest.fn().mockResolvedValue(new Set()),
@@ -1957,7 +1962,11 @@ describe("TransactionSplitService", () => {
         // fixture carries no status, so the option is { parentStatus: undefined };
         // the set is incidental to what this test pins down. `carriedSeries` is
         // the parent's embedded rows, read before the rebuild (none here).
-        { parentStatus: undefined, carriedSeries: [] },
+        {
+          parentStatus: undefined,
+          carriedSeries: [],
+          touchedSecurityIds: expect.any(Set),
+        },
         expect.any(Set),
       );
     });
@@ -2484,6 +2493,7 @@ describe("TransactionSplitService", () => {
         mockQueryRunner.manager,
         "user-1",
         investmentTx,
+        { touchedSecurityIds: expect.any(Set) },
       );
       expect(mockDataSource.transaction).toHaveBeenCalled();
     });
@@ -2555,11 +2565,13 @@ describe("TransactionSplitService", () => {
         mockQueryRunner.manager,
         "user-1",
         { id: "inv-a" },
+        expect.objectContaining({ bondGuard: expect.any(Object) }),
       );
       expect(investmentService.reverseAndRemoveEmbedded).toHaveBeenCalledWith(
         mockQueryRunner.manager,
         "user-1",
         { id: "inv-b" },
+        expect.objectContaining({ bondGuard: expect.any(Object) }),
       );
     });
 
@@ -2605,6 +2617,175 @@ describe("TransactionSplitService", () => {
 
       const investmentService = (service as any).investmentTransactionsService;
       expect(investmentService.createEmbeddedForSplit).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("the bond price recompute after a split write (INV-BOND-005, INV-CACHE-001)", () => {
+    const investmentService = () =>
+      (service as any).investmentTransactionsService;
+    const embeddedSplit = (id: string, securityId: string) => ({
+      id: `split-${id}`,
+      kind: "investment",
+      investmentTransaction: { id: `inv-${id}`, securityId, accountId: "b-1" },
+    });
+
+    it("createSplits collects the security of each embedded row it creates", async () => {
+      accountsService.findOne.mockResolvedValueOnce({
+        id: "account-1",
+        accountSubType: "INVESTMENT_CASH",
+        linkedAccountId: "brokerage-1",
+      });
+      investmentService().createEmbeddedForSplit.mockResolvedValueOnce({
+        securityId: "sec-1",
+      });
+      const touchedSecurityIds = new Set<string>();
+      await service.createSplits(
+        "tx-1",
+        [
+          {
+            amount: -3000,
+            investment: {
+              action: "BUY" as any,
+              securityId: "sec-1",
+              quantity: 30,
+              price: 100,
+              commission: 0,
+            },
+          },
+        ] as any,
+        "user-1",
+        "account-1",
+        new Date("2026-05-09"),
+        undefined,
+        undefined,
+        { touchedSecurityIds },
+      );
+      expect([...touchedSecurityIds]).toEqual(["sec-1"]);
+    });
+
+    it("deleteSplitSideEffects tracks every embedded security once, removes each row under ONE guard and verifies after the last (a parent holding the BUY and the SELL it covers is not refused half way)", async () => {
+      splitsRepository.find.mockResolvedValue([
+        embeddedSplit("a", "sec-1"),
+        embeddedSplit("b", "sec-1"),
+      ]);
+      transactionsRepository.find.mockResolvedValue([]);
+      investmentService().reverseAndRemoveEmbedded.mockClear();
+      const touchedSecurityIds = new Set<string>();
+
+      await service.deleteSplitSideEffects("tx-1", "user-1", {
+        touchedSecurityIds,
+      });
+
+      const calls = investmentService().reverseAndRemoveEmbedded.mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[0][3].bondGuard).toBeDefined();
+      expect(calls[1][3].bondGuard).toBe(calls[0][3].bondGuard);
+      expect(calls[0][3].touchedSecurityIds).toBe(touchedSecurityIds);
+    });
+
+    it("updateSplits dispatches the recompute for the torn-down and recreated securities AFTER the transaction", async () => {
+      const transaction = { ...mockTransaction } as Transaction;
+      lockParent(transaction);
+      splitsRepository.find.mockResolvedValue([]);
+      investmentService().recomputeBondPricesAfterSplitWrite.mockClear();
+      investmentService().reverseAndRemoveEmbedded.mockImplementation(
+        async (_m: unknown, _u: unknown, _row: unknown, options: any) => {
+          options.touchedSecurityIds.add("sec-old");
+        },
+      );
+      splitsRepository.find.mockResolvedValue([embeddedSplit("a", "sec-old")]);
+
+      await service.updateSplits(
+        transaction,
+        [
+          { amount: -70, categoryId: "cat-1" },
+          { amount: -30, categoryId: "cat-2" },
+        ],
+        "user-1",
+      );
+
+      expect(
+        investmentService().recomputeBondPricesAfterSplitWrite,
+      ).toHaveBeenCalledWith("user-1", ["sec-old"]);
+      const finalUpdate = mockQueryRunner.manager.update.mock.calls.findIndex(
+        ([entity, , data]: any[]) =>
+          entity === Transaction && data?.isSplit === true,
+      );
+      expect(
+        mockQueryRunner.manager.update.mock.invocationCallOrder[finalUpdate],
+      ).toBeLessThan(
+        investmentService().recomputeBondPricesAfterSplitWrite.mock
+          .invocationCallOrder[0],
+      );
+      investmentService().reverseAndRemoveEmbedded.mockResolvedValue(undefined);
+    });
+
+    it("updateSplits dispatches nothing when no embedded row was involved", async () => {
+      const transaction = { ...mockTransaction } as Transaction;
+      lockParent(transaction);
+      splitsRepository.find.mockResolvedValue([]);
+      investmentService().recomputeBondPricesAfterSplitWrite.mockClear();
+      await service.updateSplits(
+        transaction,
+        [
+          { amount: -70, categoryId: "cat-1" },
+          { amount: -30, categoryId: "cat-2" },
+        ],
+        "user-1",
+      );
+      expect(
+        investmentService().recomputeBondPricesAfterSplitWrite,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("removeSplit dispatches the recompute of the removed embedded row's security after the commit", async () => {
+      splitsRepository.findOne.mockResolvedValue({
+        id: "split-3",
+        transactionId: "tx-1",
+        kind: "investment",
+        investmentTransaction: { id: "inv-1", securityId: "sec-9" },
+      });
+      mockQueryRunner.manager.find = jest.fn().mockResolvedValue([
+        { id: "split-1", kind: "category", categoryId: "cat-1" },
+        { id: "split-2", kind: "category", categoryId: "cat-2" },
+      ]);
+      investmentService().recomputeBondPricesAfterSplitWrite.mockClear();
+      investmentService().reverseAndRemoveEmbedded.mockImplementationOnce(
+        async (_m: unknown, _u: unknown, _row: unknown, options: any) => {
+          options.touchedSecurityIds.add("sec-9");
+        },
+      );
+
+      await service.removeSplit(
+        { ...mockTransaction } as Transaction,
+        "split-3",
+        "user-1",
+      );
+
+      expect(
+        investmentService().recomputeBondPricesAfterSplitWrite,
+      ).toHaveBeenCalledWith("user-1", ["sec-9"]);
+    });
+
+    it("applyParentStatusToTransferCounterparts hands the collector to the embedded rows' status pass", async () => {
+      splitsRepository.find.mockResolvedValue([]);
+      const touchedSecurityIds = new Set<string>();
+      await service.applyParentStatusToTransferCounterparts(
+        mockQueryRunner.manager as any,
+        "tx-1",
+        "user-1",
+        TransactionStatus.VOID,
+        touchedSecurityIds,
+      );
+      expect(
+        investmentService().applyParentStatusToEmbeddedRows,
+      ).toHaveBeenCalledWith(
+        mockQueryRunner.manager,
+        "user-1",
+        "tx-1",
+        TransactionStatus.VOID,
+        touchedSecurityIds,
+      );
     });
   });
 
@@ -2662,6 +2843,7 @@ describe("TransactionSplitService", () => {
             bondInstrumentId: null,
           },
         ],
+        touchedSecurityIds: expect.any(Set),
       });
       const readOrder = mockQueryRunner.manager.query.mock.calls.findIndex(
         ([sql]: [string]) => String(sql).includes("it.transaction_split_id"),

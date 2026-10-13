@@ -71,13 +71,18 @@ function unavailable(
 /**
  * One GET on the issuer's host: a request to another host is never made, a
  * redirect elsewhere, a status other than 200, a timeout and an oversized body
- * are refused. 404 is `notFound` so the caller can name what is missing.
+ * are refused. `notFound` says what the document is: the series page (404 is
+ * `SERIES_NOT_PUBLISHED`, another permanent 4xx `SOURCE_DOCUMENT_MISSING`), the
+ * series' letter (any permanent 4xx is `SOURCE_DOCUMENT_MISSING`), or a page
+ * that belongs to no one series (`SOURCE_UNAVAILABLE`: every non-200 is
+ * transient). 5xx and 429 are always `SOURCE_UNAVAILABLE`.
  */
 export async function getFromIssuer(
   get: BondFetch,
   url: string,
   maxBytes: number,
-  notFound: "SERIES_NOT_PUBLISHED" | "SOURCE_UNAVAILABLE",
+  notFound:
+    "SERIES_NOT_PUBLISHED" | "SOURCE_DOCUMENT_MISSING" | "SOURCE_UNAVAILABLE",
 ): Promise<Uint8Array> {
   if (!isOwnHttps(new URL(url))) throw unavailable("host");
   let timer: NodeJS.Timeout | undefined;
@@ -110,6 +115,18 @@ export async function getFromIssuer(
     throw new SeriesFetchError("SERIES_NOT_PUBLISHED");
   }
   if (response.status !== 200) {
+    // A permanent 4xx on one series' own document is a refusal of that series
+    // (the pass goes on); 5xx, 429 and anything else unexpected stay transient.
+    const permanent =
+      response.status >= 400 &&
+      response.status < 500 &&
+      response.status !== 429;
+    if (permanent && notFound !== "SOURCE_UNAVAILABLE") {
+      throw new SeriesFetchError("SOURCE_DOCUMENT_MISSING", {
+        document: notFound === "SERIES_NOT_PUBLISHED" ? "page" : "letter",
+        status: String(response.status),
+      });
+    }
     throw unavailable("status", { status: String(response.status) });
   }
   if (response.body.byteLength > maxBytes) {

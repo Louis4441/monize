@@ -691,6 +691,8 @@ describe("BondsController", () => {
       ["SERIES_FETCH_UNSUPPORTED", BadRequestException],
       ["SERIES_NOT_PUBLISHED", NotFoundException],
       ["SOURCE_UNAVAILABLE", ServiceUnavailableException],
+      ["SOURCE_DOCUMENT_MISSING", UnprocessableEntityException],
+      ["MANUAL_ENTRY_INVALID", UnprocessableEntityException],
       ["SOURCE_FORMAT_CHANGED", BadGatewayException],
       ["SOURCE_INCONSISTENT", UnprocessableEntityException],
       ["TEMPLATE_NOT_VALIDATED", UnprocessableEntityException],
@@ -780,7 +782,7 @@ describe("BondsController", () => {
       const codes = Object.keys(
         SERIES_ERROR_FALLBACKS,
       ) as SeriesFetchErrorCode[];
-      expect(codes).toHaveLength(8);
+      expect(codes).toHaveLength(10);
       for (const code of codes) {
         const catalogue = (enErrors.bonds as Record<string, string>)[code];
         const interpolated = catalogue.replace(

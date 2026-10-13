@@ -17,3 +17,26 @@ export const BOND_CALENDARS: CalendarRegistry = INSTALLED_BOND_ADAPTERS.reduce(
   (registry, adapter) => adapter.registerCalendars(registry),
   EMPTY_CALENDAR_REGISTRY,
 );
+
+/**
+ * The nominal of one bond of a program, from the installed adapter's product
+ * template (`BondProgramDefinition.faceValue`), or null when no installed
+ * adapter declares the program. The program is named by the stored row's own
+ * key, so no country's code or product is known here.
+ */
+export function templateFaceValueOf(program: {
+  readonly issuerCountryCode: string;
+  readonly issuerCode: string;
+  readonly programCode: string;
+}): string | null {
+  for (const adapter of INSTALLED_BOND_ADAPTERS) {
+    const found = adapter.programs.find(
+      (p) =>
+        p.issuerCountryCode === program.issuerCountryCode &&
+        p.issuerCode === program.issuerCode &&
+        p.programCode === program.programCode,
+    );
+    if (found) return found.faceValue;
+  }
+  return null;
+}

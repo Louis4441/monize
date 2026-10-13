@@ -128,7 +128,8 @@ describe("manualSeries", () => {
         ...patch,
       } as ManualSeriesValues),
     );
-    expect(error.code).toBe("SOURCE_FORMAT_CHANGED");
+    // An administrator's own input, never "the official source changed".
+    expect(error.code).toBe("MANUAL_ENTRY_INVALID");
     expect(error.params.field).toBe(field);
   });
 

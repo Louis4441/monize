@@ -7,7 +7,11 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
-import { beginBondWriteGuard } from "../bonds/bond-write-guard";
+import {
+  beginBondWriteGuard,
+  BondWriteGuard,
+  createBondWriteGuard,
+} from "../bonds/bond-write-guard";
 import {
   resolveTransactionSeries,
   seriesCodeOf,
@@ -2618,12 +2622,29 @@ export class InvestmentTransactionsService {
    * row, and re-derive the position it left behind. The parent split's
    * deletion would cascade-delete this row via the FK, but the holdings
    * projection has to be taken after the row is gone, not before.
+   *
+   * A removal the lots of a bond-linked security cannot spare is refused here,
+   * rolling the caller's whole operation back (`BondWriteGuard`, INV-BOND-007).
+   * A caller that deletes the rows only to recreate them (a split replacement)
+   * passes its own `bondGuard`, tracked before the first deletion and verified
+   * by the caller after the recreation, so a replacement that nets out is not
+   * refused half way. `touchedSecurityIds` collects the security for the
+   * caller's post-commit bond price recompute (INV-BOND-005, INV-CACHE-001).
    */
   async reverseAndRemoveEmbedded(
     manager: EntityManager,
     userId: string,
     investmentTransaction: InvestmentTransaction,
+    options?: {
+      touchedSecurityIds?: Set<string>;
+      bondGuard?: BondWriteGuard;
+    },
   ): Promise<void> {
+    const bondGuard =
+      options?.bondGuard ??
+      (await beginBondWriteGuard(manager, userId, [
+        investmentTransaction.securityId,
+      ]));
     await this.reverseTransactionEffectsInTransaction(
       manager,
       userId,
@@ -2642,7 +2663,24 @@ export class InvestmentTransactionsService {
         ],
         manager,
       );
+      options?.touchedSecurityIds?.add(investmentTransaction.securityId);
     }
+
+    if (!options?.bondGuard) await bondGuard.verify();
+  }
+
+  /**
+   * Recompute the engine prices of the bond-linked securities among these, after
+   * the commit of a split write whose embedded investment rows changed their
+   * lots (INV-BOND-005, INV-CACHE-001: never inside the transaction).
+   */
+  async recomputeBondPricesAfterSplitWrite(
+    userId: string,
+    securityIds: Iterable<string>,
+  ): Promise<void> {
+    const ids = [...securityIds];
+    if (ids.length === 0) return;
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, ids);
   }
 
   /**
@@ -2701,6 +2739,7 @@ export class InvestmentTransactionsService {
     userId: string,
     parentTransactionId: string,
     newStatus: TransactionStatus,
+    touchedSecurityIds?: Set<string>,
   ): Promise<Set<string>> {
     // Re-entrant with the call the split-status paths make before their first
     // balance write (`lockEmbeddedHoldingScopes`): the advisory lock must
@@ -2725,12 +2764,26 @@ export class InvestmentTransactionsService {
     const securityIds = new Set<string>();
     const scopes = new Map<string, HoldingScope>();
 
+    const rowsBySplit: InvestmentTransaction[][] = [];
     for (const splitId of investmentSplitIds) {
-      const rows = await manager.getRepository(InvestmentTransaction).find({
-        // includes VOID rows: records read -- the boundary decision below is
-        // exactly about the rows already on the other side.
-        where: { userId, transactionSplitId: splitId },
-      });
+      rowsBySplit.push(
+        await manager.getRepository(InvestmentTransaction).find({
+          // includes VOID rows: records read -- the boundary decision below is
+          // exactly about the rows already on the other side.
+          where: { userId, transactionSplitId: splitId },
+        }),
+      );
+    }
+
+    // Every security whose lots this can move is tracked before the first row
+    // changes, after the holding lock above (INV-BOND-007): a void that leaves
+    // a later removal uncovered, or an un-void of a row whose price is not a
+    // price per bond, is refused and the parent's whole change rolls back.
+    const bondGuard = createBondWriteGuard(manager, userId);
+    await bondGuard.track(rowsBySplit.flat().map((row) => row.securityId));
+    const changedRowIds: string[] = [];
+
+    for (const rows of rowsBySplit) {
       for (const row of rows) {
         const wasVoid = row.status === TransactionStatus.VOID;
         if (wasVoid === isVoid) continue;
@@ -2758,8 +2811,10 @@ export class InvestmentTransactionsService {
           );
         }
         affectedAccountIds.add(row.accountId);
+        changedRowIds.push(row.id);
         if (row.securityId) {
           securityIds.add(row.securityId);
+          touchedSecurityIds?.add(row.securityId);
           scopes.set(`${row.accountId}:${row.securityId}`, {
             accountId: row.accountId,
             securityId: row.securityId,
@@ -2790,6 +2845,8 @@ export class InvestmentTransactionsService {
         securityIds.size > 0 ? Array.from(securityIds) : undefined,
       );
     }
+
+    await bondGuard.verify(changedRowIds);
 
     return affectedAccountIds;
   }

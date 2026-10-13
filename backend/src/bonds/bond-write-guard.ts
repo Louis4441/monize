@@ -4,6 +4,10 @@ import {
 } from "@nestjs/common";
 import { EntityManager } from "typeorm";
 import { tr } from "../i18n/translate";
+import {
+  findQuantitiesNotBonds,
+  QuantityNotBonds,
+} from "../securities/bond-link.util";
 import { loadBondLedger } from "./bond-ledger";
 import {
   BondLotsRefusal,
@@ -71,6 +75,25 @@ export function lotsRefusalException(
 }
 
 /**
+ * The 400 of a priced trade of a bond-linked security whose price is not a price
+ * per bond of its face value (INV-BOND-005): the quantity is not a number of
+ * bonds. Nothing is written; `QUANTITY_NOT_BONDS` is its `errorCode`.
+ */
+export function quantityNotBondsException(
+  found: QuantityNotBonds,
+): BadRequestException {
+  const params = { price: found.price, faceValue: found.faceValue };
+  return new BadRequestException({
+    message: tr(
+      "errors.bonds.QUANTITY_NOT_BONDS",
+      `The quantity must be a number of bonds and the price a price per bond of face value ${params.faceValue}; the price ${params.price} is not within half to twice the face value of one bond.`,
+      params,
+    ),
+    errorCode: "QUANTITY_NOT_BONDS",
+  });
+}
+
+/**
  * The refusal of the lot derivation over the security's whole ledger right now,
  * null when the lots are derivable, `undefined` when the security is not linked
  * to a bond program (no lots, nothing to guard).
@@ -121,6 +144,8 @@ export function createBondWriteGuard(
 ): BondWriteGuard {
   /** Per tracked linked security: its refusal before the write (null: derivable). */
   const before = new Map<string, BondLotsRefusal | null>();
+  /** Per tracked linked security: the rows already out of the price band. */
+  const outOfBandBefore = new Map<string, ReadonlySet<string>>();
   const seen = new Set<string>();
 
   return {
@@ -129,12 +154,37 @@ export function createBondWriteGuard(
         if (!id || seen.has(id)) continue;
         seen.add(id);
         const refusal = await currentLotsRefusal(m, userId, id, programCache);
-        if (refusal !== undefined) before.set(id, refusal);
+        if (refusal === undefined) continue;
+        before.set(id, refusal);
+        const program = await programOfSecurity(m, userId, id, programCache);
+        if (program !== null) {
+          const found = await findQuantitiesNotBonds(m, userId, id, program.id);
+          outOfBandBefore.set(id, new Set(found.map((f) => f.rowId)));
+        }
       }
     },
 
     async verify(writtenRowIds = []) {
       const written = new Set(writtenRowIds);
+      for (const [securityId, offendersBefore] of outOfBandBefore) {
+        const program = await programOfSecurity(
+          m,
+          userId,
+          securityId,
+          programCache,
+        );
+        if (program === null) continue;
+        const offenders = await findQuantitiesNotBonds(
+          m,
+          userId,
+          securityId,
+          program.id,
+        );
+        const refused = offenders.find(
+          (f) => written.has(f.rowId) || !offendersBefore.has(f.rowId),
+        );
+        if (refused) throw quantityNotBondsException(refused);
+      }
       for (const [securityId, refusedBefore] of before) {
         const now = await currentLotsRefusal(
           m,

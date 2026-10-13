@@ -160,6 +160,9 @@ function build() {
   };
 }
 
+/** Lets the detached post-store work (`dispatchAfterStored`) run to its end. */
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
 const refusal = async (
   promise: Promise<unknown>,
 ): Promise<SeriesFetchError> => {
@@ -190,6 +193,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       order.push("recompute");
     });
     await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await flush();
     expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledWith([
       INSTRUMENT_ID,
     ]);
@@ -205,6 +209,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       order.push("recompute");
     });
     await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await flush();
     expect(benchmarks.refreshNeverFetched).toHaveBeenCalledWith([
       INSTRUMENT_ID,
     ]);
@@ -215,6 +220,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
     const { service, catalog, benchmarks } = build();
     catalog.findStoredSeries.mockResolvedValue(SUMMARY);
     await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await flush();
     catalog.findStoredSeries.mockResolvedValue(null);
     catalog.storeEntry.mockResolvedValue({
       kind: "conflict",
@@ -247,12 +253,14 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       fetchSeries: jest.fn(async () => ({ entry: edo, sources: [] })),
     });
     await service.fetchSeries("PL", "edo1036", { adapters: [adapter] });
+    await flush();
     expect(catalog.seedBenchmarkSeries).toHaveBeenCalledWith(
       [adapter],
       new Set(["PL_CPI_GUS_YOY"]),
     );
     catalog.seedBenchmarkSeries.mockClear();
     await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await flush();
     expect(catalog.seedBenchmarkSeries).not.toHaveBeenCalled();
   });
 
@@ -260,6 +268,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
     const { service, catalog, prices } = build();
     catalog.findStoredSeries.mockResolvedValue(SUMMARY);
     await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await flush();
     catalog.findStoredSeries.mockResolvedValue(null);
     catalog.storeEntry.mockResolvedValue({
       kind: "unchanged",
@@ -267,6 +276,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       instrumentId: INSTRUMENT_ID,
     });
     await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await flush();
     expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenLastCalledWith(
       [],
     );
@@ -325,6 +335,37 @@ describe("BondSeriesService: recompute after a series is stored", () => {
     prices.recomputeLinkedSecuritiesOfSeries.mockClear();
     await service.fetchOfferOf("PL", { adapters: [adapter] });
     expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers a fetch without waiting for the benchmark refresh or the recompute", async () => {
+    const { service, prices, benchmarks } = build();
+    benchmarks.refreshNeverFetched.mockImplementation(
+      () => new Promise<void>(() => undefined),
+    );
+    prices.recomputeLinkedSecuritiesOfSeries.mockImplementation(
+      () => new Promise<void>(() => undefined),
+    );
+    const result = await service.fetchSeries("PL", "ots0127", {
+      adapters: [adapterOf()],
+    });
+    expect(result).toMatchObject({ id: INSTRUMENT_ID, created: true });
+    expect(benchmarks.refreshNeverFetched).toHaveBeenCalledWith([
+      INSTRUMENT_ID,
+    ]);
+  });
+
+  it("logs a failed post-store dispatch and never throws it to the caller", async () => {
+    const { service, prices, benchmarks } = build();
+    const warn = jest.spyOn(Logger.prototype, "warn");
+    benchmarks.refreshNeverFetched.mockRejectedValue(new Error("network down"));
+    prices.recomputeLinkedSecuritiesOfSeries.mockRejectedValue(
+      new Error("recompute broke"),
+    );
+    await expect(
+      service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] }),
+    ).resolves.toMatchObject({ created: true });
+    await flush();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("network down"));
   });
 });
 
@@ -1312,6 +1353,28 @@ describe("BondSeriesService", () => {
       expect(logLog).toHaveBeenCalledWith(
         expect.stringContaining("stopped on an unavailable source"),
       );
+    });
+
+    it("goes on after a series whose letter answers 404, and stores the next one", async () => {
+      const { service } = build();
+      const fetchSeries = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new SeriesFetchError("SOURCE_DOCUMENT_MISSING", {
+            document: "letter",
+            status: "404",
+          }),
+        )
+        .mockResolvedValueOnce({ entry: ENTRY, sources: [] });
+      const run = await service.backfillHistory({
+        adapters: [
+          withCodes({ fetchSeries, backfillCodes: () => codes.slice(0, 2) }),
+        ],
+        sleep: async () => undefined,
+        today: "2026-10-11",
+      });
+      expect(fetchSeries).toHaveBeenCalledTimes(2);
+      expect(run).toMatchObject({ stored: 1, failed: 1, stoppedEarly: false });
     });
 
     it("goes on after a series the source does not publish, and after any other refusal, logging each", async () => {

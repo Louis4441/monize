@@ -35,9 +35,27 @@ product) is the adapter's (`BondProgramDefinition`), not a column.
 DEFAULT false`. The link is checked in the write's transaction exactly as the
 series link was (`assertBondLink`): the program exists, the security's type is
 `BOND`, its currency equals the program's currency, and, when the link is
-being set, every priced trade of the security (`BUY`, `SELL`, `REINVEST` and its
-variants, not void) is within [0.5, 2] x the face value of the series it is
-read as (`LINK_QUANTITY_NOT_BONDS`, `BOND_UNIT_PRICE_BAND`).
+being set, every priced acquisition of the security (`BUY`, `REINVEST` and its
+variants, not void; a `SELL` or `REDEEM` is not read, because a long-held bond
+may be worth more than twice its face value and a removal counted in currency
+units is refused by the lot derivation) is within [0.5, 2] x the face value of
+the series it is read as (`LINK_QUANTITY_NOT_BONDS`, `BOND_UNIT_PRICE_BAND`).
+
+A quantity of a linked security is a count of bonds on every write, not only
+when the link is made (INV-BOND-005). The face value a row is read against is
+its series' own terms (`instrument.faceValue`, the newest version) when the row
+stores, or can be inferred, a series of the program; otherwise the program's
+face value from the adapter's product template (`BondProgramDefinition.faceValue`,
+`templateFaceValueOf`), so a program with no stored series is never a way past
+the band (an empty catalog dropped every row once). A program no installed
+adapter declares has no face value, and such a row is not read. After every
+write path (create, update, transfer, an embedded split row, the file imports,
+undo and redo, a split parent's void and replacement) `BondWriteGuard.verify`
+reads the stored price and series of the rows just written, inside the write's
+own transaction, and refuses one outside the band with `QUANTITY_NOT_BONDS`
+(400) before anything commits; a row that was already outside the band when the
+guard began never blocks an unrelated edit or a delete, but an edit that writes
+it again is a write.
 
 ### 2.3 Transaction series
 
@@ -97,6 +115,31 @@ each) and values each lot by its own series' terms; totals are summed as
 today. The daily `bond_engine` price is the blend over all lots of all series,
 as today over accounts. Scenarios assume a benchmark for every series that
 reads it; a series that does not read it is unchanged.
+
+**A holding's current value is its own lots' value, not quantity times the
+blend** (amended 2026-10-13 after the audit of PR #24, finding H2). One
+security now spans a whole program, so two accounts can hold lots years apart:
+10 bonds of a 2022 EDO series (gross 135.40 each) in an IKE and 10 of the newest
+series (100.08 each) in a regular account blend to 117.74, and `quantity x
+price` showed both accounts at 1177.40 (correct: 1354.00 and 1000.80) with a
+gain of 17.7 % on bonds bought a week ago. So:
+
+- The current market value of a bond-linked holding (one account, one
+  security) is the sum of the engine's `grossValue` of that account's open lots
+  on the person's financial today (`BondValuationService`), never
+  `quantity x security price`. Its gain is that value less its cost basis.
+- When any of those lots has no `grossValue` (rate unknown, lots refused, a lot
+  outside its sale window), the holding is unpriced: `marketValue` null, the
+  security in `unpricedSecurityIds`, `pricesComplete` false, exactly as a
+  security with no price. Never the blend, never the last stored close.
+- The portfolio total is unchanged in value (the per-account values sum to
+  `quantity x blend` on the same day) and is computed from the same
+  per-account values.
+- Historical per-account series (net worth by account, an account's value
+  chart) still read the daily blend: their per-account split is approximate for
+  a security held in several accounts; their total is exact. This is recorded
+  as a known limitation (`docs/system-invariants.md`, INV-BOND-010, partial)
+  and is a separate change (per-account engine prices need storage).
 
 ### 2.5 Auto-fetch
 

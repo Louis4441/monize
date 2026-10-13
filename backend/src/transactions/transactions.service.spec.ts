@@ -6598,9 +6598,116 @@ describe("TransactionsService", () => {
         // the locked row) and the touched-accounts set for the post-commit
         // net-worth fan-out. Neither is what this test pins down, but the status
         // is another committed-parent field so it is asserted precisely.
-        { parentStatus: TransactionStatus.UNRECONCILED, carriedSeries: [] },
+        {
+          parentStatus: TransactionStatus.UNRECONCILED,
+          carriedSeries: [],
+          touchedSecurityIds: expect.any(Set),
+        },
         expect.any(Set),
       );
+    });
+
+    describe("the bond price recompute after a split parent write (INV-BOND-005, INV-CACHE-001)", () => {
+      const markTouched =
+        (id: string) => async (_t: string, _u: string, bond?: any) => {
+          bond?.touchedSecurityIds?.add(id);
+          return new Set<string>();
+        };
+
+      it("a replacement of the splits runs under one guard (verified after the successors are written) and dispatches the recompute after the commit", async () => {
+        transactionsRepository.findOne.mockResolvedValue(mockTx);
+        lockedRow = { ...mockTx };
+        splitsRepository.find.mockResolvedValue([]);
+        const deleteSideEffects = jest
+          .spyOn(splitService, "deleteSplitSideEffects")
+          .mockImplementation(markTouched("sec-old") as never);
+        const recompute = jest
+          .spyOn(splitService, "recomputeBondPricesAfterWrite")
+          .mockResolvedValue(undefined);
+
+        await service.update("user-1", "tx-1", {
+          splits: [
+            { amount: -60, categoryId: "cat-1" },
+            { amount: -40, categoryId: "cat-2" },
+          ],
+        } as any);
+
+        const bond = deleteSideEffects.mock.calls[0][2] as any;
+        expect(bond.bondGuard).toEqual(
+          expect.objectContaining({
+            track: expect.any(Function),
+            verify: expect.any(Function),
+          }),
+        );
+        expect([...bond.touchedSecurityIds]).toEqual(["sec-old"]);
+        expect(recompute).toHaveBeenCalledWith(
+          "user-1",
+          bond.touchedSecurityIds,
+        );
+        // After the transaction: the dispatch follows the last in-transaction
+        // write of the parent, never precedes it.
+        const lastWrite = Math.max(
+          ...(mockQueryRunner.manager.update.mock
+            .invocationCallOrder as number[]),
+        );
+        expect(recompute.mock.invocationCallOrder[0]).toBeGreaterThan(
+          lastWrite,
+        );
+      });
+
+      it("a void edit of a split parent hands the collector to the status pass and dispatches the recompute", async () => {
+        transactionsRepository.findOne.mockResolvedValue({
+          ...mockTx,
+          isSplit: true,
+          status: TransactionStatus.UNRECONCILED,
+        });
+        lockedRow = {
+          ...mockTx,
+          isSplit: true,
+          status: TransactionStatus.UNRECONCILED,
+        };
+        splitsRepository.find.mockResolvedValue([]);
+        const apply = jest
+          .spyOn(splitService, "applyParentStatusToTransferCounterparts")
+          .mockImplementation((async (
+            _m: unknown,
+            _id: string,
+            _u: string,
+            _s: unknown,
+            touched?: Set<string>,
+          ) => {
+            touched?.add("sec-void");
+            return new Set<string>();
+          }) as never);
+        const recompute = jest
+          .spyOn(splitService, "recomputeBondPricesAfterWrite")
+          .mockResolvedValue(undefined);
+        // The row after the write reads as VOID.
+        mockQueryRunner.manager.findOne.mockResolvedValue({
+          ...mockTx,
+          isSplit: true,
+          status: TransactionStatus.VOID,
+        });
+
+        await service.update("user-1", "tx-1", {
+          status: TransactionStatus.VOID,
+        } as any);
+
+        expect(apply).toHaveBeenCalledWith(
+          expect.anything(),
+          "tx-1",
+          "user-1",
+          TransactionStatus.VOID,
+          expect.any(Set),
+        );
+        expect(recompute).toHaveBeenCalledWith(
+          "user-1",
+          expect.objectContaining({}),
+        );
+        expect([...(recompute.mock.calls[0][1] as Set<string>)]).toEqual([
+          "sec-void",
+        ]);
+      });
     });
 
     /**
@@ -7337,6 +7444,43 @@ describe("TransactionsService", () => {
   });
 
   describe("remove with split transaction", () => {
+    it("dispatches the bond price recompute of the removed embedded rows' securities after the commit (INV-BOND-005)", async () => {
+      transactionsRepository.findOne.mockResolvedValueOnce({
+        id: "tx-1",
+        userId: "user-1",
+        accountId: "account-1",
+        amount: -100,
+        status: TransactionStatus.UNRECONCILED,
+        isSplit: true,
+        splits: [],
+      });
+      splitsRepository.findOne.mockResolvedValue(null);
+      const deleteSideEffects = jest
+        .spyOn(splitService, "deleteSplitSideEffects")
+        .mockImplementation((async (
+          _t: string,
+          _u: string,
+          bond?: { touchedSecurityIds?: Set<string> },
+        ) => {
+          bond?.touchedSecurityIds?.add("sec-removed");
+          return new Set<string>();
+        }) as never);
+      const recompute = jest
+        .spyOn(splitService, "recomputeBondPricesAfterWrite")
+        .mockResolvedValue(undefined);
+
+      await service.remove("user-1", "tx-1");
+
+      expect(deleteSideEffects).toHaveBeenCalledWith(
+        "tx-1",
+        "user-1",
+        expect.objectContaining({ touchedSecurityIds: expect.any(Set) }),
+      );
+      expect([...(recompute.mock.calls[0][1] as Set<string>)]).toEqual([
+        "sec-removed",
+      ]);
+    });
+
     it("cleans up linked transfer split transactions when removing split parent", async () => {
       const mockTx = {
         id: "tx-1",

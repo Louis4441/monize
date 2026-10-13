@@ -36,9 +36,30 @@ const row = (over: Partial<Row> & { id: string }): Row => ({
  * A manager answering the guard's statements: the program lookup, the ledger's
  * security read and the ledger rows. `ledgers` are the successive ledger reads.
  */
-function world(opts: { linked?: boolean; ledgers: Row[][] }) {
+function world(opts: {
+  linked?: boolean;
+  ledgers: Row[][];
+  /** Successive answers of the price band read (rows outside it); last repeats. */
+  band?: Array<Array<{ id: string; price: string; face: string }>>;
+}) {
   let reads = 0;
-  const query = jest.fn(async (sql: string) => {
+  let bandReads = 0;
+  const query = jest.fn(async (sql: string, _params?: unknown[]) => {
+    if (sql.includes("FROM bond_programs WHERE id")) {
+      return [
+        {
+          issuer_country_code: "PL",
+          issuer_code: "PL_MF",
+          program_code: "EDO",
+        },
+      ];
+    }
+    if (sql.includes("t.price IS NOT NULL")) {
+      const all = opts.band ?? [[]];
+      const rows = all[Math.min(bandReads, all.length - 1)];
+      bandReads += 1;
+      return rows;
+    }
     if (sql.includes("s.bond_program_id AS id")) {
       return [
         opts.linked === false
@@ -242,6 +263,100 @@ describe("BondWriteGuard (INV-BOND-007: a removal is checked at write time)", ()
     await expect(guard.verify(["w1"])).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+});
+
+describe("BondWriteGuard (INV-BOND-005: a quantity of a linked security is a count of bonds, on every write)", () => {
+  const buy = row({ id: "b1" });
+  const outOfBand = (id: string, price = "1.0000") => ({
+    id,
+    price,
+    face: "100.00",
+  });
+
+  it("refuses a written trade priced below the band (BUY 1000 @ 1.00 against a face value of 100) with the price and the face value in the message", async () => {
+    const { manager } = world({
+      ledgers: [[], [buy]],
+      band: [[], [outOfBand("b1")]],
+    });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    const body = await refusalCode(guard.verify(["b1"]));
+    expect(body?.errorCode).toBe("QUANTITY_NOT_BONDS");
+    expect(body?.message).toContain("100.00");
+    expect(body?.message).toContain("1.0000");
+  });
+
+  it("refuses one priced above the band too", async () => {
+    const { manager } = world({
+      ledgers: [[], [buy]],
+      band: [[], [outOfBand("b1", "250.0000")]],
+    });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    expect((await refusalCode(guard.verify(["b1"])))?.errorCode).toBe(
+      "QUANTITY_NOT_BONDS",
+    );
+  });
+
+  it("is silent for a trade in the band (the read finds nothing out of it)", async () => {
+    const { manager } = world({ ledgers: [[], [buy]], band: [[], []] });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    await expect(guard.verify(["b1"])).resolves.toBeUndefined();
+  });
+
+  it("reads a row with no series against the program's template face value (an empty catalog does not pass)", async () => {
+    const { manager, query } = world({ ledgers: [[], [buy]] });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    await guard.verify(["b1"]);
+    const bandReads = query.mock.calls.filter(([sql]) =>
+      String(sql).includes("t.price IS NOT NULL"),
+    );
+    expect(bandReads.length).toBeGreaterThanOrEqual(2);
+    for (const [, params] of bandReads) {
+      expect((params as unknown[])[3]).toBe("100.00");
+    }
+  });
+
+  it("refuses a written row even when it was out of band before (an edit that keeps a legacy price is still a write)", async () => {
+    const { manager } = world({
+      ledgers: [[buy], [buy]],
+      band: [[outOfBand("b1")], [outOfBand("b1")]],
+    });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    expect((await refusalCode(guard.verify(["b1"])))?.errorCode).toBe(
+      "QUANTITY_NOT_BONDS",
+    );
+  });
+
+  it("does not block an unrelated write or a delete because of a legacy row that was already out of band", async () => {
+    const { manager } = world({
+      ledgers: [[buy], [buy]],
+      band: [[outOfBand("old")], [outOfBand("old")]],
+    });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    await expect(guard.verify(["unrelated"])).resolves.toBeUndefined();
+    await expect(guard.verify()).resolves.toBeUndefined();
+  });
+
+  it("covers a write that names no ids (a file import): a row out of band that was not before is refused", async () => {
+    const { manager } = world({
+      ledgers: [[], [buy]],
+      band: [[], [outOfBand("imported-1")]],
+    });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    expect((await refusalCode(guard.verify()))?.errorCode).toBe(
+      "QUANTITY_NOT_BONDS",
+    );
+  });
+
+  it("reads nothing of the band for a security that is not linked", async () => {
+    const { manager, query } = world({ linked: false, ledgers: [[]] });
+    const guard = await beginBondWriteGuard(manager, USER, [SEC]);
+    await expect(guard.verify(["b1"])).resolves.toBeUndefined();
+    expect(
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes("t.price IS NOT NULL"),
+      ),
+    ).toBe(false);
   });
 });
 

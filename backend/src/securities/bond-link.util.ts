@@ -1,4 +1,5 @@
 import { EntityManager } from "typeorm";
+import { templateFaceValueOf } from "../bonds/bond-adapters";
 import { seriesOnSaleSql } from "../bonds/bond-series-resolver";
 
 /**
@@ -54,41 +55,97 @@ export async function findBondLinkProblem(
 export const BOND_UNIT_PRICE_BAND = { min: "0.5", max: "2" } as const;
 
 /**
- * True when the security has a trade whose per-unit price is not within
- * [0.5, 2] x the face value of the series it will be read as, which means its
+ * The ACQUISITIONS whose per-unit price says what a quantity counts: BUY and the
+ * REINVEST variants (a transfer or ADD_SHARES has no price). A SELL or REDEEM is
+ * not read: a long-held EDO or ROD is legitimately worth more than twice its
+ * face value, and a removal counted in currency units is already refused by the
+ * lot derivation (REMOVAL_EXCEEDS_SERIES). The link check read SELL before; it
+ * no longer does.
+ */
+const BAND_ACTIONS_SQL = `'BUY', 'REINVEST', 'REINVEST_INTEREST',
+                             'REINVEST_CAPITAL_GAIN_SHORT', 'REINVEST_CAPITAL_GAIN_LONG'`;
+
+/** A trade whose price is outside the band of its face value. */
+export interface QuantityNotBonds {
+  readonly rowId: string;
+  /** The stored per-unit price, as a decimal string. */
+  readonly price: string;
+  /** The face value per bond it was read against, as a decimal string. */
+  readonly faceValue: string;
+}
+
+/**
+ * The face value of one bond of the program the template declares, or null when
+ * the program is not found or no installed adapter declares it (then a row with
+ * no series of its own has nothing to be read against and is not refused).
+ */
+export async function programTemplateFaceValue(
+  m: EntityManager,
+  bondProgramId: string,
+): Promise<string | null> {
+  const rows: Array<{
+    issuer_country_code: string;
+    issuer_code: string;
+    program_code: string;
+  }> = await m.query(
+    `SELECT issuer_country_code, issuer_code, program_code
+       FROM bond_programs WHERE id = $1::uuid`,
+    [bondProgramId],
+  );
+  if (rows.length === 0) return null;
+  return templateFaceValueOf({
+    issuerCountryCode: rows[0].issuer_country_code,
+    issuerCode: rows[0].issuer_code,
+    programCode: rows[0].program_code,
+  });
+}
+
+/**
+ * The priced acquisitions of the security (at most `limit`) whose per-unit price is not within
+ * [0.5, 2] x the face value of the series it is read as, which means its
  * quantities are not numbers of bonds (a legacy security recording currency
  * units, or one unit per package): the lot derivation reads a quantity as a
  * count of bonds, so the link would publish a figure off by a factor of the face
- * value. A row is read as its stored series when that is in the NEW program;
- * otherwise (no stored series, or one of another program, which the link
- * clears) as the series of the new program on sale on its date
- * (`seriesOnSaleSql`, the inference a write applies), and when none is on sale
- * that day as the program's newest series (the greatest sale window start): a
- * row is never skipped for lack of a series. Rows with no price (ADD_SHARES, a
- * transfer) say nothing and are not read; VOID rows recorded nothing.
+ * value (INV-BOND-005). A row is read as its stored series when that is in the
+ * program; otherwise (no stored series, or one of another program, which a link
+ * clears) as the series of the program on sale on its date (`seriesOnSaleSql`,
+ * the inference a write applies), and when none is on sale that day as the
+ * program's newest series (the greatest sale window start). A row with no
+ * series to read, because the program has none stored, is read against the face
+ * value of the program's template (`templateFaceValueOf`): a row is never
+ * skipped for lack of a series. Rows with no price (ADD_SHARES, a transfer) say
+ * nothing and are not read; VOID rows recorded nothing. `onlyRowIds` narrows the
+ * read to the rows a write has just stored (read from their stored price and
+ * series, inside the write's transaction).
  */
-export async function hasQuantitiesThatAreNotBonds(
+export async function findQuantitiesNotBonds(
   m: EntityManager,
   userId: string,
   securityId: string,
   bondProgramId: string,
-): Promise<boolean> {
+  options: {
+    readonly onlyRowIds?: readonly string[];
+    readonly limit?: number;
+  } = {},
+): Promise<QuantityNotBonds[]> {
+  const templateFace = await programTemplateFaceValue(m, bondProgramId);
   const onSale = seriesOnSaleSql(
     "$3",
     "TO_CHAR(t.transaction_date, 'YYYY-MM-DD')",
   );
-  const rows: unknown[] = await m.query(
-    `SELECT 1
+  const rows: Array<{ id: string; price: string; face: string }> =
+    await m.query(
+      `SELECT t.id, t.price::text AS price, COALESCE(f.face, $4::numeric)::text AS face
        FROM (
          SELECT t.*
            FROM investment_transactions t
           WHERE t.security_id = $1 AND t.user_id = $2
             AND t.status != 'VOID'
-            AND t.action IN ('BUY', 'SELL', 'REINVEST', 'REINVEST_INTEREST',
-                             'REINVEST_CAPITAL_GAIN_SHORT', 'REINVEST_CAPITAL_GAIN_LONG')
+            AND t.action IN (${BAND_ACTIONS_SQL})
             AND t.price IS NOT NULL AND t.price > 0
+            AND ($5::uuid[] IS NULL OR t.id = ANY($5::uuid[]))
        ) t
-      CROSS JOIN LATERAL (
+      LEFT JOIN LATERAL (
         SELECT i.id
           FROM bond_instruments i
          WHERE i.bond_program_id = $3::uuid
@@ -121,19 +178,47 @@ export async function hasQuantitiesThatAreNotBonds(
                )
              )
            )
-      ) r
-      CROSS JOIN LATERAL (
+      ) r ON true
+      LEFT JOIN LATERAL (
         SELECT (terms -> 'instrument' ->> 'faceValue')::numeric AS face
           FROM bond_terms_versions
          WHERE bond_instrument_id = r.id
          ORDER BY version DESC
          LIMIT 1
-      ) f
-      WHERE f.face IS NOT NULL AND f.face > 0
-        AND (t.price < f.face * ${BOND_UNIT_PRICE_BAND.min}::numeric
-             OR t.price > f.face * ${BOND_UNIT_PRICE_BAND.max}::numeric)
-      LIMIT 1`,
-    [securityId, userId, bondProgramId],
+      ) f ON true
+      WHERE COALESCE(f.face, $4::numeric) > 0
+        AND (t.price < COALESCE(f.face, $4::numeric) * ${BOND_UNIT_PRICE_BAND.min}::numeric
+             OR t.price > COALESCE(f.face, $4::numeric) * ${BOND_UNIT_PRICE_BAND.max}::numeric)
+      LIMIT $6::int`,
+      [
+        securityId,
+        userId,
+        bondProgramId,
+        templateFace,
+        options.onlyRowIds ?? null,
+        options.limit ?? null,
+      ],
+    );
+  return rows.map((r) => ({
+    rowId: r.id,
+    price: r.price,
+    faceValue: r.face,
+  }));
+}
+
+/** True when `findQuantitiesNotBonds` finds a trade (the link-time question). */
+export async function hasQuantitiesThatAreNotBonds(
+  m: EntityManager,
+  userId: string,
+  securityId: string,
+  bondProgramId: string,
+): Promise<boolean> {
+  const found = await findQuantitiesNotBonds(
+    m,
+    userId,
+    securityId,
+    bondProgramId,
+    { limit: 1 },
   );
-  return rows.length > 0;
+  return found.length > 0;
 }

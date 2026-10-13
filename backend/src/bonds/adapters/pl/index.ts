@@ -49,6 +49,7 @@ const programs: readonly BondProgramDefinition[] = Object.values(
   issuerCode: instrument.issuerCode as string,
   programCode: instrument.programCode as string,
   currency: instrument.currency as string,
+  faceValue: instrument.faceValue as string,
   infoUrl: productPageUrl(instrument.programCode as PolishProduct),
 }));
 

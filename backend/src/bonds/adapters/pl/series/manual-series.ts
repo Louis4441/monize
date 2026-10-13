@@ -11,7 +11,7 @@ import { seriesPageUrl } from "./series-source";
 import { SERIES_TEMPLATES } from "./templates";
 
 const badField = (field: string, value: unknown) =>
-  new SeriesFetchError("SOURCE_FORMAT_CHANGED", { field, value: echo(value) });
+  new SeriesFetchError("MANUAL_ENTRY_INVALID", { field, value: echo(value) });
 
 /** A decimal string of at most `places` places, in the 4-place or 2-place form. */
 function decimalString(
@@ -78,6 +78,15 @@ export function manualSeries(
     letterNumber: number,
     letterDate: date,
   };
+  // Presence follows the template (a margin only where the product has one, a
+  // fee only where it charges one): the administrator typed it, so the refusal
+  // names their field rather than a changed source.
+  if ((parsed.addend === null) !== (template.addend === null)) {
+    throw badField(template.addend ?? "addend", values.addend);
+  }
+  if ((parsed.fee === null) === template.hasFee) {
+    throw badField("fee", values.fee);
+  }
   return buildSeriesEntry(code, template, parsed, {
     provider: "manual",
     url: seriesPageUrl(code),

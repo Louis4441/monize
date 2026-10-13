@@ -1,3 +1,4 @@
+import { createBondWriteGuard } from "../bonds/bond-write-guard";
 import { readEmbeddedSeriesCarry } from "../bonds/embedded-series-carry";
 import {
   Injectable,
@@ -564,6 +565,9 @@ export class TransactionsService {
 
     // Accounts a transfer/investment split touched, invalidated after commit.
     const splitAffectedAccountIds = new Set<string>();
+    // Securities of embedded investment rows, repriced by the bond engine after
+    // the commit (INV-BOND-005, INV-CACHE-001).
+    const touchedSecurityIds = new Set<string>();
     // Schedules a settlement rule claimed an occurrence of, repriced after commit.
     const settledScheduleIds = new Set<string>();
 
@@ -602,7 +606,7 @@ export class TransactionsService {
             resolvedPayeeId,
             // A VOID parent's transfer counterpart must be VOID too and move no
             // balance; without this a void split still credited the target.
-            { parentStatus: savedTransaction.status },
+            { parentStatus: savedTransaction.status, touchedSecurityIds },
             // Transfer-target and brokerage accounts this split touched, so their
             // net-worth state is invalidated after commit -- not only the parent
             // account (recheck RR5-002).
@@ -703,6 +707,10 @@ export class TransactionsService {
     // priced on the ledger this create left, in its own transaction after the
     // commit (INV-CACHE-001; docs/specs/loan-installment-settlement.md 12.8).
     await repriceSettledLoanTemplates(this.dataSource, settledScheduleIds);
+    await this.splitService.recomputeBondPricesAfterWrite(
+      userId,
+      touchedSecurityIds,
+    );
 
     const result = await this.findOne(userId, savedTransactionId);
     this.recordTransactionAction(userId, result, "create");
@@ -2540,6 +2548,10 @@ export class TransactionsService {
     // old amount/date/status are read from the locked row inside the transaction
     // below (audit P4-003), not from this pre-lock snapshot.
     const counterpartAccountIds = new Set<string>();
+    // Securities of the embedded investment rows this edit tore down, recreated
+    // or crossed the VOID boundary with, repriced by the bond engine after the
+    // commit (INV-BOND-005, INV-CACHE-001).
+    const touchedSecurityIds = new Set<string>();
 
     const { splits, tagIds, createdAt, ...updateData } = updateTransactionDto;
 
@@ -2679,9 +2691,14 @@ export class TransactionsService {
           // Both the delete of the old counterparts and the create of the new
           // ones touch accounts the parent never named; route them into the
           // set this method already invalidates after commit (recheck RR5-002).
+          // One guard for the replacement: verified after the successors are
+          // written, so a replacement that leaves the lots as they were is not
+          // refused half way (INV-BOND-007).
+          const replacementGuard = createBondWriteGuard(m, userId);
           for (const acc of await this.splitService.deleteSplitSideEffects(
             id,
             userId,
+            { touchedSecurityIds, bondGuard: replacementGuard },
           )) {
             counterpartAccountIds.add(acc);
           }
@@ -2711,9 +2728,11 @@ export class TransactionsService {
                 (updateData.status as TransactionStatus | undefined) ??
                 ((locked.status ?? undefined) as TransactionStatus | undefined),
               carriedSeries,
+              touchedSecurityIds,
             },
             counterpartAccountIds,
           );
+          await replacementGuard.verify();
 
           // Set split-level tags (and mirror them onto any transfer counterpart)
           if (savedSplits) {
@@ -2723,6 +2742,7 @@ export class TransactionsService {
           for (const acc of await this.splitService.deleteSplitSideEffects(
             id,
             userId,
+            { touchedSecurityIds },
           )) {
             counterpartAccountIds.add(acc);
           }
@@ -2879,6 +2899,7 @@ export class TransactionsService {
           id,
           userId,
           newStatus,
+          touchedSecurityIds,
         )) {
           counterpartAccountIds.add(affected);
         }
@@ -2969,6 +2990,10 @@ export class TransactionsService {
         this.netWorthService.triggerDebouncedRecalc(affected, userId);
       }
     }
+    await this.splitService.recomputeBondPricesAfterWrite(
+      userId,
+      touchedSecurityIds,
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "transaction",
@@ -3007,6 +3032,7 @@ export class TransactionsService {
     // snapshot account would re-introduce the stale one into the net-worth
     // fan-out (RR5-002 must not undo the P4-002 locked-account guarantee).
     const affectedAccountIds = new Set<string>();
+    const touchedSecurityIds = new Set<string>();
 
     // One transaction: split side effects, linked/parent cleanup, the delete
     // itself, and the balance adjustment commit or roll back together.
@@ -3055,6 +3081,7 @@ export class TransactionsService {
         for (const acc of await this.splitService.deleteSplitSideEffects(
           id,
           userId,
+          { touchedSecurityIds },
         )) {
           affectedAccountIds.add(acc);
         }
@@ -3095,6 +3122,10 @@ export class TransactionsService {
     for (const affected of affectedAccountIds) {
       this.netWorthService.triggerDebouncedRecalc(affected, userId);
     }
+    await this.splitService.recomputeBondPricesAfterWrite(
+      userId,
+      touchedSecurityIds,
+    );
     this.recordTransactionAction(
       userId,
       { ...transaction, ...beforeSnapshot } as Transaction,

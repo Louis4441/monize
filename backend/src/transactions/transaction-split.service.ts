@@ -11,6 +11,10 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { DataSource, EntityManager, In } from "typeorm";
+import {
+  BondWriteGuard,
+  createBondWriteGuard,
+} from "../bonds/bond-write-guard";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { TransactionSplit } from "./entities/transaction-split.entity";
 import { SplitKind } from "./entities/split-kind.enum";
@@ -278,6 +282,11 @@ export class TransactionSplitService {
        * series keeps its predecessor's (INV-BOND-007).
        */
       carriedSeries?: readonly EmbeddedSeriesCarry[];
+      /**
+       * Collects the securities of the embedded investment rows this created,
+       * for the caller's bond price recompute after the commit (INV-BOND-005).
+       */
+      touchedSecurityIds?: Set<string>;
     },
     /**
      * Every account this touched besides the parent's, so the caller can
@@ -318,6 +327,7 @@ export class TransactionSplitService {
     options?: {
       parentStatus?: TransactionStatus;
       carriedSeries?: readonly EmbeddedSeriesCarry[];
+      touchedSecurityIds?: Set<string>;
     },
     affectedAccountIds?: Set<string>,
   ): Promise<TransactionSplit[]> {
@@ -548,27 +558,31 @@ export class TransactionSplitService {
       });
       const savedSplit = await m.save(splitEntity);
 
-      await this.investmentTransactionsService.createEmbeddedForSplit(
-        m,
-        userId!,
-        parentDateStr,
-        savedSplit.id,
-        brokerageAccountId!,
-        sourceAccountId!,
-        split.investment!,
-        // Checked against the resolved rate there: this amount and the
-        // investment row have to describe the same money.
-        Number(split.amount),
-        // A VOID parent's embedded investment row is created VOID (no
-        // holdings), for the same reason its transfer counterparts are.
-        options?.parentStatus,
-        takeCarriedSeries(carriedPool, {
-          securityId: split.investment!.securityId,
-          action: split.investment!.action,
-          quantity: split.investment!.quantity,
-          transactionDate: parentDateStr,
-        }),
-      );
+      const embedded =
+        await this.investmentTransactionsService.createEmbeddedForSplit(
+          m,
+          userId!,
+          parentDateStr,
+          savedSplit.id,
+          brokerageAccountId!,
+          sourceAccountId!,
+          split.investment!,
+          // Checked against the resolved rate there: this amount and the
+          // investment row have to describe the same money.
+          Number(split.amount),
+          // A VOID parent's embedded investment row is created VOID (no
+          // holdings), for the same reason its transfer counterparts are.
+          options?.parentStatus,
+          takeCarriedSeries(carriedPool, {
+            securityId: split.investment!.securityId,
+            action: split.investment!.action,
+            quantity: split.investment!.quantity,
+            transactionDate: parentDateStr,
+          }),
+        );
+      if (embedded?.securityId) {
+        options?.touchedSecurityIds?.add(embedded.securityId);
+      }
 
       savedSplits[index] = savedSplit;
     }
@@ -720,6 +734,11 @@ export class TransactionSplitService {
     transactionId: string,
     userId: string,
     newStatus: TransactionStatus,
+    /**
+     * Collects the securities whose lots a crossing of the VOID boundary moved,
+     * for the caller's bond price recompute after the commit (INV-BOND-005).
+     */
+    touchedSecurityIds?: Set<string>,
   ): Promise<Set<string>> {
     const splits = await m.getRepository(TransactionSplit).find({
       where: { transactionId },
@@ -749,6 +768,7 @@ export class TransactionSplitService {
         userId,
         transactionId,
         newStatus,
+        touchedSecurityIds,
       );
     for (const accountId of embeddedAffected) {
       affectedAccountIds.add(accountId);
@@ -803,6 +823,15 @@ export class TransactionSplitService {
   async deleteSplitSideEffects(
     transactionId: string,
     userId: string,
+    bond?: {
+      /** Collects the securities of the removed embedded rows (INV-BOND-005). */
+      touchedSecurityIds?: Set<string>;
+      /**
+       * The caller recreates the embedded rows and verifies once at the end
+       * (a split replacement): it is tracked here, before the first removal.
+       */
+      bondGuard?: BondWriteGuard;
+    },
   ): Promise<Set<string>> {
     return withScopedDb(this.dataSource, async (m) => {
       const affectedAccountIds = new Set<string>();
@@ -810,6 +839,14 @@ export class TransactionSplitService {
         where: { transactionId },
         relations: ["linkedTransaction", "investmentTransaction"],
       });
+
+      // One guard for every embedded row of the parent, verified after the last
+      // one is gone: a parent holding both the BUY and the SELL it covers is not
+      // refused because one was removed before the other (INV-BOND-007).
+      const bondGuard = bond?.bondGuard ?? createBondWriteGuard(m, userId);
+      await bondGuard.track(
+        splits.map((s) => s.investmentTransaction?.securityId),
+      );
 
       // Reverse investment splits' holdings effects before the split rows are
       // deleted.
@@ -822,9 +859,11 @@ export class TransactionSplitService {
             m,
             userId,
             s.investmentTransaction,
+            { touchedSecurityIds: bond?.touchedSecurityIds, bondGuard },
           );
         }
       }
+      if (!bond?.bondGuard) await bondGuard.verify();
 
       const linkedTxIds = splits
         .filter((s) => s.linkedTransactionId && s.transferAccountId)
@@ -894,6 +933,9 @@ export class TransactionSplitService {
     // the parent's, invalidated after the commit so a rollback leaves nothing
     // queued (recheck RR5-002).
     const affectedAccountIds = new Set<string>();
+    // The securities of the embedded rows torn down and recreated, repriced by
+    // the bond engine after the commit (INV-BOND-005, INV-CACHE-001).
+    const touchedSecurityIds = new Set<string>();
     const newSplits = await withScopedDb(this.dataSource, async (m) => {
       // First statement of the transaction: advisory before row locks
       // (`common/db/locks.ts`). A replacement tears the parent's existing
@@ -940,9 +982,15 @@ export class TransactionSplitService {
         transaction.id,
       );
 
+      // One guard for the whole replacement: the old embedded rows are removed
+      // and their successors written before it verifies, so a replacement that
+      // leaves the lots as they were is not refused half way, and one that
+      // leaves a removal uncovered rolls everything back (INV-BOND-007).
+      const bondGuard: BondWriteGuard = createBondWriteGuard(m, userId);
       for (const acc of await this.deleteSplitSideEffects(
         transaction.id,
         userId,
+        { touchedSecurityIds, bondGuard },
       )) {
         affectedAccountIds.add(acc);
       }
@@ -972,9 +1020,11 @@ export class TransactionSplitService {
         // reachable from `PUT /transactions/:id/splits`, the AI action and the
         // MCP tool -- deleted the VOID legs and recreated them active, so the
         // target account was credited money the source still showed as not sent.
-        { parentStatus: transaction.status, carriedSeries },
+        { parentStatus: transaction.status, carriedSeries, touchedSecurityIds },
         affectedAccountIds,
       );
+
+      await bondGuard.verify();
 
       await m.update(Transaction, transaction.id, {
         isSplit: true,
@@ -988,7 +1038,26 @@ export class TransactionSplitService {
     // target and brokerage account this replace touched had its net-worth state
     // invalidated (recheck RR5-002), not only the parent account the caller knows.
     this.invalidateNetWorth(affectedAccountIds, userId);
+    await this.recomputeBondPricesAfterWrite(userId, touchedSecurityIds);
     return newSplits;
+  }
+
+  /**
+   * Reprice the bond-linked securities among these after a split write's
+   * commit: its embedded investment rows changed their lots. Never called from
+   * inside a transaction (INV-CACHE-001); a failure is logged by the bond
+   * price service, not thrown, so it cannot contradict the committed write.
+   */
+  async recomputeBondPricesAfterWrite(
+    userId: string,
+    securityIds: Iterable<string>,
+  ): Promise<void> {
+    const ids = [...securityIds];
+    if (ids.length === 0) return;
+    await this.investmentTransactionsService.recomputeBondPricesAfterSplitWrite(
+      userId,
+      ids,
+    );
   }
 
   /**
@@ -1225,6 +1294,7 @@ export class TransactionSplitService {
     // Accounts this removal moved besides the parent's, invalidated after commit
     // (recheck RR5-002).
     const affectedAccountIds = new Set<string>();
+    const touchedSecurityIds = new Set<string>();
     await withScopedDb(this.dataSource, async (m) => {
       // The parent first, so a concurrent split mutation on the same parent
       // serializes behind this one, and so the split below is read from a state
@@ -1272,6 +1342,7 @@ export class TransactionSplitService {
           m,
           userId,
           split.investmentTransaction,
+          { touchedSecurityIds },
         );
       } else if (split.linkedTransactionId && split.transferAccountId) {
         const movedAccountId = await this.removeLinkedLeg(
@@ -1327,5 +1398,6 @@ export class TransactionSplitService {
     });
 
     this.invalidateNetWorth(affectedAccountIds, userId);
+    await this.recomputeBondPricesAfterWrite(userId, touchedSecurityIds);
   }
 }

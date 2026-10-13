@@ -187,6 +187,7 @@ export class TransactionBulkUpdateService {
     // Accounts moved by split-parent counterpart propagation, which only the
     // propagation helper can name.
     const counterpartAccountIds = new Set<string>();
+    const touchedSecurityIds = new Set<string>();
 
     // Balance changes and the batch update commit in a single transaction.
     await withScopedDb(this.dataSource, async (m) => {
@@ -306,6 +307,7 @@ export class TransactionBulkUpdateService {
           userId,
           crossingParentIds,
           dto.status!,
+          touchedSecurityIds,
         )) {
           counterpartAccountIds.add(affected);
         }
@@ -425,6 +427,12 @@ export class TransactionBulkUpdateService {
         // `statusIds` -- the helper discovered them -- so without this the child's
         // account kept a stale net-worth snapshot beside its corrected balance.
         counterpartAccountIds,
+      );
+      // Embedded investment rows of the split parents that crossed the VOID
+      // boundary moved lots: reprice after the commit (INV-BOND-005).
+      await this.splitService.recomputeBondPricesAfterWrite(
+        userId,
+        touchedSecurityIds,
       );
     }
 
@@ -1293,6 +1301,7 @@ export class TransactionBulkUpdateService {
     /** The crossing parents `findSplitParentCounterpartIds` discovered. */
     crossingParentIds: string[],
     newStatus: TransactionStatus,
+    touchedSecurityIds?: Set<string>,
   ): Promise<Set<string>> {
     const affectedAccountIds = new Set<string>();
 
@@ -1305,6 +1314,7 @@ export class TransactionBulkUpdateService {
         parentId,
         userId,
         newStatus,
+        touchedSecurityIds,
       )) {
         affectedAccountIds.add(affected);
       }

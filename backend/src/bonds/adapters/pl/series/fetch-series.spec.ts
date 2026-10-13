@@ -211,7 +211,10 @@ describe("fetchSeries: refusals", () => {
     }
   });
 
-  it("treats a letter that is gone as the source being unavailable", async () => {
+  // Deliberately changed: this test used to pin a letter 404 as
+  // SOURCE_UNAVAILABLE, which stopped the whole backfill pass on one missing
+  // letter. A permanent 4xx on a series' own document refuses that series only.
+  it("refuses a series whose letter answers a permanent 4xx, as its own refusal", async () => {
     const routes = seriesRoutes("EDO1036", slugOf("EDO1036"));
     routes[`${SITE}${letterHref(pageFixture("EDO1036"))}`] = {
       status: 404,
@@ -220,8 +223,33 @@ describe("fetchSeries: refusals", () => {
     const error = await failureOf(
       fetchSeries("EDO1036", fakeFetch(routes), now),
     );
-    expect(error.code).toBe("SOURCE_UNAVAILABLE");
-    expect(error.params.status).toBe("404");
+    expect(error.code).toBe("SOURCE_DOCUMENT_MISSING");
+    expect(error.params).toEqual({ document: "letter", status: "404" });
+  });
+
+  it.each([503, 429])(
+    "keeps a letter answering %s as the source being unavailable",
+    async (status) => {
+      const routes = seriesRoutes("EDO1036", slugOf("EDO1036"));
+      routes[`${SITE}${letterHref(pageFixture("EDO1036"))}`] = {
+        status,
+        body: new Uint8Array(),
+      };
+      const error = await failureOf(
+        fetchSeries("EDO1036", fakeFetch(routes), now),
+      );
+      expect(error.code).toBe("SOURCE_UNAVAILABLE");
+      expect(error.params.status).toBe(String(status));
+    },
+  );
+
+  it("refuses a series page answering 403 as a missing document, not as the source being down", async () => {
+    const get = fakeFetch({
+      [pageUrl("EDO1036")]: { status: 403, body: new Uint8Array() },
+    });
+    const error = await failureOf(fetchSeries("EDO1036", get, now));
+    expect(error.code).toBe("SOURCE_DOCUMENT_MISSING");
+    expect(error.params).toEqual({ document: "page", status: "403" });
   });
 
   it("refuses a page over 2 MB and a letter over 5 MB", async () => {

@@ -118,7 +118,10 @@ export class BondCatalogService implements OnApplicationBootstrap {
    */
   private async ensureProgram(
     m: EntityManager,
-    program: BondProgramDefinition,
+    program: Pick<
+      BondProgramDefinition,
+      "issuerCountryCode" | "issuerCode" | "programCode" | "currency"
+    >,
   ): Promise<{ id: string; currency_code: string }> {
     await m.query(
       `INSERT INTO bond_programs

@@ -8297,9 +8297,16 @@ describe("InvestmentTransactionsService", () => {
       inProgram?: string[];
       onSale?: string[];
       ledgers?: Array<Array<ReturnType<typeof ledgerRow>>>;
+      /**
+       * The answers of successive reads of the price band
+       * (`findQuantitiesNotBonds`: the rows outside it); the last repeats,
+       * none at all means no row is out of band.
+       */
+      band?: Array<Array<{ id: string; price: string; face: string }>>;
     }) => {
       const original = mockQueryRunner.manager.query.getMockImplementation();
       let ledgerReads = 0;
+      let bandReads = 0;
       mockQueryRunner.manager.query.mockImplementation(
         async (sql: string, params?: unknown[]) => {
           const text = String(sql);
@@ -8312,6 +8319,21 @@ describe("InvestmentTransactionsService", () => {
                 currency_code: "PLN",
                 bond_program_id: opts.linked === false ? null : PROGRAM,
                 bond_auto_fetch: false,
+              },
+            ];
+          }
+          if (text.includes("t.price IS NOT NULL")) {
+            const all = opts.band ?? [[]];
+            const rows = all[Math.min(bandReads, all.length - 1)];
+            bandReads += 1;
+            return rows;
+          }
+          if (text.includes("FROM bond_programs WHERE id")) {
+            return [
+              {
+                issuer_country_code: "PL",
+                issuer_code: "PL_MF",
+                program_code: "EDO",
               },
             ];
           }
@@ -9048,6 +9070,170 @@ describe("InvestmentTransactionsService", () => {
           bondInstrumentId: null,
           bondSeriesCode: null,
         });
+      });
+    });
+
+    /**
+     * INV-BOND-007 (M1): a split parent's deletion, void and replacement reach
+     * the lots through the embedded rows. The guard runs there too, so the whole
+     * parent operation rolls back; a replacement verifies once after the
+     * recreation.
+     */
+    describe("split-embedded rows (M1)", () => {
+      const embedded: any = {
+        id: "emb-1",
+        userId,
+        accountId,
+        securityId,
+        action: InvestmentAction.BUY,
+        quantity: 10,
+        price: 100,
+        commission: 0,
+        totalAmount: 1000,
+        exchangeRate: 1,
+        transactionDate: "2026-01-10",
+        transactionId: null,
+        transactionSplitId: "split-1",
+      };
+      const buyRow = ledgerRow({ id: "emb-1" });
+      const laterSell = ledgerRow({
+        id: "sell-1",
+        action: "SELL",
+        tx_date: "2026-02-01",
+        bond_instrument_id: SERIES_ON_SALE,
+      });
+
+      it("reverseAndRemoveEmbedded refuses removing a purchase a later SELL of its series depends on (REMOVAL_EXCEEDS_SERIES), after the removal, so the parent operation rolls back", async () => {
+        bondDatabase({
+          ledgers: [[buyRow, laterSell], [laterSell]],
+        });
+        const touched = new Set<string>();
+        await expect(
+          service.reverseAndRemoveEmbedded(
+            mockQueryRunner.manager as any,
+            userId,
+            embedded,
+            { touchedSecurityIds: touched },
+          ),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+        expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(embedded);
+        expect(
+          holdingsService.rebuildScopesFromTransactions,
+        ).toHaveBeenCalled();
+      });
+
+      it("reverseAndRemoveEmbedded removes what nothing depends on and reports the security for the post-commit recompute", async () => {
+        bondDatabase({ ledgers: [[buyRow], []] });
+        const touched = new Set<string>();
+        await service.reverseAndRemoveEmbedded(
+          mockQueryRunner.manager as any,
+          userId,
+          embedded,
+          { touchedSecurityIds: touched },
+        );
+        expect([...touched]).toEqual([securityId]);
+      });
+
+      it("reverseAndRemoveEmbedded leaves the verdict to a caller's own guard (a replacement recreates the row first)", async () => {
+        bondDatabase({ ledgers: [[buyRow, laterSell], [laterSell]] });
+        const callerGuard = {
+          track: jest.fn(),
+          verify: jest.fn(),
+        };
+        await service.reverseAndRemoveEmbedded(
+          mockQueryRunner.manager as any,
+          userId,
+          embedded,
+          { bondGuard: callerGuard },
+        );
+        expect(callerGuard.verify).not.toHaveBeenCalled();
+      });
+
+      it("applyParentStatusToEmbeddedRows refuses voiding an embedded purchase a later SELL depends on (REMOVAL_EXCEEDS_SERIES)", async () => {
+        transactionSplitRepository.find.mockResolvedValue([
+          { id: "split-1", kind: "investment" },
+        ]);
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, status: TransactionStatus.UNRECONCILED },
+        ]);
+        bondDatabase({ ledgers: [[buyRow, laterSell], [laterSell]] });
+        await expect(
+          service.applyParentStatusToEmbeddedRows(
+            mockQueryRunner.manager as any,
+            userId,
+            "parent-1",
+            TransactionStatus.VOID,
+          ),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+      });
+
+      it("applyParentStatusToEmbeddedRows reports the security of a row that crossed the boundary, and says nothing of one that did not", async () => {
+        transactionSplitRepository.find.mockResolvedValue([
+          { id: "split-1", kind: "investment" },
+        ]);
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, status: TransactionStatus.UNRECONCILED },
+        ]);
+        bondDatabase({ ledgers: [[buyRow], []] });
+        const touched = new Set<string>();
+        await service.applyParentStatusToEmbeddedRows(
+          mockQueryRunner.manager as any,
+          userId,
+          "parent-1",
+          TransactionStatus.VOID,
+          touched,
+        );
+        expect([...touched]).toEqual([securityId]);
+
+        const idle = new Set<string>();
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, status: TransactionStatus.VOID },
+        ]);
+        await service.applyParentStatusToEmbeddedRows(
+          mockQueryRunner.manager as any,
+          userId,
+          "parent-1",
+          TransactionStatus.VOID,
+          idle,
+        );
+        expect(idle.size).toBe(0);
+      });
+
+      it("applyParentStatusToEmbeddedRows refuses un-voiding a row whose price is not a price per bond (QUANTITY_NOT_BONDS)", async () => {
+        transactionSplitRepository.find.mockResolvedValue([
+          { id: "split-1", kind: "investment" },
+        ]);
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, price: 1, status: TransactionStatus.VOID },
+        ]);
+        bondDatabase({
+          band: [[], [{ id: "emb-1", price: "1.0000", face: "100.00" }]],
+        });
+        await expect(
+          service.applyParentStatusToEmbeddedRows(
+            mockQueryRunner.manager as any,
+            userId,
+            "parent-1",
+            TransactionStatus.UNRECONCILED,
+          ),
+        ).rejects.toMatchObject({
+          response: { errorCode: "QUANTITY_NOT_BONDS" },
+        });
+      });
+
+      it("recomputeBondPricesAfterSplitWrite dispatches the engine recompute for the ids, and nothing for none", async () => {
+        await service.recomputeBondPricesAfterSplitWrite(userId, []);
+        expect(
+          securitiesService.recomputeBondPricesAfterWrite,
+        ).not.toHaveBeenCalled();
+        await service.recomputeBondPricesAfterSplitWrite(userId, [securityId]);
+        expect(
+          securitiesService.recomputeBondPricesAfterWrite,
+        ).toHaveBeenCalledWith(userId, [securityId]);
       });
     });
   });

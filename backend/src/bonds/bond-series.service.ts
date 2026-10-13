@@ -2,7 +2,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { DataSource } from "typeorm";
 import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
-import { withScopedDb } from "../common/db/scoped-db";
+import {
+  runOutsideActiveScopedManager,
+  withScopedDb,
+} from "../common/db/scoped-db";
 import { withSystemContext } from "../common/db/with-context";
 import { todayInTimezone } from "../common/date-utils";
 import {
@@ -217,8 +220,34 @@ export class BondSeriesService {
     options: SeriesRequestOptions = {},
   ): Promise<BondSeriesResult> {
     const result = await this.fetchAndStore(countryCode, seriesCode, options);
-    await this.afterStored([result]);
+    // Detached: the network benchmark refresh and the every-user price recompute
+    // must not hold the person's REST/AI/MCP answer. The row is committed, and
+    // a recompute that fails is logged and repaired by the daily job.
+    this.dispatchAfterStored([result]);
     return result;
+  }
+
+  /**
+   * `afterStored` after the commit, not awaited. It runs outside the request's
+   * scoped manager (a manager outlives neither the response nor its
+   * transaction) and under identities of its own: the benchmark refresh and the
+   * price recompute each seed `withSystemContext` / `withUserContext`. Its own
+   * failure is a log line, never an unhandled rejection or the caller's error.
+   */
+  private dispatchAfterStored(
+    results: ReadonlyArray<Pick<BondSeriesResult, "id" | "created">>,
+  ): void {
+    runOutsideActiveScopedManager(() => {
+      Promise.resolve()
+        .then(() => this.afterStored(results))
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Bond post-store refresh and recompute failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        );
+    });
   }
 
   /**
@@ -639,7 +668,9 @@ export class BondSeriesService {
    * a run that stopped resumes where it stopped. `SOURCE_UNAVAILABLE` ends that
    * adapter's pass (the source is down; the next daily run resumes); a series
    * the source does not publish, or any other refusal, is logged and the pass
-   * goes on. Needs an ambient identity (`withSystemContext`).
+   * goes on (`SOURCE_DOCUMENT_MISSING`, a series' own document answering a
+   * permanent 4xx, is such a refusal and counts as failed). Needs an ambient
+   * identity (`withSystemContext`).
    */
   async backfillHistory(options: BackfillOptions = {}): Promise<BackfillRun> {
     const sleep = options.sleep ?? defaultSleep;

@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { BenchmarkFetchError, BondFetch } from "../../bond-adapter";
 import { POLISH_BOND_ADAPTER } from ".";
+import { templateFaceValueOf } from "../../bond-adapters";
 import { ProviderHealthService } from "../../../provider-health/provider-health.service";
 import { SeriesHttp } from "../../series-http";
 import {
@@ -429,6 +430,20 @@ describe("Polish adapter contract", () => {
       ]),
     );
     expect(POLISH_BOND_ADAPTER).not.toHaveProperty("catalog");
+  });
+
+  it("declares each program's face value from its template, and templateFaceValueOf finds it by the stored program's key (INV-BOND-005)", () => {
+    for (const program of POLISH_BOND_ADAPTER.programs) {
+      expect(program.faceValue).toBe("100.00");
+      expect(templateFaceValueOf(program)).toBe("100.00");
+    }
+    expect(
+      templateFaceValueOf({
+        issuerCountryCode: "XX",
+        issuerCode: "XX_MF",
+        programCode: "EDO",
+      }),
+    ).toBeNull();
   });
 
   it("routes each series to its fetcher and refuses an unknown one", async () => {
