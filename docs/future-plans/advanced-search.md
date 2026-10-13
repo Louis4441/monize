@@ -141,8 +141,8 @@ the text fields, unchanged; a bare term still ORs all of them.
 | `amount:` | number | magnitude; decision 8 |
 | `date:` | date | `transactions.transaction_date` |
 | `status:` | enum | `cleared`, `reconciled`, `unreconciled`, `void`, mapped to `transactions.status` |
-| `is:` | enum | `transfer` (`is_transfer`), `split` (`is_split`), `uncategorized` (the predicate the `uncategorized` category pseudo-id already uses, called, not restated) |
-| `has:` | enum | `attachment` (the `hasAttachments` filter's predicate, called), `ref` (non-blank reference), `memo` (non-blank description or any non-blank split memo), `tag` (any transaction or split tag) |
+| `is:` | enum | `transfer` (`is_transfer`), `split` (`is_split`), `uncategorized` (`uncategorizedSql`; the category filter's three inline copies are not yet folded onto it, see section 11) |
+| `has:` | enum | `attachment` (`hasAttachmentSql`; the `hasAttachments` filter's inline copies fold onto it later, section 11), `ref` (non-blank reference), `memo` (non-blank description or any non-blank split memo), `tag` (any transaction or split tag) |
 
 An unknown enum value (`status:pending`) is `malformed` (decision 6).
 
@@ -175,8 +175,8 @@ the query counts:
 - **Split grain**, used by every call site (question 5): the query joins
   its splits, and a split arm reads the row's own split, as the joined-alias
   clause always has. Every term must hold on the same line, so the register
-  draws only matching lines with a filtered total, bulk update acts on
-  matching lines, and a category breakdown of `groceries` counts the
+  draws only matching lines with a filtered total, bulk update selects the
+  transactions the register lists, and a category breakdown of `groceries` counts the
   groceries line and not its sibling. `findAll`, `buildFilteredIdsSubquery`,
   `createFilteredAnalyticsQuery`, the bulk-update filter and
   `getLlmGroupedBreakdown`.
@@ -386,7 +386,16 @@ task Q.
   (`transactions.service.ts`, `transaction-analytics.service.ts`,
   `transaction-bulk-update.service.ts`) and the inline attachment-presence
   predicates onto `uncategorizedSql` / `hasAttachmentSql`. The search uses
-  the helpers; moving the filters is its own change.
+  the helpers; moving the filters is its own change. The bulk-update copy
+  has no split-line arm, so there `is:uncategorized` and the uncategorized
+  category filter can select different rows until it is folded.
+- Bulk update's tag filter joins its own `tagSplits` alias while its search
+  reads `searchSplits` / `filterSplits`, so a tag and a search term can hold
+  on different lines of a split that the register (one `splits` alias) would
+  not list. This predates the syntax; aligning the aliases is its own change.
+- Narrowing a bulk category change to the lines the search matched, as the
+  register draws them. Today `resolveCategoryRestriction` reads only the
+  category filter, as it did before the syntax.
 
 ## 12. Deploy and compatibility
 
@@ -418,5 +427,7 @@ task Q.
    changes the second truth table's transaction column to its split column
    for the register. **Decided 2026-10-12: split grain.** The register
    keeps drawing only matching lines with a filtered total, as its category
-   filter does, and bulk update keeps acting on matching lines; every term
+   filter does, and bulk update selects the transactions the register lists
+   (a category change still rewrites the lines the category filter picks,
+   not the lines the search matched, as before the syntax); every term
    of a search must hold on the same line.

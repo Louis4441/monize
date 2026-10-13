@@ -1,5 +1,5 @@
 import apiClient from './api';
-import { Tag, CreateTagData, UpdateTagData } from '@/types/tag';
+import { Tag, CreateTagData, UpdateTagData, TagUsageMap } from '@/types/tag';
 import { dedupe, invalidateCache } from './apiCache';
 
 export const tagsApi = {
@@ -43,6 +43,12 @@ export const tagsApi = {
 
   getAllTransactionCounts: async (): Promise<Record<string, number>> => {
     const response = await apiClient.get<Record<string, number>>('/tags/transaction-counts');
+    return response.data;
+  },
+
+  // Not cached: usage follows transaction writes, and `tags:` is reference data.
+  getUsage: async (): Promise<TagUsageMap> => {
+    const response = await apiClient.get<TagUsageMap>('/tags/usage');
     return response.data;
   },
 };
