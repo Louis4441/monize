@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { accountsApi } from '@/lib/accounts';
 import { investmentsApi } from '@/lib/investments';
-import { roundToCents } from '@/lib/format';
+import { roundToCents, sumMoney } from '@/lib/format';
+import { INCOME_ACTIONS, incomeBaseKind, investmentIncomeAmount } from '@/lib/investment-actions';
 import { PortfolioSummaryCard } from '@/components/investments/PortfolioSummaryCard';
 import { AssetAllocationChart } from '@/components/investments/AssetAllocationChart';
 import { InvestmentValueChart } from '@/components/investments/InvestmentValueChart';
@@ -25,12 +26,15 @@ interface InvestmentDetailViewProps {
 }
 
 /**
- * The actions that count towards the YTD income figure. Filtered server-side,
- * one request each, because `GET /investment-transactions` matches a single
- * action per call -- the reinvestment actions are deliberately absent, matching
- * what this figure has always counted.
+ * The actions that count towards the YTD "Dividends & Interest" figure: every
+ * dividend and every interest payment, paid in cash or reinvested in shares.
+ * Filtered server-side, one request each, because `GET /investment-transactions`
+ * matches a single action per call.
  */
-const INCOME_ACTIONS = ['DIVIDEND', 'INTEREST'] as const;
+const DIVIDEND_INTEREST_ACTIONS = INCOME_ACTIONS.filter((action) => {
+  const kind = incomeBaseKind(action);
+  return kind === 'DIVIDEND' || kind === 'INTEREST';
+});
 
 /**
  * The investment detail body for a brokerage/cash pair. Resolves the pair (via
@@ -83,7 +87,7 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
       const [summaryData, incomeTx, realized] = await Promise.all([
         investmentsApi.getPortfolioSummary(ids).catch(() => null),
         Promise.all(
-          INCOME_ACTIONS.map((action) =>
+          DIVIDEND_INTEREST_ACTIONS.map((action) =>
             investmentsApi.getAllTransactionPages({
               accountIds: idsStr,
               startDate: yearStart,
@@ -103,7 +107,9 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
       setBrokerage(resolvedBrokerage);
       setCash(resolvedCash);
       setSummary(summaryData);
-      const income = incomeTx.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+      // A reinvest created in the app stores no total; its income is the cost
+      // of the shares it bought.
+      const income = sumMoney(incomeTx.map((tx) => investmentIncomeAmount(tx)));
       setDividendInterestYtd(roundToCents(income));
       setRealizedGainsYtd(roundToCents(realized.reduce((sum, r) => sum + (Number(r.realizedGain) || 0), 0)));
       setLoadedForId(account.id);

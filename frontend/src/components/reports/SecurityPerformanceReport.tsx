@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { gainLossColor, sumMoney } from '@/lib/format';
-import { baseInvestmentAction } from '@/lib/investment-actions';
+import { baseInvestmentAction, incomeBaseKind, investmentIncomeAmount } from '@/lib/investment-actions';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -114,11 +114,12 @@ interface PriceChartPoint {
  * expression coerced it only because `Math.abs` does, so a later edit taking
  * the abs off for a signed total would have started concatenating strings.
  *
- * Every row is a known amount here (`totalAmount` is non-nullable on a dividend
- * row), so this is a total and not a subtotal.
+ * Each row's dividend is `investmentIncomeAmount`: a cash dividend's total, or
+ * a reinvested one's share cost, since a reinvest created in the app stores no
+ * total. Every row is a known amount, so this is a total and not a subtotal.
  */
 function sumDividends(rows: InvestmentTransaction[]): number {
-  return sumMoney(rows.map((tx) => Math.abs(Number(tx.totalAmount))));
+  return sumMoney(rows.map((tx) => investmentIncomeAmount(tx)));
 }
 
 export function SecurityPerformanceReport() {
@@ -437,9 +438,9 @@ export function SecurityPerformanceReport() {
 
   // Dividend history
   const dividendTx = useMemo(() => {
-    const list = transactions.filter(
-      (tx) => baseInvestmentAction(tx.action) === 'DIVIDEND' || baseInvestmentAction(tx.action) === 'REINVEST',
-    );
+    // Every dividend, paid in cash or reinvested. A reinvested interest or
+    // capital-gain distribution is not a dividend, as its cash twin is not.
+    const list = transactions.filter((tx) => incomeBaseKind(tx.action) === 'DIVIDEND');
     list.sort((a, b) => {
       let comparison = 0;
       switch (dividendSort.sortField) {
@@ -456,7 +457,7 @@ export function SecurityPerformanceReport() {
           comparison = compareValues(a.action, b.action);
           break;
         case 'amount':
-          comparison = compareValues(Math.abs(a.totalAmount), Math.abs(b.totalAmount));
+          comparison = compareValues(investmentIncomeAmount(a), investmentIncomeAmount(b));
           break;
       }
       return dividendSort.sortDirection === 'asc' ? comparison : -comparison;
@@ -584,7 +585,7 @@ export function SecurityPerformanceReport() {
           formatDate(tx.transactionDate),
           accountNameById.get(tx.accountId) || '-',
           tx.action,
-          formatCurrencyFull(Math.abs(tx.totalAmount), displayCurrency),
+          formatCurrencyFull(investmentIncomeAmount(tx), displayCurrency),
         ]),
         totalRow: [t('securityPerformance.pdfTotalDividends'), '', '', formatCurrencyFull(totalDividends, displayCurrency)],
       };
@@ -1128,7 +1129,7 @@ export function SecurityPerformanceReport() {
                           {/* Amount: the headline figure, beside the date. */}
                           <td role="cell" className={`col-start-2 row-start-1 font-medium text-green-600 dark:text-green-400 ${MONEY_CELL}`}>
                             <CellLabel className={CAPTION_CLASS}>{dividendColumns.amount.label}</CellLabel>
-                            {formatCurrencyFull(Math.abs(tx.totalAmount), displayCurrency)}
+                            {formatCurrencyFull(investmentIncomeAmount(tx), displayCurrency)}
                           </td>
                         </tr>
                       ))}

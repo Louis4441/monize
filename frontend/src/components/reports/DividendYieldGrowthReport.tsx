@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { subYears } from 'date-fns';
 import { investmentsApi } from '@/lib/investments';
+import { investmentIncomeAmount } from '@/lib/investment-actions';
 import { InvestmentTransaction, HoldingWithMarketValue } from '@/types/investment';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
@@ -138,7 +139,9 @@ export function DividendYieldGrowthReport() {
    * has to leave both sides of the ratio rather than being added at face value.
    */
   const getTxAmount = useCallback((tx: InvestmentTransaction): number | null => {
-    const amount = Math.abs(tx.totalAmount);
+    // A reinvest created in the app stores no total; the dividend it records is
+    // the cost of the shares it bought.
+    const amount = investmentIncomeAmount(tx);
     if (isSingleAccount) return amount;
     const txCurrency = accountCurrencyMap.get(tx.accountId) || defaultCurrency;
     return convertToDefault(amount, txCurrency);
@@ -200,6 +203,9 @@ export function DividendYieldGrowthReport() {
         investmentsApi.getPortfolioSummary(
           selectedAccountIds.length > 0 ? selectedAccountIds : undefined,
         ),
+        // Every action whose income is a dividend, paid in cash or reinvested.
+        // The interest and capital-gain refinements of REINVEST are not
+        // dividends, as their cash twins are not.
         fetchAllPages('DIVIDEND'),
         fetchAllPages('REINVEST'),
       ]);

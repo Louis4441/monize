@@ -138,6 +138,27 @@ describe('InvestmentDetailView', () => {
     expect(screen.getByText('$100.00')).toBeInTheDocument();
   });
 
+  // Discussion #1670: a reinvested dividend or interest payment is income as
+  // surely as a cash one. The app writes a reinvest with no total, so the
+  // figure values it at quantity x price.
+  it('counts reinvested dividends and interest in the YTD figure', async () => {
+    mockGetAllTransactionPages.mockImplementation((params: { action?: string }) =>
+      Promise.resolve(
+        params?.action === 'DIVIDEND'
+          ? [{ id: 'd1', action: 'DIVIDEND', totalAmount: 50 }]
+          : params?.action === 'REINVEST'
+            ? [{ id: 'r1', action: 'REINVEST', quantity: 2, price: 15, commission: 0, totalAmount: 0 }]
+            : params?.action === 'REINVEST_INTEREST'
+              ? [{ id: 'r2', action: 'REINVEST_INTEREST', quantity: 1, price: 4, commission: 0, totalAmount: 0 }]
+              : [],
+      ),
+    );
+
+    await renderView();
+    // 50 cash + 30 reinvested dividend + 4 reinvested interest.
+    await waitFor(() => expect(screen.getByText('$84.00')).toBeInTheDocument());
+  });
+
   // The YTD income figure asked for 500 rows in one page. The endpoint caps a
   // page at 200 and answers 400 rather than clamping, the .catch() below turned
   // that into an empty list, and the figure read $0.00 for every account, every
@@ -147,7 +168,12 @@ describe('InvestmentDetailView', () => {
     await waitFor(() => expect(mockGetAllTransactionPages).toHaveBeenCalled());
 
     const params = mockGetAllTransactionPages.mock.calls.map(([p]) => p);
-    expect(params.map((p) => p.action).sort()).toEqual(['DIVIDEND', 'INTEREST']);
+    expect(params.map((p) => p.action).sort()).toEqual([
+      'DIVIDEND',
+      'INTEREST',
+      'REINVEST',
+      'REINVEST_INTEREST',
+    ]);
     // No caller-supplied page size: the helper's default is the cap itself.
     expect(params.every((p) => p.limit === undefined && p.pageSize === undefined)).toBe(true);
     expect(params.every((p) => p.accountIds === 'br-1,cash-1')).toBe(true);

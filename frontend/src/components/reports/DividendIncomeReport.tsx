@@ -22,7 +22,7 @@ import { investmentsApi } from '@/lib/investments';
 import { InvestmentTransaction, CapitalGainEntry } from '@/types/investment';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
-import { baseInvestmentAction } from '@/lib/investment-actions';
+import { incomeBaseKind, investmentIncomeAmount } from '@/lib/investment-actions';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -229,15 +229,13 @@ export function DividendIncomeReport() {
       ]);
 
       // Dividend / Interest / CAPITAL_GAIN income comes from the plain
-      // transaction list; SELL realized + unrealized capital gains come from
-      // the monthly capital gains endpoint.
-      const incomeTransactions = allTransactions.filter((tx) => {
-        // Base-normalized: CAPITAL_GAIN_SHORT/LONG are capital-gain income.
-        const base = baseInvestmentAction(tx.action);
-        return (
-          base === 'DIVIDEND' || base === 'INTEREST' || base === 'CAPITAL_GAIN'
-        );
-      });
+      // transaction list, paid in cash or reinvested in shares; SELL realized +
+      // unrealized capital gains come from the monthly capital gains endpoint,
+      // which counts a reinvestment's shares as a purchase, so their value is
+      // not also a capital gain here.
+      const incomeTransactions = allTransactions.filter(
+        (tx) => incomeBaseKind(tx.action) !== null,
+      );
 
       return {
         transactions: incomeTransactions,
@@ -359,7 +357,9 @@ export function DividendIncomeReport() {
   const isForeign = displayCurrency !== defaultCurrency;
 
   const getTxAmount = useCallback((tx: InvestmentTransaction): number | null => {
-    const amount = Math.abs(tx.totalAmount);
+    // A reinvest created in the app stores no total; its income is the cost
+    // its shares were bought at.
+    const amount = investmentIncomeAmount(tx);
     if (isSingleAccount) {
       // Single account selected: native currency, no conversion needed
       return amount;
@@ -468,7 +468,7 @@ export function DividendIncomeReport() {
     filteredTransactions.forEach((tx) => {
       const bucket = getOrCreateBucket(parseLocalDate(tx.transactionDate));
       const contribution = getTxAmount(tx);
-      switch (baseInvestmentAction(tx.action)) {
+      switch (incomeBaseKind(tx.action)) {
         case 'DIVIDEND':
           bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
@@ -533,7 +533,7 @@ export function DividendIncomeReport() {
       const txDate = parseLocalDate(tx.transactionDate);
       const bucket = getOrCreateBucket(tx.transactionDate, txDate);
       const contribution = getTxAmount(tx);
-      switch (baseInvestmentAction(tx.action)) {
+      switch (incomeBaseKind(tx.action)) {
         case 'DIVIDEND':
           bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
@@ -632,7 +632,7 @@ export function DividendIncomeReport() {
       const name = tx.security?.name || 'Unknown Security';
       const bucket = getOrCreateBucket(symbol, name);
       const contribution = getTxAmount(tx);
-      switch (baseInvestmentAction(tx.action)) {
+      switch (incomeBaseKind(tx.action)) {
         case 'DIVIDEND':
           bucket.dividends = addOrUnknown(bucket.dividends, contribution);
           break;
@@ -779,13 +779,13 @@ export function DividendIncomeReport() {
     // components could not be converted -- one missing rate makes the whole
     // figure unknown, the same rule the monthly and daily buckets follow.
     const dividends = filteredTransactions
-      .filter((t) => baseInvestmentAction(t.action) === 'DIVIDEND')
+      .filter((t) => incomeBaseKind(t.action) === 'DIVIDEND')
       .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const interest = filteredTransactions
-      .filter((t) => baseInvestmentAction(t.action) === 'INTEREST')
+      .filter((t) => incomeBaseKind(t.action) === 'INTEREST')
       .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const manualCapitalGains = filteredTransactions
-      .filter((t) => baseInvestmentAction(t.action) === 'CAPITAL_GAIN')
+      .filter((t) => incomeBaseKind(t.action) === 'CAPITAL_GAIN')
       .reduce<number | null>((sum, t) => addOrUnknown(sum, getTxAmount(t)), 0);
     const periodCapitalGains = filteredCapitalGains.reduce<number | null>(
       (sum, entry) => addOrUnknown(sum, convertCapitalGain(entry)),

@@ -289,6 +289,41 @@ describe('DividendYieldGrowthReport', () => {
     expect(screen.queryByText('2.00%')).not.toBeInTheDocument();
   });
 
+  it('counts a reinvested dividend the app wrote, with no total, at its shares\' cost', async () => {
+    // Discussion #1670: a reinvest created in the app stores totalAmount 0, so
+    // reading the total made a DRIP holding yield nothing.
+    mockGetTransactions.mockImplementation(async ({ action }: { action: string }) => {
+      if (action === 'REINVEST') {
+        return {
+          data: [
+            {
+              id: 'tx-1',
+              transactionDate: '2025-09-15',
+              action: 'REINVEST',
+              quantity: 2,
+              price: 50,
+              commission: 0,
+              totalAmount: 0,
+              accountId: 'acc-1',
+              securityId: 's-1',
+              security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
+            },
+          ],
+          pagination: { hasMore: false },
+        };
+      }
+      return { data: [], pagination: { hasMore: false } };
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    render(<DividendYieldGrowthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Per-Security Dividend Yield (Trailing 12 Months)')).toBeInTheDocument();
+    });
+    // Yield = 100 / 5000 * 100 = 2.00%.
+    expect(screen.getAllByText('2.00%').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('excludes dividends for securities with no matching holding', async () => {
     mockGetTransactions.mockImplementation(async ({ action }: { action: string }) => {
       if (action === 'DIVIDEND') {

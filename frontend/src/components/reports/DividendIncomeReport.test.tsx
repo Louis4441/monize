@@ -299,6 +299,72 @@ describe('DividendIncomeReport', () => {
     expect(screen.getByText('Total Income')).toBeInTheDocument();
   });
 
+  it('counts a reinvested distribution as income of its kind, at its shares\' cost', async () => {
+    // Discussion #1670. A reinvest created in the app stores no total, so the
+    // report values it at quantity x price + commission.
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        {
+          id: 'tx-1',
+          transactionDate: '2024-06-15',
+          action: 'DIVIDEND',
+          totalAmount: 100,
+          accountId: 'acc-1',
+          security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
+        },
+        {
+          id: 'tx-2',
+          transactionDate: '2024-07-15',
+          action: 'REINVEST',
+          quantity: 2,
+          price: 25,
+          commission: 0,
+          totalAmount: 0,
+          accountId: 'acc-1',
+          security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
+        },
+        {
+          id: 'tx-3',
+          transactionDate: '2024-08-15',
+          action: 'REINVEST_INTEREST',
+          quantity: 1,
+          price: 7,
+          commission: 0,
+          totalAmount: 0,
+          accountId: 'acc-1',
+          security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
+        },
+        {
+          id: 'tx-4',
+          transactionDate: '2024-08-15',
+          action: 'BUY',
+          quantity: 1,
+          price: 1000,
+          commission: 0,
+          totalAmount: 1000,
+          accountId: 'acc-1',
+          security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
+        },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetCapitalGains.mockResolvedValue([]);
+    render(<DividendIncomeReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Total Income')).toBeInTheDocument();
+    });
+    // Dividends: 100 in cash + 50 reinvested. Interest: 7 reinvested. The BUY
+    // is not income.
+    await waitFor(() => {
+      expect(screen.getAllByText('$150.00').length).toBeGreaterThan(0);
+    });
+    expect(screen.getAllByText('$7.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$157.00').length).toBeGreaterThan(0);
+  });
+
   it('renders view type buttons', async () => {
     mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
     mockGetInvestmentAccounts.mockResolvedValue([]);
