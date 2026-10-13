@@ -62,6 +62,9 @@ describe("parseTransactionSearch", () => {
       ["-", [any("-")]],
       ["--foo", [any("--foo")]],
       ["-école", [any("école", true)]],
+      // A prototype property is not a reserved field.
+      ["constructor:2026", [any("constructor:2026")]],
+      ["toString:x", [any("toString:x")]],
       ["10", [any("10")]],
       ["OR", [any("OR")]],
     ])("%j", (input, expected) => {
@@ -325,6 +328,18 @@ describe("parseTransactionSearch", () => {
       ["amount:>abc", [malformed("amount:>abc")]],
       ["amount:..", [malformed("amount:..")]],
       ["amount:100..50", [malformed("amount:100..50")]],
+      [
+        "amount:-100..-50",
+        [
+          {
+            field: "amount",
+            op: "between",
+            value: "50",
+            valueTo: "100",
+            negated: false,
+          },
+        ],
+      ],
       ["amount:>50..100", [malformed("amount:>50..100")]],
       ["amount:10*", [malformed("amount:10*")]],
     ])("%j", (input, expected) => {
@@ -453,6 +468,16 @@ describe("parseTransactionSearch", () => {
       expect(amount.interpreted).toEqual({ amount: 12.34, date: null });
       expect(date.interpreted).toEqual({ amount: null, date: "2026-03-15" });
       expect(word.interpreted).toEqual({ amount: null, date: null });
+    });
+
+    it("keeps a no-break or narrow no-break space inside one term", () => {
+      // fr-FR formats 1234,56 as "1\u202f234,56"; a pasted figure stays one
+      // term and reads as one amount.
+      for (const pasted of ["1\u202f234,56", "1\u00a0234,56"]) {
+        const { terms } = parseTransactionSearch(pasted, EN);
+        expect(terms).toHaveLength(1);
+        expect(terms[0].interpreted?.amount).toBe(1234.56);
+      }
     });
 
     it("reads a quoted amount with a space group separator as one amount", () => {

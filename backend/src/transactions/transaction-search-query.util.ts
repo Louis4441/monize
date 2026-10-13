@@ -143,8 +143,16 @@ interface RawToken {
   quoted: boolean;
 }
 
+/**
+ * Terms are separated by ASCII whitespace only. A no-break or narrow no-break
+ * space is part of a term: it is the thousands separator several locales
+ * format amounts with (fr-FR writes 1 234,56 with U+202F), so a pasted figure
+ * stays one term and reads as one amount, as it did before the syntax.
+ */
+const TERM_SEPARATORS = new Set([" ", "\t", "\n", "\r", "\f", "\v"]);
+
 function isWhitespace(ch: string): boolean {
-  return ch.trim() === "";
+  return TERM_SEPARATORS.has(ch);
 }
 
 function isLetter(ch: string): boolean {
@@ -208,7 +216,12 @@ function readFieldPrefix(
   let i = start;
   while (i < input.length && /[A-Za-z]/.test(input[i])) i += 1;
   if (i === start || input[i] !== ":") return null;
-  const field = FIELD_NAMES[input.slice(start, i).toLowerCase()];
+  // An own-property lookup: `constructor:` must not resolve through the
+  // prototype of a plain object and be read as a field.
+  const name = input.slice(start, i).toLowerCase();
+  const field = Object.prototype.hasOwnProperty.call(FIELD_NAMES, name)
+    ? FIELD_NAMES[name]
+    : undefined;
   return field ? { field, end: i + 1 } : null;
 }
 
@@ -407,9 +420,17 @@ function valueTerm(
   if (range) {
     if (token.operator) return null;
     if (range.from === "" && range.to === "") return null;
-    const from = range.from === "" ? null : read(range.from);
-    const to = range.to === "" ? null : read(range.to);
-    if ((range.from !== "" && !from) || (range.to !== "" && !to)) return null;
+    // An amount is a magnitude, so a range of two negatives written in
+    // natural order (`-100..-50`) names its larger magnitude first.
+    const bothNegative =
+      field === "amount" &&
+      range.from.startsWith("-") &&
+      range.to.startsWith("-");
+    const fromText = bothNegative ? range.to : range.from;
+    const toText = bothNegative ? range.from : range.to;
+    const from = fromText === "" ? null : read(fromText);
+    const to = toText === "" ? null : read(toText);
+    if ((fromText !== "" && !from) || (toText !== "" && !to)) return null;
     if (from && to) {
       if (compare(from.start, to.end) > 0) return null;
       return { ...base, op: "between", value: from.start, valueTo: to.end };
