@@ -384,7 +384,8 @@
         "STRATEGIES": "策略信号",
         "BANK_SYNC": "银行连接",
         "BANK_SYNC_ACTIVITY": "银行同步结果",
-        "EMAIL_RECEIPTS": "电子邮件收据"
+        "EMAIL_RECEIPTS": "电子邮件收据",
+        "BONDS": "债券"
       },
       "channelNotApplicable": "不适用于此通知类型",
       "emailToggleLabel": "{category} 的报告邮件",

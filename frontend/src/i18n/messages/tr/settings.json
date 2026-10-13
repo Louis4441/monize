@@ -384,7 +384,8 @@
         "STRATEGIES": "Strateji sinyalleri",
         "BANK_SYNC": "Banka bağlantıları",
         "BANK_SYNC_ACTIVITY": "Banka senkronizasyonu sonuçları",
-        "EMAIL_RECEIPTS": "E-posta makbuzları"
+        "EMAIL_RECEIPTS": "E-posta makbuzları",
+        "BONDS": "Tahviller"
       },
       "channelNotApplicable": "Bu bildirim türü için geçerli değil",
       "emailToggleLabel": "{category} için rapor e-postası",

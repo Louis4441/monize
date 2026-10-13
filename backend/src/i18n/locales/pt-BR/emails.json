@@ -325,6 +325,41 @@
       "importedNoneTitle": "{{ institution }}: nenhuma transação nova",
       "importedNoneMessage": "A sincronização diária de {{ institution }} não encontrou transações novas."
     },
+    "bond": {
+      "maturitySoonTitle": "{{ series }} vence em {{ date }}",
+      "maturitySoonMessage": "{{ quantity }} × {{ series }} vencem em {{ date }}. {{ payout }}",
+      "interestTitle": "{{ series }}: pagamento de juros hoje",
+      "interestMessage": "{{ quantity }} × {{ series }} pagam {{ amount }} de juros em {{ date }}. Registre na página do título se ainda não estiver na sua conta.",
+      "interestMessageUnknown": "{{ quantity }} × {{ series }} pagam juros em {{ date }}. O valor ainda não é conhecido: uma taxa da qual ele depende não foi publicada.",
+      "rateResetTitle": "{{ series }}: novo período de juros",
+      "rateResetMessage": "{{ series }} entrou no período {{ period }} em {{ date }} com taxa de {{ rate }} ao ano.",
+      "unbookedTitle": "{{ series }}: vencida, resgate não registrado",
+      "unbookedMessage": "{{ quantity }} × {{ series }} venceram em {{ date }} e nenhum resgate está registrado. {{ payout }} Registre o resgate na página do título.",
+      "payoutKnown": "O valor a receber é {{ payout }}.",
+      "payoutUnknown": "O valor a receber ainda não é conhecido: {{ reason }}.",
+      "reason": {
+        "RATE_UNKNOWN": "uma taxa da qual ele depende ainda não foi publicada",
+        "TERMS_INCOMPLETE": "as condições da série estão incompletas",
+        "PURCHASE_OUTSIDE_SALE_WINDOW": "uma data de compra está fora do período de venda da série",
+        "other": "não é possível calculá-lo com os dados armazenados"
+      },
+      "benchmarkTitle": "{{ benchmark }}: nova observação {{ observation }}",
+      "benchmarkMessage": "{{ publisher }} publicou {{ benchmark }} para {{ observation }}: {{ value }}. É usado por {{ series }}.",
+      "benchmarkMessageMore": "{{ publisher }} publicou {{ benchmark }} para {{ observation }}: {{ value }}. É usado por {{ series }} e mais {{ more }}.",
+      "missingTitle": "Valores das obrigações ainda não conhecidos",
+      "missingMessage": "Alguns valores das obrigações não podem ser calculados: {{ causes }}.",
+      "benchmarks": {
+        "PL_CPI_GUS_YOY": "IPCA, 12 meses (GUS)",
+        "PL_NBP_REFERENCE": "Taxa de referência do NBP"
+      },
+      "cause": {
+        "observation": "a observação {{ observation }} de {{ benchmark }} ({{ publisher }}) não está armazenada: ainda não foi publicada ou o feed não foi obtido desde então; atualize na página da obrigação",
+        "observationNoPublisher": "a observação {{ observation }} de {{ benchmark }} não está armazenada: ainda não foi publicada ou o feed não foi obtido desde então; atualize na página da obrigação",
+        "terms": "as condições de {{ series }} estão incompletas; atualize a série na página da obrigação",
+        "purchase": "uma compra de {{ series }} em {{ date }} está fora do período de venda ({{ from }} a {{ to }}); corrija a data da compra",
+        "lots": "não é possível derivar os lotes do livro-razão ({{ code }}); corrija o livro-razão"
+      }
+    },
     "emailReceiptsAttention": {
       "title": "Recibos de e-mail precisam de atenção",
       "message": "Sua caixa de entrada de recibos contém {{ noParser }} sem perfil e {{ parseFailed }} que seu perfil não reconheceu. Abra para revisar."

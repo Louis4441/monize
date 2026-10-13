@@ -39,6 +39,10 @@
     "email_receipts": {
       "title": "Potwierdzenia e-maili wymagają uwagi",
       "body": "Kilka wiadomości e-mail w skrzynce potwierdzeń wymaga profilu lub poprawy. Otwórz Monize, aby uzyskać szczegóły."
+    },
+    "bonds": {
+      "title": "Powiadomienie o obligacjach",
+      "body": "Co najmniej jedna z Twoich obligacji ma nowe informacje. Otwórz Monize, aby zobaczyć szczegóły."
     }
   },
   "actions": {

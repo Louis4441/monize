@@ -384,7 +384,8 @@
         "STRATEGIES": "Sinyal strategi",
         "BANK_SYNC": "Koneksi bank",
         "BANK_SYNC_ACTIVITY": "Hasil sinkronisasi bank",
-        "EMAIL_RECEIPTS": "Tanda terima email"
+        "EMAIL_RECEIPTS": "Tanda terima email",
+        "BONDS": "Obligasi"
       },
       "channelNotApplicable": "Tidak berlaku untuk jenis notifikasi ini",
       "emailToggleLabel": "Email laporan untuk {category}",

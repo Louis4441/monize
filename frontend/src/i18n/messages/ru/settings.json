@@ -384,7 +384,8 @@
         "STRATEGIES": "Сигналы стратегий",
         "BANK_SYNC": "Банковские подключения",
         "BANK_SYNC_ACTIVITY": "Результаты банковской синхронизации",
-        "EMAIL_RECEIPTS": "Письма-квитанции"
+        "EMAIL_RECEIPTS": "Письма-квитанции",
+        "BONDS": "Облигации"
       },
       "channelNotApplicable": "Неприменимо для этого типа уведомлений",
       "emailToggleLabel": "Эл. почта (отчёт) для «{category}»",

@@ -68,6 +68,39 @@
     "riskOn": "risk-on",
     "riskOff": "risk-off"
   },
+  "bond": {
+    "maturitySoonTitle": "{series} vence em {date}",
+    "maturitySoonMessage": "{quantity} × {series} vencem em {date}. {payout}",
+    "interestTitle": "{series}: pagamento de juros hoje",
+    "interestMessage": "{quantity} × {series} pagam {amount} de juros em {date}. Registe-os na página do título se ainda não estiverem na sua conta.",
+    "interestMessageUnknown": "{quantity} × {series} pagam juros em {date}. O montante ainda não é conhecido: uma taxa de que depende não está publicada.",
+    "rateResetTitle": "{series}: novo período de juros",
+    "rateResetMessage": "{series} entrou no período {period} em {date} com uma taxa de {rate} ao ano.",
+    "unbookedTitle": "{series}: vencida, reembolso não registado",
+    "unbookedMessage": "{quantity} × {series} venceram em {date} e não há nenhum reembolso registado. {payout} Registe o reembolso na página do título.",
+    "payoutKnown": "O valor a receber é {payout}.",
+    "payoutUnknown": "O valor a receber ainda não é conhecido: {reason}.",
+    "reason": {
+      "RATE_UNKNOWN": "uma taxa de que depende ainda não está publicada",
+      "TERMS_INCOMPLETE": "as condições da série estão incompletas",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "uma data de compra está fora do período de venda da série",
+      "other": "não pode ser calculado a partir dos dados guardados"
+    },
+    "benchmarkTitle": "{benchmark}: nova observação {observation}",
+    "benchmarkIntro": "{publisher} publicou {benchmark} para {observation}: {value}.",
+    "benchmarkSeries": "{series}: período a partir de {date} com uma taxa de {rate} ao ano.",
+    "benchmarkSeriesUnknown": "{series}: período a partir de {date}, a taxa ainda não é conhecida.",
+    "benchmarkMore": "E mais {more}.",
+    "missingTitle": "Valores de obrigações ainda não conhecidos",
+    "missingMessage": "Alguns valores de obrigações não podem ser calculados. {causes}",
+    "cause": {
+      "observation": "A observação {observation} de {benchmark} ({publisher}) não está guardada: ainda não foi publicada ou o feed não foi obtido desde então. Atualize na página da obrigação.",
+      "observationNoPublisher": "A observação {observation} de {benchmark} não está guardada: ainda não foi publicada ou o feed não foi obtido desde então. Atualize na página da obrigação.",
+      "terms": "As condições de {series} estão incompletas. Atualize a série na página da obrigação.",
+      "purchase": "Uma compra de {series} em {date} está fora do seu período de venda ({from} a {to}). Corrija a data de compra.",
+      "lots": "Os lotes não podem ser derivados do registo ({code}). Corrija o registo."
+    }
+  },
   "portfolioMovement": {
     "titleUp": "Investimentos a subir {percent}%",
     "titleDown": "Investimentos a descer {percent}%",

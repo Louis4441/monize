@@ -39,6 +39,10 @@
     "email_receipts": {
       "title": "Los recibos de correo necesitan atención",
       "body": "Algunos correos en su bandeja de entrada de recibos necesitan un perfil o una corrección. Abra Monize para más detalles."
+    },
+    "bonds": {
+      "title": "Aviso de bonos",
+      "body": "Uno de sus bonos tiene novedades. Abra Monize para ver los detalles."
     }
   },
   "actions": {

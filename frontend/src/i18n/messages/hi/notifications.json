@@ -68,6 +68,39 @@
     "riskOn": "risk-on",
     "riskOff": "risk-off"
   },
+  "bond": {
+    "maturitySoonTitle": "{series} की परिपक्वता {date} को है",
+    "maturitySoonMessage": "{quantity} × {series} {date} को परिपक्व होंगे। {payout}",
+    "interestTitle": "{series}: आज ब्याज भुगतान",
+    "interestMessage": "{quantity} × {series} पर {date} को {amount} का ब्याज मिलेगा। अगर यह अभी आपके खाते में नहीं है, तो इसे सिक्योरिटी पेज पर दर्ज करें।",
+    "interestMessageUnknown": "{quantity} × {series} पर {date} को ब्याज मिलेगा। राशि अभी ज्ञात नहीं है: जिस दर पर यह निर्भर है, वह प्रकाशित नहीं हुई है।",
+    "rateResetTitle": "{series}: नई ब्याज अवधि",
+    "rateResetMessage": "{series}: {date} से अवधि {period}, वार्षिक दर {rate}।",
+    "unbookedTitle": "{series}: परिपक्व हो चुका, मोचन दर्ज नहीं",
+    "unbookedMessage": "{quantity} × {series} {date} को परिपक्व हो चुके हैं और कोई मोचन दर्ज नहीं है। {payout} सिक्योरिटी पेज पर मोचन दर्ज करें।",
+    "payoutKnown": "भुगतान राशि {payout} है।",
+    "payoutUnknown": "भुगतान राशि अभी ज्ञात नहीं है: {reason}।",
+    "reason": {
+      "RATE_UNKNOWN": "जिस दर पर यह निर्भर है, वह अभी प्रकाशित नहीं हुई है",
+      "TERMS_INCOMPLETE": "सीरीज़ की शर्तें अधूरी हैं",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "खरीद की तारीख सीरीज़ की बिक्री अवधि से बाहर है",
+      "other": "संग्रहीत डेटा से इसकी गणना नहीं हो सकती"
+    },
+    "benchmarkTitle": "{benchmark}: नया अवलोकन {observation}",
+    "benchmarkIntro": "{publisher} ने {observation} के लिए {benchmark} प्रकाशित किया: {value}।",
+    "benchmarkSeries": "{series}: {date} से अवधि, वार्षिक दर {rate}।",
+    "benchmarkSeriesUnknown": "{series}: {date} से अवधि, दर अभी ज्ञात नहीं है।",
+    "benchmarkMore": "और {more} अन्य।",
+    "missingTitle": "बॉन्ड के आँकड़े अभी ज्ञात नहीं हैं",
+    "missingMessage": "बॉन्ड के कुछ आँकड़ों की गणना नहीं हो सकती। {causes}",
+    "cause": {
+      "observation": "{benchmark} ({publisher}) का {observation} का अवलोकन संग्रहीत नहीं है: वह अभी प्रकाशित नहीं हुआ है, या उसके बाद फ़ीड प्राप्त नहीं की गई। बॉन्ड पेज पर रीफ़्रेश करें।",
+      "observationNoPublisher": "{benchmark} का {observation} का अवलोकन संग्रहीत नहीं है: वह अभी प्रकाशित नहीं हुआ है, या उसके बाद फ़ीड प्राप्त नहीं की गई। बॉन्ड पेज पर रीफ़्रेश करें।",
+      "terms": "{series} की शर्तें अधूरी हैं। बॉन्ड पेज पर सीरीज़ रीफ़्रेश करें।",
+      "purchase": "{date} को {series} की खरीद उसकी बिक्री अवधि ({from} से {to}) से बाहर है। खरीद की तारीख सुधारें।",
+      "lots": "बही से लॉट निकाले नहीं जा सकते ({code})। बही सुधारें।"
+    }
+  },
   "portfolioMovement": {
     "titleUp": "निवेश {percent}% ऊपर",
     "titleDown": "निवेश {percent}% नीचे",

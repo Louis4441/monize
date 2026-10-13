@@ -384,7 +384,8 @@
         "STRATEGIES": "रणनीति संकेत",
         "BANK_SYNC": "बैंक कनेक्शन",
         "BANK_SYNC_ACTIVITY": "बैंक सिंक के परिणाम",
-        "EMAIL_RECEIPTS": "ईमेल रसीदें"
+        "EMAIL_RECEIPTS": "ईमेल रसीदें",
+        "BONDS": "बॉन्ड"
       },
       "channelNotApplicable": "इस सूचना प्रकार के लिए लागू नहीं",
       "emailToggleLabel": "{category} के लिए रिपोर्ट ईमेल",

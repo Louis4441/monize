@@ -384,7 +384,8 @@
         "STRATEGIES": "策略訊號",
         "BANK_SYNC": "銀行連線",
         "BANK_SYNC_ACTIVITY": "銀行同步結果",
-        "EMAIL_RECEIPTS": "電子郵件收據"
+        "EMAIL_RECEIPTS": "電子郵件收據",
+        "BONDS": "債券"
       },
       "channelNotApplicable": "不適用於此通知類型",
       "emailToggleLabel": "{category} 的報告郵件",

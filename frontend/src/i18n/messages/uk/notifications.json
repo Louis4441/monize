@@ -68,6 +68,39 @@
     "riskOn": "risk-on",
     "riskOff": "risk-off"
   },
+  "bond": {
+    "maturitySoonTitle": "{series}: погашення {date}",
+    "maturitySoonMessage": "{quantity} × {series} буде погашено {date}. {payout}",
+    "interestTitle": "{series}: сьогодні виплата відсотків",
+    "interestMessage": "{quantity} × {series}: {date} виплата відсотків у розмірі {amount}. Якщо їх ще немає на вашому рахунку, проведіть їх на сторінці цінного паперу.",
+    "interestMessageUnknown": "{quantity} × {series}: {date} виплата відсотків. Сума поки невідома: ставка, від якої вона залежить, не опублікована.",
+    "rateResetTitle": "{series}: новий відсотковий період",
+    "rateResetMessage": "{series}: з {date} триває період {period} зі ставкою {rate} річних.",
+    "unbookedTitle": "{series}: погашено, погашення не проведено",
+    "unbookedMessage": "{quantity} × {series} погашено {date}, але погашення не проведено. {payout} Проведіть погашення на сторінці цінного паперу.",
+    "payoutKnown": "Сума виплати: {payout}.",
+    "payoutUnknown": "Сума виплати поки невідома: {reason}.",
+    "reason": {
+      "RATE_UNKNOWN": "ставка, від якої вона залежить, ще не опублікована",
+      "TERMS_INCOMPLETE": "умови серії неповні",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "дата купівлі виходить за період продажу серії",
+      "other": "її не можна розрахувати за збереженими даними"
+    },
+    "benchmarkTitle": "{benchmark}: нове значення за {observation}",
+    "benchmarkIntro": "Опубліковано {benchmark} за {observation}: {value} (джерело: {publisher}).",
+    "benchmarkSeries": "{series}: період з {date} зі ставкою {rate} річних.",
+    "benchmarkSeriesUnknown": "{series}: період з {date}, ставка поки невідома.",
+    "benchmarkMore": "І ще {more}.",
+    "missingTitle": "Показники облігацій поки невідомі",
+    "missingMessage": "Деякі показники облігацій не вдається розрахувати. {causes}",
+    "cause": {
+      "observation": "Значення {benchmark} за {observation} ({publisher}) не збережено: воно ще не опубліковане або стрічку даних відтоді не завантажували. Оновіть дані на сторінці облігації.",
+      "observationNoPublisher": "Значення {benchmark} за {observation} не збережено: воно ще не опубліковане або стрічку даних відтоді не завантажували. Оновіть дані на сторінці облігації.",
+      "terms": "Умови {series} неповні. Оновіть серію на сторінці облігації.",
+      "purchase": "Купівля {series} від {date} виходить за період продажу ({from} – {to}). Виправте дату купівлі.",
+      "lots": "Партії не вдається визначити з журналу операцій ({code}). Виправте журнал."
+    }
+  },
   "portfolioMovement": {
     "titleUp": "Інвестиції зросли на {percent}%",
     "titleDown": "Інвестиції впали на {percent}%",

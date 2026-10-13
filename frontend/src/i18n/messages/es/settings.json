@@ -384,7 +384,8 @@
         "STRATEGIES": "Señales de estrategia",
         "BANK_SYNC": "Conexiones bancarias",
         "BANK_SYNC_ACTIVITY": "Resultados de la sincronización bancaria",
-        "EMAIL_RECEIPTS": "Recibos de correo"
+        "EMAIL_RECEIPTS": "Recibos de correo",
+        "BONDS": "Bonos"
       },
       "channelNotApplicable": "No aplicable a este tipo de notificación",
       "emailToggleLabel": "Correo (informe) para {category}",

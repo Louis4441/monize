@@ -384,7 +384,8 @@
         "STRATEGIES": "Strategiesignale",
         "BANK_SYNC": "Bankverbindungen",
         "BANK_SYNC_ACTIVITY": "Ergebnisse der Bank-Synchronisierung",
-        "EMAIL_RECEIPTS": "E-Mail-Belege"
+        "EMAIL_RECEIPTS": "E-Mail-Belege",
+        "BONDS": "Anleihen"
       },
       "channelNotApplicable": "Für diese Benachrichtigungsart nicht zutreffend",
       "emailToggleLabel": "Bericht-E-Mail für {category}",

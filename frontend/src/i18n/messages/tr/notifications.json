@@ -68,6 +68,39 @@
     "riskOn": "risk-on",
     "riskOff": "risk-off"
   },
+  "bond": {
+    "maturitySoonTitle": "{series} için vade {date} tarihinde doluyor",
+    "maturitySoonMessage": "{quantity} × {series} için vade {date} tarihinde doluyor. {payout}",
+    "interestTitle": "{series}: bugün faiz ödemesi",
+    "interestMessage": "{quantity} × {series} için {date} tarihinde {amount} faiz ödenecek. Henüz hesabınızda değilse menkul kıymet sayfasında kaydedin.",
+    "interestMessageUnknown": "{quantity} × {series} için {date} tarihinde faiz ödenecek. Tutar henüz bilinmiyor: bağlı olduğu oran henüz yayımlanmadı.",
+    "rateResetTitle": "{series}: yeni faiz dönemi",
+    "rateResetMessage": "{series}: {date} tarihinde başlayan dönem {period}, yıllık oran {rate}.",
+    "unbookedTitle": "{series}: vadesi doldu, itfa kaydedilmedi",
+    "unbookedMessage": "{quantity} × {series} için vade {date} tarihinde doldu ve kayıtlı bir itfa yok. {payout} İtfayı menkul kıymet sayfasında kaydedin.",
+    "payoutKnown": "Ödeme tutarı {payout}.",
+    "payoutUnknown": "Ödeme tutarı henüz bilinmiyor: {reason}.",
+    "reason": {
+      "RATE_UNKNOWN": "bağlı olduğu oran henüz yayımlanmadı",
+      "TERMS_INCOMPLETE": "serinin koşulları eksik",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "bir alış tarihi serinin satış döneminin dışında",
+      "other": "kayıtlı verilerden hesaplanamıyor"
+    },
+    "benchmarkTitle": "{benchmark}: yeni gözlem {observation}",
+    "benchmarkIntro": "{publisher}, {observation} için {benchmark} değerini yayımladı: {value}.",
+    "benchmarkSeries": "{series}: {date} tarihinden başlayan dönem, yıllık oran {rate}.",
+    "benchmarkSeriesUnknown": "{series}: {date} tarihinden başlayan dönem, oran henüz bilinmiyor.",
+    "benchmarkMore": "Ve {more} diğeri.",
+    "missingTitle": "Tahvil rakamları henüz bilinmiyor",
+    "missingMessage": "Bazı tahvil rakamları hesaplanamıyor. {causes}",
+    "cause": {
+      "observation": "{benchmark} ({publisher}) için {observation} gözlemi kayıtlı değil: henüz yayımlanmadı veya veri akışı o zamandan beri alınmadı. Tahvil sayfasında yenileyin.",
+      "observationNoPublisher": "{benchmark} için {observation} gözlemi kayıtlı değil: henüz yayımlanmadı veya veri akışı o zamandan beri alınmadı. Tahvil sayfasında yenileyin.",
+      "terms": "{series} koşulları eksik. Seriyi tahvil sayfasında yenileyin.",
+      "purchase": "{series} için {date} tarihli alış, satış döneminin ({from} – {to}) dışında. Alış tarihini düzeltin.",
+      "lots": "Lotlar defterden türetilemiyor ({code}). Defteri düzeltin."
+    }
+  },
   "portfolioMovement": {
     "titleUp": "Yatırımlar %{percent} arttı",
     "titleDown": "Yatırımlar %{percent} azaldı",

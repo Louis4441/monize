@@ -68,6 +68,39 @@
     "riskOn": "风险偏好",
     "riskOff": "避险"
   },
+  "bond": {
+    "maturitySoonTitle": "{series} 将于 {date} 到期",
+    "maturitySoonMessage": "{quantity} × {series} 将于 {date} 到期。{payout}",
+    "interestTitle": "{series}：今日付息",
+    "interestMessage": "{quantity} × {series} 将于 {date} 支付利息 {amount}。如果账户中尚未入账，请在证券页面记录。",
+    "interestMessageUnknown": "{quantity} × {series} 将于 {date} 付息。金额暂未确定：所依据的利率尚未公布。",
+    "rateResetTitle": "{series}：新的计息期",
+    "rateResetMessage": "{series} 已于 {date} 进入第 {period} 期，年利率 {rate}。",
+    "unbookedTitle": "{series}：已到期，兑付未记录",
+    "unbookedMessage": "{quantity} × {series} 已于 {date} 到期，但尚未记录兑付。{payout}请在证券页面记录兑付。",
+    "payoutKnown": "兑付金额为 {payout}。",
+    "payoutUnknown": "兑付金额暂未确定：{reason}。",
+    "reason": {
+      "RATE_UNKNOWN": "所依据的利率尚未公布",
+      "TERMS_INCOMPLETE": "该系列的条款不完整",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "购买日期不在该系列的发售期内",
+      "other": "无法根据已存数据计算"
+    },
+    "benchmarkTitle": "{benchmark}：新数据 {observation}",
+    "benchmarkIntro": "{publisher} 已公布 {observation} 的 {benchmark}：{value}。",
+    "benchmarkSeries": "{series}：自 {date} 起的计息期，年利率 {rate}。",
+    "benchmarkSeriesUnknown": "{series}：自 {date} 起的计息期，利率暂未确定。",
+    "benchmarkMore": "另有 {more} 个。",
+    "missingTitle": "债券数据暂未确定",
+    "missingMessage": "部分债券数据无法计算。{causes}",
+    "cause": {
+      "observation": "{benchmark}（{publisher}）{observation} 的数据未存储：尚未公布，或此后未获取数据源。请在债券页面刷新。",
+      "observationNoPublisher": "{benchmark} {observation} 的数据未存储：尚未公布，或此后未获取数据源。请在债券页面刷新。",
+      "terms": "{series} 的条款不完整。请在债券页面刷新该系列。",
+      "purchase": "{series} 于 {date} 的购买不在其发售期（{from} 至 {to}）内。请更正购买日期。",
+      "lots": "无法从账本推导出持仓批次（{code}）。请更正账本。"
+    }
+  },
   "portfolioMovement": {
     "titleUp": "投资上涨 {percent}%",
     "titleDown": "投资下跌 {percent}%",

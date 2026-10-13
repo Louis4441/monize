@@ -39,6 +39,10 @@
     "email_receipts": {
       "title": "Le ricevute email richiedono attenzione",
       "body": "Alcuni messaggi nella cartella riceute richiedono un profilo o una correzione. Apri Monize per i dettagli."
+    },
+    "bonds": {
+      "title": "Avviso sulle obbligazioni",
+      "body": "Una delle tue obbligazioni ha novità. Apri Monize per i dettagli."
     }
   },
   "actions": {

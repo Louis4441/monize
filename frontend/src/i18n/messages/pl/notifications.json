@@ -68,6 +68,39 @@
     "riskOn": "risk-on",
     "riskOff": "risk-off"
   },
+  "bond": {
+    "maturitySoonTitle": "{series}: termin wykupu {date}",
+    "maturitySoonMessage": "Obligacje {series} ({quantity} szt.) zostaną wykupione dnia {date}. {payout}",
+    "interestTitle": "{series}: dziś wypłata odsetek",
+    "interestMessage": "Obligacje {series} ({quantity} szt.): dnia {date} wypłata odsetek w wysokości {amount}. Jeśli odsetek nie ma jeszcze na koncie, zaksięguj je na stronie papieru wartościowego.",
+    "interestMessageUnknown": "Obligacje {series} ({quantity} szt.): dnia {date} wypłata odsetek. Kwota nie jest jeszcze znana: oprocentowanie zależy od wskaźnika, który nie został opublikowany.",
+    "rateResetTitle": "{series}: nowy okres odsetkowy",
+    "rateResetMessage": "{series}: od dnia {date} trwa okres odsetkowy {period} z oprocentowaniem {rate} w skali roku.",
+    "unbookedTitle": "{series}: wykupione, wykup niezaksięgowany",
+    "unbookedMessage": "Obligacje {series} ({quantity} szt.) zostały wykupione dnia {date}, a wykup nie jest zaksięgowany. {payout} Zaksięguj wykup na stronie papieru wartościowego.",
+    "payoutKnown": "Kwota wypłaty: {payout}.",
+    "payoutUnknown": "Kwota wypłaty nie jest jeszcze znana: {reason}.",
+    "reason": {
+      "RATE_UNKNOWN": "oprocentowanie zależy od wskaźnika, który nie został jeszcze opublikowany",
+      "TERMS_INCOMPLETE": "warunki emisji serii są niekompletne",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "data zakupu wypada poza okresem sprzedaży serii",
+      "other": "nie da się jej wyliczyć z zapisanych danych"
+    },
+    "benchmarkTitle": "{benchmark}: nowa wartość ({observation})",
+    "benchmarkIntro": "Opublikowano {benchmark} za {observation}: {value} (źródło: {publisher}).",
+    "benchmarkSeries": "{series}: okres od {date} z oprocentowaniem {rate} w skali roku.",
+    "benchmarkSeriesUnknown": "{series}: okres od {date}, oprocentowanie nie jest jeszcze znane.",
+    "benchmarkMore": "Oraz kolejne serie: {more}.",
+    "missingTitle": "Brakuje danych o obligacjach",
+    "missingMessage": "Nie można wyliczyć części danych o obligacjach. {causes}",
+    "cause": {
+      "observation": "Brak zapisanej wartości {benchmark} za {observation} (źródło: {publisher}): nie została jeszcze opublikowana albo dane nie zostały od tego czasu pobrane. Odśwież dane na stronie obligacji.",
+      "observationNoPublisher": "Brak zapisanej wartości {benchmark} za {observation}: nie została jeszcze opublikowana albo dane nie zostały od tego czasu pobrane. Odśwież dane na stronie obligacji.",
+      "terms": "Warunki serii {series} są niekompletne. Odśwież serię na stronie obligacji.",
+      "purchase": "Zakup serii {series} z dnia {date} wypada poza okresem sprzedaży (od {from} do {to}). Popraw datę zakupu.",
+      "lots": "Nie można ustalić partii na podstawie historii transakcji ({code}). Popraw historię transakcji."
+    }
+  },
   "portfolioMovement": {
     "titleUp": "Inwestycje w górę o {percent}%",
     "titleDown": "Inwestycje w dół o {percent}%",

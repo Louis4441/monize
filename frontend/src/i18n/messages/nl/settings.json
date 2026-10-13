@@ -384,7 +384,8 @@
         "STRATEGIES": "Strategiesignalen",
         "BANK_SYNC": "Bankkoppelingen",
         "BANK_SYNC_ACTIVITY": "Resultaten van banksynchronisatie",
-        "EMAIL_RECEIPTS": "E-mailkwitanties"
+        "EMAIL_RECEIPTS": "E-mailkwitanties",
+        "BONDS": "Obligaties"
       },
       "channelNotApplicable": "Niet van toepassing op dit type melding",
       "emailToggleLabel": "Rapport-e-mail voor {category}",

@@ -384,7 +384,8 @@
         "STRATEGIES": "전략 신호",
         "BANK_SYNC": "은행 연결",
         "BANK_SYNC_ACTIVITY": "은행 동기화 결과",
-        "EMAIL_RECEIPTS": "이메일 영수증"
+        "EMAIL_RECEIPTS": "이메일 영수증",
+        "BONDS": "채권"
       },
       "channelNotApplicable": "이 알림 유형에는 해당되지 않습니다",
       "emailToggleLabel": "{category} 보고서 이메일",

@@ -325,6 +325,41 @@
       "importedNoneTitle": "{{ institution }}: keine neuen Buchungen",
       "importedNoneMessage": "Die tägliche Synchronisierung von {{ institution }} hat keine neuen Buchungen gefunden."
     },
+    "bond": {
+      "maturitySoonTitle": "{{ series }}: Fälligkeit am {{ date }}",
+      "maturitySoonMessage": "{{ quantity }} × {{ series }} werden am {{ date }} fällig. {{ payout }}",
+      "interestTitle": "{{ series }}: heute Zinszahlung",
+      "interestMessage": "{{ quantity }} × {{ series }} zahlen am {{ date }} {{ amount }} Zinsen. Buchen Sie sie auf der Wertpapierseite, falls sie noch nicht auf Ihrem Konto sind.",
+      "interestMessageUnknown": "{{ quantity }} × {{ series }} zahlen am {{ date }} Zinsen. Der Betrag steht noch nicht fest: Ein Zinssatz, von dem er abhängt, ist noch nicht veröffentlicht.",
+      "rateResetTitle": "{{ series }}: neue Zinsperiode",
+      "rateResetMessage": "{{ series }} hat am {{ date }} die Periode {{ period }} mit {{ rate }} p. a. begonnen.",
+      "unbookedTitle": "{{ series }}: fällig, Rückzahlung nicht gebucht",
+      "unbookedMessage": "{{ quantity }} × {{ series }} wurden am {{ date }} fällig, und es ist keine Rückzahlung gebucht. {{ payout }} Buchen Sie die Rückzahlung auf der Wertpapierseite.",
+      "payoutKnown": "Die Auszahlung beträgt {{ payout }}.",
+      "payoutUnknown": "Die Auszahlung steht noch nicht fest: {{ reason }}.",
+      "reason": {
+        "RATE_UNKNOWN": "ein Zinssatz, von dem sie abhängt, ist noch nicht veröffentlicht",
+        "TERMS_INCOMPLETE": "die Konditionen der Serie sind unvollständig",
+        "PURCHASE_OUTSIDE_SALE_WINDOW": "ein Kaufdatum liegt außerhalb des Verkaufszeitraums der Serie",
+        "other": "sie lässt sich aus den gespeicherten Daten nicht berechnen"
+      },
+      "benchmarkTitle": "{{ benchmark }}: neuer Wert für {{ observation }}",
+      "benchmarkMessage": "{{ publisher }} hat {{ benchmark }} für {{ observation }} veröffentlicht: {{ value }}. Betroffen: {{ series }}.",
+      "benchmarkMessageMore": "{{ publisher }} hat {{ benchmark }} für {{ observation }} veröffentlicht: {{ value }}. Betroffen: {{ series }} und {{ more }} weitere.",
+      "missingTitle": "Anleihedaten noch nicht bekannt",
+      "missingMessage": "Einige Anleihedaten lassen sich nicht berechnen: {{ causes }}.",
+      "benchmarks": {
+        "PL_CPI_GUS_YOY": "Inflationsrate (VPI), 12 Monate (GUS)",
+        "PL_NBP_REFERENCE": "NBP-Referenzzins"
+      },
+      "cause": {
+        "observation": "der Wert {{ observation }} von {{ benchmark }} ({{ publisher }}) ist nicht gespeichert: Er ist noch nicht veröffentlicht, oder der Feed wurde seitdem nicht abgerufen; aktualisieren Sie auf der Anleiheseite",
+        "observationNoPublisher": "der Wert {{ observation }} von {{ benchmark }} ist nicht gespeichert: Er ist noch nicht veröffentlicht, oder der Feed wurde seitdem nicht abgerufen; aktualisieren Sie auf der Anleiheseite",
+        "terms": "die Konditionen von {{ series }} sind unvollständig; aktualisieren Sie die Serie auf der Anleiheseite",
+        "purchase": "ein Kauf von {{ series }} am {{ date }} liegt außerhalb des Verkaufszeitraums ({{ from }} bis {{ to }}); korrigieren Sie das Kaufdatum",
+        "lots": "die Lots lassen sich nicht aus dem Buchungsverlauf ableiten ({{ code }}); korrigieren Sie den Buchungsverlauf"
+      }
+    },
     "emailReceiptsAttention": {
       "title": "E-Mail-Belege benötigen Aufmerksamkeit",
       "message": "Ihr Belegepostfach enthält {{ noParser }} ohne Profil und {{ parseFailed }}, die ihr Profil nicht erkannt hat. Öffnen Sie zur Prüfung."

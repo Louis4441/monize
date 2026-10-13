@@ -325,6 +325,41 @@
       "importedNoneTitle": "{{ institution }}: новых проводок нет",
       "importedNoneMessage": "Ежедневная синхронизация {{ institution }} не нашла новых проводок."
     },
+    "bond": {
+      "maturitySoonTitle": "{{ series }}: погашение {{ date }}",
+      "maturitySoonMessage": "{{ quantity }} × {{ series }} будут погашены {{ date }}. {{ payout }}",
+      "interestTitle": "{{ series }}: сегодня выплата процентов",
+      "interestMessage": "{{ quantity }} × {{ series }}: {{ date }} выплата процентов в размере {{ amount }}. Если их ещё нет на вашем счёте, проведите их на странице ценной бумаги.",
+      "interestMessageUnknown": "{{ quantity }} × {{ series }}: {{ date }} выплата процентов. Сумма пока неизвестна: ставка, от которой она зависит, не опубликована.",
+      "rateResetTitle": "{{ series }}: новый процентный период",
+      "rateResetMessage": "{{ series }}: с {{ date }} идёт период {{ period }} со ставкой {{ rate }} годовых.",
+      "unbookedTitle": "{{ series }}: погашена, погашение не проведено",
+      "unbookedMessage": "{{ quantity }} × {{ series }} погашены {{ date }}, но погашение не проведено. {{ payout }} Проведите погашение на странице ценной бумаги.",
+      "payoutKnown": "Сумма выплаты: {{ payout }}.",
+      "payoutUnknown": "Сумма выплаты пока неизвестна: {{ reason }}.",
+      "reason": {
+        "RATE_UNKNOWN": "ставка, от которой она зависит, ещё не опубликована",
+        "TERMS_INCOMPLETE": "условия серии неполные",
+        "PURCHASE_OUTSIDE_SALE_WINDOW": "дата покупки выходит за период продажи серии",
+        "other": "её нельзя рассчитать по сохранённым данным"
+      },
+      "benchmarkTitle": "{{ benchmark }}: новое значение за {{ observation }}",
+      "benchmarkMessage": "Опубликовано {{ benchmark }} за {{ observation }}: {{ value }} (источник: {{ publisher }}). Используется в сериях: {{ series }}.",
+      "benchmarkMessageMore": "Опубликовано {{ benchmark }} за {{ observation }}: {{ value }} (источник: {{ publisher }}). Используется в сериях: {{ series }} и ещё {{ more }}.",
+      "missingTitle": "Показатели по облигациям пока неизвестны",
+      "missingMessage": "Некоторые показатели по облигациям не удаётся рассчитать: {{ causes }}.",
+      "benchmarks": {
+        "PL_CPI_GUS_YOY": "Инфляция ИПЦ, 12 месяцев (GUS)",
+        "PL_NBP_REFERENCE": "Ориентировочная ставка NBP"
+      },
+      "cause": {
+        "observation": "значение {{ benchmark }} за {{ observation }} ({{ publisher }}) не сохранено: оно ещё не опубликовано или поток данных не загружался с тех пор; обновите данные на странице облигации",
+        "observationNoPublisher": "значение {{ benchmark }} за {{ observation }} не сохранено: оно ещё не опубликовано или поток данных не загружался с тех пор; обновите данные на странице облигации",
+        "terms": "условия {{ series }} неполные; обновите серию на странице облигации",
+        "purchase": "покупка {{ series }} от {{ date }} выходит за период продажи ({{ from }} – {{ to }}); исправьте дату покупки",
+        "lots": "партии не удаётся определить по журналу операций ({{ code }}); исправьте журнал"
+      }
+    },
     "emailReceiptsAttention": {
       "title": "Письма-квитанции требуют внимания",
       "message": "Ваша папка квитанций содержит {{ noParser }} без профиля и {{ parseFailed }}, которые профиль не распознал. Откройте для проверки."
