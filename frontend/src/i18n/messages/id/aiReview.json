@@ -71,6 +71,12 @@
       "confirm": "{count, plural, one {Terapkan # usulan} other {Terapkan # usulan}}"
     }
   },
+  "sendToAssistant": {
+    "button": "Kirim {count, plural, other {# permintaan tertunda}} ke asisten AI",
+    "prompt": "Kerjakan permintaan tinjauan AI saya yang tertunda dengan alat ai_review_requests: daftarkan, klaim masing-masing, ikuti instruksinya, dan kirim usulan. Untuk permintaan draf profil, buat profil dengan alat email_receipt_parsers. Tidak ada yang diubah sampai saya menyetujui usulan di kotak masuk tinjauan AI.",
+    "opened": "Obrolan dibuka dengan pesan yang sudah disiapkan. Baca lalu tekan Kirim.",
+    "unavailable": "Asisten AI tidak dapat menjawab sekarang. Hubungkan penyedia AI di Pengaturan, atau hubungkan klien MCP Anda. Permintaan tetap menunggu di sini."
+  },
   "dismissDialog": {
     "title": "Abaikan permintaan ini?",
     "message": "Tidak ada lagi yang akan diminta menangani permintaan ini. Hal yang menjadi pokok permintaan tidak berubah.",

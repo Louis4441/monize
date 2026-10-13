@@ -71,6 +71,12 @@
       "confirm": "{count, plural, one {Appliquer # proposition} other {Appliquer # propositions}}"
     }
   },
+  "sendToAssistant": {
+    "button": "Envoyer {count, plural, one {# demande en attente} other {# demandes en attente}} à l'assistant IA",
+    "prompt": "Traite mes demandes de revue par l'IA en attente avec l'outil ai_review_requests : liste-les, prends chacune en charge, suis son instruction et soumets une proposition. Pour une demande de brouillon de profil, crée plutôt le profil avec l'outil email_receipt_parsers. Rien n'est modifié tant que je n'ai pas approuvé les propositions dans la boîte de revue par l'IA.",
+    "opened": "Le chat s'est ouvert avec un message préparé. Lisez-le et appuyez sur Envoyer.",
+    "unavailable": "L'assistant IA ne peut pas répondre pour l'instant. Connectez un fournisseur d'IA dans les Paramètres ou connectez votre client MCP. Les demandes restent en attente ici."
+  },
   "dismissDialog": {
     "title": "Ignorer cette demande ?",
     "message": "Plus personne ne sera sollicité pour traiter cette demande. Rien de ce qu'elle concernait n'est modifié.",

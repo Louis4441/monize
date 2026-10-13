@@ -71,6 +71,12 @@
       "confirm": "{count, plural, one {Zastosuj # propozycję} few {Zastosuj # propozycje} many {Zastosuj # propozycji} other {Zastosuj # propozycji}}"
     }
   },
+  "sendToAssistant": {
+    "button": "Skieruj {count, plural, one {# oczekujące żądanie} few {# oczekujące żądania} many {# oczekujących żądań} other {# oczekującego żądania}} do asystenta AI",
+    "prompt": "Przetwórz moje oczekujące żądania przeglądu AI narzędziem ai_review_requests: wyświetl ich listę, przejmij każde z nich, wykonaj jego instrukcję i prześlij propozycję. Dla żądania szkicu profilu utwórz profil narzędziem email_receipt_parsers. Nic nie zostanie zmienione, dopóki nie zatwierdzę propozycji w skrzynce przeglądu AI.",
+    "opened": "Otwarto czat z przygotowaną wiadomością. Przeczytaj ją i naciśnij Wyślij.",
+    "unavailable": "Asystent AI nie może teraz odpowiedzieć. Połącz dostawcę AI w Ustawieniach albo połącz klienta MCP. Żądania nadal czekają tutaj."
+  },
   "dismissDialog": {
     "title": "Odrzucić tę prośbę?",
     "message": "Nikt nie zostanie ponownie poproszony o zajęcie się tą prośbą. Nic, czego dotyczyła, nie zostanie zmienione.",
