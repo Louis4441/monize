@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { ChartBarIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { CARD_CLASS } from '@/components/ui/Card';
+import { CARD_CLASS, HOVER_ROW_ON_CARD } from '@/components/ui/Card';
 
 /**
  * The button in a chart card's header that folds the Transactions page's
@@ -37,7 +37,7 @@ export function CollapsedChartStrip({ onExpand }: { onExpand: () => void }) {
       aria-expanded={false}
       aria-label={t('charts.collapse.show')}
       data-testid="chart-collapsed-strip"
-      className={`${CARD_CLASS} mb-6 w-full flex items-center justify-between gap-3 px-3 sm:px-6 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+      className={`${CARD_CLASS} ${HOVER_ROW_ON_CARD} mb-6 w-full flex items-center justify-between gap-3 px-3 sm:px-6 py-2 text-sm text-gray-600 dark:text-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
     >
       <span className="inline-flex items-center gap-2">
         <ChartBarIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
