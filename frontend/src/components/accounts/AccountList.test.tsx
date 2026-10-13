@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act, within } from '@/test/render';
+import { render, screen, fireEvent, waitFor, act, within, cleanup } from '@/test/render';
 import * as nextNavigation from 'next/navigation';
 import { AccountList } from './AccountList';
 import { Account } from '@/types/account';
@@ -1654,9 +1654,10 @@ describe('AccountList', () => {
         });
       });
       afterEach(() => {
-        // Inside act: the list is still mounted when this runs, and the reset
-        // re-renders it.
-        act(() => usePreferencesStore.setState({ preferences: null }));
+        // Unmount first: this hook runs before Testing Library's own cleanup,
+        // and a store write to a mounted list re-renders it outside act.
+        cleanup();
+        usePreferencesStore.setState({ preferences: null });
       });
 
       it('opens a chequing account on its dashboard', () => {
