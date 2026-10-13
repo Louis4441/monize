@@ -436,8 +436,9 @@ export class TransactionRuleToolPrepService {
 
   /**
    * What running a saved rule on existing transactions would change, with the
-   * fingerprint the commit must echo. A run that would change nothing is
-   * refused: a card offering it would be an approval for nothing.
+   * fingerprint the commit must echo. A run that would change nothing and
+   * queue no AI review is refused: a card offering it would be an approval
+   * for nothing.
    */
   async prepareRun(
     userId: string,
@@ -452,7 +453,10 @@ export class TransactionRuleToolPrepService {
       this.runService.previewRun(userId, stored.value.id, filters.value.ids),
     );
     if (!planned.ok) return planned;
-    if (planned.value.matched.length === 0) {
+    if (
+      planned.value.matched.length === 0 &&
+      planned.value.aiReviewRequests === 0
+    ) {
       return refusal(
         `Running this rule would change no transactions (${planned.value.scanned} examined, ${planned.value.skipped.length} skipped).`,
       );

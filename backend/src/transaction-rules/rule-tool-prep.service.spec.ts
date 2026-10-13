@@ -838,6 +838,19 @@ describe("TransactionRuleToolPrepService", () => {
       });
     });
 
+    it("offers a run that changes no field but queues AI reviews", async () => {
+      const { service, runService } = build();
+      runService.previewRun.mockResolvedValue({
+        ...runPreview(0),
+        scanned: 12,
+        aiReviewRequests: 3,
+      });
+      const prep = await service.prepareRun(USER_ID, { ruleId: RULE_ID }, {});
+      if (!prep.ok) throw new Error("expected a preview");
+      expect(prep.preview.test.matchedCount).toBe(0);
+      expect(prep.preview.test.aiReviewRequests).toBe(3);
+    });
+
     it("refuses a rule that cannot run with the run service's entries", async () => {
       const { service, runService } = build();
       runService.previewRun.mockRejectedValue(

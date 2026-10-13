@@ -435,6 +435,7 @@
     "summary": "[XX-{matched, plural, one {# transaction would change} other {# transactions would change}} out of {scanned, plural, one {# transaction} other {# transactions}} scanned.-XX]",
     "matchesNone": "[XX-This rule matches none of the transactions examined ({scanned}). Check the conditions before saving. A pattern without * matches only the whole text.-XX]",
     "noChange": "[XX-{matched} of the {scanned} transactions examined match the rule's conditions, but nothing would change (for example, they already have the value and only-if-empty is on). This is not an error.-XX]",
+    "aiReview": "[XX-{count, plural, one {# transaction would be queued for AI review} other {# transactions would be queued for AI review}}. The request is created when you confirm.-XX]",
     "truncated": "[XX-More transactions matched than the limit allows. Only the newest are included. Raise the limit or narrow the dates to include the rest.-XX]",
     "truncatedOldest": "[XX-More transactions matched than the limit allows. Only the oldest are included, because this rule settles loan installments in date order. Run it again after this run to include the rest.-XX]",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "[XX-The run could not be completed. Check the action history before you try again.-XX]"
     },
     "toast": {
-      "done": "[XX-{count, plural, =0 {No transactions were changed} one {# transaction changed} other {# transactions changed}}. You can undo this from the action history.-XX]"
+      "done": "[XX-{count, plural, =0 {No transactions were changed} one {# transaction changed} other {# transactions changed}}. You can undo this from the action history.-XX]",
+      "aiReviewsQueued": "[XX-{count, plural, one {# transaction queued for AI review} other {# transactions queued for AI review}}.-XX]"
     },
     "done": {
       "summary": "[XX-{count, plural, =0 {No transactions were changed.} one {# transaction was changed.} other {# transactions were changed.}}-XX]",
+      "aiReviewsQueued": "[XX-{count, plural, one {# transaction was queued for AI review.} other {# transactions were queued for AI review.}}-XX]",
+      "aiReviewsAlreadyQueued": "[XX-{count, plural, one {# transaction already had an open AI review request, so it was not queued again.} other {# transactions already had an open AI review request, so they were not queued again.}}-XX]",
       "undo": "[XX-You can undo the run from the action history.-XX]"
     },
     "missingInputs": {

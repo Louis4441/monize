@@ -435,6 +435,7 @@
     "summary": "{matched, plural, one {# transacción cambiaría} other {# transacciones cambiarían}} de {scanned, plural, one {# transacción analizada} other {# transacciones analizadas}}.",
     "matchesNone": "Esta regla no coincide con ninguna de las transacciones analizadas ({scanned}). Revisa las condiciones antes de guardar. Un patrón sin * solo coincide con el texto completo.",
     "noChange": "{matched} de las {scanned} transacciones examinadas cumplen las condiciones de la regla, pero no cambiaría nada (por ejemplo, porque ya tienen el valor y «solo si está vacío» está activado). No es un error.",
+    "aiReview": "{count, plural, one {# transacción se pondría en cola para revisión por IA} other {# transacciones se pondrían en cola para revisión por IA}}. La solicitud se crea al confirmar.",
     "truncated": "Coinciden más transacciones de las que permite el límite. Solo se incluyen las más recientes. Sube el límite o acota las fechas para incluir el resto.",
     "truncatedOldest": "Coincidieron más transacciones de las que permite el límite. Solo se incluyen las más antiguas, porque esta regla liquida las cuotas del préstamo en orden de fecha. Ejecútala de nuevo después de esta ejecución para incluir el resto.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "No se pudo completar la ejecución. Revisa el historial de acciones antes de intentarlo de nuevo."
     },
     "toast": {
-      "done": "{count, plural, =0 {No se cambió ninguna transacción} one {# transacción cambiada} other {# transacciones cambiadas}}. Puedes deshacerlo desde el historial de acciones."
+      "done": "{count, plural, =0 {No se cambió ninguna transacción} one {# transacción cambiada} other {# transacciones cambiadas}}. Puedes deshacerlo desde el historial de acciones.",
+      "aiReviewsQueued": "{count, plural, one {# transacción en cola para revisión por IA} other {# transacciones en cola para revisión por IA}}."
     },
     "done": {
       "summary": "{count, plural, =0 {No se cambió ninguna transacción.} one {Se cambió # transacción.} other {Se cambiaron # transacciones.}}",
+      "aiReviewsQueued": "{count, plural, one {# transacción se puso en cola para revisión por IA.} other {# transacciones se pusieron en cola para revisión por IA.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transacción ya tenía una solicitud de revisión por IA abierta, así que no se volvió a poner en cola.} other {# transacciones ya tenían una solicitud de revisión por IA abierta, así que no se volvieron a poner en cola.}}",
       "undo": "Puedes deshacer la ejecución desde el historial de acciones."
     },
     "missingInputs": {

@@ -435,6 +435,7 @@
     "summary": "{matched, plural, one {# transactie zou wijzigen} other {# transacties zouden wijzigen}} van {scanned, plural, one {# gecontroleerde transactie} other {# gecontroleerde transacties}}.",
     "matchesNone": "Deze regel komt met geen van de onderzochte transacties overeen ({scanned}). Controleer de voorwaarden voordat je opslaat. Een patroon zonder * komt alleen overeen met de hele tekst.",
     "noChange": "{matched} van de {scanned} onderzochte transacties voldoen aan de voorwaarden van de regel, maar er zou niets veranderen (bijvoorbeeld omdat ze de waarde al hebben en 'alleen als leeg' aanstaat). Dit is geen fout.",
+    "aiReview": "{count, plural, one {# transactie zou in de wachtrij voor AI-beoordeling worden gezet} other {# transacties zouden in de wachtrij voor AI-beoordeling worden gezet}}. Het verzoek wordt gemaakt wanneer u bevestigt.",
     "truncated": "Er komen meer transacties overeen dan de limiet toestaat. Alleen de nieuwste zijn opgenomen. Verhoog de limiet of beperk de datums om de rest mee te nemen.",
     "truncatedOldest": "Er zijn meer transacties gematcht dan de limiet toestaat. Alleen de oudste zijn opgenomen, omdat deze regel leningtermijnen op datumvolgorde aflost. Voer de regel na deze uitvoering opnieuw uit om de rest op te nemen.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "De uitvoering kon niet worden voltooid. Controleer de actiegeschiedenis voordat je het opnieuw probeert."
     },
     "toast": {
-      "done": "{count, plural, =0 {Er zijn geen transacties gewijzigd} one {# transactie gewijzigd} other {# transacties gewijzigd}}. Je kunt dit ongedaan maken via de actiegeschiedenis."
+      "done": "{count, plural, =0 {Er zijn geen transacties gewijzigd} one {# transactie gewijzigd} other {# transacties gewijzigd}}. Je kunt dit ongedaan maken via de actiegeschiedenis.",
+      "aiReviewsQueued": "{count, plural, one {# transactie in de wachtrij voor AI-beoordeling gezet} other {# transacties in de wachtrij voor AI-beoordeling gezet}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Er zijn geen transacties gewijzigd.} one {# transactie is gewijzigd.} other {# transacties zijn gewijzigd.}}",
+      "aiReviewsQueued": "{count, plural, one {# transactie is in de wachtrij voor AI-beoordeling gezet.} other {# transacties zijn in de wachtrij voor AI-beoordeling gezet.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transactie had al een open verzoek voor AI-beoordeling en is daarom niet opnieuw in de wachtrij gezet.} other {# transacties hadden al een open verzoek voor AI-beoordeling en zijn daarom niet opnieuw in de wachtrij gezet.}}",
       "undo": "Je kunt de uitvoering ongedaan maken via de actiegeschiedenis."
     },
     "missingInputs": {

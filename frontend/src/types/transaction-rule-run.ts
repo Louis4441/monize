@@ -218,6 +218,8 @@ export interface RuleRunPreview {
   /** Echoed back by the run to confirm this exact plan. */
   fingerprint: string;
   labels: RuleRunLabels;
+  /** Rows a run would queue an AI review request for (queued on confirm, never on preview). */
+  aiReviewRequests: number;
 }
 
 export interface RuleRunResult {
@@ -226,6 +228,10 @@ export interface RuleRunResult {
   skipped: RuleRunSkippedRow[];
   /** The action-history entry, or null when nothing changed or it was not recorded. */
   historyId: string | null;
+  /** Rows the run queued an AI review request for. */
+  aiReviewsQueued: number;
+  /** Rows whose AI review request was already open, so nothing new was queued. */
+  aiReviewsAlreadyQueued: number;
 }
 
 /** An unsaved rule to test. */

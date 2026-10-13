@@ -435,6 +435,7 @@
     "summary": "{matched, plural, one {# transazione verrebbe modificata} other {# transazioni verrebbero modificate}} su {scanned, plural, one {# transazione analizzata} other {# transazioni analizzate}}.",
     "matchesNone": "Questa regola non corrisponde a nessuna delle transazioni esaminate ({scanned}). Controlla le condizioni prima di salvare. Un modello senza * corrisponde solo al testo intero.",
     "noChange": "{matched} delle {scanned} transazioni esaminate soddisfano le condizioni della regola, ma non cambierebbe nulla (ad esempio, hanno già il valore e «solo se vuoto» è attivo). Non è un errore.",
+    "aiReview": "{count, plural, one {# transazione verrebbe messa in coda per la revisione IA} other {# transazioni verrebbero messe in coda per la revisione IA}}. La richiesta viene creata quando confermi.",
     "truncated": "Corrispondono più transazioni di quante il limite consenta. Sono incluse solo le più recenti. Aumenta il limite o restringi le date per includere le altre.",
     "truncatedOldest": "Sono risultate più transazioni corrispondenti di quante il limite ne permetta. Sono incluse solo le più vecchie, perché questa regola salda le rate del prestito in ordine di data. Eseguila di nuovo dopo questa esecuzione per includere il resto.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "Non è stato possibile completare l’esecuzione. Controlla la cronologia azioni prima di riprovare."
     },
     "toast": {
-      "done": "{count, plural, =0 {Nessuna transazione è stata modificata} one {# transazione modificata} other {# transazioni modificate}}. Puoi annullare dalla cronologia azioni."
+      "done": "{count, plural, =0 {Nessuna transazione è stata modificata} one {# transazione modificata} other {# transazioni modificate}}. Puoi annullare dalla cronologia azioni.",
+      "aiReviewsQueued": "{count, plural, one {# transazione messa in coda per la revisione IA} other {# transazioni messe in coda per la revisione IA}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Nessuna transazione è stata modificata.} one {È stata modificata # transazione.} other {Sono state modificate # transazioni.}}",
+      "aiReviewsQueued": "{count, plural, one {# transazione è stata messa in coda per la revisione IA.} other {# transazioni sono state messe in coda per la revisione IA.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transazione aveva già una richiesta di revisione IA aperta, quindi non è stata rimessa in coda.} other {# transazioni avevano già una richiesta di revisione IA aperta, quindi non sono state rimesse in coda.}}",
       "undo": "Puoi annullare l’esecuzione dalla cronologia azioni."
     },
     "missingInputs": {

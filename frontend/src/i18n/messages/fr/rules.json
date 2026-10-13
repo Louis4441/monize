@@ -435,6 +435,7 @@
     "summary": "{matched, plural, one {# transaction serait modifiée} other {# transactions seraient modifiées}} sur {scanned, plural, one {# transaction analysée} other {# transactions analysées}}.",
     "matchesNone": "Cette règle ne correspond à aucune des transactions examinées ({scanned}). Vérifiez les conditions avant d'enregistrer. Un motif sans * ne correspond qu'au texte entier.",
     "noChange": "{matched} des {scanned} transactions examinées répondent aux conditions de la règle, mais rien ne changerait (par exemple, elles ont déjà la valeur et « seulement si vide » est activé). Ce n'est pas une erreur.",
+    "aiReview": "{count, plural, one {# transaction serait mise en file pour une revue par l'IA} other {# transactions seraient mises en file pour une revue par l'IA}}. La demande est créée lorsque vous confirmez.",
     "truncated": "Plus de transactions correspondent que la limite ne le permet. Seules les plus récentes sont incluses. Augmentez la limite ou réduisez les dates pour inclure le reste.",
     "truncatedOldest": "Plus de transactions ont correspondu que la limite ne le permet. Seules les plus anciennes sont incluses, car cette règle règle les échéances de prêt dans l'ordre des dates. Exécutez-la à nouveau après cette exécution pour inclure le reste.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "L’exécution n’a pas pu aboutir. Consultez l’historique des actions avant de réessayer."
     },
     "toast": {
-      "done": "{count, plural, =0 {Aucune transaction n’a été modifiée} one {# transaction modifiée} other {# transactions modifiées}}. Vous pouvez l’annuler depuis l’historique des actions."
+      "done": "{count, plural, =0 {Aucune transaction n’a été modifiée} one {# transaction modifiée} other {# transactions modifiées}}. Vous pouvez l’annuler depuis l’historique des actions.",
+      "aiReviewsQueued": "{count, plural, one {# transaction mise en file pour une revue par l'IA} other {# transactions mises en file pour une revue par l'IA}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Aucune transaction n’a été modifiée.} one {# transaction a été modifiée.} other {# transactions ont été modifiées.}}",
+      "aiReviewsQueued": "{count, plural, one {# transaction a été mise en file pour une revue par l'IA.} other {# transactions ont été mises en file pour une revue par l'IA.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transaction avait déjà une demande de revue par l'IA ouverte, elle n'a donc pas été remise en file.} other {# transactions avaient déjà une demande de revue par l'IA ouverte, elles n'ont donc pas été remises en file.}}",
       "undo": "Vous pouvez annuler l’exécution depuis l’historique des actions."
     },
     "missingInputs": {

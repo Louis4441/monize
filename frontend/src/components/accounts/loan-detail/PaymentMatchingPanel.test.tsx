@@ -85,6 +85,7 @@ const preview = (over: Partial<RuleRunPreview> = {}): RuleRunPreview => ({
   scanOrder: 'oldest_first',
   fingerprint: 'fp',
   labels: { accounts: {}, categories: {}, payees: {}, tags: {}, rules: {} },
+  aiReviewRequests: 0,
   ...over,
 });
 

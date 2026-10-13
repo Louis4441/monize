@@ -50,7 +50,11 @@ function refusalText(refusal: RuleToolRefusal): string {
 
 const changes = (test: AiActionRuleTestPreview): string => {
   const note = zeroMatchNote(test);
-  return `It would change ${test.matchedCount} of ${test.scanned} transactions examined${test.truncated ? " (more match than are examined)" : ""}.${note ? ` ${note}` : ""}`;
+  const review =
+    test.aiReviewRequests > 0
+      ? ` It would queue ${test.aiReviewRequests} transaction${test.aiReviewRequests === 1 ? "" : "s"} for AI review.`
+      : "";
+  return `It would change ${test.matchedCount} of ${test.scanned} transactions examined${test.truncated ? " (more match than are examined)" : ""}.${review}${note ? ` ${note}` : ""}`;
 };
 
 @Injectable()

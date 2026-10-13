@@ -10,6 +10,7 @@ import { LOAN_SETTLEMENT_MISSING_INPUTS } from '@/lib/rule-fields';
 import {
   RULE_SKIP_REASONS,
   type RuleRunPreview,
+  type RuleRunResult,
   type RuleRunSkipReason,
   type RuleRunSkippedRow,
 } from '@/types/transaction-rule-run';
@@ -70,6 +71,29 @@ export function RuleRunSkippedList({ skipped }: { skipped: readonly RuleRunSkipp
   );
 }
 
+/** What a confirmed run did about AI reviews; nothing when it asked for none. */
+export function RuleRunAiReviewOutcome({
+  result,
+}: {
+  result: Pick<RuleRunResult, 'aiReviewsQueued' | 'aiReviewsAlreadyQueued'>;
+}) {
+  const t = useTranslations('rules.run');
+  return (
+    <>
+      {result.aiReviewsQueued > 0 && (
+        <p className="text-sm text-gray-900 dark:text-gray-100">
+          {t('done.aiReviewsQueued', { count: result.aiReviewsQueued })}
+        </p>
+      )}
+      {result.aiReviewsAlreadyQueued > 0 && (
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          {t('done.aiReviewsAlreadyQueued', { count: result.aiReviewsAlreadyQueued })}
+        </p>
+      )}
+    </>
+  );
+}
+
 interface RuleRunPreviewTableProps {
   preview: RuleRunPreview;
 }
@@ -103,19 +127,28 @@ export function RuleRunPreviewTable({ preview }: RuleRunPreviewTableProps) {
         </p>
       )}
 
+      {preview.aiReviewRequests > 0 && (
+        <p className="mt-1 text-sm text-gray-700 dark:text-gray-300" data-testid="rule-run-ai-review">
+          {t('aiReview', { count: preview.aiReviewRequests })}
+        </p>
+      )}
+
       {preview.matched.length === 0 ? (
-        <EmptyState
-          className="py-6"
-          title={t('noMatches.title')}
-          description={
-            preview.conditionMatchedCount > 0
-              ? t('noChange', {
-                  matched: preview.conditionMatchedCount,
-                  scanned: preview.scanned,
-                })
-              : t('noMatches.body')
-          }
-        />
+        // A run that only queues reviews has nothing to list, but it is not "nothing would change".
+        preview.aiReviewRequests === 0 && (
+          <EmptyState
+            className="py-6"
+            title={t('noMatches.title')}
+            description={
+              preview.conditionMatchedCount > 0
+                ? t('noChange', {
+                    matched: preview.conditionMatchedCount,
+                    scanned: preview.scanned,
+                  })
+                : t('noMatches.body')
+            }
+          />
+        )
       ) : (
         <div className="mt-3 max-h-96 overflow-auto">
           <table className={TABLE_CLASS}>

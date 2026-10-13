@@ -1429,7 +1429,7 @@ export class ToolExecutorService {
         const prep = await this.ruleToolPrep.prepareRun(userId, rule, run);
         if (!prep.ok) return this.ruleToolError(prep);
         return awaiting(
-          `Prepared to run rule "${prep.preview.rule.name}" on ${prep.preview.test.matchedCount} transaction${prep.preview.test.matchedCount === 1 ? "" : "s"}.`,
+          `Prepared to run rule "${prep.preview.rule.name}" on ${prep.preview.test.matchedCount} transaction${prep.preview.test.matchedCount === 1 ? "" : "s"}${prep.preview.test.aiReviewRequests > 0 ? ` (${prep.preview.test.aiReviewRequests} queued for AI review)` : ""}.`,
           this.actionBuilder.buildRunTransactionRule(userId, prep.preview),
         );
       }
