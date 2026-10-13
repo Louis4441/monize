@@ -215,20 +215,20 @@ describe('useNotificationCopy: bond notifications', () => {
     it('asks for the series on a purchase without one', () => {
       for (const code of ['SERIES_NOT_DETERMINED', 'SERIES_REQUIRED']) {
         const message = lots(code, { action: 'BUY' });
-        expect(message).toContain('Buy on');
+        expect(message).toContain('Purchase on');
         expect(message).toContain('Choose the series on that transaction.');
       }
     });
 
     it('says a removal exceeds what the account holds of the series', () => {
       const message = lots('REMOVAL_EXCEEDS_SERIES');
-      expect(message).toContain('Sell on');
+      expect(message).toContain('Sale on');
       expect(message).toContain('removes more than the account holds of that series');
     });
 
     it('asks to correct the transaction for any other code, with the action as written when it has no label', () => {
       expect(lots('OVER_REMOVAL')).toContain('Correct the transaction.');
-      expect(lots('OVER_REMOVAL', { action: 'MYSTERY' })).toContain('MYSTERY on');
+      expect(lots('OVER_REMOVAL', { action: 'MYSTERY' })).toContain('Transaction on');
     });
   });
 

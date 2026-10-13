@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
-import { ACTION_LABEL_KEYS, benchmarkLabel } from '@/components/securities/detail/bond-labels';
+import { benchmarkLabel } from '@/components/securities/detail/bond-labels';
 
 /** Shared display copy for bell rows and reminder templates, including legacy fallback. */
 type Notification = {
@@ -106,7 +106,6 @@ function joinList(items: string[], locale: string): string {
 
 export function useNotificationCopy() {
   const t = useTranslations('notifications');
-  const tInv = useTranslations('investments');
   const locale = useLocale();
   const { formatCurrency, formatNumber, formatPercent } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -614,9 +613,10 @@ export function useNotificationCopy() {
           const rowDate = day(c.date);
           // A row raised before the cause named its transaction keeps the older line.
           if (!rowAction || !rowDate) return t('bond.cause.lots', { code });
-          const key = ACTION_LABEL_KEYS[rowAction];
+          // The bell's own labels (`bond.action.*`): the `investments` namespace
+          // is not in the public client catalog the bell loads.
           const args = {
-            action: key === undefined ? rowAction : tInv(`transactionList.${key}`),
+            action: t(t.has(`bond.action.${rowAction}`) ? `bond.action.${rowAction}` : 'bond.action.other'),
             date: rowDate,
             code,
           };

@@ -104,6 +104,17 @@
       "lotsRowSeries": "{action} on {date} is not placed in a series ({code}). Choose the series on that transaction.",
       "lotsRowRemoval": "{action} on {date} removes more than the account holds of that series ({code}). Correct the transaction."
     },
+    "action": {
+      "BUY": "Purchase",
+      "SELL": "Sale",
+      "REINVEST": "Reinvestment",
+      "ADD_SHARES": "Share addition",
+      "REMOVE_SHARES": "Share removal",
+      "SPLIT": "Split",
+      "TRANSFER_IN": "Incoming transfer",
+      "TRANSFER_OUT": "Outgoing transfer",
+      "other": "Transaction"
+    },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 months (GUS)",
       "PL_NBP_REFERENCE": "NBP reference rate"
