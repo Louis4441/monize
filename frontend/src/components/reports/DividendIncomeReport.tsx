@@ -22,7 +22,8 @@ import { investmentsApi } from '@/lib/investments';
 import { InvestmentTransaction, CapitalGainEntry } from '@/types/investment';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
-import { incomeBaseKind, investmentIncomeAmount } from '@/lib/investment-actions';
+import { incomeBaseKind, investmentIncomeAmount, investmentRowHasEffect } from '@/lib/investment-actions';
+import { convertRowAmount } from '@/lib/investment-row-currency';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -112,7 +113,7 @@ export function DividendIncomeReport() {
   const formatChartDate = useChartDateFormat();
   const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis } = useNumberFormat();
-  const { defaultCurrency, convertToDefault } = useExchangeRates();
+  const { defaultCurrency, convert, convertToDefault } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
   // Persisted so the report opens on the accounts the user last chose.
   // Accounts arrive with the data below, so stale IDs are pruned there.
@@ -233,8 +234,9 @@ export function DividendIncomeReport() {
       // unrealized capital gains come from the monthly capital gains endpoint,
       // which counts a reinvestment's shares as a purchase, so their value is
       // not also a capital gain here.
+      // A VOID row is listed by the endpoint as a record; it paid nothing.
       const incomeTransactions = allTransactions.filter(
-        (tx) => incomeBaseKind(tx.action) !== null,
+        (tx) => incomeBaseKind(tx.action) !== null && investmentRowHasEffect(tx),
       );
 
       return {
@@ -356,18 +358,22 @@ export function DividendIncomeReport() {
   const displayCurrency = selectedAccount?.currencyCode || defaultCurrency;
   const isForeign = displayCurrency !== defaultCurrency;
 
-  const getTxAmount = useCallback((tx: InvestmentTransaction): number | null => {
-    // A reinvest created in the app stores no total; its income is the cost
-    // its shares were bought at.
-    const amount = investmentIncomeAmount(tx);
-    if (isSingleAccount) {
-      // Single account selected: native currency, no conversion needed
-      return amount;
-    }
-    // All accounts or multiple selected: convert to default currency
-    const txCurrency = accountCurrencyMap.get(tx.accountId) || defaultCurrency;
-    return convertToDefault(amount, txCurrency);
-  }, [isSingleAccount, accountCurrencyMap, defaultCurrency, convertToDefault]);
+  // A row's income is in the row's own (security) currency, not the account's.
+  // It reaches the display currency through the row's settlement rate where it
+  // has one, the rate its cash leg was booked at, and the market rate beyond.
+  // A reinvest created in the app stores no total; its income is the cost its
+  // shares were bought at.
+  const getTxAmount = useCallback(
+    (tx: InvestmentTransaction): number | null =>
+      convertRowAmount(
+        tx,
+        investmentIncomeAmount(tx),
+        accountCurrencyMap.get(tx.accountId),
+        displayCurrency,
+        convert,
+      ),
+    [accountCurrencyMap, displayCurrency, convert],
+  );
 
   // Backend already returns each capital gain entry in the holding account's
   // currency. Convert to the default currency for multi-account views; pass

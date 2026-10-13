@@ -438,7 +438,7 @@ describe('SecurityPerformanceReport', () => {
     });
   });
 
-  it('lists a reinvested dividend at its shares\' cost, and no reinvested interest, as dividends', async () => {
+  it('lists a reinvested dividend at its shares\' cost, and no reinvested interest or void row, as dividends', async () => {
     // Discussion #1670: a reinvest created in the app stores no total, so the
     // dividend it records is quantity x price. Reinvested interest is interest.
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -451,6 +451,8 @@ describe('SecurityPerformanceReport', () => {
         { id: 'tx-1', transactionDate: '2024-06-15', action: 'DIVIDEND', quantity: null, price: null, totalAmount: 50, securityId: 's-1', security: { symbol: 'AAPL', name: 'A' }, accountId: 'acc-1' },
         { id: 'tx-2', transactionDate: '2024-07-15', action: 'REINVEST', quantity: 2, price: 25, commission: 0, totalAmount: 0, securityId: 's-1', security: { symbol: 'AAPL', name: 'A' }, accountId: 'acc-1' },
         { id: 'tx-3', transactionDate: '2024-08-15', action: 'REINVEST_INTEREST', quantity: 1, price: 9, commission: 0, totalAmount: 0, securityId: 's-1', security: { symbol: 'AAPL', name: 'A' }, accountId: 'acc-1' },
+        // A VOID dividend paid nothing.
+        { id: 'tx-4', transactionDate: '2024-09-15', action: 'DIVIDEND', status: 'VOID', quantity: null, price: null, totalAmount: 75, securityId: 's-1', security: { symbol: 'AAPL', name: 'A' }, accountId: 'acc-1' },
       ],
       pagination: { hasMore: false },
     });
@@ -471,6 +473,7 @@ describe('SecurityPerformanceReport', () => {
     });
 
     const { tableData } = (exportToPdf as any).mock.calls[0][0];
+    expect(tableData.rows).toHaveLength(2);
     const byType = new Map<string, string>(
       tableData.rows.map((row: string[]) => [row[2], row[3]]),
     );

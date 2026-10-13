@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { TransactionStatus } from '@/types/transaction';
 import {
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
@@ -6,6 +7,7 @@ import {
   incomeBaseKind,
   incomeKind,
   investmentIncomeAmount,
+  investmentRowHasEffect,
   redemptionTotalWithInterest,
   REINVESTED_INCOME_ACTIONS,
   supportsAccruedInterest,
@@ -132,5 +134,13 @@ describe('investmentIncomeAmount', () => {
     expect(
       investmentIncomeAmount(row({ action: 'BUY', quantity: 1, price: 10, totalAmount: 10 })),
     ).toBe(0);
+  });
+});
+
+describe('investmentRowHasEffect', () => {
+  it('drops a VOID row, which moved nothing, and keeps every other status', () => {
+    expect(investmentRowHasEffect({ status: TransactionStatus.VOID })).toBe(false);
+    expect(investmentRowHasEffect({ status: TransactionStatus.CLEARED })).toBe(true);
+    expect(investmentRowHasEffect({ status: TransactionStatus.UNRECONCILED })).toBe(true);
   });
 });

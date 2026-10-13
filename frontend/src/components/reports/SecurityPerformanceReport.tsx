@@ -4,7 +4,12 @@ import { useState, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { gainLossColor, sumMoney } from '@/lib/format';
-import { baseInvestmentAction, incomeBaseKind, investmentIncomeAmount } from '@/lib/investment-actions';
+import {
+  baseInvestmentAction,
+  incomeBaseKind,
+  investmentIncomeAmount,
+  investmentRowHasEffect,
+} from '@/lib/investment-actions';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
@@ -439,8 +444,11 @@ export function SecurityPerformanceReport() {
   // Dividend history
   const dividendTx = useMemo(() => {
     // Every dividend, paid in cash or reinvested. A reinvested interest or
-    // capital-gain distribution is not a dividend, as its cash twin is not.
-    const list = transactions.filter((tx) => incomeBaseKind(tx.action) === 'DIVIDEND');
+    // capital-gain distribution is not a dividend, as its cash twin is not, and
+    // a VOID row paid nothing.
+    const list = transactions.filter(
+      (tx) => incomeBaseKind(tx.action) === 'DIVIDEND' && investmentRowHasEffect(tx),
+    );
     list.sort((a, b) => {
       let comparison = 0;
       switch (dividendSort.sortField) {

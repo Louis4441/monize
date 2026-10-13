@@ -44,6 +44,7 @@ vi.mock('@/hooks/useNumberFormat', async () => {
 });
 vi.mock('@/hooks/useExchangeRates', () => ({
   useExchangeRates: () => ({
+    convert: (amount: number, _from: string, _to?: string) => amount,
     convertToDefault: (amount: number, _currency: string) => amount,
     defaultCurrency: 'CAD',
   }),
@@ -272,6 +273,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
         },
@@ -280,6 +282,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-07-15',
           action: 'INTEREST',
           totalAmount: 25,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'CASH', name: 'Cash Interest' },
         },
@@ -309,6 +312,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
         },
@@ -320,6 +324,7 @@ describe('DividendIncomeReport', () => {
           price: 25,
           commission: 0,
           totalAmount: 0,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
         },
@@ -331,6 +336,7 @@ describe('DividendIncomeReport', () => {
           price: 7,
           commission: 0,
           totalAmount: 0,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
         },
@@ -342,6 +348,7 @@ describe('DividendIncomeReport', () => {
           price: 1000,
           commission: 0,
           totalAmount: 1000,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
         },
@@ -363,6 +370,74 @@ describe('DividendIncomeReport', () => {
     });
     expect(screen.getAllByText('$7.00').length).toBeGreaterThan(0);
     expect(screen.getAllByText('$157.00').length).toBeGreaterThan(0);
+  });
+
+  it("converts a foreign security's dividend at the row's own rate, not as if it were in the account's currency", async () => {
+    // A USD dividend booked into a CAD account at 1.35. Read as CAD it was
+    // 100; it is 135 CAD.
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        {
+          id: 'tx-1',
+          transactionDate: '2024-06-15',
+          action: 'DIVIDEND',
+          totalAmount: 100,
+          amountCurrencyCode: 'USD',
+          exchangeRate: 1.35,
+          accountId: 'acc-1',
+          security: { symbol: 'SPY', name: 'S&P 500 ETF' },
+        },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetCapitalGains.mockResolvedValue([]);
+    render(<DividendIncomeReport />);
+    await waitFor(() => {
+      expect(screen.getAllByText('$135.00').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('$100.00')).not.toBeInTheDocument();
+  });
+
+  it('leaves a VOID distribution out: it paid nothing', async () => {
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        {
+          id: 'tx-1',
+          transactionDate: '2024-06-15',
+          action: 'DIVIDEND',
+          totalAmount: 100,
+          amountCurrencyCode: 'CAD',
+          accountId: 'acc-1',
+          security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
+        },
+        {
+          id: 'tx-2',
+          transactionDate: '2024-07-15',
+          action: 'REINVEST',
+          status: 'VOID',
+          quantity: 2,
+          price: 25,
+          commission: 0,
+          totalAmount: 0,
+          amountCurrencyCode: 'CAD',
+          accountId: 'acc-1',
+          security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
+        },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetCapitalGains.mockResolvedValue([]);
+    render(<DividendIncomeReport />);
+    await waitFor(() => {
+      expect(screen.getAllByText('$100.00').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('$150.00')).not.toBeInTheDocument();
   });
 
   it('renders view type buttons', async () => {
@@ -396,6 +471,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -405,6 +481,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-07-15',
           action: 'DIVIDEND',
           totalAmount: 30,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-b',
           security: { symbol: 'BBB', name: 'Beta' },
@@ -442,6 +519,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -632,6 +710,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -667,6 +746,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -727,6 +807,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -771,6 +852,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -824,6 +906,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -858,6 +941,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -915,6 +999,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-06-15',
             action: 'DIVIDEND',
             totalAmount: 50,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -949,6 +1034,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-06-15',
             action: 'DIVIDEND',
             totalAmount: 75,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -958,6 +1044,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-06-15',
             action: 'INTEREST',
             totalAmount: 10,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: null,
             security: null,
@@ -967,6 +1054,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-07-01',
             action: 'DIVIDEND',
             totalAmount: 25,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -1053,6 +1141,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-06-15',
             action: 'DIVIDEND',
             totalAmount: 50,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -1062,6 +1151,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-07-10',
             action: 'INTEREST',
             totalAmount: 20,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: null,
             security: null,
@@ -1125,6 +1215,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-06-15',
             action: 'DIVIDEND',
             totalAmount: 50,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -1250,6 +1341,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-06-17',
             action: 'DIVIDEND',
             totalAmount: 50,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -1348,6 +1440,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-06-15',
             action: 'DIVIDEND',
             totalAmount: 50,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -1388,6 +1481,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'VFV', name: 'Vanguard S&P 500' },
         },
@@ -1430,6 +1524,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 200,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha Corp' },
@@ -1479,6 +1574,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'INTEREST',
           totalAmount: 50,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'CASH', name: 'Cash Interest' },
@@ -1526,6 +1622,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-03-15',
             action: 'DIVIDEND',
             totalAmount: 50,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -1540,6 +1637,7 @@ describe('DividendIncomeReport', () => {
             transactionDate: '2024-04-15',
             action: 'DIVIDEND',
             totalAmount: 75,
+            amountCurrencyCode: 'CAD',
             accountId: 'acc-1',
             securityId: 'sec-a',
             security: { symbol: 'AAA', name: 'Alpha' },
@@ -1587,6 +1685,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'USD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -1616,6 +1715,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 80,
+          amountCurrencyCode: 'USD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -1686,6 +1786,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -1727,6 +1828,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'CAPITAL_GAIN',
           totalAmount: 150,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -1757,6 +1859,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 30,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           // security and securityId intentionally absent
         },
@@ -1793,6 +1896,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -2007,6 +2111,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -2062,6 +2167,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 100,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -2103,6 +2209,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'INTEREST',
           totalAmount: 40,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           security: { symbol: 'CASH', name: 'Cash' },
         },
@@ -2191,6 +2298,7 @@ describe('DividendIncomeReport', () => {
           transactionDate: '2024-06-15',
           action: 'DIVIDEND',
           totalAmount: 60,
+          amountCurrencyCode: 'CAD',
           accountId: 'acc-1',
           securityId: 'sec-a',
           security: { symbol: 'AAA', name: 'Alpha' },
@@ -2272,6 +2380,7 @@ describe('DividendIncomeReport', () => {
           security: { symbol: 'AAA', name: 'Alpha' },
           transactionDate: '2024-03-10',
           totalAmount: 50,
+          amountCurrencyCode: 'CAD',
           action: 'DIVIDEND',
         },
         {
@@ -2281,6 +2390,7 @@ describe('DividendIncomeReport', () => {
           security: { symbol: 'BBB', name: 'Bravo' },
           transactionDate: '2024-04-12',
           totalAmount: 30,
+          amountCurrencyCode: 'CAD',
           action: 'INTEREST',
         },
       ],

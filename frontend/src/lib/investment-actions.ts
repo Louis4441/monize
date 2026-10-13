@@ -1,4 +1,5 @@
 import { InvestmentAction, InvestmentTransaction } from '@/types/investment';
+import { TransactionStatus } from '@/types/transaction';
 import { roundToDecimals } from '@/lib/format';
 
 /**
@@ -20,6 +21,15 @@ const BASE_ACTION_BY_REFINEMENT: Partial<Record<InvestmentAction, InvestmentActi
 
 export function baseInvestmentAction(action: InvestmentAction): InvestmentAction {
   return BASE_ACTION_BY_REFINEMENT[action] ?? action;
+}
+
+/**
+ * Whether a row moved anything. A VOID row is listed as a record but moved no
+ * money and no shares, so it joins no total. Mirrors the backend's
+ * `investmentRowHasEffect` (`securities/investment-row-effects.util.ts`).
+ */
+export function investmentRowHasEffect(tx: Pick<InvestmentTransaction, 'status'>): boolean {
+  return tx.status !== TransactionStatus.VOID;
 }
 
 /** Distributions paid in cash. Mirrors the backend's `CASH_INCOME_ACTIONS`. */
