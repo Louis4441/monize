@@ -435,6 +435,7 @@
     "summary": "已检查 {scanned, plural, other {# 笔交易}}，其中 {matched, plural, other {# 笔交易}}将被更改。",
     "matchesNone": "此规则与已检查的所有交易都不匹配（{scanned} 笔）。保存前请检查条件。不含 * 的模式只匹配整段文本。",
     "noChange": "在检查的 {scanned} 笔交易中，有 {matched} 笔符合规则条件，但不会有任何更改（例如它们已有该值且开启了“仅在为空时”）。这不是错误。",
+    "aiReview": "{count, plural, other {# 笔交易将加入 AI 审核队列}}。确认后才会创建请求。",
     "truncated": "匹配的交易多于上限允许的数量。仅包含最新的交易。请提高上限或缩小日期范围以包含其余交易。",
     "truncatedOldest": "匹配的交易超过了限制数量。由于此规则按日期顺序结算贷款还款，因此仅包含最早的部分。请在此次运行之后再次运行，以包含剩余部分。",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "无法完成运行。重试之前请先查看操作历史。"
     },
     "toast": {
-      "done": "{count, plural, =0 {没有交易被更改} other {已更改 # 笔交易}}。你可以在操作历史中撤销。"
+      "done": "{count, plural, =0 {没有交易被更改} other {已更改 # 笔交易}}。你可以在操作历史中撤销。",
+      "aiReviewsQueued": "{count, plural, other {已将 # 笔交易加入 AI 审核队列}}。"
     },
     "done": {
       "summary": "{count, plural, =0 {没有交易被更改。} other {已更改 # 笔交易。}}",
+      "aiReviewsQueued": "{count, plural, other {已将 # 笔交易加入 AI 审核队列。}}",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# 笔交易已有未完成的 AI 审核请求，因此未再次加入队列。}}",
       "undo": "你可以在操作历史中撤销此次运行。"
     },
     "missingInputs": {

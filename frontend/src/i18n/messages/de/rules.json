@@ -435,6 +435,7 @@
     "summary": "{matched, plural, one {# Buchung würde geändert} other {# Buchungen würden geändert}} von {scanned, plural, one {# geprüften Buchung} other {# geprüften Buchungen}}.",
     "matchesNone": "Diese Regel trifft auf keine der geprüften Buchungen zu ({scanned}). Prüfen Sie die Bedingungen vor dem Speichern. Ein Muster ohne * trifft nur auf den gesamten Text zu.",
     "noChange": "{matched} von {scanned} geprüften Buchungen erfüllen die Bedingungen der Regel, aber es würde sich nichts ändern (zum Beispiel, weil sie den Wert schon haben und „nur wenn leer“ aktiv ist). Das ist kein Fehler.",
+    "aiReview": "{count, plural, one {# Buchung würde zur KI-Prüfung eingereiht} other {# Buchungen würden zur KI-Prüfung eingereiht}}. Die Anfrage wird beim Bestätigen erstellt.",
     "truncated": "Es passen mehr Buchungen, als das Limit zulässt. Nur die neuesten sind enthalten. Erhöhe das Limit oder grenze den Zeitraum ein, um den Rest einzubeziehen.",
     "truncatedOldest": "Es haben mehr Transaktionen übereingestimmt, als das Limit erlaubt. Nur die ältesten sind enthalten, weil diese Regel Darlehensraten in Datumsreihenfolge begleicht. Führe sie nach diesem Lauf erneut aus, um den Rest einzuschließen.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "Die Ausführung konnte nicht abgeschlossen werden. Prüfe den Aktionsverlauf, bevor du es erneut versuchst."
     },
     "toast": {
-      "done": "{count, plural, =0 {Es wurden keine Buchungen geändert} one {# Buchung geändert} other {# Buchungen geändert}}. Du kannst das im Aktionsverlauf rückgängig machen."
+      "done": "{count, plural, =0 {Es wurden keine Buchungen geändert} one {# Buchung geändert} other {# Buchungen geändert}}. Du kannst das im Aktionsverlauf rückgängig machen.",
+      "aiReviewsQueued": "{count, plural, one {# Buchung zur KI-Prüfung eingereiht} other {# Buchungen zur KI-Prüfung eingereiht}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Es wurden keine Buchungen geändert.} one {# Buchung wurde geändert.} other {# Buchungen wurden geändert.}}",
+      "aiReviewsQueued": "{count, plural, one {# Buchung wurde zur KI-Prüfung eingereiht.} other {# Buchungen wurden zur KI-Prüfung eingereiht.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, one {Für # Buchung war bereits eine KI-Prüfung offen, daher wurde sie nicht erneut eingereiht.} other {Für # Buchungen war bereits eine KI-Prüfung offen, daher wurden sie nicht erneut eingereiht.}}",
       "undo": "Du kannst die Ausführung im Aktionsverlauf rückgängig machen."
     },
     "missingInputs": {

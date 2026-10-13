@@ -82,10 +82,16 @@ function canonicalSettlement(
  * what would be written and of the rule that would write it, never of an id
  * generated per call, so a preview and a commit over unchanged data agree, and
  * an edit to the rule, to a row or to the strict lock disagrees.
+ *
+ * The rows a run would queue an AI review for are part of it too, sorted, so
+ * a run whose only action is `request_ai_review` (no field changes) commits
+ * the set the preview showed. They join only when there are some, so a plan
+ * without them hashes as before.
  */
 export function planFingerprint(
   ruleRevision: number,
   rows: readonly { transactionId: string; changes: RuleTraceChanges }[],
+  aiReviewTransactionIds: readonly string[] = [],
 ): string {
   const pairs = [...rows]
     .sort((a, b) =>
@@ -96,7 +102,15 @@ export function planFingerprint(
           : 0,
     )
     .map((row) => [row.transactionId, canonicalChanges(row.changes)]);
+  const aiReview = [...aiReviewTransactionIds].sort();
   return createHash("sha256")
-    .update(JSON.stringify({ v: 1, revision: ruleRevision, rows: pairs }))
+    .update(
+      JSON.stringify({
+        v: 1,
+        revision: ruleRevision,
+        rows: pairs,
+        ...(aiReview.length > 0 ? { aiReview } : {}),
+      }),
+    )
     .digest("hex");
 }

@@ -435,6 +435,7 @@
     "summary": "{scanned, plural, other {# işlem}} incelendi, {matched, plural, other {# işlem}} değişecek.",
     "matchesNone": "Bu kural incelenen işlemlerin hiçbiriyle eşleşmiyor ({scanned}). Kaydetmeden önce koşulları kontrol edin. * içermeyen bir desen yalnızca metnin tamamıyla eşleşir.",
     "noChange": "İncelenen {scanned} işlemden {matched} tanesi kuralın koşullarını karşılıyor, ancak hiçbir şey değişmeyecek (örneğin değer zaten var ve «yalnızca boşsa» açık). Bu bir hata değildir.",
+    "aiReview": "{count, plural, other {# işlem yapay zeka incelemesi için sıraya alınacak}}. İstek, onayladığınızda oluşturulur.",
     "truncated": "Sınırın izin verdiğinden fazla işlem eşleşti. Yalnızca en yeniler dahil edildi. Kalanı dahil etmek için sınırı artırın veya tarihleri daraltın.",
     "truncatedOldest": "Sınırın izin verdiğinden daha fazla işlem eşleşti. Bu kural kredi taksitlerini tarih sırasına göre karşıladığından, yalnızca en eskiler dahil edildi. Kalanları dahil etmek için bu çalıştırmadan sonra yeniden çalıştırın.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "Çalıştırma tamamlanamadı. Yeniden denemeden önce işlem geçmişini kontrol edin."
     },
     "toast": {
-      "done": "{count, plural, =0 {Hiçbir işlem değiştirilmedi} other {# işlem değiştirildi}}. Bunu işlem geçmişinden geri alabilirsiniz."
+      "done": "{count, plural, =0 {Hiçbir işlem değiştirilmedi} other {# işlem değiştirildi}}. Bunu işlem geçmişinden geri alabilirsiniz.",
+      "aiReviewsQueued": "{count, plural, other {# işlem yapay zeka incelemesi için sıraya alındı}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Hiçbir işlem değiştirilmedi.} other {# işlem değiştirildi.}}",
+      "aiReviewsQueued": "{count, plural, other {# işlem yapay zeka incelemesi için sıraya alındı.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# işlemin zaten açık bir yapay zeka inceleme isteği vardı, bu yüzden yeniden sıraya alınmadı.}}",
       "undo": "Çalıştırmayı işlem geçmişinden geri alabilirsiniz."
     },
     "missingInputs": {

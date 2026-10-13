@@ -435,6 +435,7 @@
     "summary": "已檢查 {scanned, plural, other {# 筆交易}}，其中 {matched, plural, other {# 筆交易}}將被變更。",
     "matchesNone": "此規則與已檢查的所有交易都不相符（{scanned} 筆）。儲存前請檢查條件。不含 * 的模式只比對整段文字。",
     "noChange": "在檢查的 {scanned} 筆交易中，有 {matched} 筆符合規則條件，但不會有任何變更（例如它們已有該值且開啟了「僅在為空時」）。這不是錯誤。",
+    "aiReview": "{count, plural, other {# 筆交易將加入 AI 審核佇列}}。確認後才會建立請求。",
     "truncated": "符合的交易多於上限允許的數量。僅包含最新的交易。請提高上限或縮小日期範圍以包含其餘交易。",
     "truncatedOldest": "符合的交易超過了限制數量。由於此規則依日期順序結算貸款還款，因此僅包含最早的部分。請在此次執行之後再次執行，以納入剩餘部分。",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "無法完成執行。重試之前請先查看操作記錄。"
     },
     "toast": {
-      "done": "{count, plural, =0 {沒有交易被變更} other {已變更 # 筆交易}}。你可以在操作記錄中復原。"
+      "done": "{count, plural, =0 {沒有交易被變更} other {已變更 # 筆交易}}。你可以在操作記錄中復原。",
+      "aiReviewsQueued": "{count, plural, other {已將 # 筆交易加入 AI 審核佇列}}。"
     },
     "done": {
       "summary": "{count, plural, =0 {沒有交易被變更。} other {已變更 # 筆交易。}}",
+      "aiReviewsQueued": "{count, plural, other {已將 # 筆交易加入 AI 審核佇列。}}",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# 筆交易已有未完成的 AI 審核請求，因此未再次加入佇列。}}",
       "undo": "你可以在操作記錄中復原此次執行。"
     },
     "missingInputs": {

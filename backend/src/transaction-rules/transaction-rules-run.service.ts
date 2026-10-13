@@ -368,7 +368,7 @@ export class TransactionRulesRunService {
       if (!fits({ before, after })) throw tooLarge();
       // Review requests are queued on commit only, never on preview, one per
       // unit on its primary (outgoing) leg, in this same transaction.
-      await this.applier.queueAiReviews(
+      const reviewed = await this.applier.queueAiReviews(
         m,
         userId,
         plan.asking.map(({ unit, effects }) => ({
@@ -378,9 +378,20 @@ export class TransactionRulesRunService {
           settledScheduleIds: [],
         })),
       );
+      const aiReviewsAlreadyQueued = reviewed.filter(({ effects }) =>
+        effects.trace.some((entry) =>
+          entry.applied.some(
+            (applied) =>
+              applied.type === "request_ai_review" &&
+              applied.outcome === "already_queued",
+          ),
+        ),
+      ).length;
       return {
         rule,
         plan,
+        aiReviewsQueued: reviewed.length - aiReviewsAlreadyQueued,
+        aiReviewsAlreadyQueued,
         before,
         after,
         affectedAccountIds,
@@ -417,6 +428,8 @@ export class TransactionRulesRunService {
       changed,
       skipped: done.plan.preview.skipped,
       historyId: entry?.id ?? null,
+      aiReviewsQueued: done.aiReviewsQueued,
+      aiReviewsAlreadyQueued: done.aiReviewsAlreadyQueued,
     };
   }
 
@@ -656,6 +669,7 @@ export class TransactionRulesRunService {
             transactionId: unit.primary.id,
             changes: effects.trace[0].changes,
           })),
+          asking.map(({ unit }) => unit.primary.id),
         ),
         labels,
         aiReviewRequests: asking.length,

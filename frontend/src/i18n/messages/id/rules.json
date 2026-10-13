@@ -435,6 +435,7 @@
     "summary": "{matched, plural, other {# transaksi}} akan berubah dari {scanned, plural, other {# transaksi}} yang diperiksa.",
     "matchesNone": "Aturan ini tidak cocok dengan satu pun transaksi yang diperiksa ({scanned}). Periksa kondisinya sebelum menyimpan. Pola tanpa * hanya cocok dengan seluruh teks.",
     "noChange": "{matched} dari {scanned} transaksi yang diperiksa cocok dengan kondisi aturan, tetapi tidak ada yang akan berubah (misalnya, nilainya sudah ada dan «hanya jika kosong» aktif). Ini bukan kesalahan.",
+    "aiReview": "{count, plural, other {# transaksi akan dimasukkan ke antrean tinjauan AI}}. Permintaan dibuat saat Anda mengonfirmasi.",
     "truncated": "Lebih banyak transaksi yang cocok daripada batas yang diizinkan. Hanya yang terbaru yang disertakan. Naikkan batas atau persempit tanggal untuk menyertakan sisanya.",
     "truncatedOldest": "Lebih banyak transaksi cocok daripada yang diizinkan batas. Hanya yang paling lama yang disertakan, karena aturan ini melunasi angsuran pinjaman menurut urutan tanggal. Jalankan lagi setelah proses ini untuk menyertakan sisanya.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "Proses tidak dapat diselesaikan. Periksa riwayat tindakan sebelum mencoba lagi."
     },
     "toast": {
-      "done": "{count, plural, =0 {Tidak ada transaksi yang diubah} other {# transaksi diubah}}. Anda dapat membatalkannya dari riwayat tindakan."
+      "done": "{count, plural, =0 {Tidak ada transaksi yang diubah} other {# transaksi diubah}}. Anda dapat membatalkannya dari riwayat tindakan.",
+      "aiReviewsQueued": "{count, plural, other {# transaksi dimasukkan ke antrean tinjauan AI}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Tidak ada transaksi yang diubah.} other {# transaksi diubah.}}",
+      "aiReviewsQueued": "{count, plural, other {# transaksi dimasukkan ke antrean tinjauan AI.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# transaksi sudah memiliki permintaan tinjauan AI yang terbuka, sehingga tidak dimasukkan ke antrean lagi.}}",
       "undo": "Anda dapat membatalkan proses ini dari riwayat tindakan."
     },
     "missingInputs": {

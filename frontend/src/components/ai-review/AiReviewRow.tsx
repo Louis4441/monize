@@ -121,8 +121,11 @@ export function AiReviewRow({
             )}
           </div>
           {/* A parser draft request's instruction is the fixed text an agent reads, not a sentence for the person. */}
+          {/* A receipt request's fixed instruction is shown in the reader's language; a rule's is their own words. */}
           {!parserDraft && (
-            <p className="mt-1 whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">{item.instruction}</p>
+            <p className="mt-1 whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">
+              {item.instructionKey ? t(`row.receiptInstruction.${item.instructionKey}`) : item.instruction}
+            </p>
           )}
           {(item.kind === 'email_receipt' || parserDraft) && item.status === 'pending' && (
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">

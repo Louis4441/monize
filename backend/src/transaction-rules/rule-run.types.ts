@@ -88,6 +88,10 @@ export interface RuleRunResult {
   readonly skipped: RuleRunSkippedRow[];
   /** The single action-history entry, or null when nothing changed or it could not be recorded. */
   readonly historyId: string | null;
+  /** Rows the run queued an AI review request for. */
+  readonly aiReviewsQueued: number;
+  /** Rows whose AI review request was already open, so nothing new was queued. */
+  readonly aiReviewsAlreadyQueued: number;
 }
 
 export interface RuleApplicationRow {

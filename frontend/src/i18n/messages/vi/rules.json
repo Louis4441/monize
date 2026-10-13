@@ -435,6 +435,7 @@
     "summary": "{matched, plural, other {# giao dịch}} sẽ thay đổi trong số {scanned, plural, other {# giao dịch}} đã kiểm tra.",
     "matchesNone": "Quy tắc này không khớp với giao dịch nào trong số đã kiểm tra ({scanned}). Hãy kiểm tra các điều kiện trước khi lưu. Mẫu không có * chỉ khớp với toàn bộ văn bản.",
     "noChange": "{matched} trong số {scanned} giao dịch được kiểm tra khớp với điều kiện của quy tắc, nhưng sẽ không có gì thay đổi (ví dụ: chúng đã có giá trị và «chỉ khi trống» đang bật). Đây không phải là lỗi.",
+    "aiReview": "{count, plural, other {# giao dịch sẽ được đưa vào hàng đợi đánh giá AI}}. Yêu cầu được tạo khi bạn xác nhận.",
     "truncated": "Có nhiều giao dịch khớp hơn giới hạn cho phép. Chỉ các giao dịch mới nhất được đưa vào. Hãy tăng giới hạn hoặc thu hẹp ngày để đưa phần còn lại vào.",
     "truncatedOldest": "Có nhiều giao dịch khớp hơn giới hạn cho phép. Chỉ các giao dịch cũ nhất được đưa vào, vì quy tắc này thanh toán các kỳ trả góp khoản vay theo thứ tự ngày. Chạy lại sau lần chạy này để đưa vào phần còn lại.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "Không thể hoàn tất lần chạy. Hãy kiểm tra lịch sử hành động trước khi thử lại."
     },
     "toast": {
-      "done": "{count, plural, =0 {Không có giao dịch nào bị thay đổi} other {Đã thay đổi # giao dịch}}. Bạn có thể hoàn tác từ lịch sử hành động."
+      "done": "{count, plural, =0 {Không có giao dịch nào bị thay đổi} other {Đã thay đổi # giao dịch}}. Bạn có thể hoàn tác từ lịch sử hành động.",
+      "aiReviewsQueued": "{count, plural, other {Đã đưa # giao dịch vào hàng đợi đánh giá AI}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Không có giao dịch nào bị thay đổi.} other {Đã thay đổi # giao dịch.}}",
+      "aiReviewsQueued": "{count, plural, other {Đã đưa # giao dịch vào hàng đợi đánh giá AI.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# giao dịch đã có yêu cầu đánh giá AI đang mở, nên không được đưa vào hàng đợi lần nữa.}}",
       "undo": "Bạn có thể hoàn tác lần chạy từ lịch sử hành động."
     },
     "missingInputs": {

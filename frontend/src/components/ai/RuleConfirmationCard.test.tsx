@@ -369,6 +369,8 @@ describe('RuleConfirmationCard: run', () => {
             { transactionId: 'tx-8', reason: 'reconciled_locked' },
           ],
           historyId: 'h1',
+          aiReviewsQueued: 0,
+          aiReviewsAlreadyQueued: 0,
         },
       }),
     );
@@ -380,11 +382,22 @@ describe('RuleConfirmationCard: run', () => {
     expect(screen.getByRole('link', { name: 'View rules' })).toBeInTheDocument();
   });
 
+  it('shows a run that only queued AI reviews without promising an undo', () => {
+    renderCard(
+      makeRuleAction('run_transaction_rule', { ...run, test: makeTest({ matchedCount: 0, rows: [], aiReviewRequests: 4 }) }, {
+        status: 'confirmed',
+        resultRuleRun: { changed: 0, skipped: [], historyId: null, aiReviewsQueued: 4, aiReviewsAlreadyQueued: 0 },
+      }),
+    );
+    expect(screen.getByText('4 transactions were queued for AI review.')).toBeInTheDocument();
+    expect(screen.queryByText('You can undo the run from the action history.')).not.toBeInTheDocument();
+  });
+
   it('shows a run that changed nothing as a known zero', () => {
     renderCard(
       makeRuleAction('run_transaction_rule', run, {
         status: 'confirmed',
-        resultRuleRun: { changed: 0, skipped: [], historyId: null },
+        resultRuleRun: { changed: 0, skipped: [], historyId: null, aiReviewsQueued: 0, aiReviewsAlreadyQueued: 0 },
       }),
     );
     expect(screen.getByText('No transactions were changed.')).toBeInTheDocument();

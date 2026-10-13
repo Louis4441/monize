@@ -38,6 +38,12 @@
     "transactionMissing": "[XX-This transaction no longer exists-XX]",
     "rule": "[XX-Rule: {name}-XX]",
     "manualRequest": "[XX-Requested manually-XX]",
+    "receiptInstruction": {
+      "automatic": "[XX-Enrich this transaction from the attached order email: split it by line items with a category each, or set the description.-XX]",
+      "chat": "[XX-You asked for the attached order email to be recognized: split this transaction by product with a category each, or set the description.-XX]",
+      "categorize": "[XX-Assign a category to each item of the attached order email that no rule categorized, then propose the split of this transaction or set the description.-XX]",
+      "parsed": "[XX-A saved parser read the order email and proposes these category lines and this description for the transaction.-XX]"
+    },
     "emailReceipt": "[XX-Email receipt: {subject} from {sender}-XX]",
     "emailReceiptMissing": "[XX-Email receipt (the email was deleted)-XX]",
     "parserDraft": "[XX-Profile draft from {count, plural, one {# email} other {# emails}} ({domain})-XX]",

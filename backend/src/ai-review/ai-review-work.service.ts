@@ -17,6 +17,7 @@ import { TransactionToolPrepService } from "../transactions/transaction-tool-pre
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionRule } from "../transaction-rules/transaction-rule.entity";
 import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
+import { receiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
 import { AiReviewRequest } from "./ai-review-request.entity";
 import { AiReviewRequestsService } from "./ai-review-requests.service";
 import {
@@ -593,6 +594,10 @@ export class AiReviewWorkService {
         kind: request.kind,
         status: request.status,
         instruction: request.instruction,
+        instructionKey:
+          request.kind === "email_receipt"
+            ? receiptInstructionKey(request.instruction)
+            : null,
         transactionId: request.transactionId,
         ruleId: request.ruleId,
         ruleName: request.ruleId

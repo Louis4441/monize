@@ -38,6 +38,12 @@
     "transactionMissing": "Esta transação já não existe",
     "rule": "Regra: {name}",
     "manualRequest": "Pedido manualmente",
+    "receiptInstruction": {
+      "automatic": "Complete esta transação a partir do e-mail de encomenda anexado: divida-a por artigo com uma categoria cada, ou defina a descrição.",
+      "chat": "Pediu o reconhecimento do e-mail de encomenda anexado: divida esta transação por produto com uma categoria cada, ou defina a descrição.",
+      "categorize": "Atribua uma categoria a cada artigo do e-mail de encomenda anexado que nenhuma regra categorizou e, depois, proponha a divisão desta transação ou defina a descrição.",
+      "parsed": "Um analisador guardado leu o e-mail de encomenda e propõe estas linhas de categoria e esta descrição para a transação."
+    },
     "emailReceipt": "Recibo por e-mail: {subject} de {sender}",
     "emailReceiptMissing": "Recibo por e-mail (o e-mail foi eliminado)",
     "parserDraft": "Rascunho de perfil de {count, plural, one {# e-mail} other {# e-mails}} ({domain})",

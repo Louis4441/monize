@@ -435,6 +435,7 @@
     "summary": "{matched, plural, one {# transação seria alterada} other {# transações seriam alteradas}} de {scanned, plural, one {# transação analisada} other {# transações analisadas}}.",
     "matchesNone": "Esta regra não corresponde a nenhuma das transações examinadas ({scanned}). Verifique as condições antes de guardar. Um padrão sem * corresponde apenas ao texto inteiro.",
     "noChange": "{matched} das {scanned} transações examinadas cumprem as condições da regra, mas nada mudaria (por exemplo, já têm o valor e «apenas se vazio» está ativo). Não é um erro.",
+    "aiReview": "{count, plural, one {# transação seria colocada na fila de revisão por IA} other {# transações seriam colocadas na fila de revisão por IA}}. O pedido é criado quando confirmar.",
     "truncated": "Correspondem mais transações do que o limite permite. Apenas as mais recentes estão incluídas. Aumente o limite ou restrinja as datas para incluir as restantes.",
     "truncatedOldest": "Corresponderam mais transações do que o limite permite. Só as mais antigas são incluídas, porque esta regra liquida prestações de empréstimo por ordem de data. Execute-a novamente depois desta execução para incluir o restante.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "Não foi possível concluir a execução. Verifique o histórico de ações antes de tentar novamente."
     },
     "toast": {
-      "done": "{count, plural, =0 {Nenhuma transação foi alterada} one {# transação alterada} other {# transações alteradas}}. Pode anular no histórico de ações."
+      "done": "{count, plural, =0 {Nenhuma transação foi alterada} one {# transação alterada} other {# transações alteradas}}. Pode anular no histórico de ações.",
+      "aiReviewsQueued": "{count, plural, one {# transação colocada na fila de revisão por IA} other {# transações colocadas na fila de revisão por IA}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Nenhuma transação foi alterada.} one {# transação foi alterada.} other {# transações foram alteradas.}}",
+      "aiReviewsQueued": "{count, plural, one {# transação foi colocada na fila de revisão por IA.} other {# transações foram colocadas na fila de revisão por IA.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transação já tinha um pedido de revisão por IA em aberto, por isso não foi colocada novamente na fila.} other {# transações já tinham um pedido de revisão por IA em aberto, por isso não foram colocadas novamente na fila.}}",
       "undo": "Pode anular a execução no histórico de ações."
     },
     "missingInputs": {

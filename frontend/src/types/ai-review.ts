@@ -68,11 +68,19 @@ export interface AiReviewParserDraft {
   parserId: string | null;
 }
 
+/** The fixed instructions the email receipt pipeline writes (`receipt-instructions.ts`). */
+export type AiReviewInstructionKey = 'automatic' | 'chat' | 'categorize' | 'parsed';
+
 export interface AiReviewItem {
   id: string;
   kind: AiReviewKind;
   status: AiReviewStatus;
   instruction: string;
+  /**
+   * Which fixed English instruction an `email_receipt` request carries, so the
+   * inbox shows it translated; null for any other instruction (a rule's own words).
+   */
+  instructionKey: AiReviewInstructionKey | null;
   /** Null for a request of kind `email_parser_draft`. */
   transactionId: string | null;
   ruleId: string | null;

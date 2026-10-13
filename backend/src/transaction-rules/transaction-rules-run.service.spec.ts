@@ -663,7 +663,13 @@ describe("TransactionRulesRunService", () => {
         fingerprint,
       });
 
-      expect(result).toEqual({ changed: 2, skipped: [], historyId: "hist-1" });
+      expect(result).toEqual({
+        changed: 2,
+        skipped: [],
+        historyId: "hist-1",
+        aiReviewsQueued: 0,
+        aiReviewsAlreadyQueued: 0,
+      });
       expect(loadCandidateUnits).toHaveBeenLastCalledWith(
         expect.anything(),
         USER,
@@ -800,11 +806,62 @@ describe("TransactionRulesRunService", () => {
       });
 
       expect(result.changed).toBe(0);
+      expect(result.aiReviewsQueued).toBe(1);
+      expect(result.aiReviewsAlreadyQueued).toBe(0);
       expect(s.writeEffects).not.toHaveBeenCalled();
+      expect(s.record).not.toHaveBeenCalled();
       expect(s.enqueue).toHaveBeenCalledTimes(1);
       expect(s.enqueue).toHaveBeenCalledWith(s.manager, USER, [
         { transactionId: "t1", ruleId: RULE_ID, instruction: "split it" },
       ]);
+    });
+
+    it("reports a row whose review was already open apart from the rows it queued", async () => {
+      const asking = storedRule({
+        actions: [{ type: "request_ai_review", instruction: "split it" }],
+      });
+      const s = setup(
+        [plainUnit(row("t1")), plainUnit(row("t2"))],
+        false,
+        asking,
+      );
+      s.enqueue.mockResolvedValue({
+        queued: [{ transactionId: "t1", ruleId: RULE_ID }],
+        alreadyQueued: [{ transactionId: "t2", ruleId: RULE_ID }],
+      });
+      const preview = await s.service.previewRun(USER, RULE_ID, filters);
+      expect(preview.aiReviewRequests).toBe(2);
+
+      const result = await s.service.run(USER, RULE_ID, {
+        ...filters,
+        fingerprint: preview.fingerprint,
+      });
+
+      expect(result.aiReviewsQueued).toBe(1);
+      expect(result.aiReviewsAlreadyQueued).toBe(1);
+    });
+
+    it("refuses with 409 when the rows to review differ from the preview's, though no field changes", async () => {
+      const asking = storedRule({
+        actions: [{ type: "request_ai_review", instruction: "split it" }],
+      });
+      const s = setup([plainUnit(row("t1"))], false, asking);
+      const preview = await s.service.previewRun(USER, RULE_ID, filters);
+      // A second row matched meanwhile: the commit would queue one the reader did not see.
+      (loadCandidateUnits as jest.Mock).mockResolvedValue({
+        units: [plainUnit(row("t1")), plainUnit(row("t2"))],
+        truncated: false,
+      });
+
+      const error = await thrown(
+        s.service.run(USER, RULE_ID, {
+          ...filters,
+          fingerprint: preview.fingerprint,
+        }),
+      );
+
+      expect(error.getStatus()).toBe(409);
+      expect(s.enqueue).not.toHaveBeenCalled();
     });
 
     it("does not queue when the fingerprint is stale", async () => {
@@ -932,7 +989,13 @@ describe("TransactionRulesRunService", () => {
         ...filters,
         fingerprint,
       });
-      expect(result).toEqual({ changed: 0, skipped: [], historyId: null });
+      expect(result).toEqual({
+        changed: 0,
+        skipped: [],
+        historyId: null,
+        aiReviewsQueued: 0,
+        aiReviewsAlreadyQueued: 0,
+      });
       expect(s.writeEffects).not.toHaveBeenCalled();
       expect(s.record).not.toHaveBeenCalled();
     });

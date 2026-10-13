@@ -1,5 +1,6 @@
 import type { PendingAiAction } from "../ai/actions/ai-action.types";
 import type { LlmTransactionRow } from "../transactions/transactions.service";
+import type { ReceiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
 import type {
   AiReviewRequestKind,
   AiReviewRequestStatus,
@@ -210,6 +211,12 @@ export interface AiReviewInboxItem {
   kind: AiReviewRequestKind;
   status: AiReviewRequestStatus;
   instruction: string;
+  /**
+   * For a request of kind `email_receipt` whose instruction is one of the
+   * fixed English texts the pipeline writes, which one, so the inbox shows it
+   * translated; null for any other instruction (a rule's own words).
+   */
+  instructionKey: ReceiptInstructionKey | null;
   /** Null for a request of kind `email_parser_draft`. */
   transactionId: string | null;
   ruleId: string | null;

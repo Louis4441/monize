@@ -87,6 +87,7 @@ export function makePreview(overrides: Partial<RuleRunPreview> = {}): RuleRunPre
       tags: { [TAG_ID]: 'Coffee run' },
       rules: {},
     },
+    aiReviewRequests: 0,
     ...overrides,
   };
 }

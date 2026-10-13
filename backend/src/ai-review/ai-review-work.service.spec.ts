@@ -1,3 +1,4 @@
+import { RECEIPT_PARSED_INSTRUCTION } from "../email-receipts/pipeline/receipt-instructions";
 import { DataSource } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { Transaction } from "../transactions/entities/transaction.entity";
@@ -806,6 +807,34 @@ describe("AiReviewWorkService inbox", () => {
     ]);
     const gone = await service.listInbox(USER);
     expect(gone[0].emailReceipt).toBeNull();
+  });
+
+  it("names a receipt request's fixed instruction so the inbox can translate it, never a rule's own words", async () => {
+    const { service, requests, txRepo } = setup();
+    requests.listForUser.mockResolvedValue([
+      request({
+        kind: "email_receipt",
+        ruleId: null,
+        instruction: RECEIPT_PARSED_INSTRUCTION,
+      }),
+      request({
+        id: "unknown",
+        kind: "email_receipt",
+        ruleId: null,
+        instruction: "An older wording",
+      }),
+      // A rule's instruction that happens to equal the fixed text is still its own words.
+      request({ id: "rule", instruction: RECEIPT_PARSED_INSTRUCTION }),
+    ]);
+    txRepo.find.mockResolvedValue([tx]);
+
+    const items = await service.listInbox(USER);
+
+    expect(items.map((item) => item.instructionKey)).toEqual([
+      "parsed",
+      null,
+      null,
+    ]);
   });
 
   describe("a parser draft request", () => {

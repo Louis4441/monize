@@ -435,6 +435,7 @@
     "summary": "{matched, plural, one {# transakcja zostałaby zmieniona} few {# transakcje zostałyby zmienione} many {# transakcji zostałoby zmienionych} other {# transakcji zostałoby zmienionych}} spośród {scanned, plural, one {# sprawdzonej transakcji} few {# sprawdzonych transakcji} many {# sprawdzonych transakcji} other {# sprawdzonych transakcji}}.",
     "matchesNone": "Ta reguła nie pasuje do żadnej ze sprawdzonych transakcji ({scanned}). Sprawdź warunki przed zapisem. Wzorzec bez * pasuje tylko do całego tekstu.",
     "noChange": "{matched} z {scanned} sprawdzonych transakcji spełnia warunki reguły, ale nic by się nie zmieniło (na przykład mają już tę wartość, a „tylko jeśli puste” jest włączone). To nie jest błąd.",
+    "aiReview": "{count, plural, one {# transakcja zostanie dodana do kolejki przeglądu AI} few {# transakcje zostaną dodane do kolejki przeglądu AI} many {# transakcji zostanie dodanych do kolejki przeglądu AI} other {# transakcji zostanie dodanych do kolejki przeglądu AI}}. Żądanie zostanie utworzone po potwierdzeniu.",
     "truncated": "Pasuje więcej transakcji, niż pozwala limit. Uwzględniono tylko najnowsze. Zwiększ limit lub zawęź daty, aby objąć resztę.",
     "truncatedOldest": "Dopasowano więcej transakcji, niż pozwala limit. Uwzględniono tylko najstarsze, ponieważ ta reguła rozlicza raty kredytu w porządku dat. Uruchom ją ponownie po tym uruchomieniu, aby uwzględnić resztę.",
     "noMatches": {
@@ -524,10 +525,13 @@
       "runFailed": "Nie udało się ukończyć uruchomienia. Sprawdź historię akcji, zanim spróbujesz ponownie."
     },
     "toast": {
-      "done": "{count, plural, =0 {Nie zmieniono żadnych transakcji} one {Zmieniono # transakcję} few {Zmieniono # transakcje} many {Zmieniono # transakcji} other {Zmieniono # transakcji}}. Możesz to cofnąć w historii akcji."
+      "done": "{count, plural, =0 {Nie zmieniono żadnych transakcji} one {Zmieniono # transakcję} few {Zmieniono # transakcje} many {Zmieniono # transakcji} other {Zmieniono # transakcji}}. Możesz to cofnąć w historii akcji.",
+      "aiReviewsQueued": "{count, plural, one {# transakcja dodana do kolejki przeglądu AI} few {# transakcje dodane do kolejki przeglądu AI} many {# transakcji dodanych do kolejki przeglądu AI} other {# transakcji dodanych do kolejki przeglądu AI}}."
     },
     "done": {
       "summary": "{count, plural, =0 {Nie zmieniono żadnych transakcji.} one {Zmieniono # transakcję.} few {Zmieniono # transakcje.} many {Zmieniono # transakcji.} other {Zmieniono # transakcji.}}",
+      "aiReviewsQueued": "{count, plural, one {# transakcja została dodana do kolejki przeglądu AI.} few {# transakcje zostały dodane do kolejki przeglądu AI.} many {# transakcji zostało dodanych do kolejki przeglądu AI.} other {# transakcji zostało dodanych do kolejki przeglądu AI.}}",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transakcja miała już otwarte żądanie przeglądu AI, więc nie została dodana ponownie.} few {# transakcje miały już otwarte żądanie przeglądu AI, więc nie zostały dodane ponownie.} many {# transakcji miało już otwarte żądanie przeglądu AI, więc nie zostały dodane ponownie.} other {# transakcji miało już otwarte żądanie przeglądu AI, więc nie zostały dodane ponownie.}}",
       "undo": "Uruchomienie można cofnąć w historii akcji."
     },
     "missingInputs": {

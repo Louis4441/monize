@@ -52,6 +52,21 @@ describe("planFingerprint", () => {
   it("an empty plan still has a fingerprint that depends on the revision", () => {
     expect(planFingerprint(1, [])).not.toBe(planFingerprint(2, []));
   });
+
+  describe("the rows queued for an AI review", () => {
+    it("hash as before when a plan queues none", () => {
+      expect(planFingerprint(1, [a, b], [])).toBe(planFingerprint(1, [a, b]));
+    });
+
+    it("change the hash of a plan with no field changes, whatever their order", () => {
+      const none = planFingerprint(1, []);
+      const one = planFingerprint(1, [], ["t1"]);
+      const two = planFingerprint(1, [], ["t1", "t2"]);
+      expect(new Set([none, one, two]).size).toBe(3);
+      expect(planFingerprint(1, [], ["t2", "t1"])).toBe(two);
+      expect(planFingerprint(1, [], ["t2"])).not.toBe(one);
+    });
+  });
 });
 
 describe("canonicalChanges", () => {
