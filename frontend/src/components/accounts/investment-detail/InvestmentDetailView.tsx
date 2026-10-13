@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { accountsApi } from '@/lib/accounts';
 import { investmentsApi } from '@/lib/investments';
@@ -26,6 +26,42 @@ import type { PortfolioSummary, InvestmentTransaction, RealizedGainEntry } from 
 type DividendInterestYtd =
   | { amount: number; unknownReason?: undefined }
   | { amount: null; unknownReason: 'displayFx' | 'unknownCurrency' };
+
+/**
+ * The year's dividends and interest in the brokerage's currency. Each row's
+ * income is in its own (security) currency and reaches the account's at the
+ * rate its cash leg settled at. A reinvest created in the app stores no total;
+ * its income is the cost of the shares it bought. One row that cannot be
+ * converted makes the year unknown, never a smaller sum.
+ */
+function dividendInterestYtdOf(
+  incomeTx: readonly InvestmentTransaction[],
+  brokerage: Account,
+  cash: Account | null,
+  convert: (amount: number, from: string, to: string) => number | null,
+): DividendInterestYtd {
+  const accountCurrency = new Map<string, string>([[brokerage.id, brokerage.currencyCode]]);
+  if (cash) accountCurrency.set(cash.id, cash.currencyCode);
+  const amounts: number[] = [];
+  for (const tx of incomeTx) {
+    const amount = convertRowAmount(
+      tx,
+      investmentIncomeAmount(tx),
+      accountCurrency.get(tx.accountId),
+      brokerage.currencyCode,
+      convert,
+    );
+    if (amount === null) {
+      // Two different repairs: a security to name, or a rate to add.
+      return {
+        amount: null,
+        unknownReason: rowAmountCurrency(tx) === null ? 'unknownCurrency' : 'displayFx',
+      };
+    }
+    amounts.push(amount);
+  }
+  return { amount: roundToCents(sumMoney(amounts)) };
+}
 
 interface InvestmentDetailViewProps {
   account: Account;
@@ -132,34 +168,8 @@ export function InvestmentDetailView({ account, refreshKey = 0 }: InvestmentDeta
   const accountIds = cash ? [brokerage.id, cash.id] : [brokerage.id];
   const currency = brokerage.currencyCode;
 
-  // Each row's income is in its own (security) currency, and reaches the
-  // account's at the rate its cash leg settled at. A reinvest created in the
-  // app stores no total; its income is the cost of the shares it bought. One
-  // row that cannot be converted makes the year unknown, never a smaller sum.
   const { convert } = useExchangeRates();
-  const dividendInterestYtd = useMemo((): DividendInterestYtd => {
-    const accountCurrency = new Map<string, string>([[brokerage.id, brokerage.currencyCode]]);
-    if (cash) accountCurrency.set(cash.id, cash.currencyCode);
-    const amounts: number[] = [];
-    for (const tx of incomeTx) {
-      const amount = convertRowAmount(
-        tx,
-        investmentIncomeAmount(tx),
-        accountCurrency.get(tx.accountId),
-        currency,
-        convert,
-      );
-      if (amount === null) {
-        // Two different repairs: a security to name, or a rate to add.
-        return {
-          amount: null,
-          unknownReason: rowAmountCurrency(tx) === null ? 'unknownCurrency' : 'displayFx',
-        };
-      }
-      amounts.push(amount);
-    }
-    return { amount: roundToCents(sumMoney(amounts)) };
-  }, [incomeTx, brokerage, cash, currency, convert]);
+  const dividendInterestYtd = dividendInterestYtdOf(incomeTx, brokerage, cash, convert);
 
   return (
     <div className="space-y-6">

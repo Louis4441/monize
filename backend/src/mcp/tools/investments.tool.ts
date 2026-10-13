@@ -175,12 +175,10 @@ export class McpInvestmentsTools {
         title: "List investment transactions",
         annotations: READ_ONLY,
         description:
-          "Brokerage transactions -- trades, income, splits, transfers and " +
-          "share adjustments -- filtered by account, symbol, action and date, " +
-          "with optional grouping. A VOID row is listed but excluded from " +
-          "every total. incomeByCurrency and each row's incomeAmount count " +
-          "dividends, interest and capital-gain distributions, paid in cash " +
-          "or reinvested in shares, in the currency they are in.",
+          "Brokerage trades, income, splits, transfers and share adjustments " +
+          "by account, symbol, action and date, optionally grouped. A VOID " +
+          "row is listed but in no total. incomeByCurrency includes " +
+          "reinvested income.",
         inputSchema: z.object({
           startDate: z.string().max(10).optional().describe("Start date."),
           endDate: z.string().max(10).optional().describe("End date."),
