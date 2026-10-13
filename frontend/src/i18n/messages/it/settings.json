@@ -232,6 +232,13 @@
         "dashboard": "Mostra la sua dashboard"
       },
       "accountOpenTargetHelp": "Si applica quando fai clic su un conto nella pagina Conti o in Conti preferiti nella dashboard.",
+      "columnsLabel": "Colonne visibili",
+      "columnsHelp": "Deseleziona una casella per nascondere quella colonna per impostazione predefinita. Il menu Colonne di una tabella la modifica solo in quel browser.",
+      "columnTables": {
+        "transactions": "Transazioni",
+        "investmentHoldings": "Posizioni di investimento",
+        "investmentRegister": "Transazioni di investimento"
+      },
       "applyHere": "Usa queste impostazioni in questo browser",
       "applyHereHelp": "Cancella le impostazioni di visualizzazione salvate da questo browser, così le impostazioni predefinite qui sopra valgono anche qui.",
       "appliedHere": "Questo browser ora usa le tue viste predefinite"

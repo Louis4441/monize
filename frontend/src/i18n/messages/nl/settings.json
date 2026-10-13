@@ -232,6 +232,13 @@
         "dashboard": "Het dashboard tonen"
       },
       "accountOpenTargetHelp": "Geldt als je op een rekening klikt op de pagina Rekeningen of bij Favoriete rekeningen op het dashboard.",
+      "columnsLabel": "Getoonde kolommen",
+      "columnsHelp": "Vink een vakje uit om die kolom standaard te verbergen. Het menu Kolommen van een tabel wijzigt dit alleen in die browser.",
+      "columnTables": {
+        "transactions": "Transacties",
+        "investmentHoldings": "Beleggingsposities",
+        "investmentRegister": "Beleggingstransacties"
+      },
       "applyHere": "Deze standaarden in deze browser gebruiken",
       "applyHereHelp": "Wist de weergave-instellingen die deze browser heeft opgeslagen, zodat de standaarden hierboven ook hier gelden.",
       "appliedHere": "Deze browser gebruikt nu je standaardweergaven"

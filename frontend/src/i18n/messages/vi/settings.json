@@ -232,6 +232,13 @@
         "dashboard": "Hiển thị bảng điều khiển của tài khoản"
       },
       "accountOpenTargetHelp": "Áp dụng khi bạn nhấp vào một tài khoản trên trang Tài khoản hoặc trong Tài khoản yêu thích trên bảng điều khiển.",
+      "columnsLabel": "Các cột hiển thị",
+      "columnsHelp": "Bỏ chọn một ô để ẩn cột đó theo mặc định. Menu Cột của bảng chỉ thay đổi điều này trên trình duyệt đó.",
+      "columnTables": {
+        "transactions": "Giao dịch",
+        "investmentHoldings": "Danh mục đầu tư nắm giữ",
+        "investmentRegister": "Giao dịch đầu tư"
+      },
       "applyHere": "Dùng các mặc định này trong trình duyệt này",
       "applyHereHelp": "Xóa các cài đặt hiển thị mà trình duyệt này đã lưu, để các mặc định ở trên cũng áp dụng tại đây.",
       "appliedHere": "Trình duyệt này hiện dùng chế độ xem mặc định của bạn"

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { DefaultViewsGroup } from './DefaultViewsGroup';
 import { useDensityStore } from '@/store/densityStore';
 import { useDateDisplayStore } from '@/store/dateDisplayStore';
+import { useHiddenColumnsStore } from '@/store/hiddenColumnsStore';
 import { TRANSACTIONS_PANEL_STORAGE_KEYS } from '@/hooks/useTransactionsPanelCollapsed';
 import type { UpdatePreferencesData } from '@/types/auth';
 
@@ -129,6 +130,7 @@ describe('DefaultViewsGroup', () => {
     useDensityStore.setState({ densities: { transactions: 'dense' } });
     useDateDisplayStore.setState({ compactMobileDates: true });
     window.localStorage.setItem(TRANSACTIONS_PANEL_STORAGE_KEYS.chart, 'false');
+    useHiddenColumnsStore.setState({ columns: { transactions: ['tags'] } });
     const success = vi.spyOn(toast, 'success');
     render(<DefaultViewsGroup initial={{}} commit={commit} />);
 
@@ -137,6 +139,7 @@ describe('DefaultViewsGroup', () => {
     expect(useDensityStore.getState().densities).toEqual({});
     expect(useDateDisplayStore.getState().compactMobileDates).toBeNull();
     expect(window.localStorage.getItem(TRANSACTIONS_PANEL_STORAGE_KEYS.chart)).toBeNull();
+    expect(useHiddenColumnsStore.getState().columns).toEqual({});
     expect(success).toHaveBeenCalledWith('This browser now uses your default views');
     // Clearing the browser writes nothing to the account.
     expect(commit).not.toHaveBeenCalled();

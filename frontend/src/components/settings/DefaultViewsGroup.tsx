@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Select } from '@/components/ui/Select';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Button } from '@/components/ui/Button';
+import { DefaultColumnsField } from '@/components/settings/DefaultColumnsField';
 import { clearBrowserViewChoices } from '@/lib/browser-view-choices';
 import {
   BUILT_IN_VIEW_DEFAULTS,
@@ -15,11 +16,14 @@ import {
   type ViewDefaults,
 } from '@/lib/view-defaults';
 import type { DensityLevel } from '@/hooks/useTableDensity';
+import type { HiddenTableColumns } from '@/lib/hidden-columns';
 import type { UpdatePreferencesData } from '@/types/auth';
 
 interface DefaultViewsGroupProps {
   /** The stored `viewDefaults` preference, untrusted until read. */
   initial: unknown;
+  /** The stored `hiddenTableColumns` preference, the default column sets. */
+  initialHiddenColumns?: HiddenTableColumns | null;
   /** PreferencesSection's optimistic write, shared by every control it hosts. */
   commit: (patch: UpdatePreferencesData, revert: () => void) => void;
   className?: string;
@@ -35,8 +39,8 @@ const FLAGS: readonly { key: FlagKey; labelKey: string }[] = [
 
 /**
  * The "Default views" group of the Preferences card: account-level defaults
- * for the view settings each browser otherwise keeps for itself, plus where
- * opening an account goes.
+ * for the view settings each browser otherwise keeps for itself (the default
+ * column sets among them), plus where opening an account goes.
  *
  * The map is one preference, but each control sends only its own key and the
  * server merges it into the stored map, so a save from this screen never
@@ -45,7 +49,12 @@ const FLAGS: readonly { key: FlagKey; labelKey: string }[] = [
  * the value it tried to save: a later change in flight is not undone by an
  * earlier one failing.
  */
-export function DefaultViewsGroup({ initial, commit, className }: DefaultViewsGroupProps) {
+export function DefaultViewsGroup({
+  initial,
+  initialHiddenColumns,
+  commit,
+  className,
+}: DefaultViewsGroupProps) {
   const t = useTranslations('settings.preferences');
   const tc = useTranslations('common');
   const [values, setValues] = useState<ViewDefaults>(() => readViewDefaults(initial));
@@ -119,6 +128,8 @@ export function DefaultViewsGroup({ initial, commit, className }: DefaultViewsGr
             {t('defaultViews.accountOpenTargetHelp')}
           </p>
         </div>
+
+        <DefaultColumnsField initial={initialHiddenColumns} commit={commit} />
 
         <div>
           <Button type="button" variant="outline" size="sm" onClick={applyHere}>

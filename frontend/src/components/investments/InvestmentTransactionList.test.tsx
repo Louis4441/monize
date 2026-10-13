@@ -6,6 +6,7 @@ import { TransactionStatus } from '@/types/transaction';
 import toast from 'react-hot-toast';
 import { useDensityStore } from '@/store/densityStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { useHiddenColumnsStore } from '@/store/hiddenColumnsStore';
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -13,6 +14,8 @@ vi.mock('@/lib/investments', () => ({
   },
 }));
 
+// The account preference write. Hiding a column saves to this browser only
+// (`useHiddenColumnsStore`), so the hidden-column tests assert it is never called.
 const mockUpdatePreferences = vi.fn();
 vi.mock('@/lib/user-settings', () => ({
   userSettingsApi: {
@@ -1333,9 +1336,7 @@ describe('InvestmentTransactionList hidden columns', () => {
       fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Price' }));
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenCalledWith({
-        hiddenTableColumns: { investmentRegister: ['price'] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ investmentRegister: ['price'] });
     });
     expect(screen.queryByRole('columnheader', { name: 'Price' })).not.toBeInTheDocument();
 
@@ -1343,10 +1344,9 @@ describe('InvestmentTransactionList hidden columns', () => {
       fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Price' }));
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenLastCalledWith({
-        hiddenTableColumns: { investmentRegister: [] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ investmentRegister: [] });
     });
+    expect(mockUpdatePreferences).not.toHaveBeenCalled();
     expect(screen.getByRole('columnheader', { name: 'Price' })).toBeInTheDocument();
   });
 
@@ -1360,9 +1360,7 @@ describe('InvestmentTransactionList hidden columns', () => {
       fireEvent.click(hide);
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenCalledWith({
-        hiddenTableColumns: { investmentRegister: ['shares'] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ investmentRegister: ['shares'] });
     });
     expect(screen.queryByRole('columnheader', { name: 'Shares' })).not.toBeInTheDocument();
   });

@@ -96,8 +96,10 @@ export class UserPreference {
   })
   dashboardWidgetConfig: Record<string, any>;
 
-  // Hidden column ids per table kind (transactions, investmentHoldings,
-  // investmentRegister). Empty object = no columns hidden anywhere. Typed as
+  // Account-level default hidden column ids per table kind (transactions,
+  // investmentHoldings, investmentRegister), merged by kind on update. A
+  // browser that has saved its own choice for a kind keeps it. Empty object =
+  // no columns hidden by default. Typed as
   // Record<string, any> (matching the other jsonb columns on
   // relation-reachable entities, e.g. action-history) so TypeORM's DeepPartial
   // stays satisfiable where UserPreference is reached through the User relation.

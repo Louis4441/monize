@@ -232,6 +232,13 @@
         "dashboard": "[XX-Show its dashboard-XX]"
       },
       "accountOpenTargetHelp": "[XX-Applies when you click an account on the Accounts page or in Favourite Accounts on the dashboard.-XX]",
+      "columnsLabel": "[XX-Columns shown-XX]",
+      "columnsHelp": "[XX-Clear a box to hide that column by default. A table's Columns menu changes it in that browser only.-XX]",
+      "columnTables": {
+        "transactions": "[XX-Transactions-XX]",
+        "investmentHoldings": "[XX-Investment holdings-XX]",
+        "investmentRegister": "[XX-Investment transactions-XX]"
+      },
       "applyHere": "[XX-Use these defaults in this browser-XX]",
       "applyHereHelp": "[XX-Clears the view settings this browser has saved, so the defaults above take effect here too.-XX]",
       "appliedHere": "[XX-This browser now uses your default views-XX]"

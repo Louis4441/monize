@@ -44,8 +44,7 @@
     "menuLabel": "Mostra o nascondi colonne",
     "showAll": "Mostra tutte",
     "hideColumn": "Nascondi colonna",
-    "sheetSubtitle": "Puoi ripristinarla dal menu Colonne.",
-    "saveFailed": "Impossibile salvare le impostazioni delle colonne. Riprova."
+    "sheetSubtitle": "Puoi ripristinarla dal menu Colonne."
   },
   "loading": "Caricamento...",
   "pagination": {

@@ -44,8 +44,7 @@
     "menuLabel": "Pokaż lub ukryj kolumny",
     "showAll": "Pokaż wszystkie",
     "hideColumn": "Ukryj kolumnę",
-    "sheetSubtitle": "Przywrócisz ją z menu Kolumny.",
-    "saveFailed": "Nie udało się zapisać ustawień kolumn. Spróbuj ponownie."
+    "sheetSubtitle": "Przywrócisz ją z menu Kolumny."
   },
   "loading": "Wczytywanie...",
   "pagination": {

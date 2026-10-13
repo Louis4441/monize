@@ -2,9 +2,10 @@ import type { RegisterColumnId } from '@/components/transactions/register-column
 
 /**
  * The table kinds whose inessential columns a user can hide. Each is a key of
- * the cross-device `hiddenTableColumns` preference
- * (`user_preferences.hidden_table_columns`); one set per kind is read
- * everywhere that table is mounted.
+ * this browser's choices (`useHiddenColumnsStore`) and of the account-level
+ * `hiddenTableColumns` preference (`user_preferences.hidden_table_columns`),
+ * the default a browser with no choice of its own follows; one set per kind is
+ * read everywhere that table is mounted.
  */
 export const HIDDEN_COLUMN_TABLES = [
   'transactions',
@@ -41,9 +42,10 @@ export type HideableColumn<T extends HiddenColumnTable> =
   (typeof HIDEABLE_COLUMNS)[T][number];
 
 /**
- * The wire shape of the preference. Every key is optional (an older row reads
- * as nothing hidden) and the ids are untrusted on read: `hiddenColumnsFor`
- * drops any it does not know.
+ * The wire shape of the preference, and of this browser's choices. Every key
+ * is optional (an absent kind means no choice, so the next fallback applies)
+ * and the ids are untrusted on read: `hiddenColumnsFor` drops any it does not
+ * know.
  */
 export type HiddenTableColumns = Partial<Record<HiddenColumnTable, string[]>>;
 

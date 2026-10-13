@@ -44,8 +44,7 @@
     "menuLabel": "[XX-Show or hide columns-XX]",
     "showAll": "[XX-Show all-XX]",
     "hideColumn": "[XX-Hide column-XX]",
-    "sheetSubtitle": "[XX-Bring it back from the Columns menu.-XX]",
-    "saveFailed": "[XX-Couldn't save column settings. Please try again.-XX]"
+    "sheetSubtitle": "[XX-Bring it back from the Columns menu.-XX]"
   },
   "loading": "[XX-Loading...-XX]",
   "pagination": {

@@ -450,6 +450,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
         <DefaultViewsGroup
           className={GROUP_DIVIDER_CLASS}
           initial={preferences.viewDefaults}
+          initialHiddenColumns={preferences.hiddenTableColumns}
           commit={commitPreference}
         />
 

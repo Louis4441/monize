@@ -232,6 +232,13 @@
         "dashboard": "Tampilkan dasbornya"
       },
       "accountOpenTargetHelp": "Berlaku saat Anda mengklik akun di halaman Akun atau di Akun Favorit pada dasbor.",
+      "columnsLabel": "Kolom yang ditampilkan",
+      "columnsHelp": "Hapus centang untuk menyembunyikan kolom itu secara default. Menu Kolom pada tabel hanya mengubahnya di browser tersebut.",
+      "columnTables": {
+        "transactions": "Transaksi",
+        "investmentHoldings": "Kepemilikan investasi",
+        "investmentRegister": "Transaksi investasi"
+      },
       "applyHere": "Gunakan default ini di browser ini",
       "applyHereHelp": "Menghapus pengaturan tampilan yang disimpan browser ini, sehingga default di atas juga berlaku di sini.",
       "appliedHere": "Browser ini sekarang menggunakan tampilan default Anda"

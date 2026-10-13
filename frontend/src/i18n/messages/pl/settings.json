@@ -232,6 +232,13 @@
         "dashboard": "Pokaż jego pulpit"
       },
       "accountOpenTargetHelp": "Dotyczy kliknięcia konta na stronie Konta lub w sekcji Ulubione konta na pulpicie.",
+      "columnsLabel": "Widoczne kolumny",
+      "columnsHelp": "Odznacz pole, aby domyślnie ukryć tę kolumnę. Menu Kolumny w tabeli zmienia to tylko w danej przeglądarce.",
+      "columnTables": {
+        "transactions": "Transakcje",
+        "investmentHoldings": "Pozycje inwestycyjne",
+        "investmentRegister": "Transakcje inwestycyjne"
+      },
       "applyHere": "Użyj tych ustawień domyślnych w tej przeglądarce",
       "applyHereHelp": "Czyści ustawienia widoku zapisane przez tę przeglądarkę, aby powyższe ustawienia domyślne obowiązywały także tutaj.",
       "appliedHere": "Ta przeglądarka używa teraz Twoich widoków domyślnych"
