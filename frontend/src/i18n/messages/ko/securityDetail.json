@@ -86,6 +86,9 @@
     "documents": "문서",
     "news": "뉴스"
   },
+  "bondPrices": {
+    "title": "가격 내역"
+  },
   "about": {
     "title": "소개",
     "noDescription": "이 종목에 저장된 설명이 없습니다.",

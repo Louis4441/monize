@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Nenhuma transação foi alterada} one {# transação alterada} other {# transações alteradas}}. Pode anular no histórico de ações.",
-      "aiReviewsQueued": "{count, plural, one {# transação colocada na fila de revisão por IA} other {# transações colocadas na fila de revisão por IA}}."
+      "changedNoUndo": "{count, plural, one {# transação alterada} other {# transações alteradas}}.",
+      "aiReviewsQueued": "{count, plural, one {# transação colocada na fila de revisão por IA} other {# transações colocadas na fila de revisão por IA}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transação já tinha um pedido de revisão por IA em aberto, por isso nada de novo foi colocado na fila} other {# transações já tinham um pedido de revisão por IA em aberto, por isso nada de novo foi colocado na fila}}.",
+      "noChanges": "Nenhuma transação foi alterada."
     },
     "done": {
       "summary": "{count, plural, =0 {Nenhuma transação foi alterada.} one {# transação foi alterada.} other {# transações foram alteradas.}}",

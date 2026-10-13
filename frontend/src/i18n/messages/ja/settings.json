@@ -818,7 +818,20 @@
       "skippedAttachments": "{count, plural, other {# 件の添付ファイルが復元されませんでした}}: バックアップに使用可能なバイト列が含まれていませんでした。エクスポート時に欠落していたかチェックサムに失敗したか、あるいはファイルが自己完結型バックアップより前のものです。添付ファイルのストレージが正常になってから新しいバックアップを取得してください。",
       "unusableAiProviderKeys": "{count, plural, other {# 件の AI プロバイダーが使用可能な API キーなしで復元されました}}: このバックアップはプロバイダーのキーが含まれるようになる前に作成されたため、保存されているキーはファイルを作成したサーバーのものです。あるいは、このサーバーにはキーを保存するための暗号化キーが設定されていません。設定 → AIプロバイダー を開き、API キーを入力し直してください。",
       "unlinkedBondSecurities": "{count, plural, other {# 件の債券銘柄が債券商品とのリンクなしで復元されました}}: このサーバーの債券カタログにはそのシリーズがない（または別の通貨で登録されている）ため、債券エンジンはこれらを評価せず、計算済みの価格も復元されませんでした。各銘柄を開き、債券商品に再度リンクしてください。",
-      "unlinkedBondSeries": "{count, plural, other {債券取引 # 件がシリーズを失いました}}。このデプロイメントのカタログにシリーズが含まれていないためです。可能な場合は日付からシリーズを読み取ります。復元するにはシリーズを取得してください。",
+      "unlinkedBondSeries": "{count, plural, other {債券取引 # 件がシリーズを失いました}}。公式ソースからシリーズを取得できなかったためです。シリーズなしで復元され、取得するまでそのままです。",
+      "unrecoveredBondSeries": "バックアップに記載されていたが取得できなかった債券シリーズ: {count} 件。",
+      "unrecoveredBondSeriesItem": "{series}（{country}）：{reason}",
+      "unrecoveredBondSeriesMore": "ほか {count} 件",
+      "unrecoveredBondSeriesAction": "復元するには、債券銘柄を開き、そのページでシリーズを取得（更新）して、シリーズのない取引でシリーズを選択してください。",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "発行体がこのシリーズをまだ公表していません",
+        "source-unavailable": "公式ソースが応答しませんでした。しばらくしてからもう一度お試しください",
+        "no-adapter": "このサーバーには、この発行体の国のソースがありません",
+        "refused": "公式ソースの応答が受け入れられませんでした",
+        "rate-limited": "公式ソースから速度を落とすよう求められました。しばらくしてからもう一度お試しください",
+        "not-attempted": "1 回の復元でシリーズが多すぎるため、試行しませんでした",
+        "other": "原因不明"
+      },
       "doneButton": "完了",
       "unlinkedBondSecuritiesList": "対象の銘柄: {symbols}。",
       "unlinkedBondSecuritiesMore": "ほか{count}件"

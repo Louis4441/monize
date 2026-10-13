@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {没有交易被更改} other {已更改 # 笔交易}}。你可以在操作历史中撤销。",
-      "aiReviewsQueued": "{count, plural, other {已将 # 笔交易加入 AI 审核队列}}。"
+      "changedNoUndo": "{count, plural, other {已更改 # 笔交易}}。",
+      "aiReviewsQueued": "{count, plural, other {已将 # 笔交易加入 AI 审核队列}}。",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# 笔交易已有未完成的 AI 审核请求，因此没有新增加入队列的内容}}。",
+      "noChanges": "没有交易被更改。"
     },
     "done": {
       "summary": "{count, plural, =0 {没有交易被更改。} other {已更改 # 笔交易。}}",

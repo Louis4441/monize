@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "Giao tác theo lịch không thể vừa là chuyển tiền vừa là đầu tư",
     "sameSourceAndDestination": "Tài khoản nguồn và đích phải khác nhau",
     "requiresBrokerageAccount": "Giao tác đầu tư theo lịch yêu cầu tài khoản môi giới",
+    "bondSeriesNotNameable": "Giao dịch {{ action }} đã lên lịch của chứng khoán liên kết với chương trình trái phiếu không thể nêu series trái phiếu của các cổ phần. Hãy ghi nhận như một giao dịch và chọn series, hoặc lên lịch lệnh mua (BUY), lệnh này lấy series đang bán vào ngày đó.",
     "notFound": "Không tìm thấy giao tác theo lịch với ID {{ id }}",
     "occurrenceAlreadyPosted": "Lần này đã được ghi nhận.",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "Không thể tính khoản thanh toán vay này vì không thể đọc số dư sổ cái của nó. Vui lòng thử lại."
   },
   "bonds": {
-    "securityNotLinked": "Không tìm thấy chứng khoán {{ securityId }} hoặc chứng khoán chưa liên kết với công cụ trái phiếu",
+    "securityNotLinked": "Không tìm thấy chứng khoán {{ securityId }} hoặc chứng khoán chưa liên kết với chương trình trái phiếu",
     "QUANTITY_INVALID": "Số lượng phải là một số nguyên dương trái phiếu: {{ quantity }}",
     "DATE_INVALID": "Ngày mua ({{ purchaseDate }}) và ngày định giá ({{ asOf }}) phải là ngày hợp lệ theo định dạng YYYY-MM-DD",
     "AS_OF_BEFORE_PURCHASE": "Ngày định giá {{ asOf }} sớm hơn ngày mua {{ purchaseDate }}",
     "AS_OF_IN_FUTURE": "Ngày định giá {{ asOf }} sau hôm nay ({{ today }}); trái phiếu được định giá vào hôm nay hoặc một ngày trước đó",
     "LINK_REQUIRES_BOND_TYPE": "Chỉ chứng khoán loại Trái phiếu mới có thể được liên kết với công cụ trái phiếu",
     "LINK_QUANTITY_NOT_BONDS": "Số lượng của chứng khoán này không phải là số trái phiếu (giá lệch xa mệnh giá mỗi trái phiếu), nên không thể liên kết với công cụ trái phiếu",
+    "QUANTITY_NOT_BONDS": "Số lượng phải là số trái phiếu và giá phải là giá mỗi trái phiếu có mệnh giá {{ faceValue }}; giá {{ price }} không nằm trong khoảng từ một nửa đến gấp đôi mệnh giá của một trái phiếu.",
     "UNDO_LINK_INVALID": "Không thể hoàn tác thay đổi này vì liên kết trái phiếu mà nó sẽ khôi phục không còn hợp lệ",
     "BENCHMARK_NOT_READ": "Series {{ series }} không đọc chỉ số tham chiếu {{ benchmarkId }}",
     "DECIMAL_INVALID": "Một giá trị đã lưu hoặc được cung cấp không phải số thập phân hợp lệ: {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "Không thể lấy series từ nguồn chính thức cho {{ country }}",
     "SERIES_NOT_PUBLISHED": "Series {{ series }} chưa được công bố trên nguồn chính thức",
     "SOURCE_UNAVAILABLE": "Hiện không thể đọc nguồn chính thức của series {{ series }}; hãy thử lại sau",
+    "SOURCE_DOCUMENT_MISSING": "Không thể đọc {{ document }} của series {{ series }} từ nguồn chính thức (nguồn trả lời: {{ status }}); không thể tải series, quản trị viên có thể nhập thủ công",
+    "MANUAL_ENTRY_INVALID": "Giá trị đã nhập cho {{ field }} của series {{ series }} không được chấp nhận",
     "SOURCE_FORMAT_CHANGED": "Điều khoản của series {{ series }} không có {{ field }} dùng được: nguồn chính thức có thể đã đổi định dạng, hoặc giá trị không được chấp nhận",
     "SOURCE_INCONSISTENT": "Các giá trị của series {{ series }} mâu thuẫn hoặc nằm ngoài giới hạn ở {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Series {{ series }} đã được bán trước khi mẫu {{ product }} được xác thực ({{ validFrom }}); cần một mục được biên soạn",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "Việc rút {{ quantity }} trái phiếu vào ngày {{ date }} nêu một series mà tài khoản nắm giữ ít hơn vào ngày đó. Hãy chọn series mà tài khoản đang nắm giữ, hoặc để trống series để rút các trái phiếu cũ nhất trước.",
     "OVER_REMOVAL": "Việc rút {{ quantity }} trái phiếu vào ngày {{ date }} lớn hơn số trái phiếu mà tài khoản nắm giữ vào ngày đó.",
     "SERIES_REQUIRED": "Hãy nêu series trái phiếu của các cổ phần này: {{ action }} không có ngày mua riêng để suy ra series.",
-    "lotsRefused": "Không thể xác định các lô trái phiếu của chứng khoán này ({{ code }}: {{ action }} vào ngày {{ date }}). Hãy sửa hoặc xóa giao dịch đó."
+    "lotsRefused": "Không thể xác định các lô trái phiếu của chứng khoán này ({{ code }}: {{ action }} vào ngày {{ date }}). Hãy sửa hoặc xóa giao dịch đó.",
+    "SERIES_FETCH_RATE_LIMITED": "Mỗi phút chỉ tải được tối đa {{ limit }} series trái phiếu; hãy chờ một phút rồi thử lại.",
+    "REDEMPTION_SPLIT_REFUSED": "Việc hoàn trả series {{ series }} vào {{ date }} không thể tách thành gốc hoàn trả và lãi ({{ code }}), nên giá và lãi tích lũy chưa được điền. Hãy sửa ngày hoặc số lượng, hoặc tự nhập giá và lãi tích lũy.",
+    "REDEEM_SERIES_REQUIRED": "Hãy nêu series trái phiếu được hoàn trả (bondSeriesCode): vào {{ date }} tài khoản giữ nhiều series của chứng khoán này (số series: {{ count }}), nên không thể tính giá và lãi tích lũy từ phần tách hoàn trả."
   },
   "securities": {
     "bondPricedByEngine": "Chứng khoán này được liên kết với một công cụ trái phiếu và được định giá bởi công cụ tính trái phiếu, không phải bởi nhà cung cấp báo giá. Hãy dùng Tính lại giá thay thế.",

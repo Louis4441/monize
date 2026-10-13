@@ -328,7 +328,7 @@
     "bond": {
       "maturitySoonTitle": "{{ series }} đáo hạn vào {{ date }}",
       "maturitySoonMessage": "{{ quantity }} × {{ series }} đáo hạn vào {{ date }}. {{ payout }}",
-      "interestTitle": "{{ series }}: hôm nay trả lãi",
+      "interestTitle": "{{ series }}: trả lãi vào {{ date }}",
       "interestMessage": "{{ quantity }} × {{ series }} trả {{ amount }} tiền lãi vào {{ date }}. Hãy ghi nhận trên trang chứng khoán nếu khoản này chưa có trong tài khoản của bạn.",
       "interestMessageUnknown": "{{ quantity }} × {{ series }} trả lãi vào {{ date }}. Số tiền chưa được biết: lãi suất mà nó phụ thuộc chưa được công bố.",
       "rateResetTitle": "{{ series }}: kỳ tính lãi mới",
@@ -357,7 +357,21 @@
         "observationNoPublisher": "quan sát {{ observation }} của {{ benchmark }} chưa được lưu: chưa được công bố, hoặc nguồn dữ liệu chưa được tải lại kể từ đó; hãy làm mới trên trang trái phiếu",
         "terms": "điều khoản của {{ series }} chưa đầy đủ; hãy làm mới đợt phát hành trên trang trái phiếu",
         "purchase": "lần mua {{ series }} vào {{ date }} nằm ngoài thời gian bán ({{ from }} đến {{ to }}); hãy sửa ngày mua",
-        "lots": "không thể suy ra các lô từ sổ cái ({{ code }}); hãy sửa sổ cái"
+        "lots": "không thể suy ra các lô từ sổ cái ({{ code }}); hãy sửa sổ cái",
+        "lotsRow": "{{ action }} ngày {{ date }}: không thể suy ra các lô ({{ code }}); hãy sửa giao dịch",
+        "lotsRowSeries": "{{ action }} ngày {{ date }}: chưa gán series ({{ code }}); hãy chọn series trong giao dịch đó",
+        "lotsRowRemoval": "{{ action }} ngày {{ date }}: rút nhiều hơn số tài khoản đang giữ của series đó ({{ code }}); hãy sửa giao dịch"
+      },
+      "action": {
+        "BUY": "mua",
+        "SELL": "bán",
+        "REINVEST": "tái đầu tư",
+        "ADD_SHARES": "thêm cổ phần",
+        "REMOVE_SHARES": "bớt cổ phần",
+        "SPLIT": "chia tách (split)",
+        "TRANSFER_IN": "chuyển vào",
+        "TRANSFER_OUT": "chuyển ra",
+        "other": "giao dịch"
       }
     },
     "emailReceiptsAttention": {

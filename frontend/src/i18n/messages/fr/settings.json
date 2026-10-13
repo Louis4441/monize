@@ -818,7 +818,20 @@
       "skippedAttachments": "{count, plural, one {# pièce jointe n'a pas été restaurée} other {# pièces jointes n'ont pas été restaurées}} : la sauvegarde ne contenait pas d'octets utilisables pour elles — ils manquaient ou ont échoué au contrôle de somme lors de l'export, ou le fichier est antérieur aux sauvegardes autonomes. Exportez une nouvelle sauvegarde lorsque le stockage des pièces jointes est sain.",
       "unusableAiProviderKeys": "{count, plural, one {# fournisseur d'IA a été restauré sans clé d'API utilisable} other {# fournisseurs d'IA ont été restaurés sans clé d'API utilisable}} : la sauvegarde a été créée avant que les clés de fournisseur y soient incluses, donc la clé enregistrée appartient au serveur qui a produit le fichier, ou ce serveur n'a aucune clé de chiffrement configurée pour en stocker une. Ouvrez Paramètres → Fournisseurs d'IA et saisissez à nouveau la clé d'API.",
       "unlinkedBondSecurities": "{count, plural, one {# titre obligataire a été restauré sans lien avec son instrument obligataire} other {# titres obligataires ont été restaurés sans lien avec leurs instruments obligataires}} : le catalogue d'obligations de ce serveur ne contient pas la série (ou la contient dans une autre devise), donc le moteur obligataire ne les valorise plus et leurs prix calculés n'ont pas été restaurés. Ouvrez chaque titre et reliez-le de nouveau à un instrument obligataire.",
-      "unlinkedBondSeries": "{count, plural, one {# transaction obligataire a perdu sa série} other {# transactions obligataires ont perdu leur série}} parce que le catalogue de ce déploiement ne la contient pas ; la série sera lue à partir de la date lorsque c'est possible, récupérez la série pour la restaurer.",
+      "unlinkedBondSeries": "{count, plural, one {# transaction obligataire a perdu sa série} other {# transactions obligataires ont perdu leur série}} parce que la série n'a pas pu être récupérée depuis la source officielle. Elles ont été restaurées sans série et n'en auront pas tant que vous ne l'aurez pas récupérée.",
+      "unrecoveredBondSeries": "Séries d'obligations citées dans la sauvegarde et non récupérées : {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}) : {reason}",
+      "unrecoveredBondSeriesMore": "et {count} de plus",
+      "unrecoveredBondSeriesAction": "Pour les restaurer, ouvrez le titre obligataire, récupérez la série sur sa page (Actualiser) et choisissez la série dans les transactions qui n'en ont pas.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "l'émetteur n'a pas (encore) publié cette série",
+        "source-unavailable": "la source officielle n'a pas répondu ; réessayez plus tard",
+        "no-adapter": "ce serveur n'a pas de source pour le pays de cet émetteur",
+        "refused": "la réponse de la source officielle n'a pas été acceptée",
+        "rate-limited": "la source officielle a demandé de ralentir ; réessayez plus tard",
+        "not-attempted": "trop de séries dans une même restauration ; non tentée",
+        "other": "motif inconnu"
+      },
       "doneButton": "Terminer",
       "unlinkedBondSecuritiesList": "Titres concernés : {symbols}.",
       "unlinkedBondSecuritiesMore": "et {count} de plus"

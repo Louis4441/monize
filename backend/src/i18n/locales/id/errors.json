@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "Transaksi terjadwal tidak dapat sekaligus menjadi transfer dan investasi",
     "sameSourceAndDestination": "Akun sumber dan tujuan harus berbeda",
     "requiresBrokerageAccount": "Transaksi investasi terjadwal memerlukan akun pialang",
+    "bondSeriesNotNameable": "Transaksi {{ action }} terjadwal pada sekuritas terkait program obligasi tidak dapat menyebutkan seri obligasi dari unitnya. Catat sebagai transaksi dan pilih serinya, atau jadwalkan pembelian (BUY), yang mengambil seri yang dijual pada tanggalnya.",
     "notFound": "Transaksi terjadwal dengan ID {{ id }} tidak ditemukan",
     "occurrenceAlreadyPosted": "Kejadian ini sudah dicatat.",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "Pembayaran pinjaman ini tidak dapat dihitung karena saldo buku besarnya tidak dapat dibaca. Coba lagi."
   },
   "bonds": {
-    "securityNotLinked": "Sekuritas {{ securityId }} tidak ditemukan atau tidak ditautkan ke instrumen obligasi",
+    "securityNotLinked": "Sekuritas {{ securityId }} tidak ditemukan atau tidak ditautkan ke program obligasi",
     "QUANTITY_INVALID": "Jumlah harus berupa bilangan bulat positif obligasi: {{ quantity }}",
     "DATE_INVALID": "Tanggal pembelian ({{ purchaseDate }}) dan tanggal penilaian ({{ asOf }}) harus berupa tanggal yang valid dengan format YYYY-MM-DD",
     "AS_OF_BEFORE_PURCHASE": "Tanggal penilaian {{ asOf }} lebih awal dari tanggal pembelian {{ purchaseDate }}",
     "AS_OF_IN_FUTURE": "Tanggal penilaian {{ asOf }} lebih akhir dari hari ini ({{ today }}); obligasi dinilai pada hari ini atau hari sebelumnya",
     "LINK_REQUIRES_BOND_TYPE": "Hanya sekuritas bertipe Obligasi yang dapat ditautkan ke instrumen obligasi",
     "LINK_QUANTITY_NOT_BONDS": "Jumlah pada sekuritas ini bukan jumlah obligasi (harga jauh dari nilai nominal per obligasi), sehingga tidak dapat ditautkan ke instrumen obligasi",
+    "QUANTITY_NOT_BONDS": "Kuantitas harus berupa jumlah obligasi dan harga berupa harga per obligasi dengan nilai nominal {{ faceValue }}; harga {{ price }} tidak berada di antara setengah hingga dua kali nilai nominal satu obligasi.",
     "UNDO_LINK_INVALID": "Perubahan ini tidak dapat dibatalkan karena tautan obligasi yang akan dipulihkan tidak lagi valid",
     "BENCHMARK_NOT_READ": "Seri {{ series }} tidak membaca acuan {{ benchmarkId }}",
     "DECIMAL_INVALID": "Nilai yang tersimpan atau diberikan bukan desimal yang valid: {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "Seri tidak dapat diambil dari sumber resmi untuk {{ country }}",
     "SERIES_NOT_PUBLISHED": "Seri {{ series }} tidak dipublikasikan di sumber resmi",
     "SOURCE_UNAVAILABLE": "Sumber resmi seri {{ series }} tidak dapat dibaca saat ini; coba lagi nanti",
+    "SOURCE_DOCUMENT_MISSING": "{{ document }} seri {{ series }} tidak dapat dibaca dari sumber resmi (jawabannya: {{ status }}); seri tidak dapat diambil, dan administrator dapat memasukkannya secara manual",
+    "MANUAL_ENTRY_INVALID": "Nilai yang dimasukkan untuk {{ field }} seri {{ series }} tidak dapat diterima",
     "SOURCE_FORMAT_CHANGED": "Ketentuan seri {{ series }} tidak memiliki {{ field }} yang dapat digunakan: sumber resmi mungkin mengubah formatnya, atau nilainya tidak dapat diterima",
     "SOURCE_INCONSISTENT": "Nilai seri {{ series }} tidak konsisten atau di luar batas pada {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Seri {{ series }} dijual sebelum templat {{ product }} divalidasi ({{ validFrom }}); seri ini memerlukan entri kurasi",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "Penarikan {{ quantity }} obligasi pada {{ date }} menyebut seri yang jumlahnya lebih sedikit di rekening pada tanggal itu. Pilih seri yang dimiliki rekening, atau biarkan seri kosong untuk menarik obligasi tertua terlebih dahulu.",
     "OVER_REMOVAL": "Penarikan {{ quantity }} obligasi pada {{ date }} lebih besar daripada jumlah obligasi yang dimiliki rekening pada tanggal itu.",
     "SERIES_REQUIRED": "Sebutkan seri obligasi untuk saham ini: {{ action }} tidak memiliki tanggal pembelian sendiri untuk menyimpulkan seri.",
-    "lotsRefused": "Lot obligasi sekuritas ini tidak dapat ditentukan ({{ code }}: {{ action }} pada {{ date }}). Perbaiki atau hapus transaksi tersebut."
+    "lotsRefused": "Lot obligasi sekuritas ini tidak dapat ditentukan ({{ code }}: {{ action }} pada {{ date }}). Perbaiki atau hapus transaksi tersebut.",
+    "SERIES_FETCH_RATE_LIMITED": "Paling banyak {{ limit }} seri obligasi dapat diambil per menit; tunggu semenit lalu coba lagi.",
+    "REDEMPTION_SPLIT_REFUSED": "Penebusan seri {{ series }} pada {{ date }} tidak dapat dipecah menjadi pokok yang dikembalikan dan bunga ({{ code }}), sehingga harga dan bunga berjalan tidak diisi. Perbaiki tanggal atau kuantitas, atau masukkan sendiri harga dan bunga berjalan.",
+    "REDEEM_SERIES_REQUIRED": "Sebutkan seri obligasi yang ditebus (bondSeriesCode): pada {{ date }} rekening memiliki beberapa seri sekuritas ini (jumlah seri: {{ count }}), sehingga harga dan bunga berjalan tidak dapat dihitung dari pemecahan penebusan."
   },
   "securities": {
     "bondPricedByEngine": "Sekuritas ini ditautkan ke instrumen obligasi dan dinilai oleh mesin obligasi, bukan oleh penyedia kuotasi. Gunakan Hitung ulang harga.",

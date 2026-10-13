@@ -86,6 +86,9 @@
     "documents": "Dokumenty",
     "news": "Wiadomości"
   },
+  "bondPrices": {
+    "title": "Historia cen"
+  },
   "about": {
     "title": "O papierze",
     "noDescription": "Nie zapisano opisu tego papieru wartościowego.",

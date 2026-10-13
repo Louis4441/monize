@@ -818,7 +818,20 @@
       "skippedAttachments": "{count, plural, one {# anexo não foi restaurado} other {# anexos não foram restaurados}}: o backup não continha bytes utilizáveis para eles — faltavam ou falharam a soma de verificação na exportação, ou o ficheiro é anterior aos backups autossuficientes. Exporte um backup novo quando o armazenamento de anexos estiver saudável.",
       "unusableAiProviderKeys": "{count, plural, one {# fornecedor de IA foi restaurado sem uma chave de API utilizável} other {# fornecedores de IA foram restaurados sem chaves de API utilizáveis}}: a cópia de segurança foi criada antes de as chaves dos fornecedores seguirem nela, por isso a chave guardada pertence ao servidor que gerou o ficheiro, ou este servidor não tem qualquer chave de cifra configurada para a guardar. Abra Definições → Fornecedores de IA e introduza novamente a chave de API.",
       "unlinkedBondSecurities": "{count, plural, one {# título de obrigação foi restaurado sem ligação ao seu instrumento de obrigação} other {# títulos de obrigação foram restaurados sem ligação aos seus instrumentos de obrigação}}: o catálogo de obrigações deste servidor não inclui a série (ou inclui-a noutra moeda), pelo que o motor de obrigações já não os avalia e os seus preços calculados não foram restaurados. Abra cada título e ligue-o novamente a um instrumento de obrigação.",
-      "unlinkedBondSeries": "{count, plural, one {# transação de obrigações perdeu a sua série} other {# transações de obrigações perderam a sua série}} porque o catálogo desta instalação não a contém; a série será lida a partir da data sempre que possível, obtenha a série para a restaurar.",
+      "unlinkedBondSeries": "{count, plural, one {# transação de obrigações perdeu a sua série} other {# transações de obrigações perderam a sua série}} porque não foi possível obter a série da fonte oficial. Foram restauradas sem série e ficam sem ela até a obter.",
+      "unrecoveredBondSeries": "Séries de obrigações indicadas na cópia de segurança que não foi possível obter: {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "e mais {count}",
+      "unrecoveredBondSeriesAction": "Para as restaurar, abra o título da obrigação, obtenha a série na respetiva página (Atualizar) e escolha a série nas transações que não a têm.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "o emitente ainda não publicou esta série",
+        "source-unavailable": "a fonte oficial não respondeu; tente novamente mais tarde",
+        "no-adapter": "este servidor não tem fonte para o país deste emitente",
+        "refused": "a resposta da fonte oficial não foi aceite",
+        "rate-limited": "a fonte oficial pediu para abrandar; tente novamente mais tarde",
+        "not-attempted": "demasiadas séries numa só restauração; não tentada",
+        "other": "motivo desconhecido"
+      },
       "doneButton": "Concluído",
       "unlinkedBondSecuritiesList": "Títulos afetados: {symbols}.",
       "unlinkedBondSecuritiesMore": "e mais {count}"

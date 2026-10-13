@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Không có giao dịch nào bị thay đổi} other {Đã thay đổi # giao dịch}}. Bạn có thể hoàn tác từ lịch sử hành động.",
-      "aiReviewsQueued": "{count, plural, other {Đã đưa # giao dịch vào hàng đợi đánh giá AI}}."
+      "changedNoUndo": "{count, plural, other {Đã thay đổi # giao dịch}}.",
+      "aiReviewsQueued": "{count, plural, other {Đã đưa # giao dịch vào hàng đợi đánh giá AI}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# giao dịch đã có yêu cầu đánh giá AI đang mở, nên không có gì mới được đưa vào hàng đợi}}.",
+      "noChanges": "Không có giao dịch nào bị thay đổi."
     },
     "done": {
       "summary": "{count, plural, =0 {Không có giao dịch nào bị thay đổi.} other {Đã thay đổi # giao dịch.}}",

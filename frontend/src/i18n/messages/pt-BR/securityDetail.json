@@ -86,6 +86,9 @@
     "documents": "Documentos",
     "news": "Notícias"
   },
+  "bondPrices": {
+    "title": "Histórico de preços"
+  },
   "about": {
     "title": "Sobre",
     "noDescription": "Nenhuma descrição foi salva para este ativo.",

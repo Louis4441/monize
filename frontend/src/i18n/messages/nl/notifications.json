@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series} loopt af op {date}",
     "maturitySoonMessage": "{quantity} × {series} lopen af op {date}. {payout}",
-    "interestTitle": "{series}: rentebetaling vandaag",
+    "interestTitle": "{series}: rentebetaling op {date}",
     "interestMessage": "{quantity} × {series} keren op {date} {amount} rente uit. Boek de rente op de effectenpagina als die nog niet op je rekening staat.",
     "interestMessageUnknown": "{quantity} × {series} keren op {date} rente uit. Het bedrag is nog niet bekend: een rente waarvan het afhangt is niet gepubliceerd.",
     "rateResetTitle": "{series}: nieuwe renteperiode",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}: nieuwe waarneming {observation}",
     "benchmarkIntro": "{publisher} publiceerde {benchmark} voor {observation}: {value}.",
     "benchmarkSeries": "{series}: periode vanaf {date} tegen {rate} per jaar.",
+    "benchmarkSeriesProjected": "{series}: periode vanaf {date} tegen een verwachte {rate} per jaar.",
     "benchmarkSeriesUnknown": "{series}: periode vanaf {date}, de rente is nog niet bekend.",
     "benchmarkMore": "En {more} andere.",
     "missingTitle": "Obligatiecijfers nog niet bekend",
@@ -98,7 +99,21 @@
       "observationNoPublisher": "De waarneming {observation} van {benchmark} is niet opgeslagen: ze is nog niet gepubliceerd of de feed is sindsdien niet opgehaald. Vernieuw op de obligatiepagina.",
       "terms": "De voorwaarden van {series} zijn onvolledig. Vernieuw de serie op de obligatiepagina.",
       "purchase": "Een aankoop van {series} op {date} valt buiten de verkoopperiode ({from} tot {to}). Corrigeer de aankoopdatum.",
-      "lots": "De partijen kunnen niet uit het grootboek worden afgeleid ({code}). Corrigeer het grootboek."
+      "lots": "De partijen kunnen niet uit het grootboek worden afgeleid ({code}). Corrigeer het grootboek.",
+      "lotsRow": "{action} van {date}: de partijen kunnen niet worden afgeleid ({code}). Corrigeer de transactie.",
+      "lotsRowSeries": "{action} van {date}: geen serie toegewezen ({code}). Kies de serie bij die transactie.",
+      "lotsRowRemoval": "{action} van {date}: haalt meer weg dan de rekening van die serie bezit ({code}). Corrigeer de transactie."
+    },
+    "action": {
+      "BUY": "Aankoop",
+      "SELL": "Verkoop",
+      "REINVEST": "Herbelegging",
+      "ADD_SHARES": "Toevoeging van stukken",
+      "REMOVE_SHARES": "Verwijdering van stukken",
+      "SPLIT": "Split",
+      "TRANSFER_IN": "Inkomende overboeking",
+      "TRANSFER_OUT": "Uitgaande overboeking",
+      "other": "Transactie"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 maanden (GUS)",

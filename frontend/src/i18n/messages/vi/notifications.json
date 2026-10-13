@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series} đáo hạn vào {date}",
     "maturitySoonMessage": "{quantity} × {series} đáo hạn vào {date}. {payout}",
-    "interestTitle": "{series}: hôm nay trả lãi",
+    "interestTitle": "{series}: trả lãi vào {date}",
     "interestMessage": "{quantity} × {series} trả {amount} tiền lãi vào {date}. Hãy ghi nhận trên trang chứng khoán nếu khoản này chưa có trong tài khoản của bạn.",
     "interestMessageUnknown": "{quantity} × {series} trả lãi vào {date}. Số tiền chưa được biết: lãi suất mà nó phụ thuộc chưa được công bố.",
     "rateResetTitle": "{series}: kỳ tính lãi mới",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}: quan sát mới {observation}",
     "benchmarkIntro": "{publisher} đã công bố {benchmark} cho {observation}: {value}.",
     "benchmarkSeries": "{series}: kỳ từ {date} với lãi suất {rate} một năm.",
+    "benchmarkSeriesProjected": "{series}: kỳ từ {date} với lãi suất dự kiến {rate} một năm.",
     "benchmarkSeriesUnknown": "{series}: kỳ từ {date}, lãi suất chưa được biết.",
     "benchmarkMore": "Và {more} đợt khác.",
     "missingTitle": "Chưa biết các số liệu trái phiếu",
@@ -98,7 +99,21 @@
       "observationNoPublisher": "Quan sát {observation} của {benchmark} chưa được lưu: chưa được công bố, hoặc nguồn dữ liệu chưa được tải lại kể từ đó. Hãy làm mới trên trang trái phiếu.",
       "terms": "Điều khoản của {series} chưa đầy đủ. Hãy làm mới đợt phát hành trên trang trái phiếu.",
       "purchase": "Lần mua {series} vào {date} nằm ngoài thời gian bán ({from} đến {to}). Hãy sửa ngày mua.",
-      "lots": "Không thể suy ra các lô từ sổ cái ({code}). Hãy sửa sổ cái."
+      "lots": "Không thể suy ra các lô từ sổ cái ({code}). Hãy sửa sổ cái.",
+      "lotsRow": "{action} ngày {date}: không thể suy ra các lô ({code}). Hãy sửa giao dịch.",
+      "lotsRowSeries": "{action} ngày {date}: chưa gán series ({code}). Hãy chọn series trong giao dịch đó.",
+      "lotsRowRemoval": "{action} ngày {date}: rút nhiều hơn số tài khoản đang giữ của series đó ({code}). Hãy sửa giao dịch."
+    },
+    "action": {
+      "BUY": "Mua",
+      "SELL": "Bán",
+      "REINVEST": "Tái đầu tư",
+      "ADD_SHARES": "Thêm cổ phần",
+      "REMOVE_SHARES": "Bớt cổ phần",
+      "SPLIT": "Chia tách (split)",
+      "TRANSFER_IN": "Chuyển vào",
+      "TRANSFER_OUT": "Chuyển ra",
+      "other": "Giao dịch"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 tháng (GUS)",

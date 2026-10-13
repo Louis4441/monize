@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "スケジュール取引は振替と投資の両方にはなれません",
     "sameSourceAndDestination": "ソース口座と振替先口座は異なる必要があります",
     "requiresBrokerageAccount": "スケジュール投資取引には証券口座が必要です",
+    "bondSeriesNotNameable": "債券プログラムにリンクされた証券の予定された{{ action }}では、その株式の債券シリーズを指定できません。取引として記録してシリーズを選択するか、その日に販売中のシリーズを採用する購入（BUY）を予定してください。",
     "notFound": "ID {{ id }} のスケジュール取引が見つかりません",
     "occurrenceAlreadyPosted": "この回はすでに記帳されています。",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "元帳の残高を読み取れなかったため、このローン支払いを計算できませんでした。もう一度お試しください。"
   },
   "bonds": {
-    "securityNotLinked": "証券 {{ securityId }} が見つからないか、債券銘柄にリンクされていません",
+    "securityNotLinked": "証券 {{ securityId }} が見つからないか、債券プログラムにリンクされていません",
     "QUANTITY_INVALID": "数量は債券の正の整数でなければなりません: {{ quantity }}",
     "DATE_INVALID": "購入日({{ purchaseDate }})と評価日({{ asOf }})は YYYY-MM-DD 形式の有効な日付でなければなりません",
     "AS_OF_BEFORE_PURCHASE": "評価日 {{ asOf }} が購入日 {{ purchaseDate }} より前です",
     "AS_OF_IN_FUTURE": "評価日 {{ asOf }} は今日（{{ today }}）より後です。債券は今日またはそれ以前の日付で評価されます",
     "LINK_REQUIRES_BOND_TYPE": "債券銘柄にリンクできるのは種類が債券の証券のみです",
     "LINK_QUANTITY_NOT_BONDS": "この証券の数量は債券の口数ではありません（価格が債券1口あたりの額面から大きく離れています）。そのため債券銘柄にリンクできません",
+    "QUANTITY_NOT_BONDS": "数量は債券の数、価格は額面 {{ faceValue }} の債券 1 枚あたりの価格である必要があります。価格 {{ price }} は債券 1 枚の額面の 2 分の 1 から 2 倍の範囲にありません。",
     "UNDO_LINK_INVALID": "この変更は元に戻せません。復元されるはずの債券リンクがすでに無効になっているためです",
     "BENCHMARK_NOT_READ": "シリーズ {{ series }} はベンチマーク {{ benchmarkId }} を参照しません",
     "DECIMAL_INVALID": "保存済みまたは指定された値が有効な小数ではありません: {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "{{ country }} のシリーズは公式ソースから取得できません",
     "SERIES_NOT_PUBLISHED": "シリーズ {{ series }} は公式ソースで公開されていません",
     "SOURCE_UNAVAILABLE": "シリーズ {{ series }} の公式ソースを現在読み取れません。しばらくしてからもう一度お試しください",
+    "SOURCE_DOCUMENT_MISSING": "シリーズ {{ series }} の{{ document }}を公式ソースから読み取れません（応答: {{ status }}）。シリーズを取得できないため、管理者が手動で入力できます",
+    "MANUAL_ENTRY_INVALID": "シリーズ {{ series }} の {{ field }} に入力された値は受け付けられません",
     "SOURCE_FORMAT_CHANGED": "シリーズ {{ series }} の条件に使用可能な {{ field }} がありません。公式ソースの形式が変更された可能性があるか、値が受け入れられません",
     "SOURCE_INCONSISTENT": "シリーズ {{ series }} の値が矛盾しているか、{{ field }} が範囲外です ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "シリーズ {{ series }} は {{ product }} テンプレートの検証前 ({{ validFrom }}) に販売されたため、キュレーション済みのエントリが必要です",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "{{ date }} の債券 {{ quantity }} 口の払い出しが指定しているシリーズは、その日の口座の保有数が不足しています。口座が保有しているシリーズを選ぶか、シリーズを空にして古い債券から順に払い出してください。",
     "OVER_REMOVAL": "{{ date }} の債券 {{ quantity }} 口の払い出しは、その日に口座が保有している債券数を超えています。",
     "SERIES_REQUIRED": "これらの株式の債券シリーズを指定してください。{{ action }} には、シリーズを推定できる独自の購入日がありません。",
-    "lotsRefused": "この銘柄の債券ロットを特定できません（{{ code }}: {{ date }} の {{ action }}）。その取引を修正または削除してください。"
+    "lotsRefused": "この銘柄の債券ロットを特定できません（{{ code }}: {{ date }} の {{ action }}）。その取引を修正または削除してください。",
+    "SERIES_FETCH_RATE_LIMITED": "債券シリーズは 1 分あたり最大 {{ limit }} 件まで取得できます。1 分待ってからもう一度お試しください。",
+    "REDEMPTION_SPLIT_REFUSED": "{{ date }} のシリーズ {{ series }} の償還は、返還元本と利子に分割できない（{{ code }}）ため、価格と経過利子は入力されませんでした。日付または数量を修正するか、価格と経過利子の両方を自分で入力してください。",
+    "REDEEM_SERIES_REQUIRED": "償還する債券シリーズ（bondSeriesCode）を指定してください。{{ date }} 時点で口座にはこの証券のシリーズが複数あり（シリーズ数: {{ count }}）、償還の内訳から価格と経過利子を算出できません。"
   },
   "securities": {
     "bondPricedByEngine": "この証券は債券銘柄にリンクされており、価格は相場提供元ではなく債券エンジンが算出します。代わりに「価格を再計算」を使用してください。",

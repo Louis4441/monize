@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series} için vade {date} tarihinde doluyor",
     "maturitySoonMessage": "{quantity} × {series} için vade {date} tarihinde doluyor. {payout}",
-    "interestTitle": "{series}: bugün faiz ödemesi",
+    "interestTitle": "{series}: {date} tarihinde faiz ödemesi",
     "interestMessage": "{quantity} × {series} için {date} tarihinde {amount} faiz ödenecek. Henüz hesabınızda değilse menkul kıymet sayfasında kaydedin.",
     "interestMessageUnknown": "{quantity} × {series} için {date} tarihinde faiz ödenecek. Tutar henüz bilinmiyor: bağlı olduğu oran henüz yayımlanmadı.",
     "rateResetTitle": "{series}: yeni faiz dönemi",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}: yeni gözlem {observation}",
     "benchmarkIntro": "{publisher}, {observation} için {benchmark} değerini yayımladı: {value}.",
     "benchmarkSeries": "{series}: {date} tarihinden başlayan dönem, yıllık oran {rate}.",
+    "benchmarkSeriesProjected": "{series}: {date} tarihinden başlayan dönem, öngörülen yıllık oran {rate}.",
     "benchmarkSeriesUnknown": "{series}: {date} tarihinden başlayan dönem, oran henüz bilinmiyor.",
     "benchmarkMore": "Ve {more} diğeri.",
     "missingTitle": "Tahvil rakamları henüz bilinmiyor",
@@ -98,7 +99,21 @@
       "observationNoPublisher": "{benchmark} için {observation} gözlemi kayıtlı değil: henüz yayımlanmadı veya veri akışı o zamandan beri alınmadı. Tahvil sayfasında yenileyin.",
       "terms": "{series} koşulları eksik. Seriyi tahvil sayfasında yenileyin.",
       "purchase": "{series} için {date} tarihli alış, satış döneminin ({from} – {to}) dışında. Alış tarihini düzeltin.",
-      "lots": "Lotlar defterden türetilemiyor ({code}). Defteri düzeltin."
+      "lots": "Lotlar defterden türetilemiyor ({code}). Defteri düzeltin.",
+      "lotsRow": "{action} ({date}): lotlar türetilemiyor ({code}). İşlemi düzeltin.",
+      "lotsRowSeries": "{action} ({date}): bir seriye atanmamış ({code}). Bu işlemde seriyi seçin.",
+      "lotsRowRemoval": "{action} ({date}): hesapta bulunandan fazlasını o seriden çıkarıyor ({code}). İşlemi düzeltin."
+    },
+    "action": {
+      "BUY": "Alım",
+      "SELL": "Satım",
+      "REINVEST": "Yeniden yatırım",
+      "ADD_SHARES": "Pay ekleme",
+      "REMOVE_SHARES": "Pay çıkarma",
+      "SPLIT": "Bölünme (split)",
+      "TRANSFER_IN": "Gelen transfer",
+      "TRANSFER_OUT": "Giden transfer",
+      "other": "İşlem"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "TÜFE, 12 ay (GUS)",

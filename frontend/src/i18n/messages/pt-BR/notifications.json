@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series} vence em {date}",
     "maturitySoonMessage": "{quantity} × {series} vencem em {date}. {payout}",
-    "interestTitle": "{series}: pagamento de juros hoje",
+    "interestTitle": "{series}: pagamento de juros em {date}",
     "interestMessage": "{quantity} × {series} pagam {amount} de juros em {date}. Registre na página do título se ainda não estiver na sua conta.",
     "interestMessageUnknown": "{quantity} × {series} pagam juros em {date}. O valor ainda não é conhecido: uma taxa da qual ele depende não foi publicada.",
     "rateResetTitle": "{series}: novo período de juros",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}: nova observação {observation}",
     "benchmarkIntro": "{publisher} publicou {benchmark} para {observation}: {value}.",
     "benchmarkSeries": "{series}: período a partir de {date} com taxa de {rate} ao ano.",
+    "benchmarkSeriesProjected": "{series}: período a partir de {date} com taxa projetada de {rate} ao ano.",
     "benchmarkSeriesUnknown": "{series}: período a partir de {date}, a taxa ainda não é conhecida.",
     "benchmarkMore": "E mais {more}.",
     "missingTitle": "Valores das obrigações ainda não conhecidos",
@@ -98,7 +99,21 @@
       "observationNoPublisher": "A observação {observation} de {benchmark} não está armazenada: ainda não foi publicada ou o feed não foi obtido desde então. Atualize na página da obrigação.",
       "terms": "As condições de {series} estão incompletas. Atualize a série na página da obrigação.",
       "purchase": "Uma compra de {series} em {date} está fora do período de venda ({from} a {to}). Corrija a data da compra.",
-      "lots": "Não é possível derivar os lotes do livro-razão ({code}). Corrija o livro-razão."
+      "lots": "Não é possível derivar os lotes do livro-razão ({code}). Corrija o livro-razão.",
+      "lotsRow": "{action} de {date}: não é possível derivar os lotes ({code}). Corrija a transação.",
+      "lotsRowSeries": "{action} de {date}: sem série atribuída ({code}). Escolha a série nessa transação.",
+      "lotsRowRemoval": "{action} de {date}: retira mais do que a conta possui dessa série ({code}). Corrija a transação."
+    },
+    "action": {
+      "BUY": "Compra",
+      "SELL": "Venda",
+      "REINVEST": "Reinvestimento",
+      "ADD_SHARES": "Adição de cotas",
+      "REMOVE_SHARES": "Remoção de cotas",
+      "SPLIT": "Split",
+      "TRANSFER_IN": "Transferência de entrada",
+      "TRANSFER_OUT": "Transferência de saída",
+      "other": "Transação"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "IPCA, 12 meses (GUS)",

@@ -328,7 +328,7 @@
     "bond": {
       "maturitySoonTitle": "{{ series }} loopt af op {{ date }}",
       "maturitySoonMessage": "{{ quantity }} × {{ series }} lopen af op {{ date }}. {{ payout }}",
-      "interestTitle": "{{ series }}: rentebetaling vandaag",
+      "interestTitle": "{{ series }}: rentebetaling op {{ date }}",
       "interestMessage": "{{ quantity }} × {{ series }} keren op {{ date }} {{ amount }} rente uit. Boek de rente op de effectenpagina als die nog niet op je rekening staat.",
       "interestMessageUnknown": "{{ quantity }} × {{ series }} keren op {{ date }} rente uit. Het bedrag is nog niet bekend: een rente waarvan het afhangt is niet gepubliceerd.",
       "rateResetTitle": "{{ series }}: nieuwe renteperiode",
@@ -357,7 +357,21 @@
         "observationNoPublisher": "de waarneming {{ observation }} van {{ benchmark }} is niet opgeslagen: ze is nog niet gepubliceerd of de feed is sindsdien niet opgehaald; vernieuw op de obligatiepagina",
         "terms": "de voorwaarden van {{ series }} zijn onvolledig; vernieuw de serie op de obligatiepagina",
         "purchase": "een aankoop van {{ series }} op {{ date }} valt buiten de verkoopperiode ({{ from }} tot {{ to }}); corrigeer de aankoopdatum",
-        "lots": "de partijen kunnen niet uit het grootboek worden afgeleid ({{ code }}); corrigeer het grootboek"
+        "lots": "de partijen kunnen niet uit het grootboek worden afgeleid ({{ code }}); corrigeer het grootboek",
+        "lotsRow": "{{ action }} van {{ date }}: de partijen kunnen niet worden afgeleid ({{ code }}); corrigeer de transactie",
+        "lotsRowSeries": "{{ action }} van {{ date }}: geen serie toegewezen ({{ code }}); kies de serie bij die transactie",
+        "lotsRowRemoval": "{{ action }} van {{ date }}: haalt meer weg dan de rekening van die serie bezit ({{ code }}); corrigeer de transactie"
+      },
+      "action": {
+        "BUY": "aankoop",
+        "SELL": "verkoop",
+        "REINVEST": "herbelegging",
+        "ADD_SHARES": "toevoeging van stukken",
+        "REMOVE_SHARES": "verwijdering van stukken",
+        "SPLIT": "split",
+        "TRANSFER_IN": "inkomende overboeking",
+        "TRANSFER_OUT": "uitgaande overboeking",
+        "other": "transactie"
       }
     },
     "emailReceiptsAttention": {

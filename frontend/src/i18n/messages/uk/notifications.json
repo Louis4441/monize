@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series}: погашення {date}",
     "maturitySoonMessage": "{quantity} × {series} буде погашено {date}. {payout}",
-    "interestTitle": "{series}: сьогодні виплата відсотків",
+    "interestTitle": "{series}: виплата відсотків {date}",
     "interestMessage": "{quantity} × {series}: {date} виплата відсотків у розмірі {amount}. Якщо їх ще немає на вашому рахунку, проведіть їх на сторінці цінного паперу.",
     "interestMessageUnknown": "{quantity} × {series}: {date} виплата відсотків. Сума поки невідома: ставка, від якої вона залежить, не опублікована.",
     "rateResetTitle": "{series}: новий відсотковий період",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}: нове значення за {observation}",
     "benchmarkIntro": "Опубліковано {benchmark} за {observation}: {value} (джерело: {publisher}).",
     "benchmarkSeries": "{series}: період з {date} зі ставкою {rate} річних.",
+    "benchmarkSeriesProjected": "{series}: період з {date} з прогнозною ставкою {rate} річних.",
     "benchmarkSeriesUnknown": "{series}: період з {date}, ставка поки невідома.",
     "benchmarkMore": "І ще {more}.",
     "missingTitle": "Показники облігацій поки невідомі",
@@ -98,7 +99,21 @@
       "observationNoPublisher": "Значення {benchmark} за {observation} не збережено: воно ще не опубліковане або стрічку даних відтоді не завантажували. Оновіть дані на сторінці облігації.",
       "terms": "Умови {series} неповні. Оновіть серію на сторінці облігації.",
       "purchase": "Купівля {series} від {date} виходить за період продажу ({from} – {to}). Виправте дату купівлі.",
-      "lots": "Партії не вдається визначити з журналу операцій ({code}). Виправте журнал."
+      "lots": "Партії не вдається визначити з журналу операцій ({code}). Виправте журнал.",
+      "lotsRow": "{action} від {date}: партії не вдається визначити ({code}). Виправте операцію.",
+      "lotsRowSeries": "{action} від {date}: серію не вказано ({code}). Виберіть серію в цій операції.",
+      "lotsRowRemoval": "{action} від {date}: кількість перевищує залишок цієї серії на рахунку ({code}). Виправте операцію."
+    },
+    "action": {
+      "BUY": "Купівля",
+      "SELL": "Продаж",
+      "REINVEST": "Реінвестування",
+      "ADD_SHARES": "Зарахування паперів",
+      "REMOVE_SHARES": "Списання паперів",
+      "SPLIT": "Спліт",
+      "TRANSFER_IN": "Вхідний переказ",
+      "TRANSFER_OUT": "Вихідний переказ",
+      "other": "Операція"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Інфляція ІСЦ, 12 місяців (GUS)",

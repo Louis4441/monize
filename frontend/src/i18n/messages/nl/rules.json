@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Er zijn geen transacties gewijzigd} one {# transactie gewijzigd} other {# transacties gewijzigd}}. Je kunt dit ongedaan maken via de actiegeschiedenis.",
-      "aiReviewsQueued": "{count, plural, one {# transactie in de wachtrij voor AI-beoordeling gezet} other {# transacties in de wachtrij voor AI-beoordeling gezet}}."
+      "changedNoUndo": "{count, plural, one {# transactie gewijzigd} other {# transacties gewijzigd}}.",
+      "aiReviewsQueued": "{count, plural, one {# transactie in de wachtrij voor AI-beoordeling gezet} other {# transacties in de wachtrij voor AI-beoordeling gezet}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transactie had al een openstaand verzoek voor AI-beoordeling, dus er is niets nieuws in de wachtrij gezet} other {# transacties hadden al een openstaand verzoek voor AI-beoordeling, dus er is niets nieuws in de wachtrij gezet}}.",
+      "noChanges": "Er zijn geen transacties gewijzigd."
     },
     "done": {
       "summary": "{count, plural, =0 {Er zijn geen transacties gewijzigd.} one {# transactie is gewijzigd.} other {# transacties zijn gewijzigd.}}",

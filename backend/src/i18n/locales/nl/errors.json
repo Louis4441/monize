@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "Een geplande transactie kan niet tegelijk een overboeking en een belegging zijn",
     "sameSourceAndDestination": "Bron- en doelrekeningen moeten verschillend zijn",
     "requiresBrokerageAccount": "Geplande beleggingstransacties vereisen een brokerage-rekening",
+    "bondSeriesNotNameable": "Een geplande {{ action }} van een effect dat aan een obligatieprogramma is gekoppeld, kan de obligatieserie van zijn stukken niet benoemen. Leg het vast als transactie en kies de serie, of plan een aankoop (BUY), die de serie neemt die op die datum in de verkoop is.",
     "notFound": "Geplande transactie met ID {{ id }} niet gevonden",
     "occurrenceAlreadyPosted": "Deze keer is al geboekt.",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "Deze leningbetaling kon niet worden berekend omdat het grootboeksaldo niet kon worden gelezen. Probeer het opnieuw."
   },
   "bonds": {
-    "securityNotLinked": "Effect {{ securityId }} niet gevonden of niet gekoppeld aan een obligatie-instrument",
+    "securityNotLinked": "Effect {{ securityId }} niet gevonden of niet gekoppeld aan een obligatieprogramma",
     "QUANTITY_INVALID": "Het aantal moet een positief geheel aantal obligaties zijn: {{ quantity }}",
     "DATE_INVALID": "De aankoopdatum ({{ purchaseDate }}) en de waarderingsdatum ({{ asOf }}) moeten geldige datums in de notatie JJJJ-MM-DD zijn",
     "AS_OF_BEFORE_PURCHASE": "De waarderingsdatum {{ asOf }} ligt vóór de aankoopdatum {{ purchaseDate }}",
     "AS_OF_IN_FUTURE": "De waarderingsdatum {{ asOf }} ligt na vandaag ({{ today }}); een obligatie wordt gewaardeerd per vandaag of een eerdere dag",
     "LINK_REQUIRES_BOND_TYPE": "Alleen een effect van het type Obligatie kan aan een obligatie-instrument worden gekoppeld",
     "LINK_QUANTITY_NOT_BONDS": "De aantallen van dit effect zijn geen aantal obligaties (een prijs ligt ver van de nominale waarde per obligatie), dus het kan niet aan een obligatie-instrument worden gekoppeld",
+    "QUANTITY_NOT_BONDS": "De hoeveelheid moet een aantal obligaties zijn en de prijs een prijs per obligatie met nominale waarde {{ faceValue }}; de prijs {{ price }} ligt niet tussen de helft en het dubbele van de nominale waarde van één obligatie.",
     "UNDO_LINK_INVALID": "Deze wijziging kan niet ongedaan worden gemaakt omdat de obligatiekoppeling die zij zou herstellen niet meer geldig is",
     "BENCHMARK_NOT_READ": "Serie {{ series }} leest de benchmark {{ benchmarkId }} niet",
     "DECIMAL_INVALID": "Een opgeslagen of opgegeven waarde is geen geldig decimaal getal: {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "Voor {{ country }} kan een serie niet uit een officiële bron worden opgehaald",
     "SERIES_NOT_PUBLISHED": "Serie {{ series }} is niet gepubliceerd in de officiële bron",
     "SOURCE_UNAVAILABLE": "De officiële bron van serie {{ series }} kan nu niet worden gelezen; probeer het later opnieuw",
+    "SOURCE_DOCUMENT_MISSING": "{{ document }} van serie {{ series }} kan niet uit de officiële bron worden gelezen (antwoord: {{ status }}); de serie kan niet worden opgehaald, en een beheerder kan haar handmatig invoeren",
+    "MANUAL_ENTRY_INVALID": "De ingevoerde waarde voor {{ field }} van serie {{ series }} is niet acceptabel",
     "SOURCE_FORMAT_CHANGED": "De voorwaarden van serie {{ series }} hebben geen bruikbaar veld {{ field }}: de officiële bron heeft mogelijk het formaat gewijzigd, of de waarde is niet aanvaardbaar",
     "SOURCE_INCONSISTENT": "De waarden van serie {{ series }} zijn inconsistent of buiten de grenzen bij {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Serie {{ series }} is verkocht voordat het sjabloon {{ product }} was gevalideerd ({{ validFrom }}); er is een samengestelde invoer nodig",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "Een opname van {{ quantity }} obligaties op {{ date }} noemt een serie waarvan de rekening op die dag minder bezit. Kies een serie die de rekening bezit, of laat de serie leeg om de oudste obligaties eerst op te nemen.",
     "OVER_REMOVAL": "Een opname van {{ quantity }} obligaties op {{ date }} is groter dan het aantal obligaties dat de rekening op die dag bezit.",
     "SERIES_REQUIRED": "Geef de obligatieserie van deze stukken op: {{ action }} heeft geen eigen aankoopdatum waaruit die kan worden afgeleid.",
-    "lotsRefused": "De obligatielots van dit effect kunnen niet worden bepaald ({{ code }}: {{ action }} op {{ date }}). Corrigeer of verwijder die transactie."
+    "lotsRefused": "De obligatielots van dit effect kunnen niet worden bepaald ({{ code }}: {{ action }} op {{ date }}). Corrigeer of verwijder die transactie.",
+    "SERIES_FETCH_RATE_LIMITED": "Er kunnen maximaal {{ limit }} obligatieseries per minuut worden opgehaald; wacht een minuut en probeer het opnieuw.",
+    "REDEMPTION_SPLIT_REFUSED": "De aflossing van serie {{ series }} op {{ date }} kan niet worden gesplitst in terugbetaalde hoofdsom en rente ({{ code }}), dus koers en opgelopen rente zijn niet ingevuld. Corrigeer de datum of de hoeveelheid, of voer koers en opgelopen rente zelf in.",
+    "REDEEM_SERIES_REQUIRED": "Geef de obligatieserie op die wordt afgelost (bondSeriesCode): op {{ date }} bezit de rekening meerdere series van dit effect (aantal series: {{ count }}), dus koers en opgelopen rente kunnen niet uit de aflossingssplitsing worden afgeleid."
   },
   "securities": {
     "bondPricedByEngine": "Dit effect is gekoppeld aan een obligatie-instrument en wordt gewaardeerd door de obligatie-engine, niet door een koersaanbieder. Gebruik in plaats daarvan Koersen herberekenen.",

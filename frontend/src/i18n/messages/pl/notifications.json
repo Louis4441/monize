@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series}: termin wykupu {date}",
     "maturitySoonMessage": "Obligacje {series} ({quantity} szt.) zostaną wykupione dnia {date}. {payout}",
-    "interestTitle": "{series}: dziś wypłata odsetek",
+    "interestTitle": "{series}: wypłata odsetek dnia {date}",
     "interestMessage": "Obligacje {series} ({quantity} szt.): dnia {date} wypłata odsetek w wysokości {amount}. Jeśli odsetek nie ma jeszcze na koncie, zaksięguj je na stronie papieru wartościowego.",
     "interestMessageUnknown": "Obligacje {series} ({quantity} szt.): dnia {date} wypłata odsetek. Kwota nie jest jeszcze znana: oprocentowanie zależy od wskaźnika, który nie został opublikowany.",
     "rateResetTitle": "{series}: nowy okres odsetkowy",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}: nowa wartość ({observation})",
     "benchmarkIntro": "Opublikowano {benchmark} za {observation}: {value} (źródło: {publisher}).",
     "benchmarkSeries": "{series}: okres od {date} z oprocentowaniem {rate} w skali roku.",
+    "benchmarkSeriesProjected": "{series}: okres od {date} z prognozowanym oprocentowaniem {rate} w skali roku.",
     "benchmarkSeriesUnknown": "{series}: okres od {date}, oprocentowanie nie jest jeszcze znane.",
     "benchmarkMore": "Oraz kolejne serie: {more}.",
     "missingTitle": "Brakuje danych o obligacjach",
@@ -98,7 +99,21 @@
       "observationNoPublisher": "Brak zapisanej wartości {benchmark} za {observation}: nie została jeszcze opublikowana albo dane nie zostały od tego czasu pobrane. Odśwież dane na stronie obligacji.",
       "terms": "Warunki serii {series} są niekompletne. Odśwież serię na stronie obligacji.",
       "purchase": "Zakup serii {series} z dnia {date} wypada poza okresem sprzedaży (od {from} do {to}). Popraw datę zakupu.",
-      "lots": "Nie można ustalić partii na podstawie historii transakcji ({code}). Popraw historię transakcji."
+      "lots": "Nie można ustalić partii na podstawie historii transakcji ({code}). Popraw historię transakcji.",
+      "lotsRow": "{action} z dnia {date} uniemożliwia ustalenie partii ({code}). Popraw transakcję.",
+      "lotsRowSeries": "{action} z dnia {date}: brak przypisania do serii ({code}). Wskaż serię w tej transakcji.",
+      "lotsRowRemoval": "{action} z dnia {date} dotyczy większej liczby obligacji tej serii, niż konto posiada ({code}). Popraw transakcję."
+    },
+    "action": {
+      "BUY": "Zakup",
+      "SELL": "Sprzedaż",
+      "REINVEST": "Reinwestycja",
+      "ADD_SHARES": "Dopisanie jednostek",
+      "REMOVE_SHARES": "Usunięcie jednostek",
+      "SPLIT": "Split",
+      "TRANSFER_IN": "Transfer przychodzący",
+      "TRANSFER_OUT": "Transfer wychodzący",
+      "other": "Transakcja"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "Inflacja CPI r/r (GUS)",

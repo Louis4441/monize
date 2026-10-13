@@ -86,6 +86,9 @@
     "documents": "Belgeler",
     "news": "Haberler"
   },
+  "bondPrices": {
+    "title": "Fiyat geçmişi"
+  },
   "about": {
     "title": "Hakkında",
     "noDescription": "Bu menkul kıymet için açıklama kaydedilmedi.",

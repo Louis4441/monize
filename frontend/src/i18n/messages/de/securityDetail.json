@@ -86,6 +86,9 @@
     "documents": "Dokumente",
     "news": "Nachrichten"
   },
+  "bondPrices": {
+    "title": "Preisverlauf"
+  },
   "about": {
     "title": "Über",
     "noDescription": "Für dieses Wertpapier ist keine Beschreibung gespeichert.",

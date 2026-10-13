@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "定期交易不能同時為轉帳和投資",
     "sameSourceAndDestination": "來源和目的科目必須不同",
     "requiresBrokerageAccount": "定期投資交易需要經紀科目",
+    "bondSeriesNotNameable": "連結到債券計畫的證券，其排程中的{{ action }}無法指明其份額所屬的債券系列。請將其記錄為交易並選擇系列，或排程一筆買入（BUY），它會採用當日在售的系列。",
     "notFound": "找不到 ID 為 {{ id }} 的定期交易",
     "occurrenceAlreadyPosted": "此次記帳已完成。",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "無法計算此貸款還款，因為無法讀取其帳簿餘額。請重試。"
   },
   "bonds": {
-    "securityNotLinked": "找不到證券 {{ securityId }}，或該證券未連結到債券工具",
+    "securityNotLinked": "找不到證券 {{ securityId }}，或該證券未連結到債券計畫",
     "QUANTITY_INVALID": "數量必須是債券的正整數：{{ quantity }}",
     "DATE_INVALID": "購買日期（{{ purchaseDate }}）和估值日期（{{ asOf }}）必須是 YYYY-MM-DD 格式的有效日期",
     "AS_OF_BEFORE_PURCHASE": "估值日期 {{ asOf }} 早於購買日期 {{ purchaseDate }}",
     "AS_OF_IN_FUTURE": "估值日期 {{ asOf }} 晚於今天（{{ today }}）；債券依今天或更早的日期估值",
     "LINK_REQUIRES_BOND_TYPE": "只有類型為債券的證券才能連結到債券品種",
     "LINK_QUANTITY_NOT_BONDS": "該證券的數量不是債券張數（價格與每張債券的面額相差甚遠），因此無法連結到債券品種",
+    "QUANTITY_NOT_BONDS": "數量必須是債券張數，價格必須是每張面額為 {{ faceValue }} 的債券的價格；價格 {{ price }} 不在一張債券面額的一半到兩倍之間。",
     "UNDO_LINK_INVALID": "無法復原此變更，因為它將還原的債券連結已不再有效",
     "BENCHMARK_NOT_READ": "系列 {{ series }} 不讀取基準 {{ benchmarkId }}",
     "DECIMAL_INVALID": "已儲存或提供的值不是有效的小數：{{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "無法從官方來源取得 {{ country }} 的系列",
     "SERIES_NOT_PUBLISHED": "系列 {{ series }} 尚未在官方來源發布",
     "SOURCE_UNAVAILABLE": "目前無法讀取系列 {{ series }} 的官方來源，請稍後再試",
+    "SOURCE_DOCUMENT_MISSING": "無法從官方來源讀取系列 {{ series }} 的{{ document }}（對方回應 {{ status }}）；無法取得該系列，管理員可以手動輸入",
+    "MANUAL_ENTRY_INVALID": "為系列 {{ series }} 的 {{ field }} 輸入的值不可接受",
     "SOURCE_FORMAT_CHANGED": "系列 {{ series }} 的條款沒有可用的 {{ field }}：官方來源可能已變更格式，或該值不可接受",
     "SOURCE_INCONSISTENT": "系列 {{ series }} 的值不一致，或 {{ field }} 超出範圍（{{ detail }}）",
     "TEMPLATE_NOT_VALIDATED": "系列 {{ series }} 在 {{ product }} 範本通過驗證之前（{{ validFrom }}）發售，需要人工整理的項目",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "{{ date }} 提領 {{ quantity }} 張債券所指定的系列，該帳戶當天持有的數量不足。請選擇帳戶持有的系列，或將系列留空以先提領最早的債券。",
     "OVER_REMOVAL": "{{ date }} 提領 {{ quantity }} 張債券，超過該帳戶當天持有的債券數量。",
     "SERIES_REQUIRED": "請指定這些股份的債券系列：{{ action }} 沒有可用來推斷系列的自身購買日期。",
-    "lotsRefused": "無法確定此證券的債券批次（{{ code }}：{{ date }} 的 {{ action }}）。請更正或刪除該交易。"
+    "lotsRefused": "無法確定此證券的債券批次（{{ code }}：{{ date }} 的 {{ action }}）。請更正或刪除該交易。",
+    "SERIES_FETCH_RATE_LIMITED": "每分鐘最多可取得 {{ limit }} 個債券系列；請等待一分鐘後再試。",
+    "REDEMPTION_SPLIT_REFUSED": "系列 {{ series }} 在 {{ date }} 的贖回無法拆分為返還本金和利息（{{ code }}），因此未填入價格和應計利息。請更正日期或數量，或自行輸入價格和應計利息。",
+    "REDEEM_SERIES_REQUIRED": "請指明被贖回的債券系列（bondSeriesCode）：帳戶在 {{ date }} 持有該證券的多個系列（系列數：{{ count }}），因此無法根據贖回拆分得出價格和應計利息。"
   },
   "securities": {
     "bondPricedByEngine": "此證券已連結到債券工具，由債券引擎而非報價提供者定價。請改用「重新計算價格」。",

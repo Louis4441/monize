@@ -328,7 +328,7 @@
     "bond": {
       "maturitySoonTitle": "{{ series }} scade il {{ date }}",
       "maturitySoonMessage": "{{ quantity }} × {{ series }} scadono il {{ date }}. {{ payout }}",
-      "interestTitle": "{{ series }}: pagamento degli interessi oggi",
+      "interestTitle": "{{ series }}: pagamento di interessi il {{ date }}",
       "interestMessage": "{{ quantity }} × {{ series }} pagano {{ amount }} di interessi il {{ date }}. Registrali nella pagina del titolo se non sono ancora nel tuo conto.",
       "interestMessageUnknown": "{{ quantity }} × {{ series }} pagano interessi il {{ date }}. L'importo non è ancora noto: un tasso da cui dipende non è pubblicato.",
       "rateResetTitle": "{{ series }}: nuovo periodo di interessi",
@@ -357,7 +357,21 @@
         "observationNoPublisher": "la rilevazione {{ observation }} di {{ benchmark }} non è memorizzata: non è ancora pubblicata o il feed non è stato scaricato da allora; aggiorna nella pagina dell'obbligazione",
         "terms": "le condizioni di {{ series }} sono incomplete; aggiorna la serie nella pagina dell'obbligazione",
         "purchase": "un acquisto di {{ series }} del {{ date }} è fuori dal suo periodo di vendita (dal {{ from }} al {{ to }}); correggi la data di acquisto",
-        "lots": "i lotti non possono essere ricavati dal registro ({{ code }}); correggi il registro"
+        "lots": "i lotti non possono essere ricavati dal registro ({{ code }}); correggi il registro",
+        "lotsRow": "{{ action }} del {{ date }}: i lotti non possono essere ricavati ({{ code }}); correggi la transazione",
+        "lotsRowSeries": "{{ action }} del {{ date }}: nessuna serie assegnata ({{ code }}); scegli la serie in quella transazione",
+        "lotsRowRemoval": "{{ action }} del {{ date }}: rimuove più di quanto il conto detiene di quella serie ({{ code }}); correggi la transazione"
+      },
+      "action": {
+        "BUY": "acquisto",
+        "SELL": "vendita",
+        "REINVEST": "reinvestimento",
+        "ADD_SHARES": "aggiunta di quote",
+        "REMOVE_SHARES": "rimozione di quote",
+        "SPLIT": "split",
+        "TRANSFER_IN": "trasferimento in entrata",
+        "TRANSFER_OUT": "trasferimento in uscita",
+        "other": "transazione"
       }
     },
     "emailReceiptsAttention": {

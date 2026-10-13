@@ -86,6 +86,9 @@
     "documents": "資料",
     "news": "ニュース"
   },
+  "bondPrices": {
+    "title": "価格履歴"
+  },
   "about": {
     "title": "概要説明",
     "noDescription": "この銘柄の説明は保存されていません。",

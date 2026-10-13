@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Es wurden keine Buchungen geändert} one {# Buchung geändert} other {# Buchungen geändert}}. Du kannst das im Aktionsverlauf rückgängig machen.",
-      "aiReviewsQueued": "{count, plural, one {# Buchung zur KI-Prüfung eingereiht} other {# Buchungen zur KI-Prüfung eingereiht}}."
+      "changedNoUndo": "{count, plural, one {# Buchung geändert} other {# Buchungen geändert}}.",
+      "aiReviewsQueued": "{count, plural, one {# Buchung zur KI-Prüfung eingereiht} other {# Buchungen zur KI-Prüfung eingereiht}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, one {Für # Buchung gab es bereits eine offene KI-Prüfungsanfrage, daher wurde nichts Neues eingereiht} other {Für # Buchungen gab es bereits eine offene KI-Prüfungsanfrage, daher wurde nichts Neues eingereiht}}.",
+      "noChanges": "Es wurden keine Buchungen geändert."
     },
     "done": {
       "summary": "{count, plural, =0 {Es wurden keine Buchungen geändert.} one {# Buchung wurde geändert.} other {# Buchungen wurden geändert.}}",

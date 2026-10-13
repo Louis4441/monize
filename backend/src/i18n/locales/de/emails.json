@@ -328,7 +328,7 @@
     "bond": {
       "maturitySoonTitle": "{{ series }}: Fälligkeit am {{ date }}",
       "maturitySoonMessage": "{{ quantity }} × {{ series }} werden am {{ date }} fällig. {{ payout }}",
-      "interestTitle": "{{ series }}: heute Zinszahlung",
+      "interestTitle": "{{ series }}: Zinszahlung am {{ date }}",
       "interestMessage": "{{ quantity }} × {{ series }} zahlen am {{ date }} {{ amount }} Zinsen. Buchen Sie sie auf der Wertpapierseite, falls sie noch nicht auf Ihrem Konto sind.",
       "interestMessageUnknown": "{{ quantity }} × {{ series }} zahlen am {{ date }} Zinsen. Der Betrag steht noch nicht fest: Ein Zinssatz, von dem er abhängt, ist noch nicht veröffentlicht.",
       "rateResetTitle": "{{ series }}: neue Zinsperiode",
@@ -357,7 +357,21 @@
         "observationNoPublisher": "der Wert {{ observation }} von {{ benchmark }} ist nicht gespeichert: Er ist noch nicht veröffentlicht, oder der Feed wurde seitdem nicht abgerufen; aktualisieren Sie auf der Anleiheseite",
         "terms": "die Konditionen von {{ series }} sind unvollständig; aktualisieren Sie die Serie auf der Anleiheseite",
         "purchase": "ein Kauf von {{ series }} am {{ date }} liegt außerhalb des Verkaufszeitraums ({{ from }} bis {{ to }}); korrigieren Sie das Kaufdatum",
-        "lots": "die Lots lassen sich nicht aus dem Buchungsverlauf ableiten ({{ code }}); korrigieren Sie den Buchungsverlauf"
+        "lots": "die Lots lassen sich nicht aus dem Buchungsverlauf ableiten ({{ code }}); korrigieren Sie den Buchungsverlauf",
+        "lotsRow": "{{ action }} vom {{ date }}: Die Lots lassen sich nicht ableiten ({{ code }}); korrigieren Sie die Buchung",
+        "lotsRowSeries": "{{ action }} vom {{ date }} ist keiner Serie zugeordnet ({{ code }}); wählen Sie die Serie in dieser Buchung",
+        "lotsRowRemoval": "{{ action }} vom {{ date }} entnimmt mehr, als das Konto von dieser Serie hält ({{ code }}); korrigieren Sie die Buchung"
+      },
+      "action": {
+        "BUY": "Kauf",
+        "SELL": "Verkauf",
+        "REINVEST": "Wiederanlage",
+        "ADD_SHARES": "Anteilszubuchung",
+        "REMOVE_SHARES": "Anteilsausbuchung",
+        "SPLIT": "Split",
+        "TRANSFER_IN": "eingehende Übertragung",
+        "TRANSFER_OUT": "ausgehende Übertragung",
+        "other": "Buchung"
       }
     },
     "emailReceiptsAttention": {

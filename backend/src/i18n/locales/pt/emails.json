@@ -328,7 +328,7 @@
     "bond": {
       "maturitySoonTitle": "{{ series }} vence em {{ date }}",
       "maturitySoonMessage": "{{ quantity }} × {{ series }} vencem em {{ date }}. {{ payout }}",
-      "interestTitle": "{{ series }}: pagamento de juros hoje",
+      "interestTitle": "{{ series }}: pagamento de juros em {{ date }}",
       "interestMessage": "{{ quantity }} × {{ series }} pagam {{ amount }} de juros em {{ date }}. Registe-os na página do título se ainda não estiverem na sua conta.",
       "interestMessageUnknown": "{{ quantity }} × {{ series }} pagam juros em {{ date }}. O montante ainda não é conhecido: uma taxa de que depende não está publicada.",
       "rateResetTitle": "{{ series }}: novo período de juros",
@@ -357,7 +357,21 @@
         "observationNoPublisher": "a observação {{ observation }} de {{ benchmark }} não está guardada: ainda não foi publicada ou o feed não foi obtido desde então; atualize na página da obrigação",
         "terms": "as condições de {{ series }} estão incompletas; atualize a série na página da obrigação",
         "purchase": "uma compra de {{ series }} em {{ date }} está fora do seu período de venda ({{ from }} a {{ to }}); corrija a data de compra",
-        "lots": "os lotes não podem ser derivados do registo ({{ code }}); corrija o registo"
+        "lots": "os lotes não podem ser derivados do registo ({{ code }}); corrija o registo",
+        "lotsRow": "{{ action }} de {{ date }}: não é possível derivar os lotes ({{ code }}); corrija a transação",
+        "lotsRowSeries": "{{ action }} de {{ date }}: sem série atribuída ({{ code }}); escolha a série nessa transação",
+        "lotsRowRemoval": "{{ action }} de {{ date }}: retira mais do que a conta detém dessa série ({{ code }}); corrija a transação"
+      },
+      "action": {
+        "BUY": "compra",
+        "SELL": "venda",
+        "REINVEST": "reinvestimento",
+        "ADD_SHARES": "adição de unidades",
+        "REMOVE_SHARES": "remoção de unidades",
+        "SPLIT": "split",
+        "TRANSFER_IN": "transferência de entrada",
+        "TRANSFER_OUT": "transferência de saída",
+        "other": "transação"
       }
     },
     "emailReceiptsAttention": {

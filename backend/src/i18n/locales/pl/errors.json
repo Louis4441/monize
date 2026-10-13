@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "Zaplanowana transakcja nie może być jednocześnie przelewem i inwestycją",
     "sameSourceAndDestination": "Konto źródłowe i docelowe muszą być różne",
     "requiresBrokerageAccount": "Zaplanowane transakcje inwestycyjne wymagają konta maklerskiego",
+    "bondSeriesNotNameable": "Zaplanowana operacja {{ action }} na papierze wartościowym powiązanym z obligacjami nie może wskazać serii obligacji swoich jednostek. Zapisz ją jako transakcję i wybierz serię albo zaplanuj zakup (BUY), który obejmuje serię będącą w sprzedaży w jego dniu.",
     "notFound": "Nie znaleziono zaplanowanej transakcji o ID {{ id }}",
     "occurrenceAlreadyPosted": "Ta rata została już zaksięgowana.",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "Nie można obliczyć tej raty kredytu, ponieważ nie udało się odczytać salda księgi. Spróbuj ponownie."
   },
   "bonds": {
-    "securityNotLinked": "Nie znaleziono papieru wartościowego {{ securityId }} albo nie jest on powiązany z instrumentem obligacyjnym",
+    "securityNotLinked": "Nie znaleziono papieru wartościowego {{ securityId }} albo nie jest on powiązany z programem obligacji",
     "QUANTITY_INVALID": "Liczba obligacji musi być dodatnią liczbą całkowitą: {{ quantity }}",
     "DATE_INVALID": "Data zakupu ({{ purchaseDate }}) i data wyceny ({{ asOf }}) muszą być poprawnymi datami w formacie RRRR-MM-DD",
     "AS_OF_BEFORE_PURCHASE": "Data wyceny {{ asOf }} jest wcześniejsza niż data zakupu {{ purchaseDate }}",
     "AS_OF_IN_FUTURE": "Data wyceny {{ asOf }} jest późniejsza niż dziś ({{ today }}); obligację wycenia się na dziś lub na dzień wcześniejszy",
     "LINK_REQUIRES_BOND_TYPE": "Z instrumentem obligacyjnym można powiązać tylko papier wartościowy typu Obligacja",
     "LINK_QUANTITY_NOT_BONDS": "Ilości tego papieru nie są liczbą obligacji (cena jest daleka od wartości nominalnej obligacji), więc nie można go powiązać z instrumentem obligacyjnym",
+    "QUANTITY_NOT_BONDS": "Ilość musi być liczbą obligacji, a cena ceną jednej obligacji o nominale {{ faceValue }}; cena {{ price }} nie mieści się w przedziale od połowy do dwukrotności nominału jednej obligacji.",
     "UNDO_LINK_INVALID": "Tej zmiany nie można cofnąć, bo powiązanie z obligacją, które by przywróciła, nie jest już prawidłowe",
     "BENCHMARK_NOT_READ": "Seria {{ series }} nie odczytuje wskaźnika {{ benchmarkId }}",
     "DECIMAL_INVALID": "Zapisana lub podana wartość nie jest poprawną liczbą dziesiętną: {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "Serii nie można pobrać z oficjalnego źródła dla kraju {{ country }}",
     "SERIES_NOT_PUBLISHED": "Seria {{ series }} nie jest opublikowana w oficjalnym źródle",
     "SOURCE_UNAVAILABLE": "Nie można teraz odczytać oficjalnego źródła serii {{ series }}; spróbuj ponownie później",
+    "SOURCE_DOCUMENT_MISSING": "Nie można odczytać z oficjalnego źródła elementu {{ document }} serii {{ series }} (źródło odpowiedziało: {{ status }}); serii nie można pobrać, ale administrator może wprowadzić ją ręcznie",
+    "MANUAL_ENTRY_INVALID": "Wartość wprowadzona w polu {{ field }} serii {{ series }} jest niedopuszczalna",
     "SOURCE_FORMAT_CHANGED": "Warunki serii {{ series }} nie zawierają użytecznego pola {{ field }}: oficjalne źródło mogło zmienić format albo wartość jest niedopuszczalna",
     "SOURCE_INCONSISTENT": "Wartości serii {{ series }} są niespójne lub poza dopuszczalnym zakresem w polu {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Seria {{ series }} została sprzedana przed zweryfikowaniem szablonu {{ product }} ({{ validFrom }}); wymaga wpisu z katalogu kuratorowanego",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "Wydanie {{ quantity }} obligacji w dniu {{ date }} wskazuje serię, której rachunek w tym dniu ma mniej. Wybierz serię posiadaną na rachunku albo zostaw serię pustą, aby wydać najpierw najstarsze obligacje.",
     "OVER_REMOVAL": "Wydanie {{ quantity }} obligacji w dniu {{ date }} jest większe niż liczba obligacji, które rachunek posiada w tym dniu.",
     "SERIES_REQUIRED": "Podaj serię obligacji tych jednostek: {{ action }} nie ma własnej daty zakupu, z której można by ją ustalić.",
-    "lotsRefused": "Nie można ustalić partii obligacji tego papieru wartościowego ({{ code }}: {{ action }} w dniu {{ date }}). Popraw lub usuń tę transakcję."
+    "lotsRefused": "Nie można ustalić partii obligacji tego papieru wartościowego ({{ code }}: {{ action }} w dniu {{ date }}). Popraw lub usuń tę transakcję.",
+    "SERIES_FETCH_RATE_LIMITED": "Można pobierać najwyżej {{ limit }} serii obligacji na minutę; odczekaj minutę i spróbuj ponownie.",
+    "REDEMPTION_SPLIT_REFUSED": "Wykupu serii {{ series }} z dnia {{ date }} nie można rozłożyć na zwracany kapitał i odsetki ({{ code }}), więc nie uzupełniono ceny ani naliczonych odsetek. Popraw datę lub ilość albo wpisz samodzielnie cenę i naliczone odsetki.",
+    "REDEEM_SERIES_REQUIRED": "Wskaż serię wykupowanych obligacji (bondSeriesCode): w dniu {{ date }} konto posiada kilka serii tego papieru wartościowego (liczba serii: {{ count }}), więc ceny i naliczonych odsetek nie można ustalić na podstawie rozkładu wykupu."
   },
   "securities": {
     "bondPricedByEngine": "Ten papier wartościowy jest powiązany z instrumentem obligacyjnym i jest wyceniany przez silnik obligacji, a nie przez dostawcę notowań. Użyj zamiast tego opcji Przelicz ceny.",

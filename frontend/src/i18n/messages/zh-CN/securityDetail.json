@@ -86,6 +86,9 @@
     "documents": "文档",
     "news": "新闻"
   },
+  "bondPrices": {
+    "title": "价格历史"
+  },
   "about": {
     "title": "简介",
     "noDescription": "尚未为该证券保存说明。",

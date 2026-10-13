@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series} 将于 {date} 到期",
     "maturitySoonMessage": "{quantity} × {series} 将于 {date} 到期。{payout}",
-    "interestTitle": "{series}：今日付息",
+    "interestTitle": "{series}：{date} 支付利息",
     "interestMessage": "{quantity} × {series} 将于 {date} 支付利息 {amount}。如果账户中尚未入账，请在证券页面记录。",
     "interestMessageUnknown": "{quantity} × {series} 将于 {date} 付息。金额暂未确定：所依据的利率尚未公布。",
     "rateResetTitle": "{series}：新的计息期",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}：新数据 {observation}",
     "benchmarkIntro": "{publisher} 已公布 {observation} 的 {benchmark}：{value}。",
     "benchmarkSeries": "{series}：自 {date} 起的计息期，年利率 {rate}。",
+    "benchmarkSeriesProjected": "{series}：自 {date} 起的计息期，预计年利率 {rate}。",
     "benchmarkSeriesUnknown": "{series}：自 {date} 起的计息期，利率暂未确定。",
     "benchmarkMore": "另有 {more} 个。",
     "missingTitle": "债券数据暂未确定",
@@ -98,7 +99,21 @@
       "observationNoPublisher": "{benchmark} {observation} 的数据未存储：尚未公布，或此后未获取数据源。请在债券页面刷新。",
       "terms": "{series} 的条款不完整。请在债券页面刷新该系列。",
       "purchase": "{series} 于 {date} 的购买不在其发售期（{from} 至 {to}）内。请更正购买日期。",
-      "lots": "无法从账本推导出持仓批次（{code}）。请更正账本。"
+      "lots": "无法从账本推导出持仓批次（{code}）。请更正账本。",
+      "lotsRow": "{date} 的{action}：无法推导出持仓批次（{code}）。请更正该交易。",
+      "lotsRowSeries": "{date} 的{action}：未归入任何系列（{code}）。请在该交易中选择系列。",
+      "lotsRowRemoval": "{date} 的{action}：减少的数量超过账户持有的该系列数量（{code}）。请更正该交易。"
+    },
+    "action": {
+      "BUY": "买入",
+      "SELL": "卖出",
+      "REINVEST": "再投资",
+      "ADD_SHARES": "增加份额",
+      "REMOVE_SHARES": "减少份额",
+      "SPLIT": "拆分",
+      "TRANSFER_IN": "转入",
+      "TRANSFER_OUT": "转出",
+      "other": "交易"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "居民消费价格指数，12 个月 (GUS)",

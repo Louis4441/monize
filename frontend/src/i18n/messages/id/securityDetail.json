@@ -86,6 +86,9 @@
     "documents": "Dokumen",
     "news": "Berita"
   },
+  "bondPrices": {
+    "title": "Riwayat harga"
+  },
   "about": {
     "title": "Tentang",
     "noDescription": "Tidak ada deskripsi yang disimpan untuk efek ini.",

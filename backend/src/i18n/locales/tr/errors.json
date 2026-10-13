@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "Zamanlanmış işlem hem transfer hem de yatırım olamaz",
     "sameSourceAndDestination": "Kaynak ve hedef hesaplar farklı olmalıdır",
     "requiresBrokerageAccount": "Zamanlanmış yatırım işlemleri için aracı kurum hesabı gereklidir",
+    "bondSeriesNotNameable": "Tahvil programına bağlı bir menkul kıymette zamanlanmış {{ action }} işlemi, paylarının tahvil serisini belirtemez. Bunu işlem olarak kaydedip seriyi seçin veya kendi tarihinde satışta olan seriyi alan bir alım (BUY) zamanlayın.",
     "notFound": "{{ id }} kimliğine sahip zamanlanmış işlem bulunamadı",
     "occurrenceAlreadyPosted": "Bu tekrar zaten kaydedildi.",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "Defter bakiyesi okunamadığı için bu kredi ödemesi hesaplanamadı. Tekrar deneyin."
   },
   "bonds": {
-    "securityNotLinked": "{{ securityId }} menkul kıymeti bulunamadı veya bir tahvil enstrümanına bağlı değil",
+    "securityNotLinked": "{{ securityId }} menkul kıymeti bulunamadı veya bir tahvil programına bağlı değil",
     "QUANTITY_INVALID": "Adet, pozitif bir tam tahvil sayısı olmalıdır: {{ quantity }}",
     "DATE_INVALID": "Alış tarihi ({{ purchaseDate }}) ve değerleme tarihi ({{ asOf }}) YYYY-AA-GG biçiminde geçerli tarihler olmalıdır",
     "AS_OF_BEFORE_PURCHASE": "Değerleme tarihi {{ asOf }}, alış tarihi {{ purchaseDate }} öncesindedir",
     "AS_OF_IN_FUTURE": "Değerleme tarihi {{ asOf }} bugünden ({{ today }}) sonradır; bir tahvil bugünün veya daha önceki bir günün tarihiyle değerlenir",
     "LINK_REQUIRES_BOND_TYPE": "Bir tahvil enstrümanına yalnızca Tahvil türündeki bir menkul kıymet bağlanabilir",
     "LINK_QUANTITY_NOT_BONDS": "Bu menkul kıymetin miktarları tahvil adedi değildir (fiyat, tahvil başına nominal değerden çok uzaktır); bu nedenle bir tahvil enstrümanına bağlanamaz",
+    "QUANTITY_NOT_BONDS": "Miktar tahvil adedi, fiyat ise nominal değeri {{ faceValue }} olan tahvil başına fiyat olmalıdır; {{ price }} fiyatı, bir tahvilin nominal değerinin yarısı ile iki katı arasında değil.",
     "UNDO_LINK_INVALID": "Bu değişiklik geri alınamaz, çünkü geri yükleyeceği tahvil bağlantısı artık geçerli değil",
     "BENCHMARK_NOT_READ": "{{ series }} serisi {{ benchmarkId }} göstergesini okumaz",
     "DECIMAL_INVALID": "Kayıtlı veya girilen bir değer geçerli bir ondalık sayı değil: {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "{{ country }} için bir seri resmi kaynaktan alınamaz",
     "SERIES_NOT_PUBLISHED": "{{ series }} serisi resmi kaynakta yayımlanmamış",
     "SOURCE_UNAVAILABLE": "{{ series }} serisinin resmi kaynağı şu anda okunamıyor; lütfen daha sonra tekrar deneyin",
+    "SOURCE_DOCUMENT_MISSING": "{{ series }} serisinin {{ document }} bilgisi resmi kaynaktan okunamıyor (yanıt: {{ status }}); seri getirilemiyor, bir yönetici elle girebilir",
+    "MANUAL_ENTRY_INVALID": "{{ series }} serisinin {{ field }} alanı için girilen değer kabul edilemez",
     "SOURCE_FORMAT_CHANGED": "{{ series }} serisinin koşullarında kullanılabilir bir {{ field }} yok: resmi kaynak biçimini değiştirmiş olabilir ya da değer kabul edilebilir değil",
     "SOURCE_INCONSISTENT": "{{ series }} serisinin değerleri tutarsız veya {{ field }} alanında sınırların dışında ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "{{ series }} serisi, {{ product }} şablonu doğrulanmadan önce satıldı ({{ validFrom }}); derlenmiş bir kayıt gerektirir",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "{{ date }} tarihinde {{ quantity }} tahvilin çıkarılması, hesabın o günde daha azına sahip olduğu bir seriyi belirtiyor. Hesabın sahip olduğu bir seri seçin veya en eski tahvillerin önce çıkarılması için seriyi boş bırakın.",
     "OVER_REMOVAL": "{{ date }} tarihinde {{ quantity }} tahvilin çıkarılması, hesabın o günde sahip olduğu tahvil sayısından fazla.",
     "SERIES_REQUIRED": "Bu hisselerin tahvil serisini belirtin: {{ action }} işleminin seriyi çıkarabileceğiniz kendi alım tarihi yok.",
-    "lotsRefused": "Bu menkul kıymetin tahvil lotları belirlenemiyor ({{ code }}: {{ date }} tarihli {{ action }}). Bu işlemi düzeltin veya silin."
+    "lotsRefused": "Bu menkul kıymetin tahvil lotları belirlenemiyor ({{ code }}: {{ date }} tarihli {{ action }}). Bu işlemi düzeltin veya silin.",
+    "SERIES_FETCH_RATE_LIMITED": "Dakikada en fazla {{ limit }} tahvil serisi getirilebilir; bir dakika bekleyip tekrar deneyin.",
+    "REDEMPTION_SPLIT_REFUSED": "{{ series }} serisinin {{ date }} tarihli itfası, iade edilen anapara ve faize ayrılamıyor ({{ code }}); bu yüzden fiyat ve birikmiş faiz doldurulmadı. Tarihi veya miktarı düzeltin ya da fiyatı ve birikmiş faizi kendiniz girin.",
+    "REDEEM_SERIES_REQUIRED": "İtfa edilen tahvil serisini belirtin (bondSeriesCode): hesapta {{ date }} tarihinde bu menkul kıymetin birden çok serisi var (seri sayısı: {{ count }}); bu yüzden fiyat ve birikmiş faiz itfa dağılımından hesaplanamıyor."
   },
   "securities": {
     "bondPricedByEngine": "Bu menkul kıymet bir tahvil enstrümanına bağlıdır ve bir kotasyon sağlayıcısı tarafından değil, tahvil motoru tarafından fiyatlanır. Bunun yerine Fiyatları yeniden hesapla seçeneğini kullanın.",

@@ -818,7 +818,20 @@
       "skippedAttachments": "{count, plural, one {# allegato non è stato ripristinato} other {# allegati non sono stati ripristinati}}: il backup non conteneva byte utilizzabili per essi — erano assenti o non hanno superato il checksum al momento dell'esportazione, oppure il file precede i backup autonomi. Esporta un nuovo backup quando l'archivio degli allegati è integro.",
       "unusableAiProviderKeys": "{count, plural, one {# provider AI è stato ripristinato senza una chiave API utilizzabile} other {# provider AI sono stati ripristinati senza chiavi API utilizzabili}}: il backup è stato creato prima che le chiavi dei provider viaggiassero al suo interno, quindi la chiave memorizzata appartiene al server che ha prodotto il file, oppure questo server non ha una chiave di cifratura configurata per conservarla. Apri Impostazioni → Provider AI e inserisci di nuovo la chiave API.",
       "unlinkedBondSecurities": "{count, plural, one {# titolo obbligazionario è stato ripristinato senza collegamento al suo strumento obbligazionario} other {# titoli obbligazionari sono stati ripristinati senza collegamento ai loro strumenti obbligazionari}}: il catalogo obbligazioni di questo server non contiene la serie (o la contiene in un'altra valuta), quindi il motore obbligazionario non li valorizza più e i loro prezzi calcolati non sono stati ripristinati. Apra ogni titolo e lo colleghi di nuovo a uno strumento obbligazionario.",
-      "unlinkedBondSeries": "{count, plural, one {# transazione obbligazionaria ha perso la propria serie} other {# transazioni obbligazionarie hanno perso la propria serie}} perché il catalogo di questa installazione non la contiene; la serie verrà letta dalla data dove possibile, recupera la serie per ripristinarla.",
+      "unlinkedBondSeries": "{count, plural, one {# transazione obbligazionaria ha perso la propria serie} other {# transazioni obbligazionarie hanno perso la propria serie}} perché non è stato possibile recuperare la serie dalla fonte ufficiale. Sono state ripristinate senza serie e restano senza finché non la recuperi.",
+      "unrecoveredBondSeries": "Serie obbligazionarie indicate nel backup che non è stato possibile recuperare: {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "e altre {count}",
+      "unrecoveredBondSeriesAction": "Per ripristinarle, apri il titolo obbligazionario, recupera la serie nella sua pagina (Aggiorna) e scegli la serie nelle transazioni che ne sono prive.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "l'emittente non ha (ancora) pubblicato questa serie",
+        "source-unavailable": "la fonte ufficiale non ha risposto; riprova più tardi",
+        "no-adapter": "questo server non ha una fonte per il paese di questo emittente",
+        "refused": "la risposta della fonte ufficiale non è stata accettata",
+        "rate-limited": "la fonte ufficiale ha chiesto di rallentare; riprova più tardi",
+        "not-attempted": "troppe serie in un solo ripristino; non tentata",
+        "other": "motivo sconosciuto"
+      },
       "doneButton": "Fatto",
       "unlinkedBondSecuritiesList": "Titoli interessati: {symbols}.",
       "unlinkedBondSecuritiesMore": "e altri {count}"

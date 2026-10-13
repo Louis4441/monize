@@ -86,6 +86,9 @@
     "documents": "Tài liệu",
     "news": "Tin tức"
   },
+  "bondPrices": {
+    "title": "Lịch sử giá"
+  },
   "about": {
     "title": "Giới thiệu",
     "noDescription": "Chưa lưu mô tả nào cho chứng khoán này.",

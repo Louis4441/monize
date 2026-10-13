@@ -328,7 +328,7 @@
     "bond": {
       "maturitySoonTitle": "{{ series }} için vade {{ date }} tarihinde doluyor",
       "maturitySoonMessage": "{{ quantity }} × {{ series }} için vade {{ date }} tarihinde doluyor. {{ payout }}",
-      "interestTitle": "{{ series }}: bugün faiz ödemesi",
+      "interestTitle": "{{ series }}: {{ date }} tarihinde faiz ödemesi",
       "interestMessage": "{{ quantity }} × {{ series }} için {{ date }} tarihinde {{ amount }} faiz ödenecek. Henüz hesabınızda değilse menkul kıymet sayfasında kaydedin.",
       "interestMessageUnknown": "{{ quantity }} × {{ series }} için {{ date }} tarihinde faiz ödenecek. Tutar henüz bilinmiyor: bağlı olduğu oran henüz yayımlanmadı.",
       "rateResetTitle": "{{ series }}: yeni faiz dönemi",
@@ -357,7 +357,21 @@
         "observationNoPublisher": "{{ benchmark }} için {{ observation }} gözlemi kayıtlı değil: henüz yayımlanmadı veya veri akışı o zamandan beri alınmadı; tahvil sayfasında yenileyin",
         "terms": "{{ series }} koşulları eksik; seriyi tahvil sayfasında yenileyin",
         "purchase": "{{ series }} için {{ date }} tarihli alış, satış döneminin ({{ from }} – {{ to }}) dışında; alış tarihini düzeltin",
-        "lots": "lotlar defterden türetilemiyor ({{ code }}); defteri düzeltin"
+        "lots": "lotlar defterden türetilemiyor ({{ code }}); defteri düzeltin",
+        "lotsRow": "{{ action }} ({{ date }}): lotlar türetilemiyor ({{ code }}); işlemi düzeltin",
+        "lotsRowSeries": "{{ action }} ({{ date }}): bir seriye atanmamış ({{ code }}); bu işlemde seriyi seçin",
+        "lotsRowRemoval": "{{ action }} ({{ date }}): hesapta bulunandan fazlasını o seriden çıkarıyor ({{ code }}); işlemi düzeltin"
+      },
+      "action": {
+        "BUY": "alım",
+        "SELL": "satım",
+        "REINVEST": "yeniden yatırım",
+        "ADD_SHARES": "pay ekleme",
+        "REMOVE_SHARES": "pay çıkarma",
+        "SPLIT": "bölünme (split)",
+        "TRANSFER_IN": "gelen transfer",
+        "TRANSFER_OUT": "giden transfer",
+        "other": "işlem"
       }
     },
     "emailReceiptsAttention": {

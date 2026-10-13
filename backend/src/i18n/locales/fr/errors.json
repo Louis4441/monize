@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "Une transaction récurrente ne peut pas être à la fois un virement et un investissement",
     "sameSourceAndDestination": "Les comptes source et destination doivent être différents",
     "requiresBrokerageAccount": "Les transactions d'investissement récurrentes nécessitent un compte de courtage",
+    "bondSeriesNotNameable": "Une opération planifiée {{ action }} sur un titre lié à un programme obligataire ne peut pas indiquer la série d'obligations de ses titres. Enregistrez-la comme transaction et choisissez la série, ou planifiez un achat (BUY), qui prend la série en vente à sa date.",
     "notFound": "Transaction récurrente avec l'ID {{ id }} introuvable",
     "occurrenceAlreadyPosted": "Cette occurrence a déjà été enregistrée.",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "Ce paiement de prêt n'a pas pu être calculé car le solde de son grand livre n'a pas pu être lu. Réessayez."
   },
   "bonds": {
-    "securityNotLinked": "Titre {{ securityId }} introuvable ou non lié à un instrument obligataire",
+    "securityNotLinked": "Titre {{ securityId }} introuvable ou non lié à un programme obligataire",
     "QUANTITY_INVALID": "La quantité doit être un nombre entier positif d'obligations : {{ quantity }}",
     "DATE_INVALID": "La date d'achat ({{ purchaseDate }}) et la date de valorisation ({{ asOf }}) doivent être des dates valides au format AAAA-MM-JJ",
     "AS_OF_BEFORE_PURCHASE": "La date de valorisation {{ asOf }} est antérieure à la date d'achat {{ purchaseDate }}",
     "AS_OF_IN_FUTURE": "La date de valorisation {{ asOf }} est postérieure à aujourd'hui ({{ today }}) ; une obligation est valorisée à la date du jour ou à une date antérieure",
     "LINK_REQUIRES_BOND_TYPE": "Seul un titre de type Obligation peut être lié à un instrument obligataire",
     "LINK_QUANTITY_NOT_BONDS": "Les quantités de ce titre ne sont pas un nombre d'obligations (un prix est très éloigné de la valeur nominale par obligation) ; il ne peut donc pas être lié à un instrument obligataire",
+    "QUANTITY_NOT_BONDS": "La quantité doit être un nombre d'obligations et le prix un prix par obligation de valeur nominale {{ faceValue }} ; le prix {{ price }} n'est pas compris entre la moitié et le double de la valeur nominale d'une obligation.",
     "UNDO_LINK_INVALID": "Cette modification ne peut pas être annulée, car le lien obligataire qu'elle rétablirait n'est plus valide",
     "BENCHMARK_NOT_READ": "La série {{ series }} ne lit pas l'indice de référence {{ benchmarkId }}",
     "DECIMAL_INVALID": "Une valeur enregistrée ou fournie n'est pas un décimal valide : {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "Une série ne peut pas être récupérée depuis une source officielle pour {{ country }}",
     "SERIES_NOT_PUBLISHED": "La série {{ series }} n'est pas publiée sur la source officielle",
     "SOURCE_UNAVAILABLE": "La source officielle de la série {{ series }} ne peut pas être lue pour le moment ; réessayez plus tard",
+    "SOURCE_DOCUMENT_MISSING": "{{ document }} de la série {{ series }} ne peut pas être lu depuis la source officielle (réponse : {{ status }}) ; la série ne peut pas être récupérée, et un administrateur peut la saisir à la main",
+    "MANUAL_ENTRY_INVALID": "La valeur saisie pour {{ field }} de la série {{ series }} n'est pas acceptable",
     "SOURCE_FORMAT_CHANGED": "Les conditions de la série {{ series }} n'ont pas de {{ field }} utilisable : la source officielle a peut-être changé de format, ou la valeur n'est pas acceptable",
     "SOURCE_INCONSISTENT": "Les valeurs de la série {{ series }} sont incohérentes ou hors limites pour {{ field }} ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "La série {{ series }} a été vendue avant la validation du modèle {{ product }} ({{ validFrom }}) ; elle nécessite une entrée curatée",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "Un retrait de {{ quantity }} obligations le {{ date }} désigne une série dont le compte détient moins ce jour-là. Choisissez une série que le compte détient, ou laissez la série vide pour retirer d'abord les obligations les plus anciennes.",
     "OVER_REMOVAL": "Un retrait de {{ quantity }} obligations le {{ date }} dépasse le nombre d'obligations que le compte détient ce jour-là.",
     "SERIES_REQUIRED": "Indiquez la série d'obligations de ces titres : {{ action }} n'a pas de date d'achat propre dont la déduire.",
-    "lotsRefused": "Les lots d'obligations de ce titre ne peuvent pas être déterminés ({{ code }} : {{ action }} le {{ date }}). Corrigez ou supprimez cette transaction."
+    "lotsRefused": "Les lots d'obligations de ce titre ne peuvent pas être déterminés ({{ code }} : {{ action }} le {{ date }}). Corrigez ou supprimez cette transaction.",
+    "SERIES_FETCH_RATE_LIMITED": "Au plus {{ limit }} séries d'obligations peuvent être récupérées par minute ; attendez une minute et réessayez.",
+    "REDEMPTION_SPLIT_REFUSED": "Le remboursement de la série {{ series }} du {{ date }} ne peut pas être scindé en capital remboursé et intérêts ({{ code }}), donc ni le prix ni les intérêts courus n'ont été renseignés. Corrigez la date ou la quantité, ou saisissez vous-même le prix et les intérêts courus.",
+    "REDEEM_SERIES_REQUIRED": "Indiquez la série d'obligations remboursée (bondSeriesCode) : le {{ date }}, le compte détient plusieurs séries de ce titre (nombre de séries : {{ count }}), donc le prix et les intérêts courus ne peuvent pas être calculés à partir de la répartition du remboursement."
   },
   "securities": {
     "bondPricedByEngine": "Ce titre est lié à un instrument obligataire et il est valorisé par le moteur d'obligations, et non par un fournisseur de cours. Utilisez plutôt Recalculer les prix.",

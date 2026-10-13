@@ -86,6 +86,9 @@
     "documents": "Documenten",
     "news": "Nieuws"
   },
+  "bondPrices": {
+    "title": "Koershistorie"
+  },
   "about": {
     "title": "Over",
     "noDescription": "Voor dit effect is geen omschrijving opgeslagen.",

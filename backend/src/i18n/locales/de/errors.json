@@ -513,6 +513,7 @@
     "notTransferAndInvestment": "Eine terminierte Buchung kann nicht gleichzeitig eine Überweisung und eine Investition sein",
     "sameSourceAndDestination": "Quell- und Zielkonto müssen verschieden sein",
     "requiresBrokerageAccount": "Terminierte Investmentbuchungen erfordern ein Maklerkonto",
+    "bondSeriesNotNameable": "Eine geplante Buchung vom Typ {{ action }} eines mit einem Anleiheprogramm verknüpften Wertpapiers kann die Anleiheserie ihrer Anteile nicht benennen. Erfassen Sie sie als Buchung und wählen Sie die Serie, oder planen Sie einen Kauf (BUY), der die an seinem Tag angebotene Serie nimmt.",
     "notFound": "Terminierte Buchung mit ID {{ id }} nicht gefunden",
     "occurrenceAlreadyPosted": "Dieser Vorgang wurde bereits gebucht.",
     "changedConcurrently": "The scheduled transaction changed during the operation. Reload it and retry.",
@@ -532,13 +533,14 @@
     "loanLedgerUnreadable": "Diese Kreditrate konnte nicht berechnet werden, da ihr Kontosaldo nicht gelesen werden konnte. Bitte erneut versuchen."
   },
   "bonds": {
-    "securityNotLinked": "Wertpapier {{ securityId }} nicht gefunden oder nicht mit einem Anleiheinstrument verknüpft",
+    "securityNotLinked": "Wertpapier {{ securityId }} nicht gefunden oder nicht mit einem Anleiheprogramm verknüpft",
     "QUANTITY_INVALID": "Die Stückzahl muss eine positive ganze Zahl von Anleihen sein: {{ quantity }}",
     "DATE_INVALID": "Kaufdatum ({{ purchaseDate }}) und Bewertungsdatum ({{ asOf }}) müssen gültige Daten im Format JJJJ-MM-TT sein",
     "AS_OF_BEFORE_PURCHASE": "Das Bewertungsdatum {{ asOf }} liegt vor dem Kaufdatum {{ purchaseDate }}",
     "AS_OF_IN_FUTURE": "Das Bewertungsdatum {{ asOf }} liegt nach heute ({{ today }}); eine Anleihe wird zum heutigen oder einem früheren Tag bewertet",
     "LINK_REQUIRES_BOND_TYPE": "Nur ein Wertpapier vom Typ Anleihe kann mit einem Anleiheinstrument verknüpft werden",
     "LINK_QUANTITY_NOT_BONDS": "Die Stückzahlen dieses Wertpapiers sind keine Anzahl von Anleihen (ein Preis liegt weit vom Nennwert je Anleihe entfernt), daher kann es nicht mit einem Anleiheinstrument verknüpft werden",
+    "QUANTITY_NOT_BONDS": "Die Menge muss eine Anzahl Anleihen und der Preis ein Preis je Anleihe mit dem Nennwert {{ faceValue }} sein; der Preis {{ price }} liegt nicht zwischen dem halben und dem doppelten Nennwert einer Anleihe.",
     "UNDO_LINK_INVALID": "Diese Änderung kann nicht rückgängig gemacht werden, weil die Anleiheverknüpfung, die sie wiederherstellen würde, nicht mehr gültig ist",
     "BENCHMARK_NOT_READ": "Die Serie {{ series }} liest den Referenzwert {{ benchmarkId }} nicht",
     "DECIMAL_INVALID": "Ein gespeicherter oder angegebener Wert ist keine gültige Dezimalzahl: {{ field }} = {{ value }}",
@@ -555,6 +557,8 @@
     "SERIES_FETCH_UNSUPPORTED": "Für {{ country }} kann eine Serie nicht aus einer offiziellen Quelle abgerufen werden",
     "SERIES_NOT_PUBLISHED": "Die Serie {{ series }} ist in der offiziellen Quelle nicht veröffentlicht",
     "SOURCE_UNAVAILABLE": "Die offizielle Quelle der Serie {{ series }} kann derzeit nicht gelesen werden; bitte später erneut versuchen",
+    "SOURCE_DOCUMENT_MISSING": "{{ document }} der Serie {{ series }} kann nicht aus der offiziellen Quelle gelesen werden (Antwort: {{ status }}); die Serie kann nicht abgerufen werden, ein Administrator kann sie von Hand eingeben",
+    "MANUAL_ENTRY_INVALID": "Der eingegebene Wert für {{ field }} der Serie {{ series }} ist nicht zulässig",
     "SOURCE_FORMAT_CHANGED": "Die Bedingungen der Serie {{ series }} enthalten kein verwendbares Feld {{ field }}: Die offizielle Quelle hat möglicherweise ihr Format geändert, oder der Wert ist nicht zulässig",
     "SOURCE_INCONSISTENT": "Die Werte der Serie {{ series }} sind widersprüchlich oder liegen im Feld {{ field }} außerhalb der Grenzen ({{ detail }})",
     "TEMPLATE_NOT_VALIDATED": "Die Serie {{ series }} wurde verkauft, bevor die Vorlage {{ product }} geprüft wurde ({{ validFrom }}); sie benötigt einen kuratierten Eintrag",
@@ -567,7 +571,10 @@
     "REMOVAL_EXCEEDS_SERIES": "Eine Entnahme von {{ quantity }} Anleihen am {{ date }} nennt eine Serie, von der das Konto an diesem Tag weniger hält. Wählen Sie eine Serie, die das Konto hält, oder lassen Sie die Serie leer, um die ältesten Anleihen zuerst zu entnehmen.",
     "OVER_REMOVAL": "Eine Entnahme von {{ quantity }} Anleihen am {{ date }} ist größer als die Anzahl der Anleihen, die das Konto an diesem Tag hält.",
     "SERIES_REQUIRED": "Geben Sie die Anleiheserie dieser Anteile an: {{ action }} hat kein eigenes Kaufdatum, aus dem sie sich ableiten ließe.",
-    "lotsRefused": "Die Anleihelose dieses Wertpapiers können nicht ermittelt werden ({{ code }}: {{ action }} am {{ date }}). Korrigieren oder löschen Sie diese Transaktion."
+    "lotsRefused": "Die Anleihelose dieses Wertpapiers können nicht ermittelt werden ({{ code }}: {{ action }} am {{ date }}). Korrigieren oder löschen Sie diese Transaktion.",
+    "SERIES_FETCH_RATE_LIMITED": "Es können höchstens {{ limit }} Anleiheserien pro Minute abgerufen werden; warten Sie eine Minute und versuchen Sie es erneut.",
+    "REDEMPTION_SPLIT_REFUSED": "Die Rückzahlung der Serie {{ series }} am {{ date }} lässt sich nicht in zurückgezahltes Kapital und Zinsen aufteilen ({{ code }}); daher wurden weder Preis noch aufgelaufene Zinsen eingetragen. Korrigieren Sie Datum oder Menge, oder geben Sie Preis und aufgelaufene Zinsen selbst ein.",
+    "REDEEM_SERIES_REQUIRED": "Nennen Sie die zurückgezahlte Anleiheserie (bondSeriesCode): Das Konto hält am {{ date }} {{ count }} Serien dieses Wertpapiers, daher lassen sich Preis und aufgelaufene Zinsen nicht aus der Rückzahlungsaufteilung ermitteln."
   },
   "securities": {
     "bondPricedByEngine": "Dieses Wertpapier ist mit einem Anleiheinstrument verknüpft und wird von der Anleihe-Engine bewertet, nicht von einem Kursanbieter. Verwenden Sie stattdessen „Preise neu berechnen“.",
