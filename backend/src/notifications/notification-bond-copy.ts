@@ -11,6 +11,8 @@ export interface BondCopyContext {
   number: (value: number, decimals?: number) => string;
   money: (value: number, currency: string) => string;
   percent: (value: number, decimals?: number) => string;
+  /** A benchmark by its translated name where the catalog has one, else by its id. */
+  benchmark: (benchmarkId: string) => string;
   date: (value: unknown) => string | null;
   locale: string;
 }
@@ -74,12 +76,12 @@ function causeText(cause: unknown, ctx: BondCopyContext): string | null {
       return isText(c.publisher)
         ? ctx.text("bond.cause.observation", {
             observation: observationLabel(c.observation, ctx),
-            benchmark: c.benchmarkId,
+            benchmark: ctx.benchmark(c.benchmarkId),
             publisher: c.publisher,
           })
         : ctx.text("bond.cause.observationNoPublisher", {
             observation: observationLabel(c.observation, ctx),
-            benchmark: c.benchmarkId,
+            benchmark: ctx.benchmark(c.benchmarkId),
           });
     case "TERMS_INCOMPLETE":
       return isText(c.seriesCode)
@@ -194,11 +196,17 @@ export function composeBondCopy(
           : [],
       );
       if (names.length === 0) return null;
+      const figure = decimal(data.value);
+      if (figure === null) return null;
       const args = {
-        benchmark: data.benchmarkId,
+        benchmark: ctx.benchmark(data.benchmarkId),
         publisher: data.publisher,
         observation: observationLabel(data.observation, ctx),
-        value: data.value,
+        // A rate series stores a fraction; any other unit is shown as a plain number.
+        value:
+          data.unit === "RATE_FRACTION"
+            ? ctx.percent(figure * 100, 2)
+            : ctx.number(figure, 4),
         series: names.join(", "),
         more: ctx.number(more, 0),
       };

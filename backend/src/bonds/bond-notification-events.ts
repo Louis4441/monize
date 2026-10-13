@@ -58,10 +58,6 @@ function baseData(
   };
 }
 
-function targetOf(securityId: string): string {
-  return `/securities/${securityId}`;
-}
-
 /** The lots grouped by (account, series), in first-appearance order. */
 export function groupLots(
   lots: readonly SecurityLotValuation[],
@@ -258,7 +254,7 @@ export function buildMaturitySoonNotification(
       quantity,
       ...payoutData(payout),
     },
-    target: targetOf(valuation.securityId),
+    target: `/securities/${valuation.securityId}`,
     periodStart: maturityDate,
     dedupeKey: bondDedupeKeys.maturity(
       candidate.accountId,
@@ -290,7 +286,7 @@ export function buildRedemptionUnbookedNotification(
       quantity,
       ...payoutData(payout),
     },
-    target: targetOf(valuation.securityId),
+    target: `/securities/${valuation.securityId}`,
     periodStart: maturityDate,
     dedupeKey: bondDedupeKeys.unbooked(
       candidate.accountId,
@@ -373,7 +369,7 @@ export function buildInterestNotification(
       amount,
       quantity,
     },
-    target: targetOf(valuation.securityId),
+    target: `/securities/${valuation.securityId}`,
     periodStart: paymentDate,
     dedupeKey: bondDedupeKeys.interest(
       candidate.accountId,
@@ -436,7 +432,7 @@ export function rateResetNotifications(
         benchmarkValue: entry?.benchmark?.value ?? null,
         addend: entry?.addend ?? null,
       },
-      target: targetOf(valuation.securityId),
+      target: `/securities/${valuation.securityId}`,
       periodStart: period.start,
       dedupeKey: bondDedupeKeys.rate(
         group.accountId,
@@ -585,7 +581,7 @@ export function missingDataNotification(
       causes,
       coverage,
     },
-    target: targetOf(valuation.securityId),
+    target: `/securities/${valuation.securityId}`,
     dedupeKey: bondDedupeKeys.missing(valuation.securityId, causes),
   };
 }
@@ -599,6 +595,8 @@ export interface BenchmarkObservation {
   /** `YYYY-MM` for a monthly series, the day for a step series. */
   readonly observation: string;
   readonly value: string;
+  /** The series' unit (`benchmark_series.unit`), so a reader formats `value` as the series says. */
+  readonly unit: string;
   readonly publishedOn: string | null;
 }
 
@@ -682,11 +680,12 @@ export function benchmarkPublishedNotification(
       publisher: observation.publisher,
       observation: observation.observation,
       value: observation.value,
+      unit: observation.unit,
       publishedOn: observation.publishedOn,
       affected: listed.map((a) => a.entry),
       affectedMore: affected.length - listed.length,
     },
-    target: targetOf(listed[0].securityId),
+    target: `/securities/${listed[0].securityId}`,
     dedupeKey: bondDedupeKeys.benchmark(
       observation.benchmarkId,
       observation.observation,

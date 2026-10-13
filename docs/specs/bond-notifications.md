@@ -119,7 +119,7 @@ Per user, for each benchmark a held OPEN lot's `rateRule.benchmarkId` names: the
 newest stored observation (`benchmark_values`, greatest `observation_date`) if
 its `retrieved_at` is within the last 7 days. Only the newest one, so a first
 fetch of a long history raises one row, not one per month. `data`:
-`benchmarkId`, `publisher`, `observation` (`YYYY-MM` for a MONTHLY series, the
+`benchmarkId`, `publisher`, `unit`, `observation` (`YYYY-MM` for a MONTHLY series, the
 day for a STEP series), `value`, `publishedOn`, and `affected`: for each held
 series reading it, `{ instrumentId, seriesCode, periodStart, annualRate,
 rateSource }` of its first period starting after T (or starting on T), at most

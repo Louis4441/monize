@@ -366,6 +366,9 @@ export function composeLocalizedNotificationCopy(
         number,
         money,
         percent: (value, decimals = 1) => n.formatPercent(value, decimals),
+        // The catalog key is the whole lookup: a missing one resolves to the id.
+        benchmark: (id) =>
+          t(`emails.notificationCopy.bond.benchmarks.${id}`, id),
         date: (value) => {
           const parsed = calendarDate(value);
           return parsed === null ? null : dateLabel(parsed);

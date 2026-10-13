@@ -384,7 +384,8 @@
         "STRATEGIES": "[XX-Strategy signals-XX]",
         "BANK_SYNC": "[XX-Bank connections-XX]",
         "BANK_SYNC_ACTIVITY": "[XX-Bank sync results-XX]",
-        "EMAIL_RECEIPTS": "[XX-Email receipts-XX]"
+        "EMAIL_RECEIPTS": "[XX-Email receipts-XX]",
+        "BONDS": "[XX-Bonds-XX]"
       },
       "channelNotApplicable": "[XX-Not applicable for this notification type-XX]",
       "emailToggleLabel": "[XX-Report email for {category}-XX]",

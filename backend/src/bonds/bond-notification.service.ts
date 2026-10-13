@@ -301,6 +301,7 @@ export class BondNotificationService {
       const rows = returnedRows<{
         kind: "STEP" | "MONTHLY";
         publisher: string;
+        unit: string;
         observation_date: string;
         value: string;
         published_on: string | null;
@@ -309,6 +310,7 @@ export class BondNotificationService {
         await m.query(
           `SELECT s.kind,
                   s.publisher,
+                  s.unit,
                   TO_CHAR(v.observation_date, 'YYYY-MM-DD') AS observation_date,
                   v.value::text AS value,
                   TO_CHAR(v.published_on, 'YYYY-MM-DD') AS published_on,
@@ -332,6 +334,7 @@ export class BondNotificationService {
             ? row.observation_date.slice(0, 7)
             : row.observation_date,
         value: row.value,
+        unit: row.unit,
         publishedOn: row.published_on,
       };
     });

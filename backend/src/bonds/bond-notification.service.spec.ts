@@ -286,6 +286,7 @@ describe("BondNotificationService", () => {
     const row = {
       kind: "MONTHLY",
       publisher: "Publisher",
+      unit: "RATE_FRACTION",
       observation_date: "2026-09-01",
       value: "0.0490000000",
       published_on: "2026-10-13",

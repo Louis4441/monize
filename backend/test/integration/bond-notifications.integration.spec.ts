@@ -304,6 +304,7 @@ describe("BondNotificationService (integration)", () => {
     expect(fresh[0].data).toMatchObject({
       benchmarkId: "PL_CPI_GUS_YOY",
       publisher: "GUS",
+      unit: "FRACTION",
       observation: "2026-08",
       securityId: null,
       accountId: null,

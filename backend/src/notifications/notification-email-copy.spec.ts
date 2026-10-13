@@ -192,7 +192,8 @@ const examples = {
     benchmarkId: "BENCH_A",
     publisher: "Publisher",
     observation: "2026-09",
-    value: "0.049",
+    value: "0.0490000000",
+    unit: "RATE_FRACTION",
     publishedOn: "2026-10-13",
     affected: [{ seriesCode: "SER0000", instrumentId: "i1" }],
     affectedMore: 2,
@@ -308,12 +309,47 @@ describe("notification email copy", () => {
       expect(copies.BOND_BENCHMARK_PUBLISHED.message).toContain(
         "SER0000 and 2 more",
       );
+      expect(copies.BOND_BENCHMARK_PUBLISHED.message).toContain("4.90%");
+      expect(copies.BOND_BENCHMARK_PUBLISHED.message).not.toContain("0.049");
       expect(copies.BOND_DATA_MISSING.message).toContain(
         "August 2026 observation of BENCH_A (Publisher)",
       );
       for (const copy of Object.values(copies)) {
         expect(JSON.stringify(copy)).not.toMatch(/\{\{|undefined|NaN/);
       }
+    });
+
+    it("names a benchmark by its catalog label, and by its id when the catalog has none", () => {
+      const labels: Record<string, string> = {
+        "emails.notificationCopy.bond.benchmarks.BENCH_A": "Bench A label",
+      };
+      const t = (key: string, fallback: string) => labels[key] ?? fallback;
+      const named = notificationEmailCopy(
+        source(
+          NotificationType.BOND_BENCHMARK_PUBLISHED,
+          examples.BOND_BENCHMARK_PUBLISHED,
+        ),
+        t,
+        "en",
+        { now },
+      );
+      expect(named.title).toBe("Bench A label: new observation September 2026");
+      const missing = notificationEmailCopy(
+        source(NotificationType.BOND_DATA_MISSING, examples.BOND_DATA_MISSING),
+        t,
+        "en",
+        { now },
+      );
+      expect(missing.message).toContain(
+        "observation of Bench A label (Publisher)",
+      );
+      expect(
+        english(NotificationType.BOND_BENCHMARK_PUBLISHED, {
+          ...examples.BOND_BENCHMARK_PUBLISHED,
+          unit: "INDEX_POINTS",
+          value: "123.5",
+        }).message,
+      ).toContain("123.5");
     });
 
     it("says a null payout is not known yet and why, never zero", () => {

@@ -141,6 +141,8 @@ export const NOTIFICATION_EMAIL_MESSAGES = {
   "bond.missingTitle": "Bond figures are not known yet",
   "bond.missingMessage":
     "Some bond figures cannot be worked out: {{ causes }}.",
+  "bond.benchmarks.PL_CPI_GUS_YOY": "CPI, 12 months (GUS)",
+  "bond.benchmarks.PL_NBP_REFERENCE": "NBP reference rate",
   "bond.cause.observation":
     "the {{ observation }} observation of {{ benchmark }} ({{ publisher }}) is not stored: it is not published yet, or the feed has not been fetched since; refresh on the bond page",
   "bond.cause.observationNoPublisher":

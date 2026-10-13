@@ -422,6 +422,7 @@ describe("item 5, benchmark published", () => {
     publisher: "Publisher",
     observation: "2026-09",
     value: "0.049",
+    unit: "RATE_FRACTION",
     publishedOn: "2026-10-13",
   };
   const reading = (

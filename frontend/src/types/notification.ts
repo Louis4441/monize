@@ -46,7 +46,15 @@ export type NotificationType =
   | 'BANK_SYNC_IMPORTED'
   // Receipts inbox emails with no profile or that their profile did not recognize
   // (EMAIL_RECEIPTS). Financial, not system.
-  | 'EMAIL_RECEIPTS_ATTENTION';
+  | 'EMAIL_RECEIPTS_ATTENTION'
+  // Engine-priced bonds (BONDS): what is about to happen to the money in them,
+  // what still needs booking, and which data the figures wait for.
+  | 'BOND_MATURITY_SOON'
+  | 'BOND_INTEREST_PAYMENT'
+  | 'BOND_RATE_RESET'
+  | 'BOND_REDEMPTION_UNBOOKED'
+  | 'BOND_BENCHMARK_PUBLISHED'
+  | 'BOND_DATA_MISSING';
 
 /** How urgent, and how it is drawn. */
 export type NotificationSeverity = 'info' | 'warning' | 'critical' | 'success';
@@ -87,7 +95,8 @@ export type NotificationCategory =
   | 'STRATEGIES'
   | 'BANK_SYNC'
   | 'BANK_SYNC_ACTIVITY'
-  | 'EMAIL_RECEIPTS';
+  | 'EMAIL_RECEIPTS'
+  | 'BONDS';
 
 export interface Notification {
   id: string;

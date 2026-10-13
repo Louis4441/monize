@@ -68,6 +68,39 @@
     "riskOn": "[XX-risk-on-XX]",
     "riskOff": "[XX-risk-off-XX]"
   },
+  "bond": {
+    "maturitySoonTitle": "[XX-{series} matures on {date}-XX]",
+    "maturitySoonMessage": "[XX-{quantity} x {series} mature on {date}. {payout}-XX]",
+    "interestTitle": "[XX-{series}: interest payment today-XX]",
+    "interestMessage": "[XX-{quantity} x {series} pay {amount} of interest on {date}. Book it on the security page if it is not in your account yet.-XX]",
+    "interestMessageUnknown": "[XX-{quantity} x {series} pay interest on {date}. The amount is not known yet: a rate it depends on is not published.-XX]",
+    "rateResetTitle": "[XX-{series}: new interest period-XX]",
+    "rateResetMessage": "[XX-{series} entered period {period} on {date} at {rate} a year.-XX]",
+    "unbookedTitle": "[XX-{series}: matured, redemption not booked-XX]",
+    "unbookedMessage": "[XX-{quantity} x {series} matured on {date} and no redemption is booked. {payout} Book the redemption on the security page.-XX]",
+    "payoutKnown": "[XX-The payout is {payout}.-XX]",
+    "payoutUnknown": "[XX-The payout is not known yet: {reason}.-XX]",
+    "reason": {
+      "RATE_UNKNOWN": "[XX-a rate it depends on is not published yet-XX]",
+      "TERMS_INCOMPLETE": "[XX-the terms of the series are incomplete-XX]",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "[XX-a purchase date is outside the sale window of the series-XX]",
+      "other": "[XX-it cannot be worked out from the data stored-XX]"
+    },
+    "benchmarkTitle": "[XX-{benchmark}: new observation {observation}-XX]",
+    "benchmarkIntro": "[XX-{publisher} published {benchmark} for {observation}: {value}.-XX]",
+    "benchmarkSeries": "[XX-{series}: period from {date} at {rate} a year.-XX]",
+    "benchmarkSeriesUnknown": "[XX-{series}: period from {date}, the rate is not known yet.-XX]",
+    "benchmarkMore": "[XX-And {more} more.-XX]",
+    "missingTitle": "[XX-Bond figures are not known yet-XX]",
+    "missingMessage": "[XX-Some bond figures cannot be worked out. {causes}-XX]",
+    "cause": {
+      "observation": "[XX-The {observation} observation of {benchmark} ({publisher}) is not stored: it is not published yet, or the feed has not been fetched since. Refresh on the bond page.-XX]",
+      "observationNoPublisher": "[XX-The {observation} observation of {benchmark} is not stored: it is not published yet, or the feed has not been fetched since. Refresh on the bond page.-XX]",
+      "terms": "[XX-The terms of {series} are incomplete. Refresh the series on the bond page.-XX]",
+      "purchase": "[XX-A purchase of {series} on {date} is outside its sale window ({from} to {to}). Correct the purchase date.-XX]",
+      "lots": "[XX-The lots cannot be derived from the ledger ({code}). Correct the ledger.-XX]"
+    }
+  },
   "emailReceiptsAttention": {
     "title": "[XX-Email receipts need attention-XX]",
     "message": "[XX-Your receipts inbox holds {noParser} without a profile and {parseFailed} that their profile did not recognize. Open to review.-XX]"
