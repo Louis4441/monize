@@ -26,6 +26,7 @@ import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 import { LinkifiedText } from '@/components/ui/LinkifiedText';
+import { quoteSearchValue } from '@/lib/search-query';
 
 type SortField = 'date' | 'amount' | 'payee' | 'account';
 
@@ -201,7 +202,14 @@ export function UncategorizedTransactionsReport() {
     const params = new URLSearchParams();
     params.set('categoryIds', 'uncategorized');
     params.set('accountIds', tx.accountId);
-    const search = tx.payeeName || tx.description;
+    // One quoted term, so a multi-word name is not read as AND-ed words: the
+    // payee exactly, or else the description as a phrase (contains, so a
+    // description cut at the search's 200-character cap still matches).
+    const search = tx.payeeName
+      ? quoteSearchValue('payee', tx.payeeName)
+      : tx.description
+        ? quoteSearchValue('memo', tx.description, 'contains')
+        : '';
     if (search) params.set('search', search);
     router.push(`/transactions?${params.toString()}`);
   };
