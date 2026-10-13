@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "np. 5,5",
     "estimatedFromHistory": "Oszacowano z historii transakcji: {rate}%",
     "interestExpenseCategory": "Kategoria wydatków na odsetki",
+    "interestExpenseCategoryRequired": "Kategoria wydatków na odsetki (wymagane)",
     "detectedCategory": "Wykryto: {name}",
     "selectCategory": "Wybierz kategorię...",
     "payeeLender": "Odbiorca / Pożyczkodawca",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Płatność z konta (wymagane)",
     "paymentFromAccountEditHelp": "Zmiana przenosi nadchodzące zaplanowane płatności i regułę dopasowywania płatności na nowe konto. Już zaksięgowane płatności nie ulegają zmianie.",
     "interestCategory": "Kategoria odsetek",
+    "interestCategoryRequired": "Kategoria odsetek (wymagane)",
     "interestBookingMode": {
       "label": "Jak księgowane są odsetki?",
       "help": "Aby wykrywanie oprocentowania czytało je poprawnie. Automatycznie pasuje w większości.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "Data pierwszej płatności jest wymagana",
     "paymentAccountRequired": "Konto płatności jest wymagane",
     "amortizationRequired": "Okres spłaty jest wymagany",
+    "interestCategoryRequired": "Wybierz kategorię, na którą księgowane są odsetki tej pożyczki",
     "acceleratedNeedsAnnuity": "Ten kredyt hipoteczny jest spłacany według przyspieszonego harmonogramu, który ma tylko kredyt z ratami równymi. Kredyt z ratami malejącymi lub tylko odsetkowy wymaga zwykłej częstotliwości płatności, więc zostaw typ z ratami równymi.",
     "paymentMatchingPayeePatternRequired": "Podaj wzorzec odbiorcy, który rozpozna obciążenie z banku",
     "paymentMatchingPayeePatternWildcard": "Wzorzec odbiorcy musi zawierać symbol wieloznaczny *",

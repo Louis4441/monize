@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "mis. 5,5",
     "estimatedFromHistory": "Diperkirakan dari riwayat transaksi: {rate}%",
     "interestExpenseCategory": "Kategori Pengeluaran Bunga",
+    "interestExpenseCategoryRequired": "Kategori Pengeluaran Bunga (wajib)",
     "detectedCategory": "Terdeteksi: {name}",
     "selectCategory": "Pilih kategori...",
     "payeeLender": "Penerima / Pemberi Pinjaman",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Pembayaran Dari Akun (wajib)",
     "paymentFromAccountEditHelp": "Mengubahnya memindahkan pembayaran terjadwal mendatang dan aturan pencocokan pembayaran ke akun baru. Pembayaran yang sudah dicatat tidak berubah.",
     "interestCategory": "Kategori Bunga",
+    "interestCategoryRequired": "Kategori Bunga (wajib)",
     "interestBookingMode": {
       "label": "Bagaimana bunga dicatat?",
       "help": "Agar deteksi suku bunga membacanya dengan benar. Otomatis cocok untuk kebanyakan.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "Tanggal pembayaran pertama wajib diisi",
     "paymentAccountRequired": "Akun pembayaran wajib dipilih",
     "amortizationRequired": "Periode amortisasi wajib diisi",
+    "interestCategoryRequired": "Pilih kategori tempat bunga pinjaman ini dicatat",
     "acceleratedNeedsAnnuity": "KPR ini dibayar dengan jadwal dipercepat, yang hanya dimiliki KPR anuitas. KPR linear atau hanya bunga memerlukan frekuensi pembayaran biasa, jadi tetap gunakan jenis anuitas.",
     "paymentMatchingPayeePatternRequired": "Masukkan pola penerima pembayaran untuk mencocokkan debit bank",
     "paymentMatchingPayeePatternWildcard": "Pola penerima pembayaran harus menyertakan karakter pengganti *",

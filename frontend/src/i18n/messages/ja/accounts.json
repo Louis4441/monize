@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "例：5.5",
     "estimatedFromHistory": "取引履歴からの推定：{rate}%",
     "interestExpenseCategory": "利息費用カテゴリ",
+    "interestExpenseCategoryRequired": "利息費用カテゴリ（必須）",
     "detectedCategory": "検出済み：{name}",
     "selectCategory": "カテゴリを選択...",
     "payeeLender": "支払先 / 貸し手",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "支払い元勘定科目（必須）",
     "paymentFromAccountEditHelp": "変更すると、今後の予定支払いと支払い照合ルールが新しい口座に移動します。記帳済みの支払いは変更されません。",
     "interestCategory": "利息カテゴリ",
+    "interestCategoryRequired": "利息カテゴリ（必須）",
     "interestBookingMode": {
       "label": "利息の記録方法は？",
       "help": "金利検出が正しく読めるようにします。ほとんどは自動でOK。",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "初回支払日は必須です",
     "paymentAccountRequired": "支払い元勘定科目は必須です",
     "amortizationRequired": "償却期間は必須です",
+    "interestCategoryRequired": "このローンの利息を記帳するカテゴリを選択してください",
     "acceleratedNeedsAnnuity": "この住宅ローンは繰上げ型の返済スケジュールで支払われており、これは元利均等返済の住宅ローンにしかありません。元金均等返済や利息のみの住宅ローンには通常の返済頻度が必要なため、元利均等の種類のままにしてください。",
     "paymentMatchingPayeePatternRequired": "銀行の引き落としと照合する受取人パターンを入力してください",
     "paymentMatchingPayeePatternWildcard": "受取人パターンには * ワイルドカードを含める必要があります",

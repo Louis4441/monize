@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "vd. 5,5",
     "estimatedFromHistory": "Ước tính từ lịch sử giao dịch: {rate}%",
     "interestExpenseCategory": "Danh mục chi phí lãi",
+    "interestExpenseCategoryRequired": "Danh mục chi phí lãi (bắt buộc)",
     "detectedCategory": "Đã phát hiện: {name}",
     "selectCategory": "Chọn danh mục...",
     "payeeLender": "Người nhận thanh toán / Bên cho vay",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Thanh toán từ tài khoản (bắt buộc)",
     "paymentFromAccountEditHelp": "Thay đổi mục này sẽ chuyển các khoản thanh toán theo lịch sắp tới và quy tắc đối chiếu thanh toán sang tài khoản mới. Các khoản thanh toán đã ghi sổ không thay đổi.",
     "interestCategory": "Danh mục lãi suất",
+    "interestCategoryRequired": "Danh mục lãi suất (bắt buộc)",
     "interestBookingMode": {
       "label": "Lãi được ghi nhận thế nào?",
       "help": "Để phát hiện lãi suất đọc đúng. Tự động hợp với hầu hết.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "Ngày thanh toán đầu tiên là bắt buộc",
     "paymentAccountRequired": "Tài khoản thanh toán là bắt buộc",
     "amortizationRequired": "Thời gian khấu hao là bắt buộc",
+    "interestCategoryRequired": "Chọn danh mục ghi nhận lãi của khoản vay này",
     "acceleratedNeedsAnnuity": "Khoản vay thế chấp này được trả theo lịch tăng tốc, vốn chỉ có ở khoản vay trả góp đều. Khoản vay trả gốc đều hoặc chỉ trả lãi cần tần suất thanh toán thông thường, vì vậy hãy giữ loại trả góp đều.",
     "paymentMatchingPayeePatternRequired": "Nhập mẫu người nhận để khớp với khoản ghi nợ của ngân hàng",
     "paymentMatchingPayeePatternWildcard": "Mẫu người nhận phải chứa ký tự đại diện *",

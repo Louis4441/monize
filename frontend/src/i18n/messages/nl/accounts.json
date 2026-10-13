@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "bijv. 5,5",
     "estimatedFromHistory": "Geschat uit transactiegeschiedenis: {rate}%",
     "interestExpenseCategory": "Categorie renteonkosten",
+    "interestExpenseCategoryRequired": "Categorie renteonkosten (vereist)",
     "detectedCategory": "Gedetecteerd: {name}",
     "selectCategory": "Selecteer categorie...",
     "payeeLender": "Begunstigde / geldverstrekker",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Betaling van rekening (vereist)",
     "paymentFromAccountEditHelp": "Als u dit wijzigt, worden de komende geplande betalingen en de betalingskoppelingsregel naar de nieuwe rekening verplaatst. Reeds geboekte betalingen veranderen niet.",
     "interestCategory": "Rentecategorie",
+    "interestCategoryRequired": "Rentecategorie (vereist)",
     "interestBookingMode": {
       "label": "Hoe wordt rente geboekt?",
       "help": "Zodat rentedetectie het goed leest. Automatisch werkt meestal.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "Datum eerste betaling is vereist",
     "paymentAccountRequired": "Betaalrekening is vereist",
     "amortizationRequired": "Afschrijvingstermijn is vereist",
+    "interestCategoryRequired": "Kies de categorie waarop de rente van deze lening wordt geboekt",
     "acceleratedNeedsAnnuity": "Deze hypotheek wordt volgens een versneld schema betaald, dat alleen een annuïteitenhypotheek heeft. Een lineaire of aflossingsvrije hypotheek heeft een gewone betaalfrequentie nodig, dus houd een annuïteitensoort aan.",
     "paymentMatchingPayeePatternRequired": "Voer een begunstigdepatroon in om de afschrijving van de bank te herkennen",
     "paymentMatchingPayeePatternWildcard": "Het begunstigdepatroon moet een *-jokerteken bevatten",

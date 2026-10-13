@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "ex. 5,5",
     "estimatedFromHistory": "Estimé à partir de l'historique : {rate}%",
     "interestExpenseCategory": "Catégorie de charges d'intérêts",
+    "interestExpenseCategoryRequired": "Catégorie de charges d'intérêts (obligatoire)",
     "detectedCategory": "Détecté : {name}",
     "selectCategory": "Sélectionner une catégorie…",
     "payeeLender": "Bénéficiaire / Prêteur",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Paiement depuis le compte (obligatoire)",
     "paymentFromAccountEditHelp": "La modifier transfère les prochains paiements planifiés et la règle de rapprochement des paiements vers le nouveau compte. Les paiements déjà comptabilisés ne changent pas.",
     "interestCategory": "Catégorie d'intérêts",
+    "interestCategoryRequired": "Catégorie d'intérêts (obligatoire)",
     "interestBookingMode": {
       "label": "Comment les intérêts sont-ils enregistrés ?",
       "help": "Pour que la détection du taux les lise correctement. Auto convient le plus souvent.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "La date du premier paiement est obligatoire",
     "paymentAccountRequired": "Le compte de paiement est obligatoire",
     "amortizationRequired": "La période d'amortissement est obligatoire",
+    "interestCategoryRequired": "Choisissez la catégorie dans laquelle les intérêts de ce prêt sont comptabilisés",
     "acceleratedNeedsAnnuity": "Ce prêt hypothécaire est remboursé selon un calendrier accéléré, que seul un prêt à annuités possède. Un prêt linéaire ou in fine exige une fréquence de paiement régulière : conservez un type à annuités.",
     "paymentMatchingPayeePatternRequired": "Saisissez un modèle de bénéficiaire pour identifier le prélèvement de la banque",
     "paymentMatchingPayeePatternWildcard": "Le modèle de bénéficiaire doit comporter un caractère générique *",

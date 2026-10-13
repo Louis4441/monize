@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "उदा. 5.5",
     "estimatedFromHistory": "लेनदेन इतिहास से अनुमानित: {rate}%",
     "interestExpenseCategory": "ब्याज व्यय श्रेणी",
+    "interestExpenseCategoryRequired": "ब्याज व्यय श्रेणी (आवश्यक)",
     "detectedCategory": "पाया गया: {name}",
     "selectCategory": "श्रेणी चुनें...",
     "payeeLender": "आदाता / ऋणदाता",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "भुगतान खाता (आवश्यक)",
     "paymentFromAccountEditHelp": "इसे बदलने से आगामी निर्धारित भुगतान और भुगतान मिलान नियम नए खाते में चले जाते हैं। पहले से दर्ज भुगतान नहीं बदलते।",
     "interestCategory": "ब्याज श्रेणी",
+    "interestCategoryRequired": "ब्याज श्रेणी (आवश्यक)",
     "interestBookingMode": {
       "label": "ब्याज कैसे दर्ज होता है?",
       "help": "ताकि दर पहचान सही पढ़े। ऑटो अधिकांश के लिए ठीक है।",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "पहली भुगतान तिथि आवश्यक है",
     "paymentAccountRequired": "भुगतान खाता आवश्यक है",
     "amortizationRequired": "परिशोधन अवधि आवश्यक है",
+    "interestCategoryRequired": "वह श्रेणी चुनें जिसमें इस ऋण का ब्याज दर्ज होता है",
     "acceleratedNeedsAnnuity": "इस मॉर्गेज का भुगतान त्वरित अनुसूची पर होता है, जो केवल एन्युटी मॉर्गेज में होती है। रैखिक या केवल-ब्याज मॉर्गेज को नियमित भुगतान आवृत्ति चाहिए, इसलिए एन्युटी प्रकार ही रखें।",
     "paymentMatchingPayeePatternRequired": "बैंक की डेबिट से मिलान के लिए पेयी पैटर्न दर्ज करें",
     "paymentMatchingPayeePatternWildcard": "पेयी पैटर्न में * वाइल्डकार्ड शामिल होना चाहिए",

@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "例如 5.5",
     "estimatedFromHistory": "根据交易历史估算：{rate}%",
     "interestExpenseCategory": "利息支出科目",
+    "interestExpenseCategoryRequired": "利息支出科目（必填）",
     "detectedCategory": "已检测到：{name}",
     "selectCategory": "选择科目...",
     "payeeLender": "收款人/贷款方",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "还款来源账户（必填）",
     "paymentFromAccountEditHelp": "更改后，即将到来的计划付款和付款匹配规则将转移到新账户。已入账的付款不会改变。",
     "interestCategory": "利息科目",
+    "interestCategoryRequired": "利息科目（必填）",
     "interestBookingMode": {
       "label": "利息如何记账？",
       "help": "让利率检测正确读取。多数情况用自动即可。",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "首次还款日期为必填项",
     "paymentAccountRequired": "还款来源账户为必填项",
     "amortizationRequired": "摊销期为必填项",
+    "interestCategoryRequired": "请选择记录此贷款利息的科目",
     "acceleratedNeedsAnnuity": "此按揭按加速还款计划支付，只有等额本息按揭才有这种计划。等额本金或只付利息的按揭需要常规还款频率，因此请保留等额本息类型。",
     "paymentMatchingPayeePatternRequired": "请输入用于识别银行扣款的收款人模式",
     "paymentMatchingPayeePatternWildcard": "收款人模式必须包含 * 通配符",
