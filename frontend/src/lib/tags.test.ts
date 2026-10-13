@@ -65,4 +65,13 @@ describe('tagsApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/tags/transaction-counts');
     expect(result['t-1']).toBe(5);
   });
+
+  it('getUsage fetches /tags/usage on every call', async () => {
+    const usage = { 't-1': { lastUsed: '2026-09-30', count: 4 } };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: usage });
+    expect(await tagsApi.getUsage()).toEqual(usage);
+    await tagsApi.getUsage();
+    expect(apiClient.get).toHaveBeenCalledWith('/tags/usage');
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
 });

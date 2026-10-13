@@ -39,7 +39,7 @@ import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { categoriesApi } from '@/lib/categories';
 import { payeesApi } from '@/lib/payees';
 import { tagsApi } from '@/lib/tags';
-import { Transaction, PaginationInfo, BulkUpdateData, BulkUpdateFilters, MonthlyTotal, BulkDeleteData } from '@/types/transaction';
+import { Transaction, PaginationInfo, BulkUpdateData, BulkUpdateFilters, MonthlyTotal, BulkDeleteData, SearchInterpretation } from '@/types/transaction';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTransactionSelection } from '@/hooks/useTransactionSelection';
 import { useTransactionFilters } from '@/hooks/useTransactionFilters';
@@ -246,6 +246,12 @@ function TransactionsContent() {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [startingBalance, setStartingBalance] = useState<number | undefined>();
   const [startingBalanceWithheld, setStartingBalanceWithheld] = useState<'sort' | undefined>();
+  // How the server read the search, kept with the search string that produced
+  // it so a reply for an earlier string is never shown under a newer one.
+  const [searchEcho, setSearchEcho] = useState<{
+    search: string;
+    interpretation: SearchInterpretation | undefined;
+  } | null>(null);
   // The order the rows currently on screen came back in. Held beside them
   // rather than read from the live sort, so a click that has not been answered
   // yet cannot make the register reinterpret the page it is still showing.
@@ -413,6 +419,7 @@ function TransactionsContent() {
             Object.keys(chartParams).length > 0 ? chartParams : undefined,
           ).catch(() => [] as Array<{ date: string; balance: number; accountId: string; currencyCode: string }>);
 
+      const requestedSearch = filters.filterSearch;
       const [transactionsResponse, chartResult] = await Promise.all([
         transactionsApi.getAll({
           accountIds: accountIdsForQuery,
@@ -453,6 +460,10 @@ function TransactionsContent() {
       // Adopted with the rows and the balance it belongs to: a reload that
       // keeps the rows has to keep the reason the balance is missing too.
       setStartingBalanceWithheld(transactionsResponse.startingBalanceWithheld);
+      setSearchEcho({
+        search: requestedSearch,
+        interpretation: transactionsResponse.searchInterpretation,
+      });
       // The order these rows were fetched in, adopted with them. The headers
       // moved the moment the reader clicked; the running balance, the today
       // divider and the Balance column itself must not, because they are
@@ -1446,6 +1457,11 @@ function TransactionsContent() {
           filterEndDate={filters.filterEndDate}
           filterSearch={filters.filterSearch}
           searchInput={filters.searchInput}
+          searchInterpretation={
+            searchEcho && searchEcho.search === filters.filterSearch
+              ? searchEcho.interpretation
+              : undefined
+          }
           filterAccountStatus={filters.filterAccountStatus}
           filterTimePeriod={filters.filterTimePeriod}
           filterAmountFrom={filters.filterAmountFrom}

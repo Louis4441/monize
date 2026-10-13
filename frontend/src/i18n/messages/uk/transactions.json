@@ -258,7 +258,7 @@
       "statuses": "Всі статуси",
       "amountMin": "Мін",
       "amountMax": "Макс",
-      "search": "Пошук за одержувачем, категорією, сумою, тегом, описом, реф. №...",
+      "search": "Пошук, або спробуйте #10 чи payee:costco",
       "tagKeyValue": "напр. usa"
     },
     "tagKeyNone": "Будь-який (без фільтра за ключем)",
@@ -609,5 +609,69 @@
     "title": "Витрати за {key}",
     "other": "Інше",
     "noData": "Немає позначених тегами витрат для розподілу за цим ключем."
+  },
+  "searchSyntax": {
+    "open": "Синтаксис пошуку",
+    "title": "Синтаксис пошуку",
+    "fields": "Поля: payee, memo, cat, tag, account, ref, amount, date, status, is, has. Виберіть приклад, щоб вставити його в поле пошуку.",
+    "examples": {
+      "allWords": "Кожне слово десь трапляється",
+      "phrase": "Саме ця фраза",
+      "exclude": "Виключити все, що збігається з refund",
+      "fieldContains": "Отримувач містить costco",
+      "fieldExact": "Отримувач точно Costco",
+      "reference": "Номер чека або посилання рівно 10",
+      "wildcard": "Посилання починається з 10",
+      "amountOver": "Сума понад 100",
+      "amountRange": "Сума від 50 до 100",
+      "datePeriod": "Будь-який день березня 2026",
+      "isSplit": "Розділені операції",
+      "hasAttachment": "Має вкладення"
+    }
+  },
+  "searchInterpretation": {
+    "label": "Пошук:",
+    "negated": "не {phrase}",
+    "malformed": "{raw} (не розпізнано, шукали як текст)",
+    "empty": "{raw} (порожньо, пропущено)",
+    "status": "Статус: {value}",
+    "any": "«{value}» у будь-якому полі",
+    "fields": {
+      "payee": "Отримувач",
+      "memo": "Нотатка",
+      "cat": "Категорія",
+      "tag": "Мітка",
+      "account": "Рахунок",
+      "ref": "Посилання",
+      "amount": "Сума",
+      "date": "Дата",
+      "status": "Статус",
+      "is": "Тип",
+      "has": "Має"
+    },
+    "ops": {
+      "contains": "{field} містить «{value}»",
+      "exact": "{field}: «{value}»",
+      "glob": "{field} відповідає «{value}»",
+      "eq": "{field}: {value}",
+      "gt": "{field} понад {value}",
+      "gte": "{field} від {value}",
+      "lt": "{field} менше {value}",
+      "lte": "{field} до {value}",
+      "between": "{field} від {value} до {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Перекази",
+        "split": "Розділені операції",
+        "uncategorized": "Без категорії"
+      },
+      "has": {
+        "attachment": "Має вкладення",
+        "ref": "Має номер посилання",
+        "memo": "Має нотатку",
+        "tag": "Має мітку"
+      }
+    }
   }
 }

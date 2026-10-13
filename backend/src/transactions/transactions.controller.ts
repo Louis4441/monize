@@ -68,7 +68,11 @@ import {
   DATE_REGEX,
 } from "../common/query-param-utils";
 import { tr } from "../i18n/translate";
-import { MAX_SEARCH_LENGTH } from "./transaction-search-query.util";
+import {
+  MAX_SEARCH_LENGTH,
+  MAX_SEARCH_TERMS,
+  SEARCH_ENUM_VALUES,
+} from "./transaction-search-query.util";
 import {
   TagKeyFilter,
   TagKeyFilterOp,
@@ -84,14 +88,15 @@ const ALL_TRANSACTION_STATUSES = new Set<string>(
 
 /** The `search` parameter's Swagger text, one for every endpoint that takes it. */
 const SEARCH_PARAM_DESCRIPTION =
-  "Search text, at most 200 characters and 12 terms. A bare word matches " +
-  "description, payee, category, amount, reference number, split memo and " +
-  'tag; words are ANDed, "quotes" make a phrase and -word excludes. ' +
-  "field:text is contains, field:=text exact, * a wildcard, over payee, " +
-  "memo, cat, tag, account, ref, amount, date, status " +
-  "(cleared|reconciled|unreconciled|void), is (transfer|split|uncategorized) " +
-  "and has (attachment|ref|memo|tag). #10 is reference exactly 10; amounts " +
-  "and dates take >, >=, <, <= and a..b (date:2026-03 is that month).";
+  `Search text, at most ${MAX_SEARCH_LENGTH} characters and ` +
+  `${MAX_SEARCH_TERMS} terms. A bare word matches description, payee, ` +
+  "category, amount, reference number, split memo and tag; words are ANDed, " +
+  '"quotes" make a phrase and -word excludes. field:text is contains, ' +
+  "field:=text exact, * a wildcard, over payee, memo, cat, tag, account, " +
+  `ref, amount, date, status (${SEARCH_ENUM_VALUES.status.join("|")}), ` +
+  `is (${SEARCH_ENUM_VALUES.is.join("|")}) and has ` +
+  `(${SEARCH_ENUM_VALUES.has.join("|")}). #10 is reference exactly 10; ` +
+  "amounts and dates take >, >=, <, <= and a..b (date:2026-03 is that month).";
 
 /**
  * The `search` query value: refused when not a string (a repeated key arrives

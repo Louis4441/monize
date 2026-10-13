@@ -59,7 +59,7 @@ vi.mock('@/lib/payees', () => ({
   payeesApi: { getAll: vi.fn().mockResolvedValue([]), create: vi.fn(), getById: vi.fn() },
 }));
 vi.mock('@/lib/tags', () => ({
-  tagsApi: { getAll: vi.fn().mockResolvedValue([]), create: vi.fn() },
+  tagsApi: { getAll: vi.fn().mockResolvedValue([]), getUsage: vi.fn().mockResolvedValue({}), create: vi.fn() },
 }));
 vi.mock('@/lib/scheduled-transactions', () => ({
   scheduledTransactionsApi: { create: vi.fn(), update: vi.fn() },

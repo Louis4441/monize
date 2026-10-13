@@ -258,7 +258,7 @@
       "statuses": "Alle Status",
       "amountMin": "Min.",
       "amountMax": "Max.",
-      "search": "Zahlungsempfänger, Kategorie, Betrag, Tag, Beschreibung, Referenz-Nr. suchen...",
+      "search": "Suchen, oder #10 bzw. payee:costco versuchen",
       "tagKeyValue": "z. B. usa"
     },
     "tagKeyNone": "Beliebig (kein Schlüsselfilter)",
@@ -609,5 +609,69 @@
     "title": "Ausgaben nach {key}",
     "other": "Sonstige",
     "noData": "Keine getaggten Ausgaben für diesen Schlüssel."
+  },
+  "searchSyntax": {
+    "open": "Suchsyntax",
+    "title": "Suchsyntax",
+    "fields": "Felder: payee, memo, cat, tag, account, ref, amount, date, status, is, has. Wählen Sie ein Beispiel, um es in das Suchfeld zu übernehmen.",
+    "examples": {
+      "allWords": "Jedes Wort kommt irgendwo vor",
+      "phrase": "Genau diese Wortfolge",
+      "exclude": "Alles mit refund ausschließen",
+      "fieldContains": "Empfänger enthält costco",
+      "fieldExact": "Empfänger ist genau Costco",
+      "reference": "Scheck- oder Referenznummer genau 10",
+      "wildcard": "Referenz beginnt mit 10",
+      "amountOver": "Betrag über 100",
+      "amountRange": "Betrag von 50 bis 100",
+      "datePeriod": "Jeder Tag im März 2026",
+      "isSplit": "Aufgeteilte Buchungen",
+      "hasAttachment": "Hat einen Anhang"
+    }
+  },
+  "searchInterpretation": {
+    "label": "Suche:",
+    "negated": "nicht {phrase}",
+    "malformed": "{raw} (nicht verstanden, als Text gesucht)",
+    "empty": "{raw} (leer, ignoriert)",
+    "status": "Status ist {value}",
+    "any": "„{value}“ überall",
+    "fields": {
+      "payee": "Empfänger",
+      "memo": "Notiz",
+      "cat": "Kategorie",
+      "tag": "Tag",
+      "account": "Konto",
+      "ref": "Referenz",
+      "amount": "Betrag",
+      "date": "Datum",
+      "status": "Status",
+      "is": "Typ",
+      "has": "Hat"
+    },
+    "ops": {
+      "contains": "{field} enthält „{value}“",
+      "exact": "{field} ist „{value}“",
+      "glob": "{field} entspricht „{value}“",
+      "eq": "{field} ist {value}",
+      "gt": "{field} über {value}",
+      "gte": "{field} {value} oder mehr",
+      "lt": "{field} unter {value}",
+      "lte": "{field} {value} oder weniger",
+      "between": "{field} von {value} bis {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Umbuchungen",
+        "split": "Aufgeteilte Buchungen",
+        "uncategorized": "Ohne Kategorie"
+      },
+      "has": {
+        "attachment": "Hat einen Anhang",
+        "ref": "Hat eine Referenznummer",
+        "memo": "Hat eine Notiz",
+        "tag": "Hat einen Tag"
+      }
+    }
   }
 }

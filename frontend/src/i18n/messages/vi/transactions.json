@@ -258,7 +258,7 @@
       "statuses": "Tất cả trạng thái",
       "amountMin": "Tối thiểu",
       "amountMax": "Tối đa",
-      "search": "Tìm kiếm người nhận, danh mục, số tiền, thẻ, mô tả, số tham chiếu...",
+      "search": "Tìm kiếm, hoặc thử #10 hay payee:costco",
       "tagKeyValue": "ví dụ: usa"
     },
     "tagKeyNone": "Bất kỳ (không lọc theo khóa)",
@@ -609,5 +609,69 @@
     "title": "Chi tiêu theo {key}",
     "other": "Khác",
     "noData": "Không có chi tiêu được gắn thẻ để phân tích cho khóa này."
+  },
+  "searchSyntax": {
+    "open": "Cú pháp tìm kiếm",
+    "title": "Cú pháp tìm kiếm",
+    "fields": "Trường: payee, memo, cat, tag, account, ref, amount, date, status, is, has. Chọn một ví dụ để đưa vào ô tìm kiếm.",
+    "examples": {
+      "allWords": "Mỗi từ khớp ở đâu đó",
+      "phrase": "Đúng cụm từ này",
+      "exclude": "Loại trừ mọi thứ khớp với refund",
+      "fieldContains": "Người nhận chứa costco",
+      "fieldExact": "Người nhận đúng là Costco",
+      "reference": "Số séc hoặc số tham chiếu đúng 10",
+      "wildcard": "Tham chiếu bắt đầu bằng 10",
+      "amountOver": "Số tiền trên 100",
+      "amountRange": "Số tiền từ 50 đến 100",
+      "datePeriod": "Bất kỳ ngày nào trong tháng 3 năm 2026",
+      "isSplit": "Giao dịch tách",
+      "hasAttachment": "Có tệp đính kèm"
+    }
+  },
+  "searchInterpretation": {
+    "label": "Đang tìm:",
+    "negated": "không {phrase}",
+    "malformed": "{raw} (không hiểu, tìm như văn bản)",
+    "empty": "{raw} (trống, bỏ qua)",
+    "status": "Trạng thái là {value}",
+    "any": "“{value}” ở bất kỳ đâu",
+    "fields": {
+      "payee": "Người nhận",
+      "memo": "Ghi chú",
+      "cat": "Danh mục",
+      "tag": "Thẻ",
+      "account": "Tài khoản",
+      "ref": "Tham chiếu",
+      "amount": "Số tiền",
+      "date": "Ngày",
+      "status": "Trạng thái",
+      "is": "Loại",
+      "has": "Có"
+    },
+    "ops": {
+      "contains": "{field} chứa “{value}”",
+      "exact": "{field} là “{value}”",
+      "glob": "{field} khớp “{value}”",
+      "eq": "{field} là {value}",
+      "gt": "{field} trên {value}",
+      "gte": "{field} từ {value} trở lên",
+      "lt": "{field} dưới {value}",
+      "lte": "{field} từ {value} trở xuống",
+      "between": "{field} từ {value} đến {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Chuyển khoản",
+        "split": "Giao dịch tách",
+        "uncategorized": "Chưa phân loại"
+      },
+      "has": {
+        "attachment": "Có tệp đính kèm",
+        "ref": "Có số tham chiếu",
+        "memo": "Có ghi chú",
+        "tag": "Có thẻ"
+      }
+    }
   }
 }

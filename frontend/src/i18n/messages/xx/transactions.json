@@ -258,7 +258,7 @@
       "statuses": "[XX-All statuses-XX]",
       "amountMin": "[XX-Min-XX]",
       "amountMax": "[XX-Max-XX]",
-      "search": "[XX-Search payee, category, amount, tag, description, reference #...-XX]",
+      "search": "[XX-Search, or try #10 or payee:costco-XX]",
       "tagKeyValue": "[XX-e.g. usa-XX]"
     },
     "tagKeyNone": "[XX-Any (no key filter)-XX]",
@@ -609,5 +609,69 @@
     "title": "[XX-Spending by {key}-XX]",
     "other": "[XX-Other-XX]",
     "noData": "[XX-No tagged spending to break down for this key.-XX]"
+  },
+  "searchSyntax": {
+    "open": "[XX-Search syntax-XX]",
+    "title": "[XX-Search syntax-XX]",
+    "fields": "[XX-Fields: payee, memo, cat, tag, account, ref, amount, date, status, is and has. Choose an example to put it in the search box.-XX]",
+    "examples": {
+      "allWords": "[XX-Every word matches somewhere-XX]",
+      "phrase": "[XX-This exact phrase-XX]",
+      "exclude": "[XX-Leave out anything matching refund-XX]",
+      "fieldContains": "[XX-Payee contains costco-XX]",
+      "fieldExact": "[XX-Payee is exactly Costco-XX]",
+      "reference": "[XX-Cheque or reference number 10 exactly-XX]",
+      "wildcard": "[XX-Reference starts with 10-XX]",
+      "amountOver": "[XX-Amount over 100-XX]",
+      "amountRange": "[XX-Amount from 50 to 100-XX]",
+      "datePeriod": "[XX-Any day in March 2026-XX]",
+      "isSplit": "[XX-Split transactions-XX]",
+      "hasAttachment": "[XX-Has an attachment-XX]"
+    }
+  },
+  "searchInterpretation": {
+    "label": "[XX-Searching:-XX]",
+    "negated": "[XX-not {phrase}-XX]",
+    "malformed": "[XX-{raw} (not understood, searched as text)-XX]",
+    "empty": "[XX-{raw} (empty, ignored)-XX]",
+    "status": "[XX-Status is {value}-XX]",
+    "any": "[XX-“{value}” anywhere-XX]",
+    "fields": {
+      "payee": "[XX-Payee-XX]",
+      "memo": "[XX-Memo-XX]",
+      "cat": "[XX-Category-XX]",
+      "tag": "[XX-Tag-XX]",
+      "account": "[XX-Account-XX]",
+      "ref": "[XX-Reference-XX]",
+      "amount": "[XX-Amount-XX]",
+      "date": "[XX-Date-XX]",
+      "status": "[XX-Status-XX]",
+      "is": "[XX-Type-XX]",
+      "has": "[XX-Has-XX]"
+    },
+    "ops": {
+      "contains": "[XX-{field} contains “{value}”-XX]",
+      "exact": "[XX-{field} is “{value}”-XX]",
+      "glob": "[XX-{field} matches “{value}”-XX]",
+      "eq": "[XX-{field} is {value}-XX]",
+      "gt": "[XX-{field} over {value}-XX]",
+      "gte": "[XX-{field} {value} or more-XX]",
+      "lt": "[XX-{field} under {value}-XX]",
+      "lte": "[XX-{field} {value} or less-XX]",
+      "between": "[XX-{field} from {value} to {valueTo}-XX]"
+    },
+    "enum": {
+      "is": {
+        "transfer": "[XX-Transfers-XX]",
+        "split": "[XX-Split transactions-XX]",
+        "uncategorized": "[XX-Uncategorized-XX]"
+      },
+      "has": {
+        "attachment": "[XX-Has an attachment-XX]",
+        "ref": "[XX-Has a reference number-XX]",
+        "memo": "[XX-Has a memo-XX]",
+        "tag": "[XX-Has a tag-XX]"
+      }
+    }
   }
 }
