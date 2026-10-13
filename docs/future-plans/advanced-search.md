@@ -8,9 +8,10 @@ filter because searching `#10` returns cheques 100, 101, 110 and 1010 and
 every amount or memo containing "10". The task list is
 [`advanced-search-tasks.md`](./advanced-search-tasks.md).
 
-Status: **approved-to-build** (2026-10-12). The decisions in section 3 were
-agreed in the planning session of that date; the open questions in section 13
-proceed on their recorded defaults unless a task's PR is told otherwise.
+Status: **built** (2026-10-12). B1 to F1 are merged (#1729 to #1733); F2
+(#1734), F3 and Q are open. The decisions in section 3 were agreed in the
+planning session of that date; section 13 records how each open question was
+answered.
 
 **Answer to the Discussion:** `ref:=10`, or the shorthand `#10`, returns
 cheque 10 and nothing else.
@@ -401,11 +402,15 @@ task Q.
 
 1. Ignore leading zeros and one leading `#` on an exact reference
    (section 4.3)? **Default: yes.** A bank import often pads cheque numbers.
+   *Built as the default (B2, `referenceKey` and its SQL twin, #1730).*
 2. Include `account:` in v1? **Default: yes**, as the row's own account
-   name, without adding that arm to a bare term.
-3. Is the term cap 12? **Default: 12.**
+   name, without adding that arm to a bare term. *Built as the default (B2,
+   #1730).*
+3. Is the term cap 12? **Default: 12.** *Built as the default (B1,
+   `MAX_SEARCH_TERMS`, #1729).*
 4. Should an amount comparison read the total only (decision 8), or also
-   the splits? **Default: total only.**
+   the splits? **Default: total only.** *Built as the default (B2, #1730):
+   equality reads the splits too, a comparison reads the total.*
 5. Does the register's search (`findAll` and `buildFilteredIdsSubquery`,
    which must agree) run at transaction grain, listing whole transactions
    with every split drawn, or at split grain, keeping today's partial-line
