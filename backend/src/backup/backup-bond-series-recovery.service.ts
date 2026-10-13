@@ -72,6 +72,9 @@ export interface BondSeriesRecovery {
  * did not come back are restored without it, as before (`unlinkedBondSeries`
  * counts them; the result lists the series and the reason).
  */
+/** How long a transient failure keeps a series from being asked for again. */
+export const TRANSIENT_COOLDOWN_MS = 10 * 60_000;
+
 /** Failures that say nothing about the series, only about the moment. */
 const TRANSIENT_REASONS: ReadonlySet<UnrecoveredBondSeriesReason> = new Set([
   "source-unavailable",
@@ -160,11 +163,13 @@ export class BackupBondSeriesRecoveryService {
         );
         unrecovered.set(key, describe(identity, reason));
         // Only a definitive answer (not published, refused) holds the day's
-        // lease. A transient one releases it, so a source outage during one
-        // person's restore does not keep the series from anyone else's
-        // restore, Refresh or backfill for a day.
+        // lease. A transient one shortens it to a cooldown rather than
+        // clearing it: a source outage during one person's restore must not
+        // keep the series from everyone for a day, and restores repeated
+        // back-to-back must not hit a source that has just said "slow down".
         if (TRANSIENT_REASONS.has(reason)) {
           await this.fetchSync.release(attemptJob, claimed);
+          await this.fetchSync.claim(attemptJob, TRANSIENT_COOLDOWN_MS);
         }
         // A limit answering (the source's own, since the restore is not charged
         // the per-user one) holds for every later request; asking again only

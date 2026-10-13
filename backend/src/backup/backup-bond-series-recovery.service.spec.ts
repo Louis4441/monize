@@ -12,6 +12,7 @@ import {
 import { FetchSyncService } from "../common/jobs/fetch-sync.service";
 import {
   BackupBondSeriesRecoveryService,
+  TRANSIENT_COOLDOWN_MS,
   classifyFetchFailure,
 } from "./backup-bond-series-recovery.service";
 import {
@@ -142,17 +143,24 @@ describe("BackupBondSeriesRecoveryService", () => {
     expect(second.unrecovered.map((u) => u.reason)).toEqual(["not-attempted"]);
   });
 
-  it("releases the day's lease after a transient failure, so the series can be asked for again", async () => {
-    const { service, fetchSeries, release } = setup();
-    fetchSeries.mockRejectedValueOnce(new ProviderUnavailableError("down", 1, null));
+  it("shortens the day's lease to a cooldown after a transient failure", async () => {
+    const { service, fetchSeries, release, claim } = setup();
+    fetchSeries.mockRejectedValueOnce(
+      new ProviderUnavailableError("down", 1, null),
+    );
     await service.recover(USER, backup(["EDO1036"]));
     expect(release).toHaveBeenCalledWith(
       "bond-series-attempt:PL|EDO1036",
       "token-bond-series-attempt:PL|EDO1036",
     );
+    expect(claim).toHaveBeenLastCalledWith(
+      "bond-series-attempt:PL|EDO1036",
+      TRANSIENT_COOLDOWN_MS,
+    );
+    // Within the cooldown the series is not asked for again.
     const second = await service.recover(USER, backup(["EDO1036"]));
-    expect(fetchSeries).toHaveBeenCalledTimes(2);
-    expect(second.unrecovered).toEqual([]);
+    expect(fetchSeries).toHaveBeenCalledTimes(1);
+    expect(second.unrecovered.map((u) => u.reason)).toEqual(["not-attempted"]);
   });
 
   it("fetches nothing when every series is already in the catalog", async () => {
