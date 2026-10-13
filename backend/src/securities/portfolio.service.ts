@@ -1504,6 +1504,12 @@ export class PortfolioService {
 
     const securityIds = [...new Set(holdings.map((h) => h.securityId))];
     const priceMap = await this.getLatestPrices(securityIds);
+    // A bond-linked holding is worth its own account's lots, never its quantity
+    // times the program-wide blend (bond-program-securities.md 2.4).
+    const bondValues = await this.calculationService.valueBondHoldings(
+      userId,
+      holdings,
+    );
 
     const accountCurrency = new Map<string, string>();
     for (const a of accounts) accountCurrency.set(a.id, a.currencyCode);
@@ -1512,10 +1518,16 @@ export class PortfolioService {
     const result = new Map<string, number>();
     for (const h of holdings) {
       if (Math.abs(Number(h.quantity)) < 0.0001) continue;
-      const price = priceMap.get(h.securityId);
-      if (price == null) continue;
-
-      const marketValue = Number(h.quantity) * price;
+      let marketValue: number;
+      if (h.security.bondProgramId) {
+        const own = bondValues.get(`${h.accountId}:${h.securityId}`);
+        if (!own) continue;
+        marketValue = own.marketValue;
+      } else {
+        const price = priceMap.get(h.securityId);
+        if (price == null) continue;
+        marketValue = Number(h.quantity) * price;
+      }
       const securityCurrency = h.security.currencyCode;
       const acctCurrency = accountCurrency.get(h.accountId) ?? securityCurrency;
 

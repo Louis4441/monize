@@ -1,8 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
-import { todayInTimezone } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
-import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
 import {
   annualizedReturn,
   annualizedReturnOverDays,
@@ -22,6 +20,7 @@ import {
   BondReferenceData,
   BondTermsSource,
   BondValuationService,
+  financialTodayOf,
 } from "./bond-valuation.service";
 import {
   BondValuation,
@@ -154,9 +153,7 @@ export class BondOfferService {
   ): Promise<BondOffer> {
     const country = countryCode.toUpperCase();
     return withScopedDb(this.dataSource, async (m) => {
-      const timezone = await getEffectiveTimezoneOfUser(m, userId);
-      const today = (todayInTimezone(timezone) ??
-        todayInTimezone("UTC")) as string;
+      const today = await financialTodayOf(m, userId);
       const ids = await this.idsOnSale(m, country, today);
       const series: BondOfferSeries[] = [];
       for (const id of ids) {

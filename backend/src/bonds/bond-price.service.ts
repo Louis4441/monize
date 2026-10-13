@@ -5,8 +5,6 @@ import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { returnedRows } from "../common/db/query-result";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
-import { todayInTimezone } from "../common/date-utils";
-import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
 import {
   FetchSyncJob,
   FetchSyncService,
@@ -21,6 +19,7 @@ import { BondLot, bondLotsAsOf } from "./bond-lots";
 import {
   BondReferenceData,
   BondValuationService,
+  financialTodayOf,
 } from "./bond-valuation.service";
 import { ExactDecimal } from "./domain/exact-decimal";
 import { grossValueSeries } from "./engine/bond-engine";
@@ -205,7 +204,7 @@ export class BondPriceService {
               .filter((id): id is string => typeof id === "string"),
           ),
         );
-        const today = options.today ?? (await this.financialToday(m, userId));
+        const today = options.today ?? (await financialTodayOf(m, userId));
         const prices = this.dailyPrices(ledger.transactions, references, today);
 
         const written = await this.upsertPrices(m, securityId, prices);
@@ -348,20 +347,6 @@ export class BondPriceService {
     for (const accountId of accountIds) {
       this.netWorthService.triggerDebouncedRecalc(accountId, userId);
     }
-  }
-
-  /**
-   * The user's financial today (R17): the date in the timezone the user's
-   * preferences name, the same rule the daily jobs bucket users by
-   * (`getUsersByEffectiveTimezone`). Read on the transaction, so a request and
-   * the cron end on the same day for one user.
-   */
-  private async financialToday(
-    m: EntityManager,
-    userId: string,
-  ): Promise<string> {
-    const timezone = await getEffectiveTimezoneOfUser(m, userId);
-    return (todayInTimezone(timezone) ?? todayInTimezone("UTC")) as string;
   }
 
   /**

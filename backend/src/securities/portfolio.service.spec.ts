@@ -36,6 +36,7 @@ jest.mock("../common/db/scoped-db", () =>
 
 describe("PortfolioService", () => {
   let service: PortfolioService;
+  let bondValuation: { valueByAccount: jest.Mock };
   let holdingsRepository: Record<string, jest.Mock>;
   let securityPriceRepository: Record<string, jest.Mock>;
   let securityRepository: Record<string, jest.Mock>;
@@ -336,9 +337,11 @@ describe("PortfolioService", () => {
         : accountsRepository.query(sql, params),
     );
 
+    bondValuation = { valueByAccount: jest.fn() };
     const calculationService = new PortfolioCalculationService(
       dataSource as never,
       exchangeRateService as never,
+      bondValuation as never,
     );
     // Default: a portfolio with no investment transaction at all, which is the
     // empty decision rather than a zero return.
@@ -3763,6 +3766,74 @@ describe("PortfolioService", () => {
 
       const result = await service.getAccountMarketValues(userId);
       expect(result.get("acct-brokerage-1")).toBe(2000);
+    });
+
+    describe("a bond-linked holding", () => {
+      const bondSecurity = {
+        ...mockSecurityXIC,
+        id: "sec-bond",
+        securityType: "BOND",
+        bondProgramId: "prog-1",
+      };
+      const heldIn = (accountId: string) =>
+        ({
+          ...mockHoldingVFV,
+          id: `hold-${accountId}`,
+          accountId,
+          securityId: "sec-bond",
+          security: bondSecurity,
+          quantity: "10",
+        }) as any;
+
+      beforeEach(() => {
+        accountsRepository.find.mockResolvedValue([
+          mockBrokerageAccount,
+          { ...mockBrokerageAccount, id: "acct-brokerage-2" },
+        ]);
+        holdingsRepository.find.mockResolvedValue([
+          heldIn("acct-brokerage-1"),
+          heldIn("acct-brokerage-2"),
+        ]);
+        // The blend (117.74) a quantity x price reading would use.
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-bond",
+            close_price: "117.74",
+            price_date: "2026-02-01",
+          },
+        ]);
+      });
+
+      it("values each account by its own lots, not quantity x the blend", async () => {
+        bondValuation.valueByAccount.mockResolvedValue({
+          asOf: "2026-02-01",
+          accounts: new Map([
+            ["acct-brokerage-1", { quantity: 10, grossValue: "1354.00" }],
+            ["acct-brokerage-2", { quantity: 10, grossValue: "1000.80" }],
+          ]),
+        });
+
+        const result = await service.getAccountMarketValues(userId);
+
+        expect(result.get("acct-brokerage-1")).toBe(1354);
+        expect(result.get("acct-brokerage-2")).toBe(1000.8);
+        expect(bondValuation.valueByAccount).toHaveBeenCalledTimes(1);
+      });
+
+      it("leaves out an account whose lots have an unknown value", async () => {
+        bondValuation.valueByAccount.mockResolvedValue({
+          asOf: "2026-02-01",
+          accounts: new Map([
+            ["acct-brokerage-1", { quantity: 10, grossValue: null }],
+            ["acct-brokerage-2", { quantity: 10, grossValue: "1000.80" }],
+          ]),
+        });
+
+        const result = await service.getAccountMarketValues(userId);
+
+        expect(result.has("acct-brokerage-1")).toBe(false);
+        expect(result.get("acct-brokerage-2")).toBe(1000.8);
+      });
     });
   });
 

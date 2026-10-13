@@ -1101,4 +1101,173 @@ describe("BondValuationService", () => {
       expect(result.series.map((x) => x.seriesCode)).toEqual(["TOS1029"]);
     });
   });
+  describe("valueByAccount: a holding is its own lots' value", () => {
+    const owned = [
+      {
+        id: "sec-1",
+        user_id: "user-1",
+        symbol: "TOS1029",
+        currency_code: "PLN",
+        bond_program_id: "p1",
+        bond_auto_fetch: false,
+      },
+    ];
+    const buy = (
+      account: string,
+      date: string,
+      quantity: string,
+      series: string | null = "i1",
+    ) => ({
+      action: "BUY",
+      status: "UNRECONCILED",
+      tx_date: date,
+      quantity,
+      account_id: account,
+      counterpart_account_id: null,
+      bond_instrument_id: series,
+    });
+
+    /** Answers the user's timezone preference on top of the store. */
+    const withTimezone = (
+      built: ReturnType<typeof setup>,
+      timezone: string | null,
+    ) => {
+      const store = built.manager.query.getMockImplementation() as (
+        sql: string,
+        params: unknown[],
+      ) => Promise<unknown>;
+      built.manager.query.mockImplementation(
+        async (sql: string, params: unknown[]) =>
+          sql.includes("FROM user_preferences")
+            ? [{ timezone, last_client_timezone: null }]
+            : store(sql, params),
+      );
+      return built;
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers({
+        now: new Date("2027-04-14T12:00:00Z"),
+        doNotFake: [
+          "nextTick",
+          "setImmediate",
+          "setTimeout",
+          "setInterval",
+          "clearTimeout",
+          "clearInterval",
+          "clearImmediate",
+          "queueMicrotask",
+          "performance",
+          "hrtime",
+        ],
+      });
+    });
+    afterEach(() => jest.useRealTimers());
+
+    it("sums each account's lots on the person's financial today, exactly", async () => {
+      const built = withTimezone(
+        setup({
+          securities: owned,
+          ledger: [
+            buy("acc-1", "2026-10-15", "25.00000000"),
+            buy("acc-2", "2026-10-20", "10.00000000"),
+            buy("acc-2", "2026-10-20", "5.00000000"),
+          ],
+        }),
+        "Pacific/Kiritimati",
+      );
+      const spy = jest.spyOn(built.service, "valueSecurity");
+
+      const result = await built.service.valueByAccount("user-1", "sec-1");
+
+      // 2027-04-14T12:00Z is already the 15th at UTC+14.
+      expect(result.asOf).toBe("2027-04-15");
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith("user-1", "sec-1", "2027-04-15");
+      const whole = await spy.mock.results[0].value;
+      expect(result.accounts?.get("acc-1")?.quantity).toBe(25);
+      expect(result.accounts?.get("acc-2")?.quantity).toBe(15);
+      const sum = [...(result.accounts?.values() ?? [])].reduce(
+        (n, a) => Math.round(Number(a.grossValue) * 100) + n,
+        0,
+      );
+      expect(sum).toBe(Math.round(Number(whole.totals.grossValue) * 100));
+      expect(result.accounts?.get("acc-1")?.grossValue).toBe(
+        whole.lots.find((l: { accountId?: string }) => l.accountId === "acc-1")
+          .valuation.grossValue,
+      );
+    });
+
+    it("has no accounts when the lots are unknowable", async () => {
+      const result = await withTimezone(
+        setup({
+          securities: owned,
+          onSale: [],
+          ledger: [buy("acc-1", "2026-10-15", "25", null)],
+        }),
+        "UTC",
+      ).service.valueByAccount("user-1", "sec-1");
+
+      expect(result.accounts).toBeNull();
+    });
+
+    it("gives an account with a lot that has no gross value a null value, not a subtotal", async () => {
+      const built = withTimezone(
+        setup({
+          securities: owned,
+          ledger: [
+            buy("acc-1", "2026-10-15", "25"),
+            buy("acc-2", "2026-10-20", "10"),
+          ],
+        }),
+        "UTC",
+      );
+      const real = built.service.valueSecurity.bind(built.service);
+      jest
+        .spyOn(built.service, "valueSecurity")
+        .mockImplementation(async (...args) => {
+          const v = await real(...args);
+          return {
+            ...v,
+            lots: v.lots.map((l) =>
+              l.accountId === "acc-2"
+                ? { ...l, valuation: { ...l.valuation, grossValue: null } }
+                : l,
+            ),
+          };
+        });
+
+      const result = await built.service.valueByAccount("user-1", "sec-1");
+
+      expect(result.accounts?.get("acc-2")?.grossValue).toBeNull();
+      expect(result.accounts?.get("acc-1")?.grossValue).not.toBeNull();
+    });
+
+    it("treats a REFUSED lot as having no value", async () => {
+      const built = withTimezone(
+        setup({
+          securities: owned,
+          ledger: [buy("acc-1", "2026-10-15", "25")],
+        }),
+        "UTC",
+      );
+      const real = built.service.valueSecurity.bind(built.service);
+      jest
+        .spyOn(built.service, "valueSecurity")
+        .mockImplementation(async (...args) => {
+          const v = await real(...args);
+          return {
+            ...v,
+            lots: v.lots.map((l) => ({
+              ...l,
+              valuation: { ...l.valuation, status: "REFUSED" as const },
+            })),
+          };
+        });
+
+      const result = await built.service.valueByAccount("user-1", "sec-1");
+
+      expect(result.accounts?.get("acc-1")?.grossValue).toBeNull();
+    });
+  });
 });

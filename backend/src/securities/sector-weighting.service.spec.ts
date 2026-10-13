@@ -95,6 +95,7 @@ describe("SectorWeightingService", () => {
       convertToDefault: jest
         .fn()
         .mockImplementation((amount) => Promise.resolve(amount)),
+      valueBondHoldings: jest.fn().mockResolvedValue(new Map()),
     };
 
     const { manager: managerMock, dataSource } = createScopedDbMocks([
@@ -666,6 +667,69 @@ describe("SectorWeightingService", () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0].sector).toBe("Technology");
       expect(result.totalEtfValue).toBe(0);
+    });
+  });
+
+  describe("a bond-linked holding is its own account's lots", () => {
+    const accounts = ["acct-ike", "acct-reg"].map((id) => ({
+      id,
+      userId: "user-1",
+      accountType: "INVESTMENT",
+      currencyCode: "USD",
+    }));
+    const bond: Partial<Security> = {
+      ...mockNoSectorSecurity,
+      id: "sec-bond",
+      securityType: "BOND",
+      bondProgramId: "prog-1",
+    };
+    const heldIn = (accountId: string) => ({
+      id: `h-${accountId}`,
+      accountId,
+      securityId: "sec-bond",
+      quantity: 10,
+      security: bond,
+    });
+
+    beforeEach(() => {
+      accountsRepo.find.mockResolvedValue(accounts);
+      calcService.categoriseAccounts.mockReturnValue({
+        cashAccounts: [],
+        brokerageAccounts: [],
+        standaloneAccounts: accounts,
+        holdingsAccountIds: accounts.map((a) => a.id),
+      });
+      holdingsRepo.find.mockResolvedValue(accounts.map((a) => heldIn(a.id)));
+      // The blend (117.74) a quantity x price reading would use.
+      manager.query.mockResolvedValue([
+        { security_id: "sec-bond", close_price: "117.74" },
+      ]);
+    });
+
+    it("sums each account's own lots, not quantity x the blend", async () => {
+      calcService.valueBondHoldings.mockResolvedValue(
+        new Map([
+          ["acct-ike:sec-bond", { marketValue: 1354, unitPrice: 135.4 }],
+          ["acct-reg:sec-bond", { marketValue: 1000.8, unitPrice: 100.08 }],
+        ]),
+      );
+
+      const result = await service.getSectorWeightings("user-1");
+
+      expect(result.unclassifiedValue).toBeCloseTo(2354.8, 6);
+    });
+
+    it("leaves an unpriced account out and never falls back to the blend", async () => {
+      calcService.valueBondHoldings.mockResolvedValue(
+        new Map([
+          ["acct-ike:sec-bond", null],
+          ["acct-reg:sec-bond", { marketValue: 1000.8, unitPrice: 100.08 }],
+        ]),
+      );
+
+      const result = await service.getAssetClassWeightings("user-1");
+
+      expect(result.totalPortfolioValue).toBeCloseTo(1000.8, 6);
     });
   });
 

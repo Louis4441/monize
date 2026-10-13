@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
+import { todayInTimezone } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
+import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
 import { loadBondLedger } from "./bond-ledger";
 import { BondLotsRefusal, bondLotsAsOf } from "./bond-lots";
 import { BenchmarkData } from "./domain/benchmark";
@@ -160,6 +162,62 @@ export interface SecurityValuation {
   readonly benchmarkCoverage: readonly BenchmarkCoverage[];
   readonly totals: SecurityValuationTotals;
   readonly refusal: BondLotsRefusal | null;
+}
+
+/** One account's lots of a linked security: their bond count and exact gross value. */
+export interface AccountLotsValue {
+  readonly quantity: number;
+  /** Null unless every lot of the account has a gross value. */
+  readonly grossValue: string | null;
+}
+
+export interface SecurityValueByAccount {
+  readonly asOf: string;
+  /** Keyed by account id; null when the lots are unknowable (a refusal). */
+  readonly accounts: ReadonlyMap<string, AccountLotsValue> | null;
+}
+
+/** How far a lot count may sit from a holding's quantity and still be the same position. */
+const LOT_QUANTITY_TOLERANCE = 0.0001;
+
+/**
+ * The gross value of one account's lots as the value of its holding of
+ * `quantity` bonds, or why it has none: the valuation failed or its lots are
+ * unknowable or one lot has no gross value (`UNKNOWN`), or the lots count a
+ * different number of bonds than the holding (`QUANTITY_MISMATCH`: never price
+ * a different quantity). Written once for every surface that values a
+ * bond-linked holding (`bond-program-securities.md` 2.4).
+ */
+export function ownLotsGrossValue(
+  valued: SecurityValueByAccount | null | undefined,
+  accountId: string,
+  quantity: number,
+):
+  | { readonly grossValue: string; readonly lotQuantity: number }
+  | { readonly unpriced: "UNKNOWN" | "QUANTITY_MISMATCH" } {
+  const lots = valued?.accounts?.get(accountId);
+  if (!lots || lots.grossValue === null) return { unpriced: "UNKNOWN" };
+  if (Math.abs(lots.quantity - quantity) >= LOT_QUANTITY_TOLERANCE) {
+    return { unpriced: "QUANTITY_MISMATCH" };
+  }
+  return { grossValue: lots.grossValue, lotQuantity: lots.quantity };
+}
+
+/**
+ * The user's financial today (R17): the date in the timezone the user's
+ * preferences name, the same rule the daily jobs bucket users by
+ * (`getUsersByEffectiveTimezone`). Read on the caller's transaction.
+ */
+export async function financialTodayOf(
+  m: EntityManager,
+  userId: string,
+): Promise<string> {
+  const timezone = await getEffectiveTimezoneOfUser(m, userId);
+  return (todayInTimezone(timezone) ?? todayInTimezone("UTC")) as string;
+}
+
+function decimalPlacesOf(figure: string | null): number {
+  return figure === null ? 0 : (figure.split(".")[1]?.length ?? 0);
 }
 
 function summarize(
@@ -384,6 +442,55 @@ export class BondValuationService {
         },
         refusal: null,
       };
+    });
+  }
+
+  /**
+   * What each account's lots of a program-linked security are worth on the
+   * person's financial today (`bond-program-securities.md` 2.4, "A holding's
+   * current value is its own lots' value"): one `valueSecurity` call, the lots
+   * grouped by the account that holds them.
+   *
+   * An account's `grossValue` is the exact sum of its lots' gross values and is
+   * null unless every one of its lots has one (a subtotal is not a total); a
+   * REFUSED lot has none. `accounts` is null when the lots are unknowable
+   * (`refusal`), so no account has a value. Lots without an account are keyed
+   * `""`, like the fold. `date` is the day valued (the person's financial
+   * today when omitted). Owner-scoped like `valueSecurity`.
+   */
+  async valueByAccount(
+    userId: string,
+    securityId: string,
+    date?: string,
+  ): Promise<SecurityValueByAccount> {
+    return withScopedDb(this.dataSource, async (m) => {
+      const asOf = date ?? (await financialTodayOf(m, userId));
+      const valuation = await this.valueSecurity(userId, securityId, asOf);
+      if (valuation.refusal !== null) return { asOf, accounts: null };
+      const grouped = new Map<
+        string,
+        { quantity: number; figures: Array<string | null> }
+      >();
+      for (const lot of valuation.lots) {
+        const key = lot.accountId ?? "";
+        const entry = grouped.get(key) ?? { quantity: 0, figures: [] };
+        entry.quantity += lot.quantity;
+        entry.figures.push(
+          lot.valuation.status === "REFUSED" ? null : lot.valuation.grossValue,
+        );
+        grouped.set(key, entry);
+      }
+      const accounts = new Map<string, AccountLotsValue>();
+      for (const [key, { quantity, figures }] of grouped) {
+        accounts.set(key, {
+          quantity,
+          grossValue: sumKnown(
+            figures,
+            figures.reduce((n, f) => Math.max(n, decimalPlacesOf(f)), 0),
+          ),
+        });
+      }
+      return { asOf, accounts };
     });
   }
 
