@@ -258,7 +258,7 @@
       "statuses": "Alle statussen",
       "amountMin": "Min",
       "amountMax": "Max",
-      "search": "Zoek op begunstigde, categorie, bedrag, label, omschrijving, referentie #...",
+      "search": "Zoeken, of probeer #10 of payee:costco",
       "tagKeyValue": "bijv. usa"
     },
     "tagKeyNone": "Alle (geen sleutelfilter)",
@@ -604,5 +604,69 @@
     "title": "Uitgaven per {key}",
     "other": "Overige",
     "noData": "Geen getagde uitgaven om te verdelen voor deze sleutel."
+  },
+  "searchSyntax": {
+    "open": "Zoeksyntaxis",
+    "title": "Zoeksyntaxis",
+    "fields": "Velden: payee, memo, cat, tag, account, ref, amount, date, status, is, has. Kies een voorbeeld om het in het zoekvak te zetten.",
+    "examples": {
+      "allWords": "Elk woord komt ergens voor",
+      "phrase": "Precies deze woordgroep",
+      "exclude": "Alles uitsluiten wat overeenkomt met refund",
+      "fieldContains": "Begunstigde bevat costco",
+      "fieldExact": "Begunstigde is precies Costco",
+      "reference": "Cheque- of referentienummer precies 10",
+      "wildcard": "Referentie begint met 10",
+      "amountOver": "Bedrag boven 100",
+      "amountRange": "Bedrag van 50 tot 100",
+      "datePeriod": "Elke dag in maart 2026",
+      "isSplit": "Gesplitste transacties",
+      "hasAttachment": "Heeft een bijlage"
+    }
+  },
+  "searchInterpretation": {
+    "label": "Zoeken op:",
+    "negated": "niet {phrase}",
+    "malformed": "{raw} (niet begrepen, als tekst gezocht)",
+    "empty": "{raw} (leeg, genegeerd)",
+    "status": "Status is {value}",
+    "any": "‘{value}’ overal",
+    "fields": {
+      "payee": "Begunstigde",
+      "memo": "Notitie",
+      "cat": "Categorie",
+      "tag": "Tag",
+      "account": "Rekening",
+      "ref": "Referentie",
+      "amount": "Bedrag",
+      "date": "Datum",
+      "status": "Status",
+      "is": "Soort",
+      "has": "Heeft"
+    },
+    "ops": {
+      "contains": "{field} bevat ‘{value}’",
+      "exact": "{field} is ‘{value}’",
+      "glob": "{field} komt overeen met ‘{value}’",
+      "eq": "{field} is {value}",
+      "gt": "{field} boven {value}",
+      "gte": "{field} {value} of meer",
+      "lt": "{field} onder {value}",
+      "lte": "{field} {value} of minder",
+      "between": "{field} van {value} tot {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Overboekingen",
+        "split": "Gesplitste transacties",
+        "uncategorized": "Zonder categorie"
+      },
+      "has": {
+        "attachment": "Heeft een bijlage",
+        "ref": "Heeft een referentienummer",
+        "memo": "Heeft een notitie",
+        "tag": "Heeft een tag"
+      }
+    }
   }
 }

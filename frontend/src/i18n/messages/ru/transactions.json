@@ -258,7 +258,7 @@
       "statuses": "Все статусы",
       "amountMin": "Мин.",
       "amountMax": "Макс.",
-      "search": "Поиск получателя, категории, суммы, тега, описания, реф. номера...",
+      "search": "Поиск, или попробуйте #10 или payee:costco",
       "tagKeyValue": "например, usa"
     },
     "tagKeyNone": "Любой (без фильтра по ключу)",
@@ -604,5 +604,69 @@
     "title": "Расходы по {key}",
     "other": "Прочее",
     "noData": "Нет помеченных тегами расходов для разбивки по этому ключу."
+  },
+  "searchSyntax": {
+    "open": "Синтаксис поиска",
+    "title": "Синтаксис поиска",
+    "fields": "Поля: payee, memo, cat, tag, account, ref, amount, date, status, is, has. Выберите пример, чтобы вставить его в поле поиска.",
+    "examples": {
+      "allWords": "Каждое слово где-то встречается",
+      "phrase": "Именно эта фраза",
+      "exclude": "Исключить всё, что совпадает с refund",
+      "fieldContains": "Получатель содержит costco",
+      "fieldExact": "Получатель точно Costco",
+      "reference": "Номер чека или ссылки ровно 10",
+      "wildcard": "Ссылка начинается с 10",
+      "amountOver": "Сумма больше 100",
+      "amountRange": "Сумма от 50 до 100",
+      "datePeriod": "Любой день марта 2026",
+      "isSplit": "Разделённые операции",
+      "hasAttachment": "Есть вложение"
+    }
+  },
+  "searchInterpretation": {
+    "label": "Поиск:",
+    "negated": "не {phrase}",
+    "malformed": "{raw} (не распознано, искали как текст)",
+    "empty": "{raw} (пусто, пропущено)",
+    "status": "Статус: {value}",
+    "any": "«{value}» в любом поле",
+    "fields": {
+      "payee": "Получатель",
+      "memo": "Заметка",
+      "cat": "Категория",
+      "tag": "Метка",
+      "account": "Счёт",
+      "ref": "Ссылка",
+      "amount": "Сумма",
+      "date": "Дата",
+      "status": "Статус",
+      "is": "Тип",
+      "has": "Есть"
+    },
+    "ops": {
+      "contains": "{field} содержит «{value}»",
+      "exact": "{field}: «{value}»",
+      "glob": "{field} соответствует «{value}»",
+      "eq": "{field}: {value}",
+      "gt": "{field} больше {value}",
+      "gte": "{field} от {value}",
+      "lt": "{field} меньше {value}",
+      "lte": "{field} до {value}",
+      "between": "{field} от {value} до {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Переводы",
+        "split": "Разделённые операции",
+        "uncategorized": "Без категории"
+      },
+      "has": {
+        "attachment": "Есть вложение",
+        "ref": "Есть номер ссылки",
+        "memo": "Есть заметка",
+        "tag": "Есть метка"
+      }
+    }
   }
 }

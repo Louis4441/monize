@@ -258,7 +258,7 @@
       "statuses": "所有狀態",
       "amountMin": "最小",
       "amountMax": "最大",
-      "search": "搜尋收款人、類別、金額、標籤、描述、參考號碼...",
+      "search": "搜尋，或試試 #10 或 payee:costco",
       "tagKeyValue": "例如 usa"
     },
     "tagKeyNone": "任意（無鍵篩選）",
@@ -604,5 +604,69 @@
     "title": "依 {key} 的支出",
     "other": "其他",
     "noData": "沒有可依此鍵細分的已標記支出。"
+  },
+  "searchSyntax": {
+    "open": "搜尋語法",
+    "title": "搜尋語法",
+    "fields": "欄位：payee, memo, cat, tag, account, ref, amount, date, status, is, has。選擇一個範例即可放入搜尋框。",
+    "examples": {
+      "allWords": "每個詞都在某處相符",
+      "phrase": "完全相符此詞組",
+      "exclude": "排除所有符合 refund 的項目",
+      "fieldContains": "收款人包含 costco",
+      "fieldExact": "收款人恰好是 Costco",
+      "reference": "支票號碼或參考號碼恰好為 10",
+      "wildcard": "參考號碼以 10 開頭",
+      "amountOver": "金額大於 100",
+      "amountRange": "金額 50 至 100",
+      "datePeriod": "2026 年 3 月的任何一天",
+      "isSplit": "分割交易",
+      "hasAttachment": "有附件"
+    }
+  },
+  "searchInterpretation": {
+    "label": "搜尋條件：",
+    "negated": "非 {phrase}",
+    "malformed": "{raw}（無法辨識，已按文字搜尋）",
+    "empty": "{raw}（空白，已忽略）",
+    "status": "狀態為 {value}",
+    "any": "任何欄位包含「{value}」",
+    "fields": {
+      "payee": "收款人",
+      "memo": "備註",
+      "cat": "類別",
+      "tag": "標籤",
+      "account": "帳戶",
+      "ref": "參考號碼",
+      "amount": "金額",
+      "date": "日期",
+      "status": "狀態",
+      "is": "類型",
+      "has": "有"
+    },
+    "ops": {
+      "contains": "{field}包含「{value}」",
+      "exact": "{field}為「{value}」",
+      "glob": "{field}符合「{value}」",
+      "eq": "{field}為 {value}",
+      "gt": "{field}大於 {value}",
+      "gte": "{field}不低於 {value}",
+      "lt": "{field}小於 {value}",
+      "lte": "{field}不高於 {value}",
+      "between": "{field} {value} 至 {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "轉帳",
+        "split": "分割交易",
+        "uncategorized": "未分類"
+      },
+      "has": {
+        "attachment": "有附件",
+        "ref": "有參考號碼",
+        "memo": "有備註",
+        "tag": "有標籤"
+      }
+    }
   }
 }

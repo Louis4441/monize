@@ -258,7 +258,7 @@
       "statuses": "सभी स्थितियां",
       "amountMin": "न्यूनतम",
       "amountMax": "अधिकतम",
-      "search": "भुगतानकर्ता, श्रेणी, राशि, टैग, विवरण, संदर्भ # खोजें...",
+      "search": "खोजें, या #10 या payee:costco आज़माएँ",
       "tagKeyValue": "जैसे usa"
     },
     "tagKeyNone": "कोई भी (कुंजी फ़िल्टर नहीं)",
@@ -604,5 +604,69 @@
     "title": "{key} के अनुसार खर्च",
     "other": "अन्य",
     "noData": "इस कुंजी के लिए विभाजित करने हेतु कोई टैग किया गया खर्च नहीं है।"
+  },
+  "searchSyntax": {
+    "open": "खोज सिंटैक्स",
+    "title": "खोज सिंटैक्स",
+    "fields": "फ़ील्ड: payee, memo, cat, tag, account, ref, amount, date, status, is, has। किसी उदाहरण को खोज बॉक्स में डालने के लिए उसे चुनें।",
+    "examples": {
+      "allWords": "हर शब्द कहीं न कहीं मिलता है",
+      "phrase": "यही सटीक वाक्यांश",
+      "exclude": "refund से मेल खाने वाली हर चीज़ हटाएँ",
+      "fieldContains": "प्राप्तकर्ता में costco है",
+      "fieldExact": "प्राप्तकर्ता ठीक Costco है",
+      "reference": "चेक या संदर्भ संख्या ठीक 10",
+      "wildcard": "संदर्भ 10 से शुरू होता है",
+      "amountOver": "राशि 100 से अधिक",
+      "amountRange": "राशि 50 से 100 तक",
+      "datePeriod": "मार्च 2026 का कोई भी दिन",
+      "isSplit": "विभाजित लेन-देन",
+      "hasAttachment": "अनुलग्नक है"
+    }
+  },
+  "searchInterpretation": {
+    "label": "खोज रहे हैं:",
+    "negated": "{phrase} नहीं",
+    "malformed": "{raw} (समझा नहीं गया, पाठ के रूप में खोजा गया)",
+    "empty": "{raw} (खाली, अनदेखा)",
+    "status": "स्थिति {value} है",
+    "any": "“{value}” कहीं भी",
+    "fields": {
+      "payee": "प्राप्तकर्ता",
+      "memo": "नोट",
+      "cat": "श्रेणी",
+      "tag": "टैग",
+      "account": "खाता",
+      "ref": "संदर्भ",
+      "amount": "राशि",
+      "date": "तारीख",
+      "status": "स्थिति",
+      "is": "प्रकार",
+      "has": "में है"
+    },
+    "ops": {
+      "contains": "{field} में “{value}” है",
+      "exact": "{field} “{value}” है",
+      "glob": "{field} “{value}” से मेल खाता है",
+      "eq": "{field} {value} है",
+      "gt": "{field} {value} से अधिक",
+      "gte": "{field} {value} या अधिक",
+      "lt": "{field} {value} से कम",
+      "lte": "{field} {value} या कम",
+      "between": "{field} {value} से {valueTo} तक"
+    },
+    "enum": {
+      "is": {
+        "transfer": "स्थानांतरण",
+        "split": "विभाजित लेन-देन",
+        "uncategorized": "बिना श्रेणी"
+      },
+      "has": {
+        "attachment": "अनुलग्नक है",
+        "ref": "संदर्भ संख्या है",
+        "memo": "नोट है",
+        "tag": "टैग है"
+      }
+    }
   }
 }

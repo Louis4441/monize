@@ -241,6 +241,8 @@ file that imports `useIsMobile`, and a second hand-rolled `pointer: coarse`.
 
 If a figure or a setting carries an explanation on a desktop, the same explanation opens on a phone. `InfoTooltip` (`components/ui/InfoTooltip.tsx`) is the one help popover: a mouse hovers it, a keyboard focuses it, and a click, a tap or Enter pins it open until the reader presses outside it, taps it again, moves focus to another control, or presses Escape. It takes one `text`, which is the popover body and the trigger's `aria-label` at once, so desktop, phone and screen reader read one translated string and there is no second copy to drift.
 
+Help that holds controls is not a tooltip. The transaction search's syntax help (`components/transactions/SearchSyntaxHelp.tsx`) lists examples a reader can choose to fill the search box, so it is a click-opened `role="dialog"` through a portal, placed with `InfoTooltip`'s own `placePopover` and re-measured on scroll and resize; it claims Escape only while open, and takes a `popoverRef` so a parent with its own outside-press handler (the header search) can count a press inside the portal as inside.
+
 The trigger used to be `hidden md:inline-flex`, because its popover opened only on `:hover`, and so every metric explanation on the investments screens (TWR, MWR, CAGR, simple return, investment result, net flows, cost basis, incomplete valuation) was missing on a phone. What the fix rests on:
 
 - **Never hide the trigger at a breakpoint.** Its hit area is extended with a `before:` inset so a finger finds the 16px icon.
