@@ -23,6 +23,7 @@ import {
 import { extractPdfText } from "@/bonds/adapters/pl/series/pdf-text";
 import { AuthAttemptCounterService } from "@/auth/auth-attempt-counter.service";
 import { CurrenciesService } from "@/currencies/currencies.service";
+import { FxProviderChain } from "@/currencies/providers/fx-provider-chain";
 import { ProviderHealthService } from "@/provider-health/provider-health.service";
 import { BackupBondSeriesRecoveryService } from "@/backup/backup-bond-series-recovery.service";
 import { BondValuationService } from "@/bonds/bond-valuation.service";
@@ -143,6 +144,8 @@ describe("Backup export/restore round-trip (integration)", () => {
         BondSeriesService,
         BondCatalogService,
         CurrenciesService,
+        // The bond catalog only ensures a currency row; it never asks the FX chain.
+        { provide: FxProviderChain, useValue: {} },
         ProviderHealthService,
         {
           provide: SeriesHttp,
