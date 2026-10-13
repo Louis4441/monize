@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "ex.: 5,5",
     "estimatedFromHistory": "Estimada a partir do histórico de transações: {rate}%",
     "interestExpenseCategory": "Categoria de Despesa de Juros",
+    "interestExpenseCategoryRequired": "Categoria de Despesa de Juros (obrigatória)",
     "detectedCategory": "Detetada: {name}",
     "selectCategory": "Selecionar categoria...",
     "payeeLender": "Beneficiário / Mutuante",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Pagar a Partir da Conta (obrigatório)",
     "paymentFromAccountEditHelp": "Alterá-la move os próximos pagamentos agendados e a regra de correspondência de pagamentos para a nova conta. Os pagamentos já registados não são alterados.",
     "interestCategory": "Categoria de Juros",
+    "interestCategoryRequired": "Categoria de Juros (obrigatória)",
     "interestBookingMode": {
       "label": "Como os juros são registados?",
       "help": "Para a deteção de taxa os ler bem. Automático serve na maioria.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "A data do primeiro pagamento é obrigatória",
     "paymentAccountRequired": "A conta de pagamento é obrigatória",
     "amortizationRequired": "O período de amortização é obrigatório",
+    "interestCategoryRequired": "Escolha a categoria em que são registados os juros deste empréstimo",
     "acceleratedNeedsAnnuity": "Este crédito à habitação é pago com um calendário acelerado, que só um crédito de prestação constante tem. Um crédito linear ou só de juros precisa de uma frequência de pagamento normal, por isso mantenha um tipo de prestação constante.",
     "paymentMatchingPayeePatternRequired": "Introduza um padrão de beneficiário para associar ao débito do banco",
     "paymentMatchingPayeePatternWildcard": "O padrão do beneficiário deve incluir um carácter universal *",

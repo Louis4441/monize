@@ -342,7 +342,7 @@ export function LoanPaymentSetupDialog({
   }, [t]);
 
   const handleSubmit = useCallback(async () => {
-    if (!submittedPaymentAmount || !sourceAccountId || !nextDueDate) {
+    if (!submittedPaymentAmount || !sourceAccountId || !nextDueDate || !interestCategoryId) {
       toast.error(t('loanPaymentSetup.fillRequiredFields'));
       return;
     }
@@ -363,7 +363,7 @@ export function LoanPaymentSetupDialog({
         sourceAccountId,
         nextDueDate,
         interestRate,
-        interestCategoryId: interestCategoryId || undefined,
+        interestCategoryId,
         payeeId: selectedPayeeId || undefined,
         payeeName: payeeName || undefined,
         // The checkbox's displayed value: forced off while payment matching
@@ -631,7 +631,7 @@ export function LoanPaymentSetupDialog({
               {/* Interest Category */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('loanPaymentSetup.interestExpenseCategory')}
+                  {t('loanPaymentSetup.interestExpenseCategoryRequired')}
                 </label>
                 <Combobox
                   value={interestCategoryId}

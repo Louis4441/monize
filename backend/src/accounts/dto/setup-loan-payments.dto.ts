@@ -67,12 +67,12 @@ export class SetupLoanPaymentsDto {
   @Max(100)
   interestRate?: number;
 
-  @ApiPropertyOptional({
-    description: "Interest expense category ID",
+  @ApiProperty({
+    description:
+      "Interest expense category ID; one of the caller's own categories",
   })
-  @IsOptional()
   @IsUUID()
-  interestCategoryId?: string;
+  interestCategoryId: string;
 
   @ApiPropertyOptional({
     description: "Payee ID for the scheduled transaction",

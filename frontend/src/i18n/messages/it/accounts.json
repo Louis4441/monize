@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "es. 5,5",
     "estimatedFromHistory": "Stimato dallo storico transazioni: {rate}%",
     "interestExpenseCategory": "Categoria spese interessi",
+    "interestExpenseCategoryRequired": "Categoria spese interessi (obbligatoria)",
     "detectedCategory": "Rilevata: {name}",
     "selectCategory": "Seleziona categoria...",
     "payeeLender": "Beneficiario / Istituto mutuante",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Pagamento dal conto (obbligatorio)",
     "paymentFromAccountEditHelp": "Modificandolo, i prossimi pagamenti pianificati e la regola di abbinamento dei pagamenti passano al nuovo conto. I pagamenti già registrati non cambiano.",
     "interestCategory": "Categoria interessi",
+    "interestCategoryRequired": "Categoria interessi (obbligatoria)",
     "interestBookingMode": {
       "label": "Come vengono registrati gli interessi?",
       "help": "Così il rilevamento del tasso li legge bene. Auto va nella maggior parte dei casi.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "La data del primo pagamento è obbligatoria",
     "paymentAccountRequired": "Il conto di pagamento è obbligatorio",
     "amortizationRequired": "Il periodo di ammortamento è obbligatorio",
+    "interestCategoryRequired": "Scegli la categoria in cui vengono registrati gli interessi di questo prestito",
     "acceleratedNeedsAnnuity": "Questo mutuo è pagato con un piano accelerato, che ha solo un mutuo a rata costante. Un mutuo lineare o solo interessi richiede una frequenza di pagamento regolare, quindi mantieni un tipo a rata costante.",
     "paymentMatchingPayeePatternRequired": "Inserisci un pattern del beneficiario per riconoscere l'addebito della banca",
     "paymentMatchingPayeePatternWildcard": "Il pattern del beneficiario deve includere un carattere jolly *",

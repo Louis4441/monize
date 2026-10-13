@@ -509,7 +509,7 @@ export interface SetupLoanPaymentsData {
   sourceAccountId: string;
   nextDueDate: string;
   interestRate?: number;
-  interestCategoryId?: string;
+  interestCategoryId: string;
   payeeId?: string;
   payeeName?: string;
   autoPost?: boolean;

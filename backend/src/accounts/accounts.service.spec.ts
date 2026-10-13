@@ -12,7 +12,7 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { Holding } from "../securities/entities/holding.entity";
 import { Institution } from "../institutions/entities/institution.entity";
-import { CategoriesService } from "../categories/categories.service";
+import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService } from "../securities/portfolio.service";
@@ -27,6 +27,8 @@ import { DataSource } from "typeorm";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import { ScheduledTransactionSplit } from "../scheduled-transactions/entities/scheduled-transaction-split.entity";
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 import { LoanRateChange } from "../loan-rate-changes/entities/loan-rate-change.entity";
 import {
   createScopedDbMocks,
@@ -44,7 +46,7 @@ describe("AccountsService", () => {
   let investmentTxRepository: Record<string, jest.Mock>;
   let institutionsRepository: Record<string, jest.Mock>;
   let scheduledTransactionsService: Record<string, jest.Mock>;
-  let categoriesService: Record<string, jest.Mock>;
+  let categoriesRepository: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: DataSourceMock;
@@ -52,7 +54,8 @@ describe("AccountsService", () => {
   let exchangeRateService: Record<string, jest.Mock>;
   let mockActionHistoryService: Record<string, jest.Mock>;
   let scheduledOccurrenceService: { expand: jest.Mock };
-  let scheduleRepository: { find: jest.Mock };
+  let scheduleRepository: { find: jest.Mock; findOne: jest.Mock };
+  let splitRepository: { find: jest.Mock; save: jest.Mock };
   let rateChangeRepository: { find: jest.Mock };
   let loanRateChangesService: Record<string, jest.Mock>;
   // loanMortgageService uses the real class with mocked repositories
@@ -135,10 +138,13 @@ describe("AccountsService", () => {
       ),
     };
 
-    categoriesService = {
-      findLoanCategories: jest.fn().mockResolvedValue({
-        interestCategory: { id: "interest-cat-1" },
-      }),
+    // The interest category is the caller's unless a case says otherwise.
+    categoriesRepository = {
+      findOne: jest
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          Promise.resolve({ id: where.id, userId: where.userId }),
+        ),
     };
 
     netWorthService = {
@@ -165,7 +171,14 @@ describe("AccountsService", () => {
       getLatestRate: jest.fn().mockResolvedValue(null),
     };
 
-    scheduleRepository = { find: jest.fn().mockResolvedValue([]) };
+    scheduleRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+    splitRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn().mockImplementation((split) => Promise.resolve(split)),
+    };
     rateChangeRepository = { find: jest.fn().mockResolvedValue([]) };
     const { manager: txManager, dataSource } = createScopedDbMocks([
       [Account, accountsRepository],
@@ -175,6 +188,8 @@ describe("AccountsService", () => {
       [UserPreference, userPreferenceRepository],
       [ScheduledTransaction, scheduleRepository],
       [LoanRateChange, rateChangeRepository],
+      [Category, categoriesRepository],
+      [ScheduledTransactionSplit, splitRepository],
     ]);
     mockDataSource = dataSource;
     txManager.save.mockImplementation((data) => data);
@@ -201,7 +216,6 @@ describe("AccountsService", () => {
           provide: getRepositoryToken(Institution),
           useValue: institutionsRepository,
         },
-        { provide: CategoriesService, useValue: categoriesService },
         {
           provide: ScheduledTransactionsService,
           useValue: scheduledTransactionsService,
@@ -822,6 +836,132 @@ describe("AccountsService", () => {
 
         expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
         expect(mockQueryRunner.manager.findOne).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("interest category", () => {
+      const mortgage = {
+        ...mockAccount,
+        id: "mortgage-1",
+        accountType: "MORTGAGE",
+        interestCategoryId: "cat-a",
+        scheduledTransactionId: "sched-1",
+      };
+      const principal = {
+        id: "s-principal",
+        kind: SplitKind.TRANSFER,
+        transferAccountId: "mortgage-1",
+        categoryId: null,
+        amount: -800,
+        memo: "Principal",
+      };
+      const interestLine = (categoryId: string | null) => ({
+        id: "s-interest",
+        kind: SplitKind.CATEGORY,
+        transferAccountId: null,
+        categoryId,
+        amount: -200,
+        memo: "Interest",
+      });
+
+      beforeEach(() => {
+        scheduleRepository.findOne.mockResolvedValue({
+          id: "sched-1",
+          userId: "user-1",
+        });
+      });
+
+      it("moves the template's interest line with a changed category, after the account save", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+        splitRepository.find.mockResolvedValue([
+          { ...principal },
+          interestLine("cat-a"),
+        ]);
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: "cat-b",
+        });
+
+        expect(categoriesRepository.findOne).toHaveBeenCalledWith({
+          where: { id: "cat-b", userId: "user-1" },
+        });
+        expect(scheduleRepository.findOne).toHaveBeenCalledWith({
+          where: { id: "sched-1", userId: "user-1" },
+          lock: { mode: "pessimistic_write" },
+        });
+        expect(
+          mockQueryRunner.manager.save.mock.calls[0][0].interestCategoryId,
+        ).toBe("cat-b");
+        expect(splitRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: "s-interest",
+            categoryId: "cat-b",
+            amount: -200,
+          }),
+        );
+        expect(
+          mockQueryRunner.manager.save.mock.invocationCallOrder[0],
+        ).toBeLessThan(splitRepository.save.mock.invocationCallOrder[0]);
+      });
+
+      it("touches nothing when the form resends the stored category", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: "cat-a",
+        });
+
+        expect(categoriesRepository.findOne).not.toHaveBeenCalled();
+        expect(scheduleRepository.findOne).not.toHaveBeenCalled();
+        expect(splitRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("refuses a category the caller does not own before writing", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+        categoriesRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.update("user-1", "mortgage-1", {
+            interestCategoryId: "someone-elses",
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+        expect(splitRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("saves a cleared category without reading the schedule", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: null,
+        });
+
+        expect(
+          mockQueryRunner.manager.save.mock.calls[0][0].interestCategoryId,
+        ).toBeNull();
+        expect(scheduleRepository.findOne).not.toHaveBeenCalled();
+        expect(splitRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("saves the account but leaves an escrow line alone when the line is ambiguous", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({
+          ...mortgage,
+          interestCategoryId: null,
+        });
+        splitRepository.find.mockResolvedValue([
+          { ...principal },
+          interestLine(null),
+          { ...interestLine(null), id: "s-escrow", memo: "Escrow" },
+        ]);
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: "cat-b",
+        });
+
+        expect(
+          mockQueryRunner.manager.save.mock.calls[0][0].interestCategoryId,
+        ).toBe("cat-b");
+        expect(splitRepository.save).not.toHaveBeenCalled();
       });
     });
 
@@ -1895,6 +2035,7 @@ describe("AccountsService", () => {
         sourceAccountId: "source-1",
         interestRate: 5.5,
         institution: "Bank of Test",
+        interestCategoryId: "interest-cat-1",
       } as any);
 
       // Should have created the account with negative balance (liability)
@@ -1930,6 +2071,7 @@ describe("AccountsService", () => {
         amortizationMonths: 300,
         interestRate: 4.5,
         institution: "Mortgage Bank",
+        interestCategoryId: "interest-cat-1",
       } as any);
 
       const createCall = accountsRepository.create.mock.calls[0][0];
@@ -1952,6 +2094,7 @@ describe("AccountsService", () => {
       sourceAccountId: "source-1",
       interestRate: 6.0,
       institution: "Test Bank",
+      interestCategoryId: "interest-cat-1",
     };
 
     beforeEach(() => {
@@ -2029,12 +2172,12 @@ describe("AccountsService", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it("fetches loan categories when interestCategoryId not provided", async () => {
-      await service.createLoanAccount("user-1", baseLoanDto as any);
-
-      expect(categoriesService.findLoanCategories).toHaveBeenCalledWith(
-        "user-1",
-      );
+    it("refuses a loan without an interest category, writing nothing", async () => {
+      const { interestCategoryId: _omit, ...withoutCategory } = baseLoanDto;
+      await expect(
+        service.createLoanAccount("user-1", withoutCategory as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(accountsRepository.create).not.toHaveBeenCalled();
     });
 
     it("uses provided interestCategoryId when given", async () => {
@@ -2043,7 +2186,9 @@ describe("AccountsService", () => {
         interestCategoryId: "custom-cat-1",
       } as any);
 
-      expect(categoriesService.findLoanCategories).not.toHaveBeenCalled();
+      expect(categoriesRepository.findOne).toHaveBeenCalledWith({
+        where: { id: "custom-cat-1", userId: "user-1" },
+      });
       const createCall = accountsRepository.create.mock.calls[0][0];
       expect(createCall.interestCategoryId).toBe("custom-cat-1");
     });
@@ -2113,6 +2258,7 @@ describe("AccountsService", () => {
       amortizationMonths: 300,
       interestRate: 5.0,
       institution: "Big Bank",
+      interestCategoryId: "interest-cat-1",
     };
 
     beforeEach(() => {
@@ -2190,12 +2336,12 @@ describe("AccountsService", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it("fetches loan categories when interestCategoryId not provided", async () => {
-      await service.createMortgageAccount("user-1", baseMortgageDto as any);
-
-      expect(categoriesService.findLoanCategories).toHaveBeenCalledWith(
-        "user-1",
-      );
+    it("refuses a mortgage without an interest category, writing nothing", async () => {
+      const { interestCategoryId: _omit, ...withoutCategory } = baseMortgageDto;
+      await expect(
+        service.createMortgageAccount("user-1", withoutCategory as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(accountsRepository.create).not.toHaveBeenCalled();
     });
 
     it("uses provided interestCategoryId when given", async () => {
@@ -2204,7 +2350,8 @@ describe("AccountsService", () => {
         interestCategoryId: "custom-interest-cat",
       } as any);
 
-      expect(categoriesService.findLoanCategories).not.toHaveBeenCalled();
+      const createCall = accountsRepository.create.mock.calls[0][0];
+      expect(createCall.interestCategoryId).toBe("custom-interest-cat");
     });
 
     it("stores mortgage balance as negative (liability)", async () => {

@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "ör. 5,5",
     "estimatedFromHistory": "İşlem geçmişinden tahmini: {rate}%",
     "interestExpenseCategory": "Faiz Gider Kategorisi",
+    "interestExpenseCategoryRequired": "Faiz Gider Kategorisi (zorunlu)",
     "detectedCategory": "Tespit edildi: {name}",
     "selectCategory": "Kategori seçin...",
     "payeeLender": "Alacaklı / Borç Veren",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Ödeme Hesabı (zorunlu)",
     "paymentFromAccountEditHelp": "Değiştirmek, yaklaşan planlı ödemeleri ve ödeme eşleştirme kuralını yeni hesaba taşır. Zaten kaydedilmiş ödemeler değişmez.",
     "interestCategory": "Faiz Kategorisi",
+    "interestCategoryRequired": "Faiz Kategorisi (zorunlu)",
     "interestBookingMode": {
       "label": "Faiz nasıl kaydedilir?",
       "help": "Oran algılaması doğru okusun diye. Otomatik çoğu durumda uyar.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "İlk ödeme tarihi zorunludur",
     "paymentAccountRequired": "Ödeme hesabı zorunludur",
     "amortizationRequired": "Amortisman süresi zorunludur",
+    "interestCategoryRequired": "Bu kredinin faizinin kaydedileceği kategoriyi seçin",
     "acceleratedNeedsAnnuity": "Bu konut kredisi hızlandırılmış bir planla ödeniyor ve bu yalnızca anüiteli kredilerde bulunur. Doğrusal veya yalnızca faizli bir kredi normal bir ödeme sıklığı gerektirir, bu nedenle anüite türünü koruyun.",
     "paymentMatchingPayeePatternRequired": "Bankanın çekimini tanımak için bir alacaklı deseni girin",
     "paymentMatchingPayeePatternWildcard": "Alacaklı deseni bir * joker karakteri içermelidir",

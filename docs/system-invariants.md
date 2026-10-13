@@ -99,6 +99,7 @@ implied.
 | INV-LOAN-007 | One amortization method per mortgage type, from preview to pricing to projection | enforced |
 | INV-LOAN-008 | One settlement per scheduled occurrence, and the claim commits with the split | enforced |
 | INV-LOAN-009 | An annuity installment's payment is the one stated for its own due date | enforced |
+| INV-LOAN-010 | A loan's interest category and its managed payment template's interest line change together | enforced |
 | INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
@@ -2955,6 +2956,74 @@ Known gaps          A cursor moved without an advancement (skip, an edit of
 Status              enforced
 ```
 
+### INV-LOAN-010 -- a loan's interest category and its template's interest line change together
+
+```text
+Statement           A loan's payment template is priced per installment only
+                    while identifyLoanTemplate manages it: one principal
+                    transfer, one interest line carrying
+                    accounts.interest_category_id, optionally an
+                    extra-principal transfer. So every path that writes the
+                    template's interest line names an interest category the
+                    caller owns, and a change of the account's category moves
+                    that line with it: a template managed before a successful
+                    update is managed after it. No line is guessed: an
+                    escrow, insurance or tax line is never marked as interest.
+Source of truth     accounts.interest_category_id and the template's
+                    scheduled_transaction_splits, read under the schedule
+                    row lock.
+Enforcement         Creation: createLoanAccount, createMortgageAccount
+                    (loan-mortgage-account.service.ts) and setupLoanPayments
+                    (loan-payment-setup.service.ts) refuse a missing category
+                    (errors.accounts.loanRequiresInterestCategory /
+                    mortgageRequiresInterestCategory) and one the caller does
+                    not own (assertLoanInterestCategory,
+                    backend/src/accounts/loan-interest-category.ts) before
+                    anything is written; there is no default lookup. The
+                    account form and the payment setup dialog require the
+                    field. Change: AccountsService.update, on a value
+                    difference only, runs assertLoanInterestCategory and
+                    planLoanInterestRelink before the account save and
+                    applyLoanInterestRelink after it, in the update's
+                    withScopedDb transaction. The plan relinks exactly one
+                    candidate (a category line with no transfer whose
+                    category is NULL or the previous one, or the line a
+                    managed template prices as interest) when
+                    identifyLoanTemplate reports the relinked template
+                    managed; it is a no-op (logged) for a cleared category, no
+                    schedule, or an ambiguous or already-unmanaged template.
+Concurrency scope   per loan: the update holds the account row lock, then the
+                    plan takes the schedule row lock (pessimistic_write), the
+                    order reassignLoanSourceAccount and the template
+                    repricing take.
+Retry semantics     Safe: a repeat is a resend of the stored value, which is
+                    no value difference and touches nothing.
+Crash semantics     One withScopedDb transaction: the account and the line
+                    commit together or not at all.
+Failure response    400 errors.accounts.invalidInterestCategory for a category
+                    that is unknown or another user's; 400
+                    errors.accounts.interestCategoryBreaksTemplate when a
+                    managed template would stop being managed (defensive: the
+                    candidate rule makes it unreachable); nothing written in
+                    either case.
+Required tests      Met: loan-interest-category.spec.ts (relink from NULL and
+                    from A to B, cleared, no schedule, the three escrow
+                    cases, the forced refusal writing nothing),
+                    accounts.service.spec.ts (runs on a value change only,
+                    account saved before the line, refusal before any save),
+                    the create and setup refusals in
+                    loan-mortgage-account.service.spec.ts and
+                    loan-payment-setup.service.spec.ts, and the PG cases in
+                    loan-interest-relink.integration.spec.ts.
+Known gaps          Templates that drifted before this invariant are repaired
+                    only by a later category change or by hand; interest lines
+                    in per-occurrence overrides
+                    (scheduled_transaction_overrides.splits) are not relinked;
+                    a 0% loan set up through setupLoanPayments has no interest
+                    line, so its template is unmanaged regardless.
+Status              enforced
+```
+
 ### INV-LOAN-HISTORY-001 -- historical loan interest counted as paid is ledger-backed
 
 ```text
@@ -3057,10 +3126,12 @@ Known gap           **Standalone interest is attributed by `(interest category,
                     `pairSeparateInterestByDate` sums both onto whichever
                     payment date matches. The source comment has always said to
                     give each loan its own category; what makes the state normal
-                    rather than exceptional is the DEFAULT --
-                    `LoanPaymentSetupService` falls back to
-                    `CategoriesService.findLoanCategories`, which resolves one
-                    user-level `Loan -> Loan Interest` category for every loan.
+                    rather than exceptional was the DEFAULT -- the setup and
+                    create paths used to fall back to one user-level
+                    `Loan -> Loan Interest` category for every loan. They now
+                    require the user to choose a category per loan
+                    (INV-LOAN-010), so a shared category is a user's choice,
+                    not a default; the merge still happens when one is chosen.
                     Worked example: Loan A pays 800 principal + 200 interest and
                     Loan B pays 500 + 100 on the same date from the same
                     chequing account; A's history reports 300 of interest and an
@@ -3068,7 +3139,7 @@ Known gap           **Standalone interest is attributed by `(interest category,
                     Closing it needs a durable provenance link (the loan account
                     id, or the principal payment / scheduled occurrence, recorded
                     on the interest transaction) plus a decision about existing
-                    data and about the setup default. Both are schema/product
+                    data. That is a schema/product
                     decisions, so the status is `partial` and says so rather than
                     the catalogue claiming a guarantee the code does not give.
                     A second, smaller gap: `accounts.interest_booking_mode`

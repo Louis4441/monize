@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "z. B. 5,5",
     "estimatedFromHistory": "Aus Buchungshistorie geschätzt: {rate}%",
     "interestExpenseCategory": "Zinsaufwandskategorie",
+    "interestExpenseCategoryRequired": "Zinsaufwandskategorie (erforderlich)",
     "detectedCategory": "Erkannt: {name}",
     "selectCategory": "Kategorie auswählen...",
     "payeeLender": "Zahlungsempfänger / Kreditgeber",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Zahlung vom Konto (erforderlich)",
     "paymentFromAccountEditHelp": "Eine Änderung verschiebt die anstehenden geplanten Zahlungen und die Zahlungsabgleichsregel auf das neue Konto. Bereits gebuchte Zahlungen bleiben unverändert.",
     "interestCategory": "Zinskategorie",
+    "interestCategoryRequired": "Zinskategorie (erforderlich)",
     "interestBookingMode": {
       "label": "Wie werden Zinsen erfasst?",
       "help": "Damit die Zinserkennung korrekt liest. Automatisch passt meistens.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "Datum der ersten Zahlung ist erforderlich",
     "paymentAccountRequired": "Zahlungskonto ist erforderlich",
     "amortizationRequired": "Tilgungszeitraum ist erforderlich",
+    "interestCategoryRequired": "Wählen Sie die Kategorie, auf die die Zinsen dieses Kredits gebucht werden",
     "acceleratedNeedsAnnuity": "Diese Hypothek wird nach einem beschleunigten Zahlungsplan bezahlt, den nur eine Annuitätenhypothek hat. Eine lineare oder tilgungsfreie Hypothek braucht eine reguläre Zahlungsfrequenz; behalte daher eine Annuitätenart bei.",
     "paymentMatchingPayeePatternRequired": "Gib ein Zahlungsempfänger-Muster ein, das die Bankabbuchung erkennt",
     "paymentMatchingPayeePatternWildcard": "Das Zahlungsempfänger-Muster muss einen *-Platzhalter enthalten",

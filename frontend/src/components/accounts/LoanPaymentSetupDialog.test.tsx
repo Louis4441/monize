@@ -93,8 +93,8 @@ const defaultDetected: DetectedLoanPayment = {
   confidence: 0.85,
   sourceAccountId: 'acc-1',
   sourceAccountName: 'My Chequing',
-  interestCategoryId: null,
-  interestCategoryName: null,
+  interestCategoryId: 'cat-int',
+  interestCategoryName: 'Loan Interest',
   principalCategoryId: null,
   estimatedInterestRate: 5.5,
   suggestedNextDueDate: '2026-04-01',
@@ -175,6 +175,7 @@ describe('LoanPaymentSetupDialog', () => {
       paymentFrequency: 'MONTHLY',
       sourceAccountId: 'acc-1',
       nextDueDate: '2026-04-01',
+      interestCategoryId: 'cat-int',
     }));
     expect(toast.success).toHaveBeenCalled();
     expect(defaultProps.onSetupComplete).toHaveBeenCalled();
@@ -816,6 +817,35 @@ describe('LoanPaymentSetupDialog', () => {
   it('does not run detection when isOpen is false', () => {
     render(<LoanPaymentSetupDialog {...defaultProps} isOpen={false} />);
     expect(mockDetectLoanPayments).not.toHaveBeenCalled();
+  });
+
+  it('refuses to submit without an interest category, and only a chosen one is sent', async () => {
+    mockDetectLoanPayments.mockResolvedValue({
+      ...defaultDetected,
+      interestCategoryId: null,
+      interestCategoryName: null,
+    });
+    mockSetupLoanPayments.mockResolvedValue({} as any);
+    await renderDialog();
+
+    expect(screen.getByText('Interest Expense Category (required)')).toBeInTheDocument();
+    const submitButton = screen.getByRole('button', { name: /Set Up Payments/i });
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
+    expect(toast.error).toHaveBeenCalledWith('Please fill in all required fields');
+    expect(mockSetupLoanPayments).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('combobox-input-category'), { target: { value: 'cat-chosen' } });
+    });
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
+    expect(mockSetupLoanPayments).toHaveBeenCalledWith(
+      'loan-1',
+      expect.objectContaining({ interestCategoryId: 'cat-chosen' }),
+    );
   });
 
   it('shows validation error toast when required fields are missing', async () => {

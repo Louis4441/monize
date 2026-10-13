@@ -821,34 +821,6 @@ export class CategoriesService {
     });
   }
 
-  async findLoanCategories(userId: string): Promise<{
-    principalCategory: Category | null;
-    interestCategory: Category | null;
-  }> {
-    return withScopedDb(this.dataSource, async (m) => {
-      const repo = m.getRepository(Category);
-      const loanParent = await repo.findOne({
-        where: { userId, name: "Loan", parentId: IsNull() },
-      });
-
-      if (!loanParent) {
-        return {
-          principalCategory: null,
-          interestCategory: null,
-        };
-      }
-
-      const principalCategory = await repo.findOne({
-        where: { userId, name: "Loan Principal", parentId: loanParent.id },
-      });
-      const interestCategory = await repo.findOne({
-        where: { userId, name: "Loan Interest", parentId: loanParent.id },
-      });
-
-      return { principalCategory, interestCategory };
-    });
-  }
-
   async importDefaults(
     userId: string,
     options: ImportDefaultsDto = {},

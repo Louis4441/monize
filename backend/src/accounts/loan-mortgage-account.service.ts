@@ -10,7 +10,7 @@ import { DataSource } from "typeorm";
 import { Account, AccountType } from "./entities/account.entity";
 import { Institution } from "../institutions/entities/institution.entity";
 import { CreateAccountDto } from "./dto/create-account.dto";
-import { CategoriesService } from "../categories/categories.service";
+import { assertLoanInterestCategory } from "./loan-interest-category";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { FrequencyType as FrequencyTypeDto } from "../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import {
@@ -105,8 +105,6 @@ export class LoanMortgageAccountService {
 
   constructor(
     private dataSource: DataSource,
-    @Inject(forwardRef(() => CategoriesService))
-    private categoriesService: CategoriesService,
     @Inject(forwardRef(() => ScheduledTransactionsService))
     private scheduledTransactionsService: ScheduledTransactionsService,
     @Inject(forwardRef(() => LoanRateChangesService))
@@ -227,15 +225,21 @@ export class LoanMortgageAccountService {
       );
     }
 
-    let interestCatId = interestCategoryId;
-
-    if (!interestCatId) {
-      const { interestCategory } =
-        await this.categoriesService.findLoanCategories(userId);
-      if (interestCategory) {
-        interestCatId = interestCategory.id;
-      }
+    // No default: a name lookup cannot find the user's own interest category
+    // (translated trees, mortgage-specific categories), and an interest line
+    // without one leaves the template unmanaged (INV-LOAN-010).
+    if (!interestCategoryId) {
+      throw new BadRequestException(
+        tr(
+          "errors.accounts.loanRequiresInterestCategory",
+          "Loan accounts require an interest category",
+        ),
+      );
     }
+    await withScopedDb(this.dataSource, (m) =>
+      assertLoanInterestCategory(m, userId, interestCategoryId),
+    );
+    const interestCatId = interestCategoryId;
 
     const loanAmount = Math.abs(openingBalance);
     const amortization = calculateAmortization(
@@ -262,7 +266,7 @@ export class LoanMortgageAccountService {
         // every amortization the account later computes.
         paymentStartDate: localDateForColumn(paymentStartDate),
         sourceAccountId,
-        interestCategoryId: interestCatId || null,
+        interestCategoryId: interestCatId,
       });
       return repo.save(account);
     });
@@ -305,7 +309,7 @@ export class LoanMortgageAccountService {
             memo: "Principal",
           },
           {
-            categoryId: interestCatId || undefined,
+            categoryId: interestCatId,
             amount: -amortization.interestPayment,
             memo: "Interest",
           },
@@ -386,15 +390,21 @@ export class LoanMortgageAccountService {
       );
     }
 
-    let interestCatId = interestCategoryId;
-
-    if (!interestCatId) {
-      const { interestCategory } =
-        await this.categoriesService.findLoanCategories(userId);
-      if (interestCategory) {
-        interestCatId = interestCategory.id;
-      }
+    // No default: a name lookup cannot find the user's own interest category
+    // (translated trees, mortgage-specific categories), and an interest line
+    // without one leaves the template unmanaged (INV-LOAN-010).
+    if (!interestCategoryId) {
+      throw new BadRequestException(
+        tr(
+          "errors.accounts.mortgageRequiresInterestCategory",
+          "Mortgage accounts require an interest category",
+        ),
+      );
     }
+    await withScopedDb(this.dataSource, (m) =>
+      assertLoanInterestCategory(m, userId, interestCategoryId),
+    );
+    const interestCatId = interestCategoryId;
 
     // The type wins over the legacy flags; a request naming neither is the
     // default type, as the flags' `false` defaults always denoted.
@@ -484,7 +494,7 @@ export class LoanMortgageAccountService {
         // every amortization the account later computes.
         paymentStartDate: localDateForColumn(paymentStartDate),
         sourceAccountId,
-        interestCategoryId: interestCatId || null,
+        interestCategoryId: interestCatId,
         ...mortgageTypeColumns(mortgageType),
         prepaymentMode: prepaymentModeColumn(mortgageType, prepaymentMode),
         termMonths: termMonths || null,
@@ -534,7 +544,7 @@ export class LoanMortgageAccountService {
             memo: "Principal",
           },
           {
-            categoryId: interestCatId || undefined,
+            categoryId: interestCatId,
             amount: -firstInstallment.interest,
             memo: "Interest",
           },

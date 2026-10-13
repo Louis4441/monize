@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "例如 5.5",
     "estimatedFromHistory": "從交易記錄估算：{rate}%",
     "interestExpenseCategory": "利息支出類別",
+    "interestExpenseCategoryRequired": "利息支出類別（必填）",
     "detectedCategory": "偵測到：{name}",
     "selectCategory": "選擇類別...",
     "payeeLender": "收款人 / 貸款機構",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "從科目付款（必填）",
     "paymentFromAccountEditHelp": "變更後，即將到來的排定付款和付款比對規則將移至新帳戶。已入帳的付款不會變更。",
     "interestCategory": "利息類別",
+    "interestCategoryRequired": "利息類別（必填）",
     "interestBookingMode": {
       "label": "利息如何記帳？",
       "help": "讓利率偵測正確讀取。多數情況用自動即可。",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "首次還款日期為必填",
     "paymentAccountRequired": "付款科目為必填",
     "amortizationRequired": "攤還期為必填",
+    "interestCategoryRequired": "請選擇記錄此貸款利息的類別",
     "acceleratedNeedsAnnuity": "此房貸依加速還款計畫支付，只有本息平均攤還的房貸才有這種計畫。本金平均攤還或只付利息的房貸需要一般還款頻率，因此請保留本息平均攤還類型。",
     "paymentMatchingPayeePatternRequired": "請輸入用於識別銀行扣款的收款人模式",
     "paymentMatchingPayeePatternWildcard": "收款人模式必須包含 * 萬用字元",

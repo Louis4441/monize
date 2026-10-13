@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "예: 5.5",
     "estimatedFromHistory": "거래 내역에서 추정: {rate}%",
     "interestExpenseCategory": "이자 지출 카테고리",
+    "interestExpenseCategoryRequired": "이자 지출 카테고리 (필수)",
     "detectedCategory": "감지됨: {name}",
     "selectCategory": "카테고리 선택...",
     "payeeLender": "수취인 / 대출 기관",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "납부 출금 계정 (필수)",
     "paymentFromAccountEditHelp": "변경하면 예정된 향후 결제와 결제 매칭 규칙이 새 계좌로 이동합니다. 이미 기록된 결제는 변경되지 않습니다.",
     "interestCategory": "이자 카테고리",
+    "interestCategoryRequired": "이자 카테고리 (필수)",
     "interestBookingMode": {
       "label": "이자를 어떻게 기록하나요?",
       "help": "금리 감지가 올바르게 읽도록 합니다. 대부분 자동이면 됩니다.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "첫 납부일은 필수입니다",
     "paymentAccountRequired": "납부 출금 계정은 필수입니다",
     "amortizationRequired": "상환 기간은 필수입니다",
+    "interestCategoryRequired": "이 대출의 이자가 기록될 카테고리를 선택하세요",
     "acceleratedNeedsAnnuity": "이 모기지는 가속 일정으로 납입되며, 이는 원리금 균등 모기지에만 있습니다. 원금 균등 또는 이자만 내는 모기지에는 일반 납입 주기가 필요하므로 원리금 균등 유형을 유지하세요.",
     "paymentMatchingPayeePatternRequired": "은행 출금과 일치시킬 수취인 패턴을 입력하세요",
     "paymentMatchingPayeePatternWildcard": "수취인 패턴에는 * 와일드카드가 포함되어야 합니다",

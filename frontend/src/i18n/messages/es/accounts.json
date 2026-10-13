@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "p. ej. 5,5",
     "estimatedFromHistory": "Estimado del historial de transacciones: {rate}%",
     "interestExpenseCategory": "Categoría de Gasto de Interés",
+    "interestExpenseCategoryRequired": "Categoría de Gasto de Interés (obligatoria)",
     "detectedCategory": "Detectado: {name}",
     "selectCategory": "Seleccionar categoría...",
     "payeeLender": "Beneficiario / Prestamista",
@@ -309,6 +310,7 @@
     "paymentFromAccount": "Pagar desde Cuenta (obligatorio)",
     "paymentFromAccountEditHelp": "Al cambiarla, los próximos pagos programados y la regla de conciliación de pagos pasan a la nueva cuenta. Los pagos ya registrados no cambian.",
     "interestCategory": "Categoría de Interés",
+    "interestCategoryRequired": "Categoría de Interés (obligatoria)",
     "interestBookingMode": {
       "label": "¿Cómo se registran los intereses?",
       "help": "Para que la detección de tipos los lea bien. Automático sirve casi siempre.",
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "La fecha del primer pago es obligatoria",
     "paymentAccountRequired": "La cuenta de pago es obligatoria",
     "amortizationRequired": "El período de amortización es obligatorio",
+    "interestCategoryRequired": "Elija la categoría en la que se registran los intereses de este préstamo",
     "acceleratedNeedsAnnuity": "Esta hipoteca se paga con un calendario acelerado, que solo tiene una hipoteca de anualidad. Una hipoteca lineal o de solo intereses necesita una frecuencia de pago normal, así que mantén un tipo de anualidad.",
     "paymentMatchingPayeePatternRequired": "Introduce un patrón de beneficiario para identificar el adeudo del banco",
     "paymentMatchingPayeePatternWildcard": "El patrón del beneficiario debe incluir un comodín *",

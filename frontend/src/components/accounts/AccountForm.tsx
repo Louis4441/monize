@@ -227,6 +227,7 @@ const buildAccountSchema = (
     requireField(!data.paymentStartDate, 'paymentStartDate', 'validation.paymentStartDateRequired');
     requireField(!data.sourceAccountId, 'sourceAccountId', 'validation.paymentAccountRequired');
     requireField(!data.amortizationMonths, 'amortizationMonths', 'validation.amortizationRequired');
+    requireField(!data.interestCategoryId, 'interestCategoryId', 'validation.interestCategoryRequired');
   } else if (data.accountType === 'LOAN') {
     requireField(!data.institutionId, 'institutionId', 'validation.institutionRequired');
     requireField(data.interestRate === undefined, 'interestRate', 'validation.interestRateRequired');
@@ -234,6 +235,7 @@ const buildAccountSchema = (
     requireField(!data.paymentFrequency, 'paymentFrequency', 'validation.paymentFrequencyRequired');
     requireField(!data.paymentStartDate, 'paymentStartDate', 'validation.paymentStartDateRequired');
     requireField(!data.sourceAccountId, 'sourceAccountId', 'validation.paymentAccountRequired');
+    requireField(!data.interestCategoryId, 'interestCategoryId', 'validation.interestCategoryRequired');
   }
 
   if (data.accountType === 'MORTGAGE' && data.paymentMatchingEnabled) {
@@ -370,10 +372,6 @@ export function AccountForm({
   const [currencies, setCurrencies] = useState<CurrencyInfo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [_defaultLoanCategories, setDefaultLoanCategories] = useState<{
-    principalId: string | null;
-    interestId: string | null;
-  }>({ principalId: null, interestId: null });
   const [selectedAssetCategoryId, setSelectedAssetCategoryId] = useState<string>(account?.assetCategoryId || '');
   const [assetCategoryName, setAssetCategoryName] = useState<string>('');
   const [selectedInterestCategoryId, setSelectedInterestCategoryId] = useState<string>(account?.interestCategoryId || '');
@@ -777,47 +775,15 @@ export function AccountForm({
           // Filter out loan and mortgage accounts from source account options
           setAccounts(accountsData.filter(a => a.accountType !== 'LOAN' && a.accountType !== 'MORTGAGE'));
         }
-
-          if (isLoanAccount && !account) {
-            // Find default loan interest category
-            const loanParent = categoriesData.find(c => c.name === 'Loan' && !c.parentId);
-            if (loanParent) {
-              const interestCat = categoriesData.find(
-                c => c.name === 'Loan Interest' && c.parentId === loanParent.id
-              );
-              setDefaultLoanCategories({
-                principalId: null,
-                interestId: interestCat?.id || null,
-              });
-              // Set default interest category if not already set
-              if (interestCat && !getValues('interestCategoryId')) {
-                setValue('interestCategoryId', interestCat.id);
-                setSelectedInterestCategoryId(interestCat.id);
-              }
-            }
-          }
-
-          if (isMortgageAccount && !account) {
-            // Find default mortgage interest category (fallback to loan interest)
-            const mortgageParent = categoriesData.find(c => c.name === 'Mortgage' && !c.parentId);
-            const loanParent = categoriesData.find(c => c.name === 'Loan' && !c.parentId);
-            const parent = mortgageParent || loanParent;
-            if (parent) {
-              const interestCat = categoriesData.find(
-                c => (c.name === 'Mortgage Interest' || c.name === 'Loan Interest') && c.parentId === parent.id
-              );
-              if (interestCat && !getValues('interestCategoryId')) {
-                setValue('interestCategoryId', interestCat.id);
-                setSelectedInterestCategoryId(interestCat.id);
-              }
-            }
-          }
+        // No default interest category: a name lookup cannot find the user's
+        // own (translated or mortgage-specific) category, so the form requires
+        // a choice instead (INV-LOAN-010).
       } catch (error) {
         logger.error('Failed to load accounts/categories:', error);
       }
     };
     loadData();
-  }, [isLoanAccount, isMortgageAccount, isLineOfCreditAccount, isAssetAccount, account, setValue, getValues]);
+  }, [isLoanAccount, isMortgageAccount, isLineOfCreditAccount, isAssetAccount]);
 
   // The payment-source select is uncontrolled and mounts before its options
   // load, so the browser drops the saved account and shows the placeholder.

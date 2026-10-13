@@ -12,7 +12,7 @@ import { BadRequestException } from "@nestjs/common";
 import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
 import { Account, AccountType } from "./entities/account.entity";
 import { Institution } from "../institutions/entities/institution.entity";
-import { CategoriesService } from "../categories/categories.service";
+import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { LoanRateChangesService } from "../loan-rate-changes/loan-rate-changes.service";
 import { LoanPaymentDetectorService } from "./loan-payment-detector.service";
@@ -48,6 +48,7 @@ describe("LoanMortgageAccountService: LINEAR and INTEREST_ONLY", () => {
       institution: "ING",
       amortizationMonths: 360,
       mortgageType: "LINEAR",
+      interestCategoryId: "cat-interest",
       ...overrides,
     }) as unknown as CreateAccountDto;
 
@@ -101,6 +102,16 @@ describe("LoanMortgageAccountService: LINEAR and INTEREST_ONLY", () => {
     const mocks = createScopedDbMocks([
       [Account, accountsRepository],
       [Institution, { findOne: jest.fn().mockResolvedValue(null) }],
+      [
+        Category,
+        {
+          findOne: jest
+            .fn()
+            .mockImplementation(({ where }: any) =>
+              Promise.resolve({ id: where.id, userId: where.userId }),
+            ),
+        },
+      ],
     ]);
     manager = mocks.manager;
     manager.query.mockResolvedValue([{ balance: "-235000.0012" }]);
@@ -109,14 +120,6 @@ describe("LoanMortgageAccountService: LINEAR and INTEREST_ONLY", () => {
       providers: [
         LoanMortgageAccountService,
         { provide: DataSource, useValue: mocks.dataSource },
-        {
-          provide: CategoriesService,
-          useValue: {
-            findLoanCategories: jest.fn().mockResolvedValue({
-              interestCategory: { id: "cat-interest" },
-            }),
-          },
-        },
         {
           provide: ScheduledTransactionsService,
           useValue: scheduledTransactionsService,
