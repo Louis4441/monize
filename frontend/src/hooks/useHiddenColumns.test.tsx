@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, renderHook, waitFor } from '@/test/render';
-import toast from 'react-hot-toast';
+import { act, renderHook } from '@/test/render';
 import { useHiddenColumns } from './useHiddenColumns';
+import { useHiddenColumnsStore } from '@/store/hiddenColumnsStore';
 
 const { storeState } = vi.hoisted(() => ({
   storeState: {
@@ -15,14 +15,7 @@ vi.mock('@/store/preferencesStore', () => {
   const usePreferencesStore = ((selector: (s: unknown) => unknown) =>
     selector({ preferences: storeState.preferences })) as unknown as {
     (selector: (s: unknown) => unknown): unknown;
-    getState: () => unknown;
   };
-  usePreferencesStore.getState = () => ({
-    preferences: storeState.preferences,
-    updatePreferences: (patch: Record<string, unknown>) => {
-      storeState.preferences = { ...storeState.preferences, ...patch } as typeof storeState.preferences;
-    },
-  });
   return { usePreferencesStore };
 });
 
@@ -32,14 +25,15 @@ vi.mock('@/lib/user-settings', () => ({
   },
 }));
 
+const browserChoices = () => useHiddenColumnsStore.getState().columns;
+
 describe('useHiddenColumns', () => {
   beforeEach(() => {
     storeState.preferences = { hiddenTableColumns: {} };
     updatePreferencesApi.mockReset();
-    (toast.error as ReturnType<typeof vi.fn>).mockReset?.();
   });
 
-  it('reads the kind entry, dropping unknown ids', () => {
+  it('reads the account default for a kind this browser has not chosen, dropping unknown ids', () => {
     storeState.preferences = {
       hiddenTableColumns: { transactions: ['tags', 'bogus'], investmentRegister: ['price'] },
     };
@@ -52,6 +46,20 @@ describe('useHiddenColumns', () => {
       'attachments',
       'status',
     ]);
+  });
+
+  it("prefers this browser's choice over the account default", () => {
+    storeState.preferences = { hiddenTableColumns: { transactions: ['tags'] } };
+    useHiddenColumnsStore.setState({ columns: { transactions: ['status'] } });
+    const { result } = renderHook(() => useHiddenColumns('transactions'));
+    expect([...result.current.hidden]).toEqual(['status']);
+  });
+
+  it("treats this browser's empty choice as show everything, not as no choice", () => {
+    storeState.preferences = { hiddenTableColumns: { transactions: ['tags'] } };
+    useHiddenColumnsStore.setState({ columns: { transactions: [] } });
+    const { result } = renderHook(() => useHiddenColumns('transactions'));
+    expect(result.current.hidden.size).toBe(0);
   });
 
   it('treats a missing map as nothing hidden', () => {
@@ -77,108 +85,70 @@ describe('useHiddenColumns', () => {
     expect(result.current.isVisible).toBe(first);
   });
 
-  it('updates optimistically and sends the whole map, canonicalised', async () => {
+  it('hides into this browser only, starting from the account default, canonicalised', () => {
     storeState.preferences = {
       hiddenTableColumns: { transactions: ['status'], investmentRegister: ['price'] },
     };
-    let resolveSave: (value: unknown) => void = () => {};
-    updatePreferencesApi.mockReturnValue(
-      new Promise((resolve) => {
-        resolveSave = resolve;
-      }),
-    );
-
     const { result } = renderHook(() => useHiddenColumns('transactions'));
-    let pending: Promise<void> = Promise.resolve();
     act(() => {
-      pending = result.current.hide('tags');
+      result.current.hide('tags');
     });
 
-    // Optimistic: the store already holds the new list before the save resolves.
+    expect(browserChoices()).toEqual({ transactions: ['tags', 'status'] });
+    expect([...result.current.hidden]).toEqual(['tags', 'status']);
+    expect(updatePreferencesApi).not.toHaveBeenCalled();
+    // The account default is untouched.
     expect(storeState.preferences.hiddenTableColumns).toEqual({
-      transactions: ['tags', 'status'],
+      transactions: ['status'],
       investmentRegister: ['price'],
     });
-    expect(updatePreferencesApi).toHaveBeenCalledWith({
-      hiddenTableColumns: {
-        transactions: ['tags', 'status'],
-        investmentRegister: ['price'],
-      },
-    });
-
-    await act(async () => {
-      resolveSave({
-        hiddenTableColumns: {
-          transactions: ['tags', 'status'],
-          investmentRegister: ['price'],
-        },
-      });
-      await pending;
-    });
   });
 
-  it('adopts the saved map from the response', async () => {
-    const saved = { transactions: ['refNumber'], investmentHoldings: ['avgCost'] };
-    updatePreferencesApi.mockResolvedValue({ hiddenTableColumns: saved });
-
-    const { result } = renderHook(() => useHiddenColumns('transactions'));
-    await act(async () => {
-      await result.current.hide('refNumber');
-    });
-
-    expect(storeState.preferences.hiddenTableColumns).toEqual(saved);
-  });
-
-  it('does not duplicate an id hidden twice', async () => {
+  it('does not duplicate an id hidden twice', () => {
     storeState.preferences = { hiddenTableColumns: { investmentRegister: ['status'] } };
-    updatePreferencesApi.mockImplementation(async (body: unknown) => body);
-
     const { result } = renderHook(() => useHiddenColumns('investmentRegister'));
-    await act(async () => {
-      await result.current.hide('status');
+    act(() => {
+      result.current.hide('status');
     });
-
-    expect(updatePreferencesApi).toHaveBeenCalledWith({
-      hiddenTableColumns: { investmentRegister: ['status'] },
-    });
+    expect(browserChoices()).toEqual({ investmentRegister: ['status'] });
   });
 
-  it('show removes one id and showAll empties the kind only', async () => {
-    storeState.preferences = {
-      hiddenTableColumns: {
-        investmentHoldings: ['shares', 'price'],
-        transactions: ['tags'],
-      },
-    };
-    updatePreferencesApi.mockImplementation(async (body: unknown) => body);
-
+  it('show removes one id and showAll empties the kind only', () => {
+    useHiddenColumnsStore.setState({
+      columns: { investmentHoldings: ['shares', 'price'], transactions: ['tags'] },
+    });
     const { result } = renderHook(() => useHiddenColumns('investmentHoldings'));
-    await act(async () => {
-      await result.current.show('price');
+    act(() => {
+      result.current.show('price');
     });
-    expect(updatePreferencesApi).toHaveBeenLastCalledWith({
-      hiddenTableColumns: { investmentHoldings: ['shares'], transactions: ['tags'] },
-    });
+    expect(browserChoices()).toEqual({ investmentHoldings: ['shares'], transactions: ['tags'] });
 
-    await act(async () => {
-      await result.current.showAll();
+    act(() => {
+      result.current.showAll();
     });
-    expect(updatePreferencesApi).toHaveBeenLastCalledWith({
-      hiddenTableColumns: { investmentHoldings: [], transactions: ['tags'] },
-    });
+    expect(browserChoices()).toEqual({ investmentHoldings: [], transactions: ['tags'] });
   });
 
-  it('reverts the optimistic update and toasts on failure', async () => {
-    const before = { transactions: ['status'] };
-    storeState.preferences = { hiddenTableColumns: before };
-    updatePreferencesApi.mockRejectedValue(new Error('boom'));
-
+  it('persists the choice to localStorage and drops unknown kinds and ids on rehydrate', async () => {
     const { result } = renderHook(() => useHiddenColumns('transactions'));
-    await act(async () => {
-      await result.current.hide('tags');
+    act(() => {
+      result.current.hide('refNumber');
+    });
+    expect(JSON.parse(window.localStorage.getItem('monize-hidden-columns')!)).toEqual({
+      state: { columns: { transactions: ['refNumber'] } },
+      version: 0,
     });
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(storeState.preferences.hiddenTableColumns).toEqual(before);
+    window.localStorage.setItem(
+      'monize-hidden-columns',
+      JSON.stringify({
+        state: { columns: { transactions: ['status', 'bogus'], nope: ['x'], investmentHoldings: 'x' } },
+        version: 0,
+      }),
+    );
+    await act(async () => {
+      await useHiddenColumnsStore.persist.rehydrate();
+    });
+    expect(browserChoices()).toEqual({ transactions: ['status'] });
   });
 });

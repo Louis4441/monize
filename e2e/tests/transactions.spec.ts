@@ -236,8 +236,8 @@ test.describe('Register sorting', () => {
 });
 
 // Hideable columns (issue #1708): the register's "Columns" menu hides a
-// column from the DOM at every width and the choice follows the user across
-// a reload; the menu is also the one way to bring it back.
+// column from the DOM at every width and this browser remembers the choice
+// across a reload; the menu is also the one way to bring it back.
 test.describe('Hideable columns', () => {
   test('hides a register column through the menu, keeps it hidden across a reload, and restores it', async ({
     authedPage: page,
@@ -256,14 +256,9 @@ test.describe('Hideable columns', () => {
 
     await page.getByRole('button', { name: /^columns\b/i }).click();
     const menu = page.getByRole('menu', { name: /show or hide columns/i });
-    // The checkbox's own click handler only starts the PATCH that persists
-    // the choice (useHiddenColumns.hide); it does not await it. Waiting on
-    // the response, not just the optimistic DOM update, is what the reload
-    // below actually proves.
-    await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/users/preferences') && r.ok()),
-      menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click(),
-    ]);
+    // The choice is saved to this browser's localStorage synchronously
+    // (useHiddenColumnsStore), so the reload below reads it back.
+    await menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click();
 
     await expect(statusHeader).toHaveCount(0);
 
@@ -271,10 +266,7 @@ test.describe('Hideable columns', () => {
     await expect(statusHeader).toHaveCount(0);
 
     await page.getByRole('button', { name: /^columns\b/i }).click();
-    await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/users/preferences') && r.ok()),
-      menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click(),
-    ]);
+    await menu.getByRole('menuitemcheckbox', { name: /^status$/i }).click();
 
     await expect(statusHeader).toBeVisible();
   });

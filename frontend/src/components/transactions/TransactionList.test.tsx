@@ -6,6 +6,7 @@ import { useDensityStore } from '@/store/densityStore';
 import { useDateDisplayStore } from '@/store/dateDisplayStore';
 import { REGISTER_PAYEE_CELL_FLOOR } from './register-columns';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { useHiddenColumnsStore } from '@/store/hiddenColumnsStore';
 import toast from 'react-hot-toast';
 
 vi.mock('@/lib/transactions', () => ({
@@ -51,8 +52,8 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
-// The hidden-column preference's write (`useHiddenColumns`), so toggling a
-// column from the toolbar menu reaches a mock rather than the network.
+// The account preference write. Toggling a column saves to this browser only
+// (`useHiddenColumnsStore`), so the hidden-column tests assert it is never called.
 const mockUpdatePreferences = vi.fn();
 vi.mock('@/lib/user-settings', () => ({
   userSettingsApi: {
@@ -3806,9 +3807,7 @@ describe('TransactionList hidden columns', () => {
       fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Status' }));
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenCalledWith({
-        hiddenTableColumns: { transactions: ['status'] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ transactions: ['status'] });
     });
     expect(screen.queryByRole('columnheader', { name: /status/i })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitemcheckbox', { name: 'Status' })).toHaveAttribute('aria-checked', 'false');
@@ -3817,10 +3816,9 @@ describe('TransactionList hidden columns', () => {
       fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Status' }));
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenLastCalledWith({
-        hiddenTableColumns: { transactions: [] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ transactions: [] });
     });
+    expect(mockUpdatePreferences).not.toHaveBeenCalled();
     expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
   });
 
@@ -3837,9 +3835,7 @@ describe('TransactionList hidden columns', () => {
       fireEvent.click(hide);
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenCalledWith({
-        hiddenTableColumns: { transactions: ['status'] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ transactions: ['status'] });
     });
     expect(screen.queryByRole('columnheader', { name: /status/i })).not.toBeInTheDocument();
   });

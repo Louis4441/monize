@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, render, screen, fireEvent, waitFor, within } from '@/test/render';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { useHiddenColumnsStore } from '@/store/hiddenColumnsStore';
 import { GroupedHoldingsList } from './GroupedHoldingsList';
 
-// Hiding a column writes the cross-device preference; the write reaches a mock
-// rather than the network.
+// The account preference write. Hiding a column saves to this browser only
+// (`useHiddenColumnsStore`), so the hidden-column tests assert it is never called.
 const mockUpdatePreferences = vi.fn();
 vi.mock('@/lib/user-settings', () => ({
   userSettingsApi: {
@@ -886,9 +887,7 @@ describe('GroupedHoldingsList hidden columns', () => {
       fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Gain/Loss' }));
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenCalledWith({
-        hiddenTableColumns: { investmentHoldings: ['gainLoss'] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ investmentHoldings: ['gainLoss'] });
     });
     expect(screen.queryByRole('columnheader', { name: 'Gain/Loss' })).not.toBeInTheDocument();
 
@@ -896,10 +895,9 @@ describe('GroupedHoldingsList hidden columns', () => {
       fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Gain/Loss' }));
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenLastCalledWith({
-        hiddenTableColumns: { investmentHoldings: [] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ investmentHoldings: [] });
     });
+    expect(mockUpdatePreferences).not.toHaveBeenCalled();
     expect(screen.getByRole('columnheader', { name: 'Gain/Loss' })).toBeInTheDocument();
   });
 
@@ -916,9 +914,7 @@ describe('GroupedHoldingsList hidden columns', () => {
       fireEvent.click(hide);
     });
     await waitFor(() => {
-      expect(mockUpdatePreferences).toHaveBeenCalledWith({
-        hiddenTableColumns: { investmentHoldings: ['shares'] },
-      });
+      expect(useHiddenColumnsStore.getState().columns).toEqual({ investmentHoldings: ['shares'] });
     });
     expect(screen.queryByRole('columnheader', { name: 'Shares' })).not.toBeInTheDocument();
     expect(totalLabelSpan()).toBe(3);
