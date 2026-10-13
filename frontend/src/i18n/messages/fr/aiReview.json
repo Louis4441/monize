@@ -38,6 +38,12 @@
     "transactionMissing": "Cette transaction n'existe plus",
     "rule": "Règle : {name}",
     "manualRequest": "Demandée manuellement",
+    "receiptInstruction": {
+      "automatic": "Compléter cette transaction à partir de l'e-mail de commande joint : la répartir par article avec une catégorie chacun, ou définir la description.",
+      "chat": "Vous avez demandé la reconnaissance de l'e-mail de commande joint : répartir cette transaction par produit avec une catégorie chacun, ou définir la description.",
+      "categorize": "Attribuer une catégorie à chaque article de l'e-mail de commande joint qu'aucune règle n'a catégorisé, puis proposer la répartition de cette transaction ou définir la description.",
+      "parsed": "Un analyseur enregistré a lu l'e-mail de commande et propose ces lignes de catégorie et cette description pour la transaction."
+    },
     "emailReceipt": "Reçu par e-mail : {subject} de {sender}",
     "emailReceiptMissing": "Reçu par e-mail (l'e-mail a été supprimé)",
     "parserDraft": "Brouillon d'profil à partir de {count, plural, one {# e-mail} other {# e-mails}} ({domain})",

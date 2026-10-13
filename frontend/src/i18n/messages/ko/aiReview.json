@@ -38,6 +38,12 @@
     "transactionMissing": "이 거래는 더 이상 존재하지 않습니다",
     "rule": "규칙: {name}",
     "manualRequest": "수동으로 요청됨",
+    "receiptInstruction": {
+      "automatic": "첨부된 주문 이메일로 이 거래를 보완합니다. 품목별로 각각 카테고리를 지정해 분할하거나 설명을 설정합니다.",
+      "chat": "첨부된 주문 이메일 인식을 요청했습니다. 이 거래를 상품별로 각각 카테고리를 지정해 분할하거나 설명을 설정합니다.",
+      "categorize": "첨부된 주문 이메일에서 어떤 규칙으로도 분류되지 않은 각 품목에 카테고리를 지정한 다음, 이 거래의 분할을 제안하거나 설명을 설정합니다.",
+      "parsed": "저장된 파서가 주문 이메일을 읽고 이 거래에 대해 이 카테고리 줄과 설명을 제안합니다."
+    },
     "emailReceipt": "이메일 영수증: {sender}의 {subject}",
     "emailReceiptMissing": "이메일 영수증 (이메일이 삭제됨)",
     "parserDraft": "프로필 초안: {count, plural, one {이메일 #통} other {이메일 #통}} ({domain})",

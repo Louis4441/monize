@@ -7,6 +7,7 @@ export function makeReviewItem(overrides: Partial<AiReviewItem> = {}): AiReviewI
     kind: 'transaction_review',
     status: 'pending',
     instruction: 'Split this purchase by the items in the order',
+    instructionKey: null,
     transactionId: 'tx-1',
     ruleId: 'rule-1',
     ruleName: 'Allegro orders',

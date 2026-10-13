@@ -38,6 +38,12 @@
     "transactionMissing": "此交易已不存在",
     "rule": "規則：{name}",
     "manualRequest": "手動請求",
+    "receiptInstruction": {
+      "automatic": "根據附加的訂單郵件完善此交易：依商品行拆分並為每行指定類別，或設定描述。",
+      "chat": "你要求辨識附加的訂單郵件：依產品拆分此交易並為每項指定類別，或設定描述。",
+      "categorize": "為附加訂單郵件中沒有被任何規則分類的每個商品指定類別，然後提議此交易的拆分或設定描述。",
+      "parsed": "已儲存的解析器讀取了訂單郵件，並為此交易提議這些類別行和此描述。"
+    },
     "emailReceipt": "郵件收據：來自 {sender} 的 {subject}",
     "emailReceiptMissing": "郵件收據（該郵件已被刪除）",
     "parserDraft": "來自 {count, plural, one {# 封電子郵件} other {# 封電子郵件}} 的設定檔草稿 ({domain})",
