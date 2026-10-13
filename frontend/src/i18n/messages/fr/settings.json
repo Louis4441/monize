@@ -232,6 +232,13 @@
         "dashboard": "Afficher son tableau de bord"
       },
       "accountOpenTargetHelp": "S’applique lorsque vous cliquez sur un compte dans la page Comptes ou dans Comptes favoris du tableau de bord.",
+      "columnsLabel": "Colonnes affichées",
+      "columnsHelp": "Décochez une case pour masquer cette colonne par défaut. Le menu Colonnes d’un tableau la modifie dans ce navigateur uniquement.",
+      "columnTables": {
+        "transactions": "Opérations",
+        "investmentHoldings": "Positions de placement",
+        "investmentRegister": "Opérations de placement"
+      },
       "applyHere": "Utiliser ces réglages dans ce navigateur",
       "applyHereHelp": "Efface les réglages d’affichage enregistrés par ce navigateur, pour que les valeurs ci-dessus s’appliquent ici aussi.",
       "appliedHere": "Ce navigateur utilise maintenant vos vues par défaut"

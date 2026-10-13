@@ -44,8 +44,7 @@
     "menuLabel": "顯示或隱藏欄位",
     "showAll": "全部顯示",
     "hideColumn": "隱藏欄位",
-    "sheetSubtitle": "可在「欄位」選單中重新顯示。",
-    "saveFailed": "無法儲存欄位設定。請再試一次。"
+    "sheetSubtitle": "可在「欄位」選單中重新顯示。"
   },
   "loading": "載入中...",
   "pagination": {

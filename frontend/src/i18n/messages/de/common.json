@@ -44,8 +44,7 @@
     "menuLabel": "Spalten ein- oder ausblenden",
     "showAll": "Alle einblenden",
     "hideColumn": "Spalte ausblenden",
-    "sheetSubtitle": "Über das Spaltenmenü wieder einblenden.",
-    "saveFailed": "Spalteneinstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut."
+    "sheetSubtitle": "Über das Spaltenmenü wieder einblenden."
   },
   "loading": "Wird geladen...",
   "pagination": {

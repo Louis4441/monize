@@ -44,8 +44,7 @@
     "menuLabel": "Mostrar ou ocultar colunas",
     "showAll": "Mostrar todas",
     "hideColumn": "Ocultar coluna",
-    "sheetSubtitle": "Volte a mostrá-la a partir do menu Colunas.",
-    "saveFailed": "Não foi possível guardar as definições das colunas. Tente novamente."
+    "sheetSubtitle": "Volte a mostrá-la a partir do menu Colunas."
   },
   "loading": "A carregar...",
   "pagination": {

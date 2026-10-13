@@ -232,6 +232,13 @@
         "dashboard": "顯示其儀表板"
       },
       "accountOpenTargetHelp": "在「科目」頁面或儀表板的「我的最愛科目」中點按科目時適用。",
+      "columnsLabel": "顯示的欄位",
+      "columnsHelp": "取消勾選即可預設隱藏該欄位。表格的「欄位」選單只會在該瀏覽器中變更此設定。",
+      "columnTables": {
+        "transactions": "交易",
+        "investmentHoldings": "投資持股",
+        "investmentRegister": "投資交易"
+      },
       "applyHere": "在此瀏覽器中使用這些預設值",
       "applyHereHelp": "清除此瀏覽器已儲存的檢視設定，使上述預設值在此處也生效。",
       "appliedHere": "此瀏覽器現在使用您的預設檢視"

@@ -232,6 +232,13 @@
         "dashboard": "ダッシュボードを表示する"
       },
       "accountOpenTargetHelp": "口座ページまたはダッシュボードのお気に入りの勘定科目で口座をクリックしたときに適用されます。",
+      "columnsLabel": "表示する列",
+      "columnsHelp": "チェックを外すと、その列が既定で非表示になります。表の「列」メニューでの変更は、そのブラウザにのみ適用されます。",
+      "columnTables": {
+        "transactions": "取引",
+        "investmentHoldings": "投資の保有銘柄",
+        "investmentRegister": "投資取引"
+      },
       "applyHere": "このブラウザでこれらの既定を使用する",
       "applyHereHelp": "このブラウザに保存されている表示設定を消去し、上記の既定がここでも適用されるようにします。",
       "appliedHere": "このブラウザで既定の表示を使用するようになりました"

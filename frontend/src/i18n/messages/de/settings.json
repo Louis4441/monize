@@ -232,6 +232,13 @@
         "dashboard": "Kontoübersicht anzeigen"
       },
       "accountOpenTargetHelp": "Gilt, wenn Sie auf der Seite „Konten“ oder unter „Favoritenkonten“ im Dashboard auf ein Konto klicken.",
+      "columnsLabel": "Angezeigte Spalten",
+      "columnsHelp": "Entfernen Sie ein Häkchen, um diese Spalte standardmäßig auszublenden. Das Spaltenmenü einer Tabelle ändert dies nur in diesem Browser.",
+      "columnTables": {
+        "transactions": "Buchungen",
+        "investmentHoldings": "Wertpapierbestände",
+        "investmentRegister": "Wertpapierbuchungen"
+      },
       "applyHere": "Diese Standards in diesem Browser verwenden",
       "applyHereHelp": "Löscht die Ansichtseinstellungen, die dieser Browser gespeichert hat, damit die obigen Standards auch hier gelten.",
       "appliedHere": "Dieser Browser verwendet jetzt Ihre Standardansichten"

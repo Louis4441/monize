@@ -44,8 +44,7 @@
     "menuLabel": "Sütunları göster veya gizle",
     "showAll": "Tümünü göster",
     "hideColumn": "Sütunu gizle",
-    "sheetSubtitle": "Sütunlar menüsünden geri getirebilirsiniz.",
-    "saveFailed": "Sütun ayarları kaydedilemedi. Lütfen tekrar deneyin."
+    "sheetSubtitle": "Sütunlar menüsünden geri getirebilirsiniz."
   },
   "loading": "Yükleniyor...",
   "pagination": {

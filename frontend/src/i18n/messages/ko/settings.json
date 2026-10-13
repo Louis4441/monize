@@ -232,6 +232,13 @@
         "dashboard": "대시보드 표시"
       },
       "accountOpenTargetHelp": "계정 페이지나 대시보드의 즐겨찾기 계정에서 계정을 클릭할 때 적용됩니다.",
+      "columnsLabel": "표시할 열",
+      "columnsHelp": "체크를 해제하면 해당 열이 기본적으로 숨겨집니다. 표의 열 메뉴에서 변경하면 해당 브라우저에만 적용됩니다.",
+      "columnTables": {
+        "transactions": "거래",
+        "investmentHoldings": "투자 보유 종목",
+        "investmentRegister": "투자 거래"
+      },
       "applyHere": "이 브라우저에서 이 기본값 사용",
       "applyHereHelp": "이 브라우저에 저장된 보기 설정을 지워 위의 기본값이 여기에서도 적용되도록 합니다.",
       "appliedHere": "이제 이 브라우저에서 기본 보기를 사용합니다"

@@ -232,6 +232,13 @@
         "dashboard": "Mostrar seu painel"
       },
       "accountOpenTargetHelp": "Vale ao clicar em uma conta na página Contas ou em Contas Favoritas no painel.",
+      "columnsLabel": "Colunas visíveis",
+      "columnsHelp": "Desmarque uma caixa para ocultar essa coluna por padrão. O menu Colunas de uma tabela a altera somente naquele navegador.",
+      "columnTables": {
+        "transactions": "Transações",
+        "investmentHoldings": "Posições de investimento",
+        "investmentRegister": "Transações de investimento"
+      },
       "applyHere": "Usar estes padrões neste navegador",
       "applyHereHelp": "Limpa as configurações de visualização salvas por este navegador, para que os padrões acima também valham aqui.",
       "appliedHere": "Este navegador agora usa suas visualizações padrão"

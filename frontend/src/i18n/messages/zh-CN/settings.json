@@ -232,6 +232,13 @@
         "dashboard": "显示其仪表板"
       },
       "accountOpenTargetHelp": "在“账户”页面或仪表板的“收藏账户”中点击账户时适用。",
+      "columnsLabel": "显示的列",
+      "columnsHelp": "取消勾选即可默认隐藏该列。表格的“列”菜单只会在该浏览器中更改此设置。",
+      "columnTables": {
+        "transactions": "交易",
+        "investmentHoldings": "投资持仓",
+        "investmentRegister": "投资交易"
+      },
       "applyHere": "在此浏览器中使用这些默认设置",
       "applyHereHelp": "清除此浏览器已保存的视图设置，使上述默认设置在此处也生效。",
       "appliedHere": "此浏览器现在使用您的默认视图"

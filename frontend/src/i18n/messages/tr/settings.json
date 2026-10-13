@@ -232,6 +232,13 @@
         "dashboard": "Panosunu göster"
       },
       "accountOpenTargetHelp": "Hesaplar sayfasında veya panodaki Favori Hesaplar'da bir hesaba tıkladığınızda geçerlidir.",
+      "columnsLabel": "Gösterilen sütunlar",
+      "columnsHelp": "Bir sütunu varsayılan olarak gizlemek için kutusunun işaretini kaldırın. Bir tablonun Sütunlar menüsü bunu yalnızca o tarayıcıda değiştirir.",
+      "columnTables": {
+        "transactions": "İşlemler",
+        "investmentHoldings": "Yatırım varlıkları",
+        "investmentRegister": "Yatırım işlemleri"
+      },
       "applyHere": "Bu varsayılanları bu tarayıcıda kullan",
       "applyHereHelp": "Bu tarayıcının kaydettiği görünüm ayarlarını temizler, böylece yukarıdaki varsayılanlar burada da geçerli olur.",
       "appliedHere": "Bu tarayıcı artık varsayılan görünümlerinizi kullanıyor"
