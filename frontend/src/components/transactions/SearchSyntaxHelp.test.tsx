@@ -19,6 +19,12 @@ describe('SearchSyntaxHelp', () => {
     expect(screen.getByText('Cheque or reference number 10 exactly')).toBeInTheDocument();
   });
 
+  it('moves focus into the panel, so the keyboard can reach the examples', () => {
+    render(<SearchSyntaxHelp onExample={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Search syntax' }));
+    expect(screen.getByRole('button', { name: SEARCH_SYNTAX_EXAMPLES[0].example })).toHaveFocus();
+  });
+
   it('writes the chosen example and closes', () => {
     const onExample = vi.fn();
     render(<SearchSyntaxHelp onExample={onExample} />);
@@ -61,10 +67,10 @@ describe('SearchSyntaxHelp', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Search syntax' }));
 
-    fireEvent.pointerDown(screen.getByText('Search syntax', { selector: 'div' }));
+    fireEvent.mouseDown(screen.getByText('Search syntax', { selector: 'div' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    fireEvent.pointerDown(screen.getByText('elsewhere'));
+    fireEvent.mouseDown(screen.getByText('elsewhere'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

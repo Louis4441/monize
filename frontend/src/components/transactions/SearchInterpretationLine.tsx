@@ -12,6 +12,12 @@ interface SearchInterpretationLineProps {
 
 const ENUM_FIELDS = new Set(['is', 'has']);
 
+/** Decimals to show for an echoed amount: its own, between two and four. */
+function amountDecimals(value: string): number {
+  const fraction = value.split('.')[1] ?? '';
+  return Math.min(4, Math.max(2, fraction.length));
+}
+
 /**
  * How the server read the search string, one phrase per term, under the
  * search box: "Reference is 10", "not Category contains transfer". A term the
@@ -27,7 +33,9 @@ export function SearchInterpretationLine({ interpretation }: SearchInterpretatio
   if (!interpretation || interpretation.terms.length === 0) return null;
 
   const shownValue = (term: SearchTermEcho, value: string) => {
-    if (term.field === 'amount') return formatNumber(Number(value));
+    // As many decimals as the value carries (money is stored to four), and
+    // never fewer than two, so the line never rounds what the server matches.
+    if (term.field === 'amount') return formatNumber(Number(value), amountDecimals(value));
     if (term.field === 'date') return formatDate(value);
     return value;
   };

@@ -4,7 +4,6 @@ import {
   KeyboardEvent,
   RefObject,
   useCallback,
-  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -13,6 +12,7 @@ import {
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import { placePopover } from '@/components/ui/InfoTooltip';
+import { useClickOutside } from '@/hooks/useClickOutside';
 
 const POPOVER_WIDTH = 320;
 
@@ -52,8 +52,10 @@ interface SearchSyntaxHelpProps {
  *
  * Not `InfoTooltip`: that is one string of help, and this holds controls. It
  * opens on a click or a tap only, through a viewport-clamped portal placed by
- * the tooltip's own `placePopover` and re-measured on scroll and resize, and
- * closes on Escape, on a press outside it, or when an example is chosen.
+ * the tooltip's own `placePopover` and re-measured on scroll and resize, moves
+ * focus to its first example (a portal at the end of the document is never
+ * reached by Tab from the trigger), and closes on Escape, on a press outside
+ * it (`useClickOutside`), or when an example is chosen.
  */
 export function SearchSyntaxHelp({ onExample, popoverRef }: SearchSyntaxHelpProps) {
   const t = useTranslations('transactions');
@@ -81,6 +83,12 @@ export function SearchSyntaxHelp({ onExample, popoverRef }: SearchSyntaxHelpProp
       panel.style.left = `${left}px`;
     };
     place();
+    // The panel is portalled to the end of the document, so Tab from the
+    // trigger would never reach it: focus moves to the first example, and
+    // Escape hands it back to the trigger.
+    panelRef.current
+      ?.querySelector<HTMLButtonElement>('button')
+      ?.focus({ preventScroll: true });
     window.addEventListener('scroll', place, true);
     window.addEventListener('resize', place);
     return () => {
@@ -89,17 +97,9 @@ export function SearchSyntaxHelp({ onExample, popoverRef }: SearchSyntaxHelpProp
     };
   }, [open, panelRef]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPress = (event: globalThis.PointerEvent) => {
-      const target = event.target as Node | null;
-      if (target && triggerRef.current?.contains(target)) return;
-      if (target && panelRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPress, true);
-    return () => document.removeEventListener('pointerdown', onPress, true);
-  }, [open, panelRef]);
+  // A press outside the trigger and the panel closes it, through the same
+  // hook the header's search uses for its own outside press.
+  useClickOutside([triggerRef, panelRef], close, { enabled: open });
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape' || !open) return;

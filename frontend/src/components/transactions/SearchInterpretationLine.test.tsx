@@ -8,7 +8,7 @@ vi.mock('@/hooks/useNumberFormat', async () => {
   return {
     useNumberFormat: () => ({
       ...numberFormatMockDefaults(),
-      formatNumber: (n: number) => n.toFixed(2),
+      formatNumber: (n: number, decimals = 2) => n.toFixed(decimals),
     }),
   };
 });
@@ -39,6 +39,7 @@ describe('SearchInterpretationLine', () => {
     [term({ field: 'ref', op: 'glob', value: '10*' }), 'Reference matches “10*”'],
     [term({ field: 'amount', op: 'gt', value: '100' }), 'Amount over 100.00'],
     [term({ field: 'amount', op: 'lte', value: '5' }), 'Amount 5.00 or less'],
+    [term({ field: 'amount', op: 'eq', value: '12.345' }), 'Amount is 12.345'],
     [
       term({ field: 'amount', op: 'between', value: '50', valueTo: '100' }),
       'Amount from 50.00 to 100.00',
