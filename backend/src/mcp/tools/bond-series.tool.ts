@@ -51,9 +51,8 @@ export class McpBondSeriesTools {
         title: "Fetch bond series",
         annotations: FETCH_EXTERNAL,
         description:
-          "Add a bond series missing from the catalog from the issuer's " +
-          "official source. Pass only the country and series codes, never " +
-          "rates or dates. created=false: it was already stored.",
+          "Store a bond series from its official source; codes only. " +
+          "created=false: already stored",
         inputSchema: fetchBondSeriesSchema,
         outputSchema: bondSeriesOutput,
       },
@@ -87,16 +86,15 @@ export class McpBondSeriesTools {
         title: "Enter bond series by hand",
         annotations: CREATE,
         description:
-          "Administrators only. Enter a series by hand when its official " +
-          "source cannot be read. Rates are fractions (0.0535); omit addend " +
-          "for a fixed rate and fee when none. The user confirms first.",
+          "Admins only: enter a series by hand. Fractional rates; omit " +
+          "addend if fixed, fee if none. User confirms.",
         inputSchema: z.object({
           countryCode: fetchBondSeriesSchema.shape.countryCode,
           seriesCode: fetchBondSeriesSchema.shape.seriesCode,
           values: z.object({
             firstPeriodRate: z.string().regex(DECIMAL),
-            addend: z.string().regex(DECIMAL).nullish(),
-            fee: z.string().regex(DECIMAL).nullish(),
+            addend: z.string().regex(DECIMAL).optional(),
+            fee: z.string().regex(DECIMAL).optional(),
             saleWindow: z.object({ from: ymdDate(), to: ymdDate() }),
             letter: z.object({
               number: z.string().max(32),

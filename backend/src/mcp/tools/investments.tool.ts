@@ -558,7 +558,7 @@ export class McpInvestmentsTools {
               accruedInterest: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe(
-                  "REDEEM: accrued interest, a linked INTEREST row. Bond-linked: omit it and price (the redemption split fills them).",
+                  "REDEEM: accrued interest (linked INTEREST row). Bonds: omit; the redemption split fills it.",
                 ),
               exchangeRate: numberArg(z.number().min(0).max(999999999999))
                 .optional()
@@ -572,7 +572,7 @@ export class McpInvestmentsTools {
                 .describe("Description or memo."),
               bondSeriesCode: bondSeriesCodeSchema
                 .optional()
-                .describe("Bond series code, e.g. EDO1036."),
+                .describe("e.g. EDO1036"),
               transactionId: uuidString()
                 .optional()
                 .describe("update/delete: the row's id."),
