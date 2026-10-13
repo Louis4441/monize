@@ -880,6 +880,55 @@ describe("UsersService", () => {
       expect(savedData.hiddenTableColumns).toEqual({ transactions: ["tags"] });
     });
 
+    it("updates viewDefaults", async () => {
+      preferencesRow.seed({ ...mockPreferences, viewDefaults: {} });
+
+      await service.updatePreferences("user-1", {
+        viewDefaults: {
+          density: "compact",
+          chartCollapsed: true,
+          accountOpenTarget: "dashboard",
+        },
+      });
+
+      const savedData = preferencesRow.row()!;
+      expect(savedData.viewDefaults).toEqual({
+        density: "compact",
+        chartCollapsed: true,
+        accountOpenTarget: "dashboard",
+      });
+    });
+
+    it("merges viewDefaults into the stored map, keeping keys it was not sent", async () => {
+      // Another device set density; this save, from a screen that never saw
+      // it, sends only the key it changed.
+      preferencesRow.seed({
+        ...mockPreferences,
+        viewDefaults: { density: "compact", chartCollapsed: false },
+      });
+
+      await service.updatePreferences("user-1", {
+        viewDefaults: { chartCollapsed: true },
+      });
+
+      expect(preferencesRow.row()!.viewDefaults).toEqual({
+        density: "compact",
+        chartCollapsed: true,
+      });
+    });
+
+    it("leaves viewDefaults untouched when not provided", async () => {
+      preferencesRow.seed({
+        ...mockPreferences,
+        viewDefaults: { widgetsCollapsed: true },
+      });
+
+      await service.updatePreferences("user-1", { timeFormat: "24h" });
+
+      const savedData = preferencesRow.row()!;
+      expect(savedData.viewDefaults).toEqual({ widgetsCollapsed: true });
+    });
+
     it("updates preferredExchanges", async () => {
       preferencesRow.seed(mockPreferences);
 

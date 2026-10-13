@@ -335,7 +335,24 @@ export class UsersService {
       async (manager) => {
         await ensureUserPreferencesRow(manager, userId);
         const repo = manager.getRepository(UserPreference);
-        const before = await repo.findOne({ where: { userId } });
+        // viewDefaults merges into the stored map rather than replacing it, so
+        // a save from a Settings screen opened before another device changed a
+        // different default keeps that default. The merge reads the stored map,
+        // so the row is locked for it: two concurrent saves of different keys
+        // then both land.
+        const before = await repo.findOne({
+          where: { userId },
+          ...(dto.viewDefaults !== undefined && {
+            lock: { mode: "pessimistic_write" as const },
+          }),
+        });
+        if (dto.viewDefaults !== undefined) {
+          // A JSONB map, cast for the same reason as dashboardWidgetConfig above.
+          patch.viewDefaults = {
+            ...(before?.viewDefaults ?? {}),
+            ...dto.viewDefaults,
+          } as UserPreference["viewDefaults"];
+        }
         // Copy the value out now, not after the write: reading it from `before`
         // later would depend on that object not having been touched by the
         // update in between.
