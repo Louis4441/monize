@@ -36,6 +36,10 @@ import {
   createIntegrationModule,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { FxProviderChain } from "@/currencies/providers/fx-provider-chain";
+
+// The bond catalog only ensures a currency row; it never asks the FX chain.
+const NO_FX_CHAIN = {} as unknown as FxProviderChain;
 
 // The letter is read as text: the fake PDF is the magic plus the saved letter
 // text, so the real adapter parses the real fixture without pdfjs.
@@ -139,7 +143,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
     dataSource = module.get(DataSource);
     catalog = new BondCatalogService(
       dataSource,
-      new CurrenciesService(dataSource),
+      new CurrenciesService(dataSource, NO_FX_CHAIN),
     );
     adminId = (await createTestUserDirect(dataSource, { role: "admin" })).id;
     userId = (await createTestUserDirect(dataSource)).id;

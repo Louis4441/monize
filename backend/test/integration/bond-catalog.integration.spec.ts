@@ -34,6 +34,10 @@ import {
   insertBondProgram,
   storeFixtureSeries,
 } from "../helpers/integration-setup";
+import { FxProviderChain } from "@/currencies/providers/fx-provider-chain";
+
+// The bond catalog only ensures a currency row; it never asks the FX chain.
+const NO_FX_CHAIN = {} as unknown as FxProviderChain;
 
 // The GUS fixture's newest month is 2026-08, and a feed more than three months
 // behind today is refused as stale. A fixed Warsaw date keeps the fixture
@@ -76,7 +80,7 @@ describe("bond catalog and benchmark refresh (integration)", () => {
   beforeAll(async () => {
     module = await createIntegrationModule([]);
     dataSource = module.get(DataSource);
-    currencies = new CurrenciesService(dataSource);
+    currencies = new CurrenciesService(dataSource, NO_FX_CHAIN);
     fetchSync = new FetchSyncService(dataSource);
     catalog = new BondCatalogService(dataSource, currencies);
     const health = new ProviderHealthService(dataSource);
