@@ -387,6 +387,54 @@ describe("notification email copy", () => {
       expect(copy.message).toContain("1234,50");
     });
 
+    describe("underivable lots name the refused row and what to do", () => {
+      const lots = (refusalCode: string, extra: Record<string, unknown> = {}) =>
+        english(NotificationType.BOND_DATA_MISSING, {
+          ...bondFacts,
+          causes: [
+            {
+              code: "LOTS_UNDERIVABLE",
+              refusalCode,
+              action: "SELL",
+              date: "2026-01-02",
+              quantity: "5",
+              rowId: "row-1",
+              ...extra,
+            },
+          ],
+          coverage: [],
+        }).message;
+
+      it("asks for the series on a purchase without one", () => {
+        for (const code of ["SERIES_NOT_DETERMINED", "SERIES_REQUIRED"]) {
+          const message = lots(code, { action: "BUY" });
+          expect(message).toContain("the purchase dated Jan 2, 2026");
+          expect(message).toContain("choose the series on that transaction");
+        }
+      });
+
+      it("says a removal exceeds what the account holds of the series", () => {
+        const message = lots("REMOVAL_EXCEEDS_SERIES");
+        expect(message).toContain("the sale dated Jan 2, 2026");
+        expect(message).toContain(
+          "removes more than the account holds of that series",
+        );
+      });
+
+      it("asks to correct the transaction for any other code", () => {
+        expect(lots("OVER_REMOVAL")).toContain("correct the transaction");
+      });
+
+      it("keeps the older line for a row raised before the cause named its transaction", () => {
+        const message = english(NotificationType.BOND_DATA_MISSING, {
+          ...bondFacts,
+          causes: [{ code: "LOTS_UNDERIVABLE", refusalCode: "OVER_REMOVAL" }],
+          coverage: [],
+        }).message;
+        expect(message).toContain("correct the ledger");
+      });
+    });
+
     it("falls back whole for a row without the facts its copy needs", () => {
       const { amount, ...older } = examples.BOND_INTEREST_PAYMENT;
       expect(amount).toBeDefined();

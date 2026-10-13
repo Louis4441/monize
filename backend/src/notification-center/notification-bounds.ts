@@ -18,6 +18,23 @@ export const DEDUPE_KEY_MAX_LENGTH = 120;
 export const TARGET_MAX_LENGTH = 255;
 
 /**
+ * Dedupe-key prefixes of the state-keyed bond notifications (item 4, redemption
+ * not booked; item 6, data missing). The dedupe row is the only memory that such
+ * an event was raised, so `NotificationService.purgeOld` keeps these rows past
+ * the retention window and forgets one only when it was dismissed more than
+ * `STATE_KEYED_FORGET_DAYS` ago. They must match `bondDedupeKeys.unbooked` and
+ * `bondDedupeKeys.missing` (`bond-notification-events.ts`, which builds its keys
+ * from these).
+ */
+export const STATE_KEYED_DEDUPE_PREFIXES: readonly string[] = [
+  "bond:unbooked:",
+  "bond:missing:",
+];
+
+/** A dismissed state-keyed notification older than this is forgotten by the purge. */
+export const STATE_KEYED_FORGET_DAYS = 365;
+
+/**
  * A title the `title VARCHAR(255)` column will accept.
  *
  * Producers interpolate names they do not control -- a scheduled

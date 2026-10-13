@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "{series} matures on {date}",
     "maturitySoonMessage": "{quantity} x {series} mature on {date}. {payout}",
-    "interestTitle": "{series}: interest payment today",
+    "interestTitle": "{series}: interest payment on {date}",
     "interestMessage": "{quantity} x {series} pay {amount} of interest on {date}. Book it on the security page if it is not in your account yet.",
     "interestMessageUnknown": "{quantity} x {series} pay interest on {date}. The amount is not known yet: a rate it depends on is not published.",
     "rateResetTitle": "{series}: new interest period",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "{benchmark}: new observation {observation}",
     "benchmarkIntro": "{publisher} published {benchmark} for {observation}: {value}.",
     "benchmarkSeries": "{series}: period from {date} at {rate} a year.",
+    "benchmarkSeriesProjected": "{series}: period from {date}, projected at {rate} a year.",
     "benchmarkSeriesUnknown": "{series}: period from {date}, the rate is not known yet.",
     "benchmarkMore": "And {more} more.",
     "missingTitle": "Bond figures are not known yet",
@@ -98,7 +99,10 @@
       "observationNoPublisher": "The {observation} observation of {benchmark} is not stored: it is not published yet, or the feed has not been fetched since. Refresh on the bond page.",
       "terms": "The terms of {series} are incomplete. Refresh the series on the bond page.",
       "purchase": "A purchase of {series} on {date} is outside its sale window ({from} to {to}). Correct the purchase date.",
-      "lots": "The lots cannot be derived from the ledger ({code}). Correct the ledger."
+      "lots": "The lots cannot be derived from the ledger ({code}). Correct the ledger.",
+      "lotsRow": "{action} on {date} makes the lots impossible to derive ({code}). Correct the transaction.",
+      "lotsRowSeries": "{action} on {date} is not placed in a series ({code}). Choose the series on that transaction.",
+      "lotsRowRemoval": "{action} on {date} removes more than the account holds of that series ({code}). Correct the transaction."
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "CPI, 12 months (GUS)",

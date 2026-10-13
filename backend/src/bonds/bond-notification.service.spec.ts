@@ -29,7 +29,8 @@ import { BondValuationService } from "./bond-valuation.service";
 import { BadRequestException } from "@nestjs/common";
 
 const TODAY = "2026-10-13";
-const YESTERDAY = "2026-10-12";
+// Item 2 reads the valuation as of three days before today.
+const WINDOW_START = "2026-10-10";
 
 describe("BondNotificationService", () => {
   let inTransaction: boolean;
@@ -41,6 +42,7 @@ describe("BondNotificationService", () => {
   let redemptionSplit: jest.Mock;
   let notify: jest.Mock;
   let service: BondNotificationService;
+  let manager: ReturnType<typeof createScopedDbMocks>["manager"];
   let order: string[];
 
   beforeEach(() => {
@@ -53,7 +55,9 @@ describe("BondNotificationService", () => {
     failFor = null;
     order = [];
 
-    const { manager, dataSource } = createScopedDbMocks([]);
+    const mocks = createScopedDbMocks([]);
+    manager = mocks.manager;
+    const dataSource = mocks.dataSource;
     manager.query.mockImplementation((sql: string) => {
       if (/SELECT DISTINCT user_id FROM securities/.test(sql)) {
         return Promise.resolve(userIds.map((user_id) => ({ user_id })));
@@ -101,7 +105,7 @@ describe("BondNotificationService", () => {
 
   afterEach(() => jest.useRealTimers());
 
-  /** Today: one lot maturing in 12 days; yesterday: one lot paying interest today. */
+  /** Today: one lot maturing in 12 days; window start: one lot paying interest today. */
   function holdings() {
     const today = security(
       [
@@ -117,13 +121,13 @@ describe("BondNotificationService", () => {
         lot({
           quantity: 10,
           valuation: {
-            asOf: YESTERDAY,
+            asOf: WINDOW_START,
             maturityDate: "2029-10-13",
-            nextPayment: [flow()],
+            knownCashflows: [flow()],
           },
         }),
       ],
-      { asOf: YESTERDAY },
+      { asOf: WINDOW_START },
     );
     valueSecurity.mockImplementation(
       (_user: string, _security: string, asOf: string) =>
@@ -150,7 +154,11 @@ describe("BondNotificationService", () => {
     await service.evaluateUser("user-1");
 
     expect(valueSecurity).toHaveBeenCalledWith("user-1", SECURITY, TODAY);
-    expect(valueSecurity).toHaveBeenCalledWith("user-1", SECURITY, YESTERDAY);
+    expect(valueSecurity).toHaveBeenCalledWith(
+      "user-1",
+      SECURITY,
+      WINDOW_START,
+    );
     expect(redemptionSplit).toHaveBeenCalledWith(
       "user-1",
       SECURITY,
@@ -214,17 +222,51 @@ describe("BondNotificationService", () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("keeps today's events when only yesterday's valuation fails", async () => {
+  it("keeps today's events when only the window start's valuation fails", async () => {
     holdings();
     const todayImpl = valueSecurity.getMockImplementation()!;
     valueSecurity.mockImplementation(
       (user: string, sec: string, asOf: string) =>
-        asOf === YESTERDAY
+        asOf === WINDOW_START
           ? Promise.reject(new Error("as of before purchase"))
           : todayImpl(user, sec, asOf),
     );
     await service.evaluateUser("user-1");
     expect(typesNotified()).toEqual([NotificationType.BOND_MATURITY_SOON]);
+  });
+
+  it("raises the interest of a day the cron skipped and checks that day's booking, not today's", async () => {
+    holdings();
+    const todayImpl = valueSecurity.getMockImplementation()!;
+    valueSecurity.mockImplementation(
+      async (user: string, sec: string, asOf: string) => {
+        const v = await todayImpl(user, sec, asOf);
+        return asOf !== WINDOW_START
+          ? v
+          : {
+              ...v,
+              lots: v.lots.map((l: (typeof v.lots)[number]) => ({
+                ...l,
+                valuation: {
+                  ...l.valuation,
+                  knownCashflows: [flow({ date: "2026-10-11" })],
+                },
+              })),
+            };
+      },
+    );
+    await service.evaluateUser("user-1");
+    const interest = notify.mock.calls
+      .map(([, input]) => input)
+      .find((input) => input.type === NotificationType.BOND_INTEREST_PAYMENT);
+    expect(interest.data).toMatchObject({ paymentDate: "2026-10-11" });
+    expect(interest.dedupeKey).toBe(
+      `bond:interest:${ACCOUNT_A}:${SERIES_1}:2026-10-11`,
+    );
+    const probe = manager.query.mock.calls.find(([sql]) =>
+      /FROM investment_transactions/.test(String(sql)),
+    );
+    expect(probe?.[1]).toContain("2026-10-11");
   });
 
   it("keeps going when one notification fails to write", async () => {

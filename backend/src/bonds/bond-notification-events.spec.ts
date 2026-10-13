@@ -34,6 +34,7 @@ import {
 } from "../test-helpers/bond-valuation-fixtures";
 import { BondRedemptionSplit } from "./bond-holdings.service";
 import { BondValuation, RateScheduleEntry } from "./engine/bond-engine";
+import { CashFlow } from "./engine/bond-engine-types";
 
 const knownSplit: BondRedemptionSplit = {
   date: "2026-10-25",
@@ -164,20 +165,27 @@ describe("item 1, maturity soon", () => {
 });
 
 describe("item 2, interest payment", () => {
-  const paying = (over: Partial<BondValuation> = {}, quantity = 10) =>
+  /** A lot valued as of the window start, with the engine's flows after it. */
+  const paying = (
+    flows: CashFlow[] = [flow()],
+    over: Partial<BondValuation> = {},
+    quantity = 10,
+  ) =>
     lot({
       quantity,
       valuation: {
-        asOf: "2026-10-12",
-        nextPayment: [flow()],
+        asOf: "2026-10-10",
+        knownCashflows: flows.filter((f) => f.status === "KNOWN"),
+        projectedCashflows: flows.filter((f) => f.status !== "KNOWN"),
         maturityDate: "2029-10-13",
         ...over,
       },
     });
+  const atWindowStart = (lots: ReturnType<typeof paying>[]) =>
+    security(lots, { asOf: "2026-10-10" });
 
   it("raises the day's interest of a series, summed over its lots", () => {
-    const yesterday = security([paying()], { asOf: "2026-10-12" });
-    const [candidate] = interestCandidates(yesterday, TODAY);
+    const [candidate] = interestCandidates(atWindowStart([paying()]), TODAY);
     expect(candidate).toMatchObject({
       accountId: ACCOUNT_A,
       instrumentId: SERIES_1,
@@ -196,44 +204,70 @@ describe("item 2, interest payment", () => {
       quantity: 10,
     });
 
-    const two = security([paying(), paying({}, 4)]);
+    const two = atWindowStart([paying(), paying([flow()], {}, 4)]);
     expect(interestCandidates(two, TODAY)[0]).toMatchObject({
       quantity: 14,
       amount: "102.00",
     });
   });
 
+  it("looks back three days: T-3 is excluded, T-2 and T-1 are included", () => {
+    const flows = (date: string) => atWindowStart([paying([flow({ date })])]);
+    expect(interestCandidates(flows("2026-10-10"), TODAY)).toHaveLength(0);
+    const [skipped] = interestCandidates(flows("2026-10-11"), TODAY);
+    expect(skipped).toMatchObject({
+      paymentDate: "2026-10-11",
+      amount: "51.00",
+    });
+    expect(buildInterestNotification(security([]), skipped).dedupeKey).toBe(
+      `bond:interest:${ACCOUNT_A}:${SERIES_1}:2026-10-11`,
+    );
+    expect(interestCandidates(flows("2026-10-12"), TODAY)).toHaveLength(1);
+    // Tomorrow is not yet due.
+    expect(interestCandidates(flows("2026-10-14"), TODAY)).toHaveLength(0);
+  });
+
+  it("raises one row per day when two paying days fall in the window", () => {
+    const v = atWindowStart([
+      paying([flow({ date: "2026-10-11" })]),
+      paying([flow({ date: TODAY })]),
+    ]);
+    expect(interestCandidates(v, TODAY).map((c) => c.paymentDate)).toEqual([
+      "2026-10-11",
+      TODAY,
+    ]);
+  });
+
   it("excludes the maturity day, which is items 1 and 4", () => {
-    const yesterday = security([
-      paying({
+    const v = atWindowStart([
+      paying([flow(), flow({ type: "PRINCIPAL", amount: "1000.00" })], {
         maturityDate: TODAY,
-        nextPayment: [flow(), flow({ type: "PRINCIPAL", amount: "1000.00" })],
       }),
     ]);
-    expect(interestCandidates(yesterday, TODAY)).toHaveLength(0);
+    expect(interestCandidates(v, TODAY)).toHaveLength(0);
   });
 
   it("ignores a principal-only flow and a flow on another day", () => {
     expect(
       interestCandidates(
-        security([paying({ nextPayment: [flow({ type: "PRINCIPAL" })] })]),
+        atWindowStart([paying([flow({ type: "PRINCIPAL" })])]),
         TODAY,
       ),
     ).toHaveLength(0);
     expect(
       interestCandidates(
-        security([paying({ nextPayment: [flow({ date: "2026-10-14" })] })]),
+        atWindowStart([paying([flow({ date: "2026-10-14" })])]),
         TODAY,
       ),
     ).toHaveLength(0);
   });
 
   it("keeps the amount null when a flow is unknown, whatever the other lots pay", () => {
-    const yesterday = security([
+    const v = atWindowStart([
       paying(),
-      paying({ nextPayment: [flow({ amount: null, status: "UNKNOWN" })] }),
+      paying([flow({ amount: null, status: "UNKNOWN" })]),
     ]);
-    const [candidate] = interestCandidates(yesterday, TODAY);
+    const [candidate] = interestCandidates(v, TODAY);
     expect(candidate.amount).toBeNull();
     expect(
       buildInterestNotification(security([]), candidate).data,
@@ -243,10 +277,10 @@ describe("item 2, interest payment", () => {
   });
 
   it("sums a projected flow as the engine's figure", () => {
-    const yesterday = security([
-      paying({ nextPayment: [flow({ status: "PROJECTED", amount: "12.50" })] }),
+    const v = atWindowStart([
+      paying([flow({ status: "PROJECTED", amount: "12.50" })]),
     ]);
-    expect(interestCandidates(yesterday, TODAY)[0].amount).toBe("12.50");
+    expect(interestCandidates(v, TODAY)[0].amount).toBe("12.50");
   });
 });
 
@@ -325,9 +359,23 @@ describe("item 3, new interest period", () => {
     expect(
       rateResetNotifications(security([entering("DERIVED", 1)]), TODAY),
     ).toHaveLength(0);
+    // The period starts after the day asked about.
     expect(
-      rateResetNotifications(security([entering("DERIVED")]), "2026-10-14"),
+      rateResetNotifications(security([entering("DERIVED")]), "2026-10-12"),
     ).toHaveLength(0);
+  });
+
+  it("looks back three days: a start at T-3 is excluded, T-2 and T-1 are included", () => {
+    const at = (today: string) =>
+      rateResetNotifications(security([entering("DERIVED")]), today);
+    // The period started on TODAY (2026-10-13).
+    expect(at("2026-10-14")).toHaveLength(1);
+    expect(at("2026-10-15")).toHaveLength(1);
+    expect(at("2026-10-16")).toHaveLength(0);
+    // Date-scoped key: the late read writes the row the on-time one would have.
+    expect(at("2026-10-15")[0].dedupeKey).toBe(
+      `bond:rate:${ACCOUNT_A}:${SERIES_1}:${TODAY}`,
+    );
   });
 
   it("is not raised when the rate is null; item 6 reports it", () => {
@@ -665,8 +713,49 @@ describe("item 6, missing data", () => {
       },
     });
     expect(missingDataNotification(underivable)?.data?.causes).toEqual([
-      { code: "LOTS_UNDERIVABLE", refusalCode: "OVER_REMOVAL" },
+      {
+        code: "LOTS_UNDERIVABLE",
+        refusalCode: "OVER_REMOVAL",
+        action: "SELL",
+        date: "2026-01-01",
+        quantity: "5",
+      },
     ]);
+  });
+
+  it("names the refused row of underivable lots and keys the gap by it, not by its quantity", () => {
+    const refused = (
+      over: Partial<{ rowId: string; date: string; quantity: string }> = {},
+    ) =>
+      missingDataNotification(
+        security([], {
+          refusal: {
+            code: "SERIES_NOT_DETERMINED",
+            rowId: over.rowId ?? "row-1",
+            params: {
+              action: "BUY",
+              date: over.date ?? "2026-01-01",
+              quantity: over.quantity ?? "5",
+            },
+            detail: "no series",
+          },
+        }),
+      ) as NonNullable<ReturnType<typeof missingDataNotification>>;
+    const first = refused();
+    expect(first.data?.causes).toEqual([
+      {
+        code: "LOTS_UNDERIVABLE",
+        refusalCode: "SERIES_NOT_DETERMINED",
+        action: "BUY",
+        date: "2026-01-01",
+        quantity: "5",
+        rowId: "row-1",
+      },
+    ]);
+    expect(refused({ quantity: "6" }).dedupeKey).toBe(first.dedupeKey);
+    expect(refused({ rowId: "row-2" }).dedupeKey).not.toBe(first.dedupeKey);
+    expect(refused({ date: "2026-01-02" }).dedupeKey).not.toBe(first.dedupeKey);
+    expect(first.message).toContain("choose the series on that transaction");
   });
 
   it("raises nothing for a complete valuation or for a matured lot", () => {

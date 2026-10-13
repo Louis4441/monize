@@ -4,10 +4,12 @@ import {
   NotificationType,
 } from "../notification-center/entities/notification.entity";
 import { CreateNotificationInput } from "../notification-center/notification.service";
+import { STATE_KEYED_DEDUPE_PREFIXES } from "../notification-center/notification-bounds";
 import { addDaysYMD } from "../common/date-utils";
 import { canonicalJson } from "./canonical-json";
 import { BondRedemptionSplit } from "./bond-holdings.service";
 import { ExactDecimal } from "./domain/exact-decimal";
+import { CashFlow } from "./engine/bond-engine-types";
 import {
   SecurityLotValuation,
   SecurityValuation,
@@ -26,6 +28,13 @@ import {
 export const BOND_MATURITY_NOTICE_DAYS = 14;
 /** A benchmark observation stored within this many days raises item 5. */
 export const BOND_BENCHMARK_FRESH_DAYS = 7;
+/**
+ * Items 2 and 3 look back this many days (today included, the day that many
+ * days ago excluded), so a cron day that did not run, or a person's local day
+ * that was skipped, does not lose them. Keys are date-scoped: a re-read of a day
+ * already raised writes nothing.
+ */
+export const BOND_LOOKBACK_DAYS = 3;
 /** Affected series listed on an item 5 row; the rest are counted. */
 export const BOND_BENCHMARK_AFFECTED_LIMIT = 20;
 
@@ -116,6 +125,8 @@ function percentOf(fraction: string): string {
 
 // ---------------------------------------------------------------- dedupe keys
 
+const [UNBOOKED_PREFIX, MISSING_PREFIX] = STATE_KEYED_DEDUPE_PREFIXES;
+
 export const bondDedupeKeys = {
   maturity: (a: string | null, i: string, maturity: string): string =>
     `bond:maturity:${a ?? "-"}:${i}:${maturity}`,
@@ -124,12 +135,12 @@ export const bondDedupeKeys = {
   rate: (a: string | null, i: string, start: string): string =>
     `bond:rate:${a ?? "-"}:${i}:${start}`,
   unbooked: (a: string | null, i: string, maturity: string): string =>
-    `bond:unbooked:${a ?? "-"}:${i}:${maturity}`,
+    `${UNBOOKED_PREFIX}${a ?? "-"}:${i}:${maturity}`,
   benchmark: (benchmarkId: string, observation: string): string =>
     `bond:bench:${benchmarkId}:${observation}`,
   missing: (securityId: string, causes: readonly BondMissingCause[]): string =>
-    `bond:missing:${securityId}:${createHash("sha256")
-      .update(canonicalJson(causes))
+    `${MISSING_PREFIX}${securityId}:${createHash("sha256")
+      .update(canonicalJson(causes.map(causeIdentity)))
       .digest("hex")
       .slice(0, 16)}`,
 };
@@ -309,39 +320,46 @@ export interface InterestCandidate {
 }
 
 /**
- * Item 2, from the valuation as of the day BEFORE `today`: the `INTEREST` flows
- * dated `today` of lots maturing after it (the maturity payment is items 1 and
- * 4), summed per (account, series). One unknown flow makes the sum null.
+ * Item 2, from the valuation as of the day `BOND_LOOKBACK_DAYS` before `today`
+ * (the window start): the `INTEREST` flows dated in (window start, `today`] of
+ * lots maturing after the flow's date (the maturity payment is items 1 and 4),
+ * summed per (account, series, date). One unknown flow makes the sum null. The
+ * flows are every one the engine lists after that day, known and not, so a
+ * flow of a skipped day is found as well as today's.
  */
 export function interestCandidates(
-  valuationYesterday: SecurityValuation,
+  valuationAtWindowStart: SecurityValuation,
   today: string,
 ): InterestCandidate[] {
-  const paying = valuationYesterday.lots.filter(
-    (lot) =>
-      lot.valuation.status === "OPEN" &&
-      lot.valuation.maturityDate > today &&
-      lot.valuation.nextPayment.some(
-        (flow) => flow.type === "INTEREST" && flow.date === today,
-      ),
-  );
-  return groupLots(paying).map((group) => {
-    const flows = group.lots.flatMap((lot) =>
-      lot.valuation.nextPayment.filter(
-        (flow) => flow.type === "INTEREST" && flow.date === today,
-      ),
+  const candidates: InterestCandidate[] = [];
+  const interestOn = (lot: SecurityLotValuation, date: string): CashFlow[] =>
+    [
+      ...lot.valuation.knownCashflows,
+      ...lot.valuation.projectedCashflows,
+    ].filter((flow) => flow.type === "INTEREST" && flow.date === date);
+  for (let back = BOND_LOOKBACK_DAYS - 1; back >= 0; back -= 1) {
+    const date = addDaysYMD(today, -back);
+    const paying = valuationAtWindowStart.lots.filter(
+      (lot) =>
+        lot.valuation.status === "OPEN" &&
+        lot.valuation.maturityDate > date &&
+        interestOn(lot, date).length > 0,
     );
-    return {
-      accountId: group.accountId,
-      instrumentId: group.instrumentId,
-      seriesCode: group.seriesCode,
-      paymentDate: today,
-      quantity: quantityOf(group.lots),
-      amount: sumExact(
-        flows.map((flow) => (flow.status === "UNKNOWN" ? null : flow.amount)),
-      ),
-    };
-  });
+    for (const group of groupLots(paying)) {
+      const flows = group.lots.flatMap((lot) => interestOn(lot, date));
+      candidates.push({
+        accountId: group.accountId,
+        instrumentId: group.instrumentId,
+        seriesCode: group.seriesCode,
+        paymentDate: date,
+        quantity: quantityOf(group.lots),
+        amount: sumExact(
+          flows.map((flow) => (flow.status === "UNKNOWN" ? null : flow.amount)),
+        ),
+      });
+    }
+  }
+  return candidates;
 }
 
 export function buildInterestNotification(
@@ -353,7 +371,7 @@ export function buildInterestNotification(
   return {
     type: NotificationType.BOND_INTEREST_PAYMENT,
     severity: NotificationSeverity.INFO,
-    title: `${seriesCode}: interest payment today`,
+    title: `${seriesCode}: interest payment on ${paymentDate}`,
     message:
       amount === null
         ? `${quantity} x ${seriesCode} pay interest on ${paymentDate}. The amount is not known yet: a rate it depends on is not published.`
@@ -382,7 +400,8 @@ export function buildInterestNotification(
 // ------------------------------------------------------------ item 3, reset
 
 /**
- * Item 3: OPEN lots entering, on `today`, a period (the second or later) whose
+ * Item 3: OPEN lots that entered, within the last `BOND_LOOKBACK_DAYS` days (the
+ * day that many days ago excluded, `today` included), a period (the second or later) whose
  * rate comes from a benchmark or an announcement. A fixed or terms rate is not
  * news; a period whose rate is unknown is reported by item 6, not here.
  */
@@ -390,12 +409,14 @@ export function rateResetNotifications(
   valuation: SecurityValuation,
   today: string,
 ): CreateNotificationInput[] {
+  const windowStart = addDaysYMD(today, -BOND_LOOKBACK_DAYS);
   const entering = valuation.lots.filter((lot) => {
     const period = lot.valuation.currentPeriod;
     return (
       lot.valuation.status === "OPEN" &&
       period !== null &&
-      period.start === today &&
+      period.start > windowStart &&
+      period.start <= today &&
       period.index >= 2 &&
       period.annualRate !== null &&
       period.rateSource !== null &&
@@ -466,7 +487,28 @@ export type BondMissingCause =
       readonly from: string;
       readonly to: string;
     }
-  | { readonly code: "LOTS_UNDERIVABLE"; readonly refusalCode: string };
+  | {
+      readonly code: "LOTS_UNDERIVABLE";
+      readonly refusalCode: string;
+      /** The base action of the row that refused (`SELL`). */
+      readonly action: string;
+      /** That row's transaction date. */
+      readonly date: string;
+      /** That row's quantity as stored; null when it has none. Not part of the gap's identity. */
+      readonly quantity: string | null;
+      /** The id of the row, when the ledger read carried ids. */
+      readonly rowId?: string;
+    };
+
+/**
+ * What identifies a gap: the cause without the figures a person can edit away
+ * and without any text, so the same gap hashes the same on every run.
+ */
+function causeIdentity(cause: BondMissingCause): unknown {
+  if (cause.code !== "LOTS_UNDERIVABLE") return cause;
+  const { quantity: _quantity, ...identity } = cause;
+  return identity;
+}
 
 /** The causes of a security's valuation, sorted and without duplicates. */
 export function missingCausesOf(valuation: SecurityValuation): {
@@ -476,7 +518,16 @@ export function missingCausesOf(valuation: SecurityValuation): {
   if (valuation.refusal !== null) {
     return {
       causes: [
-        { code: "LOTS_UNDERIVABLE", refusalCode: valuation.refusal.code },
+        {
+          code: "LOTS_UNDERIVABLE",
+          refusalCode: valuation.refusal.code,
+          action: valuation.refusal.params.action,
+          date: valuation.refusal.params.date,
+          quantity: valuation.refusal.params.quantity,
+          ...(valuation.refusal.rowId !== undefined
+            ? { rowId: valuation.refusal.rowId }
+            : {}),
+        },
       ],
       lots: [],
     };
@@ -532,6 +583,19 @@ export function missingCausesOf(valuation: SecurityValuation): {
   return { causes, lots: involved };
 }
 
+/** What to do about a refused ledger row, per refusal code (English fallback). */
+function lotsRemedy(refusalCode: string): string {
+  switch (refusalCode) {
+    case "SERIES_NOT_DETERMINED":
+    case "SERIES_REQUIRED":
+      return "choose the series on that transaction";
+    case "REMOVAL_EXCEEDS_SERIES":
+      return "the removal exceeds what the account holds of that series; correct the transaction";
+    default:
+      return "correct the transaction";
+  }
+}
+
 function soleOf<T>(values: readonly (T | null)[]): T | null {
   const distinct = [...new Set(values)];
   return distinct.length === 1 ? distinct[0] : null;
@@ -562,7 +626,7 @@ export function missingDataNotification(
         case "PURCHASE_OUTSIDE_SALE_WINDOW":
           return `a purchase of ${cause.seriesCode} on ${cause.purchaseDate} is outside its sale window ${cause.from} to ${cause.to}; correct the purchase date`;
         case "LOTS_UNDERIVABLE":
-          return `the lots cannot be derived from the ledger (${cause.refusalCode}); correct the ledger`;
+          return `the ${cause.action} of ${cause.date} makes the lots impossible to derive (${cause.refusalCode}); ${lotsRemedy(cause.refusalCode)}`;
       }
     })
     .join("; ");

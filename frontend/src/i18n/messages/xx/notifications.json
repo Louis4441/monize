@@ -71,7 +71,7 @@
   "bond": {
     "maturitySoonTitle": "[XX-{series} matures on {date}-XX]",
     "maturitySoonMessage": "[XX-{quantity} x {series} mature on {date}. {payout}-XX]",
-    "interestTitle": "[XX-{series}: interest payment today-XX]",
+    "interestTitle": "[XX-{series}: interest payment on {date}-XX]",
     "interestMessage": "[XX-{quantity} x {series} pay {amount} of interest on {date}. Book it on the security page if it is not in your account yet.-XX]",
     "interestMessageUnknown": "[XX-{quantity} x {series} pay interest on {date}. The amount is not known yet: a rate it depends on is not published.-XX]",
     "rateResetTitle": "[XX-{series}: new interest period-XX]",
@@ -89,6 +89,7 @@
     "benchmarkTitle": "[XX-{benchmark}: new observation {observation}-XX]",
     "benchmarkIntro": "[XX-{publisher} published {benchmark} for {observation}: {value}.-XX]",
     "benchmarkSeries": "[XX-{series}: period from {date} at {rate} a year.-XX]",
+    "benchmarkSeriesProjected": "[XX-{series}: period from {date}, projected at {rate} a year.-XX]",
     "benchmarkSeriesUnknown": "[XX-{series}: period from {date}, the rate is not known yet.-XX]",
     "benchmarkMore": "[XX-And {more} more.-XX]",
     "missingTitle": "[XX-Bond figures are not known yet-XX]",
@@ -98,7 +99,10 @@
       "observationNoPublisher": "[XX-The {observation} observation of {benchmark} is not stored: it is not published yet, or the feed has not been fetched since. Refresh on the bond page.-XX]",
       "terms": "[XX-The terms of {series} are incomplete. Refresh the series on the bond page.-XX]",
       "purchase": "[XX-A purchase of {series} on {date} is outside its sale window ({from} to {to}). Correct the purchase date.-XX]",
-      "lots": "[XX-The lots cannot be derived from the ledger ({code}). Correct the ledger.-XX]"
+      "lots": "[XX-The lots cannot be derived from the ledger ({code}). Correct the ledger.-XX]",
+      "lotsRow": "[XX-{action} on {date} makes the lots impossible to derive ({code}). Correct the transaction.-XX]",
+      "lotsRowSeries": "[XX-{action} on {date} is not placed in a series ({code}). Choose the series on that transaction.-XX]",
+      "lotsRowRemoval": "[XX-{action} on {date} removes more than the account holds of that series ({code}). Correct the transaction.-XX]"
     },
     "benchmarks": {
       "PL_CPI_GUS_YOY": "[XX-CPI, 12 months (GUS)-XX]",

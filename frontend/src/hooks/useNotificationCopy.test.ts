@@ -130,6 +130,39 @@ describe('useNotificationCopy: bond notifications', () => {
     expect(copy.message).toContain('And 3 more.');
   });
 
+  it('BOND_BENCHMARK_PUBLISHED says a projected rate is projected, and keeps derived, announced and terms rates as known', () => {
+    const entry = (seriesCode: string, rateSource: string) => ({
+      instrumentId: seriesCode,
+      seriesCode,
+      periodStart: '2026-11-01',
+      annualRate: '0.069',
+      rateSource,
+    });
+    const copy = copyOf(
+      row('BOND_BENCHMARK_PUBLISHED', {
+        currency: 'PLN',
+        benchmarkId: 'PL_CPI_GUS_YOY',
+        publisher: 'GUS',
+        observation: '2026-09',
+        value: '0.0490000000',
+        unit: 'RATE_FRACTION',
+        affected: [
+          entry('PRJ1', 'PROJECTED'),
+          entry('DER1', 'DERIVED'),
+          entry('ANN1', 'ANNOUNCED'),
+          entry('TRM1', 'TERMS'),
+        ],
+        affectedMore: 0,
+      }),
+    );
+    expect(copy.message).toContain('PRJ1: period from');
+    expect(copy.message).toMatch(/PRJ1: period from [^.]*, projected at 6\.90% a year\./);
+    for (const known of ['DER1', 'ANN1', 'TRM1']) {
+      expect(copy.message).toMatch(new RegExp(`${known}: period from [^,]* at 6\\.90% a year\\.`));
+    }
+    expect(copy.message).not.toMatch(/DER1[^.]*projected/);
+  });
+
   it('BOND_BENCHMARK_PUBLISHED shows an unknown unit as a plain number and an unlabelled benchmark by its id', () => {
     const copy = copyOf(
       row('BOND_BENCHMARK_PUBLISHED', {
@@ -165,6 +198,38 @@ describe('useNotificationCopy: bond notifications', () => {
     expect(copy.message).toContain('Refresh on the bond page.');
     expect(copy.message).toContain('Correct the purchase date.');
     expect(copy.message).toContain('(NEGATIVE_QUANTITY). Correct the ledger.');
+  });
+
+  describe('BOND_DATA_MISSING names the refused row of underivable lots', () => {
+    const lots = (refusalCode: string, extra: Record<string, unknown> = {}) =>
+      copyOf(
+        row('BOND_DATA_MISSING', {
+          ...base,
+          seriesCode: null,
+          causes: [
+            { code: 'LOTS_UNDERIVABLE', refusalCode, action: 'SELL', date: '2026-01-02', quantity: '5', rowId: 'r1', ...extra },
+          ],
+        }),
+      ).message;
+
+    it('asks for the series on a purchase without one', () => {
+      for (const code of ['SERIES_NOT_DETERMINED', 'SERIES_REQUIRED']) {
+        const message = lots(code, { action: 'BUY' });
+        expect(message).toContain('Buy on');
+        expect(message).toContain('Choose the series on that transaction.');
+      }
+    });
+
+    it('says a removal exceeds what the account holds of the series', () => {
+      const message = lots('REMOVAL_EXCEEDS_SERIES');
+      expect(message).toContain('Sell on');
+      expect(message).toContain('removes more than the account holds of that series');
+    });
+
+    it('asks to correct the transaction for any other code, with the action as written when it has no label', () => {
+      expect(lots('OVER_REMOVAL')).toContain('Correct the transaction.');
+      expect(lots('OVER_REMOVAL', { action: 'MYSTERY' })).toContain('MYSTERY on');
+    });
   });
 
   it('falls back to the stored English when the facts are missing', () => {

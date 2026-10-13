@@ -22,7 +22,7 @@ import type {
   BondProjectionMissing,
   SecurityBondValuation,
 } from '@/types/bond';
-import { benchmarkLabel } from './bond-labels';
+import { ACTION_LABEL_KEYS, benchmarkLabel } from './bond-labels';
 import { SecurityBondProgramCard } from './SecurityBondProgramCard';
 import { SecurityBondScenarioPanel } from './SecurityBondScenarioPanel';
 import { SecurityBondSeriesTable } from './SecurityBondSeriesTable';
@@ -39,21 +39,6 @@ interface SecurityBondCardProps {
 }
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Investment action enum to its key in `investments.transactionList`. */
-const ACTION_LABEL_KEYS: Record<string, string> = {
-  BUY: 'actionBuy',
-  SELL: 'actionSell',
-  DIVIDEND: 'actionDividend',
-  INTEREST: 'actionInterest',
-  CAPITAL_GAIN: 'actionCapitalGain',
-  SPLIT: 'actionSplit',
-  TRANSFER_IN: 'actionTransferIn',
-  TRANSFER_OUT: 'actionTransferOut',
-  REINVEST: 'actionReinvest',
-  ADD_SHARES: 'actionAddShares',
-  REMOVE_SHARES: 'actionRemoveShares',
-};
 
 /** Each distinct entry once, in first-seen order. */
 function distinct<T>(items: readonly T[], keyOf: (item: T) => string): T[] {

@@ -110,6 +110,11 @@ implied.
 | INV-BOND-007 | A program-linked security's acquisitions with a date of their own are inferred, TRANSFER_IN and ADD_SHARES name their series, a removal the account cannot cover is refused at write time, and an import may store NULL which the lots name | enforced |
 | INV-BOND-008 | No country's bond data (series, terms version, benchmark observation) is fetched or stored without a person's action | enforced |
 | INV-BOND-009 | A bond redemption's cash splits into returned principal and interest, never into a capital gain | enforced |
+| INV-BONDNOTIFY-001 | The bond notification producer reads stored terms, observations and the ledger, fetches nothing and writes nothing but notification rows | enforced |
+| INV-BONDNOTIFY-002 | Each bond notification event has one row per person: a re-run, a second replica or a restart raises nothing new, and a state-keyed event is raised once while its state lasts | enforced |
+| INV-BONDNOTIFY-003 | Every amount, rate and date in a bond notification is the engine's | enforced |
+| INV-BONDNOTIFY-004 | A bond amount the engine cannot work out is null in a notification and its copy says it is not known and why, never zero | enforced |
+| INV-BONDNOTIFY-005 | The bond notification producer names no country, program, publisher or benchmark | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3805,6 +3810,105 @@ Required tests      backend/src/bonds/engine/redemption-split.spec.ts (the
                     security 404); the form that fills the price and the accrued
                     interest from it by
                     InvestmentTransactionForm.bondRedemption.test.tsx.
+Status              enforced
+```
+
+### INV-BONDNOTIFY-001 -- the bond notification producer fetches nothing
+
+```text
+Statement           BondNotificationService (backend/src/bonds/) reads stored
+                    terms, observations and the ledger through
+                    BondValuationService and BondHoldingsService, and writes
+                    nothing but notification rows, through
+                    NotificationDispatchService.notify after every read has
+                    committed. It never fetches a series, a benchmark or an
+                    offer.
+Why                 A notification cron that fetched would send every
+                    deployment's traffic to every issuer daily (INV-BOND-008),
+                    and a push or email fan-out inside a read transaction holds
+                    a connection across an external call.
+Mechanism           The service injects no fetching collaborator; dispatch runs
+                    after the reads, outside any transaction.
+Enforcement         backend/src/bonds/no-automatic-bonds.guard.spec.ts (the
+                    producer's source names none of BondSeriesService,
+                    BenchmarkRefreshService, SeriesHttp, BondOfferService and
+                    makes no request) and bond-notification.service.spec.ts
+                    (dispatch outside the transaction).
+Status              enforced
+```
+
+### INV-BONDNOTIFY-002 -- one row per event, and a state-keyed event once
+
+```text
+Statement           Each event has a dedupe key (docs/specs/bond-notifications.md
+                    section 4) and NotificationService.create refuses a second
+                    row with the same key per user. The two state-keyed events
+                    (bond:unbooked:*, item 4, and bond:missing:*, item 6) are
+                    raised once while their state lasts: the nightly purge
+                    keeps their rows, read or dismissed, and forgets one only
+                    when it was dismissed more than 365 days ago. Items 2 and 3
+                    look back 3 days with date-scoped keys, so a skipped day is
+                    caught up without a duplicate.
+Why                 The dedupe row is the only memory that an event was
+                    raised; purging it at 30 days raised the same state again
+                    every month.
+Mechanism           INSERT ... ON CONFLICT DO NOTHING against the unique
+                    idx_notifications_dedupe; STATE_KEYED_DEDUPE_PREFIXES
+                    (backend/src/notification-center/notification-bounds.ts)
+                    excluded from both DELETEs of NotificationService.purgeOld
+                    by a parameterized LIKE ANY.
+Enforcement         notification.service.spec.ts (the purge SQL),
+                    bond-notification-events.spec.ts (dedupe keys, window
+                    edges), backend/test/integration/bond-notifications.integration.spec.ts
+                    (real database: a row dismissed 31 days ago survives the
+                    purge and the next run raises nothing; one dismissed 366
+                    days ago is forgotten).
+Status              enforced
+```
+
+### INV-BONDNOTIFY-003 -- the engine's figures
+
+```text
+Statement           Every amount, rate and date in a bond notification is
+                    BondValuationService.valueSecurity's (lot figures) or
+                    BondHoldingsService.redemptionSplit's (a payout), so the
+                    notification and the security page cannot disagree.
+Mechanism           The event rules (bond-notification-events.ts) are pure over
+                    the valuation; nothing is recomputed. An affected series of
+                    item 5 carries its rate source, and a projected rate is
+                    worded as projected.
+Enforcement         bond-notification-events.spec.ts,
+                    bond-notification.service.spec.ts,
+                    frontend/src/hooks/useNotificationCopy.test.ts
+Status              partial: the copy of both layers is held by unit tests,
+                    there is no guard scanning the rules for a recomputed figure
+```
+
+### INV-BONDNOTIFY-004 -- unknown is said, never zero
+
+```text
+Statement           A figure the engine cannot work out (a payout, a coupon
+                    whose rate is not published) is null in the row's data, and
+                    both copies say it is not known and why; a refused ledger
+                    names the row (action, date) and what to do.
+Mechanism           payoutOf / unknownPayout, sumExact (null when any flow is
+                    unknown), missingDataNotification (causes carry the
+                    refusal's action, date and row id; the dedupe hash covers
+                    the code, row and date, never a translated text).
+Enforcement         bond-notification-events.spec.ts,
+                    notification-email-copy.spec.ts,
+                    frontend/src/hooks/useNotificationCopy.test.ts
+Status              enforced
+```
+
+### INV-BONDNOTIFY-005 -- country-agnostic
+
+```text
+Statement           The producer holds no country, program, publisher or
+                    benchmark literal.
+Mechanism           Every such value arrives in the valuation or the stored
+                    benchmark row.
+Enforcement         backend/src/bonds/country-agnostic.guard.spec.ts
 Status              enforced
 ```
 

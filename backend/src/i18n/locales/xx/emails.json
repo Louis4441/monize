@@ -332,7 +332,7 @@
     "bond": {
       "maturitySoonTitle": "[XX-{{ series }} matures on {{ date }}-XX]",
       "maturitySoonMessage": "[XX-{{ quantity }} x {{ series }} mature on {{ date }}. {{ payout }}-XX]",
-      "interestTitle": "[XX-{{ series }}: interest payment today-XX]",
+      "interestTitle": "[XX-{{ series }}: interest payment on {{ date }}-XX]",
       "interestMessage": "[XX-{{ quantity }} x {{ series }} pay {{ amount }} of interest on {{ date }}. Book it on the security page if it is not in your account yet.-XX]",
       "interestMessageUnknown": "[XX-{{ quantity }} x {{ series }} pay interest on {{ date }}. The amount is not known yet: a rate it depends on is not published.-XX]",
       "rateResetTitle": "[XX-{{ series }}: new interest period-XX]",
@@ -361,7 +361,21 @@
         "observationNoPublisher": "[XX-the {{ observation }} observation of {{ benchmark }} is not stored: it is not published yet, or the feed has not been fetched since; refresh on the bond page-XX]",
         "terms": "[XX-the terms of {{ series }} are incomplete; refresh the series on the bond page-XX]",
         "purchase": "[XX-a purchase of {{ series }} on {{ date }} is outside its sale window ({{ from }} to {{ to }}); correct the purchase date-XX]",
-        "lots": "[XX-the lots cannot be derived from the ledger ({{ code }}); correct the ledger-XX]"
+        "lots": "[XX-the lots cannot be derived from the ledger ({{ code }}); correct the ledger-XX]",
+        "lotsRow": "[XX-the {{ action }} dated {{ date }} makes the lots impossible to derive ({{ code }}); correct the transaction-XX]",
+        "lotsRowSeries": "[XX-the {{ action }} dated {{ date }} is not placed in a series ({{ code }}); choose the series on that transaction-XX]",
+        "lotsRowRemoval": "[XX-the {{ action }} dated {{ date }} removes more than the account holds of that series ({{ code }}); correct the transaction-XX]"
+      },
+      "action": {
+        "BUY": "[XX-purchase-XX]",
+        "SELL": "[XX-sale-XX]",
+        "REINVEST": "[XX-reinvestment-XX]",
+        "ADD_SHARES": "[XX-share addition-XX]",
+        "REMOVE_SHARES": "[XX-share removal-XX]",
+        "SPLIT": "[XX-split-XX]",
+        "TRANSFER_IN": "[XX-incoming transfer-XX]",
+        "TRANSFER_OUT": "[XX-outgoing transfer-XX]",
+        "other": "[XX-transaction-XX]"
       }
     }
   },

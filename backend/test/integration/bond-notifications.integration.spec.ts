@@ -44,13 +44,14 @@ describe("BondNotificationService (integration)", () => {
   let owner: DataSource;
   let service: BondNotificationService;
   let holdings: BondHoldingsService;
+  let writeDoor: NotificationService;
 
   beforeAll(async () => {
     harness = await createEnforcedIntegrationModule([]);
     owner = harness.owner;
     const valuation = new BondValuationService(harness.app);
     holdings = new BondHoldingsService(harness.app, valuation);
-    const writeDoor = new NotificationService(harness.app);
+    writeDoor = new NotificationService(harness.app);
     service = new BondNotificationService(
       harness.app,
       valuation,
@@ -320,6 +321,32 @@ describe("BondNotificationService (integration)", () => {
     );
     await service.evaluateUser(held.userId);
     expect(await rowsOf("BOND_BENCHMARK_PUBLISHED")).toHaveLength(0);
+  });
+
+  it("raises BOND_REDEMPTION_UNBOOKED once for as long as the state lasts: the nightly purge keeps its dedupe row until it was dismissed a year ago", async () => {
+    // TOS1029 bought 2023-10-10 matured on 2026-10-10 and no REDEEM is booked.
+    const held = await hold("tos1029", "TOS", "TOS1029", "2023-10-10", 40);
+
+    expect(await service.evaluateUser(held.userId)).toBe(1);
+    expect(await rowsOf("BOND_REDEMPTION_UNBOOKED")).toHaveLength(1);
+
+    // Dismissed 31 days ago: any other notification would be purged now.
+    await owner.query(
+      `UPDATE notifications SET dismissed_at = NOW() - INTERVAL '31 days',
+                                is_read = true`,
+    );
+    await writeDoor.purgeOld();
+    expect(await rowsOf("BOND_REDEMPTION_UNBOOKED")).toHaveLength(1);
+    expect(await service.evaluateUser(held.userId)).toBe(0);
+    expect(await rowsOf("BOND_REDEMPTION_UNBOOKED")).toHaveLength(1);
+
+    // Dismissed over a year ago: forgotten, so the state raises it afresh.
+    await owner.query(
+      `UPDATE notifications SET dismissed_at = NOW() - INTERVAL '366 days'`,
+    );
+    await writeDoor.purgeOld();
+    expect(await rowsOf("BOND_REDEMPTION_UNBOOKED")).toHaveLength(0);
+    expect(await service.evaluateUser(held.userId)).toBe(1);
   });
 
   it("run() picks up the owner of an active bond security and ignores one whose bond security is inactive", async () => {

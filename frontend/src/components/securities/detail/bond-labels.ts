@@ -11,6 +11,21 @@ interface ArgTranslator extends Translator {
   (key: string, values: Record<string, string | number>): string;
 }
 
+/** Investment action enum to its key in `investments.transactionList`. */
+export const ACTION_LABEL_KEYS: Record<string, string> = {
+  BUY: 'actionBuy',
+  SELL: 'actionSell',
+  DIVIDEND: 'actionDividend',
+  INTEREST: 'actionInterest',
+  CAPITAL_GAIN: 'actionCapitalGain',
+  SPLIT: 'actionSplit',
+  TRANSFER_IN: 'actionTransferIn',
+  TRANSFER_OUT: 'actionTransferOut',
+  REINVEST: 'actionReinvest',
+  ADD_SHARES: 'actionAddShares',
+  REMOVE_SHARES: 'actionRemoveShares',
+};
+
 /** A benchmark by its translated name where the catalog has one, else by its id. */
 export function benchmarkLabel(t: Translator, benchmarkId: string): string {
   return t.has(`bond.benchmarks.${benchmarkId}`)

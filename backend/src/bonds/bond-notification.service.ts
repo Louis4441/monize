@@ -2,15 +2,15 @@ import { HttpException, Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { DataSource } from "typeorm";
 
-import { addDaysYMD, todayInTimezone } from "../common/date-utils";
+import { addDaysYMD } from "../common/date-utils";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
-import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
 import { CreateNotificationInput } from "../notification-center/notification.service";
 import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 import {
   BOND_BENCHMARK_FRESH_DAYS,
+  BOND_LOOKBACK_DAYS,
   BenchmarkObservation,
   BondPayout,
   MaturityCandidate,
@@ -35,6 +35,7 @@ import { BondHoldingsService } from "./bond-holdings.service";
 import {
   BondValuationService,
   SecurityValuation,
+  financialTodayOf,
 } from "./bond-valuation.service";
 import { BondEngineError } from "./engine/bond-engine";
 
@@ -201,15 +202,15 @@ export class BondNotificationService {
     }
     events.push(...rateResetNotifications(valuation, today));
 
-    // Item 2 reads the day before: a lot's next payment, once the day has
-    // come, is the one after it. Its own failure drops only item 2, never the
-    // events of today's valuation already found above.
-    let yesterday: SecurityValuation;
+    // Item 2 reads the valuation as of the start of its look-back window: the
+    // flows after that day, today's and those of a day the cron missed. Its own
+    // failure drops only item 2, never the events of today's valuation above.
+    let windowStart: SecurityValuation;
     try {
-      yesterday = await this.valuation.valueSecurity(
+      windowStart = await this.valuation.valueSecurity(
         userId,
         securityId,
-        addDaysYMD(today, -1),
+        addDaysYMD(today, -BOND_LOOKBACK_DAYS),
       );
     } catch (error) {
       this.logger.warn(
@@ -217,15 +218,15 @@ export class BondNotificationService {
       );
       return { valuation, events };
     }
-    if (yesterday.refusal === null) {
-      for (const candidate of interestCandidates(yesterday, today)) {
+    if (windowStart.refusal === null) {
+      for (const candidate of interestCandidates(windowStart, today)) {
         if (
           candidate.accountId !== null &&
           (await this.interestBooked(
             userId,
             securityId,
             candidate.accountId,
-            today,
+            candidate.paymentDate,
           ))
         ) {
           continue;
@@ -377,12 +378,9 @@ export class BondNotificationService {
     );
   }
 
-  /** The person's own calendar day, as `BondPriceService` defines it. */
+  /** The person's own calendar day, the one rule the bond module shares. */
   private financialToday(userId: string): Promise<string> {
-    return withScopedDb(this.dataSource, async (m) => {
-      const timezone = await getEffectiveTimezoneOfUser(m, userId);
-      return (todayInTimezone(timezone) ?? todayInTimezone("UTC")) as string;
-    });
+    return withScopedDb(this.dataSource, (m) => financialTodayOf(m, userId));
   }
 }
 

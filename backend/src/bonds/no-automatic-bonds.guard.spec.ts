@@ -208,6 +208,59 @@ describe("no bond data without a person's action (INV-BOND-008)", () => {
     );
   });
 
+  describe("the bond notification producer fetches nothing", () => {
+    /** Services that reach a provider, by class and by the file that holds it. */
+    const FETCHING = [
+      { name: "BondSeriesService", file: "bond-series.service" },
+      { name: "BenchmarkRefreshService", file: "benchmark-refresh.service" },
+      { name: "SeriesHttp", file: "series-http" },
+      { name: "BondOfferService", file: "bond-offer.service" },
+    ];
+    const stripComments = (text: string): string =>
+      text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+    /** What of the fetching services a source mentions, by class or by import. */
+    const fetchingIn = (text: string): string[] =>
+      FETCHING.filter(
+        ({ name, file }) =>
+          new RegExp(`\\b${name}\\b`).test(text) ||
+          new RegExp(`from\\s+["'][^"']*${file}["']`).test(text),
+      ).map(({ name }) => name);
+    const producer = stripComments(
+      readFileSync(join(__dirname, "bond-notification.service.ts"), "utf8"),
+    );
+
+    it(`injects and imports no service that fetches. ${RULE}`, () => {
+      expect({ rule: RULE, fetching: fetchingIn(producer) }).toEqual({
+        rule: RULE,
+        fetching: [],
+      });
+    });
+
+    it(`makes no request of its own. ${RULE}`, () => {
+      expect({
+        rule: RULE,
+        fetches: /\bfetch\s*\(|\bhttps?\.request\b|\baxios\b/.test(producer),
+      }).toEqual({ rule: RULE, fetches: false });
+    });
+
+    it("the scan names a fetching service that is injected or imported", () => {
+      expect(
+        fetchingIn(
+          "constructor(private readonly series: BondSeriesService) {}",
+        ),
+      ).toEqual(["BondSeriesService"]);
+      expect(
+        fetchingIn('import { Refresh } from "./benchmark-refresh.service";'),
+      ).toEqual(["BenchmarkRefreshService"]);
+      expect(fetchingIn("// BondOfferService is not used")).toEqual([
+        "BondOfferService",
+      ]);
+      expect(
+        fetchingIn(stripComments("// BondOfferService is not used")),
+      ).toEqual([]);
+    });
+  });
+
   it(`a BondAdapter has no series catalog. ${RULE}`, () => {
     const adapter = INSTALLED_BOND_ADAPTERS[0];
     // @ts-expect-error INV-BOND-008: an adapter ships programs, never series

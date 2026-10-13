@@ -23,6 +23,18 @@ const REASONS: Readonly<Record<string, Key>> = {
   PURCHASE_OUTSIDE_SALE_WINDOW: "bond.reason.PURCHASE_OUTSIDE_SALE_WINDOW",
 };
 
+/** The base action of a refused ledger row to its label. */
+const ACTION_LABELS: Readonly<Record<string, Key>> = {
+  BUY: "bond.action.BUY",
+  SELL: "bond.action.SELL",
+  REINVEST: "bond.action.REINVEST",
+  ADD_SHARES: "bond.action.ADD_SHARES",
+  REMOVE_SHARES: "bond.action.REMOVE_SHARES",
+  SPLIT: "bond.action.SPLIT",
+  TRANSFER_IN: "bond.action.TRANSFER_IN",
+  TRANSFER_OUT: "bond.action.TRANSFER_OUT",
+};
+
 const isText = (value: unknown): value is string =>
   typeof value === "string" && value !== "";
 
@@ -99,10 +111,28 @@ function causeText(cause: unknown, ctx: BondCopyContext): string | null {
         to,
       });
     }
-    case "LOTS_UNDERIVABLE":
-      return isText(c.refusalCode)
-        ? ctx.text("bond.cause.lots", { code: c.refusalCode })
-        : null;
+    case "LOTS_UNDERIVABLE": {
+      if (!isText(c.refusalCode)) return null;
+      const date = ctx.date(c.date);
+      // A row raised before the cause named its transaction keeps the older line.
+      if (!isText(c.action) || !date) {
+        return ctx.text("bond.cause.lots", { code: c.refusalCode });
+      }
+      const args = {
+        action: ctx.text(ACTION_LABELS[c.action] ?? "bond.action.other"),
+        date,
+        code: c.refusalCode,
+      };
+      switch (c.refusalCode) {
+        case "SERIES_NOT_DETERMINED":
+        case "SERIES_REQUIRED":
+          return ctx.text("bond.cause.lotsRowSeries", args);
+        case "REMOVAL_EXCEEDS_SERIES":
+          return ctx.text("bond.cause.lotsRowRemoval", args);
+        default:
+          return ctx.text("bond.cause.lotsRow", args);
+      }
+    }
     default:
       return null;
   }

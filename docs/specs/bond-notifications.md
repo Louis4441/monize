@@ -61,7 +61,7 @@ for each user (one failure does not stop the others):
     T = the user's financial today (as BondPriceService.financialToday)
     for each active bond-linked security of the user:
       v  = valueSecurity(userId, securityId, T)
-      v1 = valueSecurity(userId, securityId, T - 1 day)   // for item 2 only
+      v3 = valueSecurity(userId, securityId, T - 3 days)   // for item 2 only
       if v.refusal (lots underivable) -> item 6 with cause LOTS_UNDERIVABLE; next security
       group v.lots by (accountId, instrumentId)
       evaluate items 1-4 and 6 per group, item 5 per user (below)
@@ -86,24 +86,30 @@ raised by the first run inside the window, so a cron day missed does not lose it
 
 ### 3.2 Item 2, interest payment
 
-From `v1` (valued as of yesterday): each lot's `nextPayment` entries of type
-`INTEREST` dated T, for a lot whose `maturityDate` is after T (the maturity
-payment is items 1 and 4). Summed per group; an UNKNOWN flow makes the sum null.
-Suppressed when the ledger already holds an `INTEREST` investment transaction of
-the security in the account dated T (the person booked it before the cron).
-`data`: `paymentDate`, `amount`, `quantity`. Dedupe:
-`bond:interest:<accountId>:<instrumentId>:<T>`. A day the cron does not run
-loses that day's notice; accepted (section 6).
+From `v3` (valued as of T - 3 days, the window start): each lot's flows after
+that day (`knownCashflows` and `projectedCashflows`, so an UNKNOWN flow is
+included) of type `INTEREST` dated in the window (T - 3, T] (T - 3 excluded, T - 2,
+T - 1 and T included), for a lot whose `maturityDate` is after the flow's date
+(the maturity payment is items 1 and 4). Summed per group and flow date; an
+UNKNOWN flow makes the sum null. Suppressed when the ledger already holds an
+`INTEREST` investment transaction of the security in the account dated the
+flow's own date (the person booked it before the cron). `data`: `paymentDate`
+(the flow's date), `amount`, `quantity`. Dedupe:
+`bond:interest:<accountId>:<instrumentId>:<paymentDate>`, so a re-read of a day
+already raised writes nothing. A skipped day is caught up within 3 days; a
+longer outage loses the notice (section 6).
 
 ### 3.3 Item 3, new interest period
 
-An OPEN lot whose `currentPeriod.start` is T, `currentPeriod.index >= 2`, and
+An OPEN lot whose `currentPeriod.start` is in (T - 3, T] (T - 3 excluded, T - 2
+included), `currentPeriod.index >= 2`, and
 `currentPeriod.rateSource` is `DERIVED` or `ANNOUNCED` (a FIXED or TERMS rate is
 not news). Grouped per `(accountId, instrumentId, start)`. `data`: `periodStart`,
 `periodEnd`, `periodIndex`, `annualRate`, `rateSource`, and from the matching
 `rateSchedule` entry `benchmarkId`, `observation`, `benchmarkValue`, `addend`.
 When `annualRate` is null the event is not raised here; item 6 reports it.
-Dedupe: `bond:rate:<accountId>:<instrumentId>:<start>`.
+Dedupe: `bond:rate:<accountId>:<instrumentId>:<start>` (date-scoped: the
+look-back is idempotent).
 
 ### 3.4 Item 4, matured and not redeemed
 
@@ -111,7 +117,10 @@ A group of lots with status `MATURED` as of T (the fold keeps a lot until a
 REDEEM removes it). `data`: `maturityDate`, `quantity`, and the split at the
 maturity date (`payout`, `interest`, `principalReturned`, null when unknown).
 Dedupe: `bond:unbooked:<accountId>:<instrumentId>:<maturityDate>`; raised once,
-it stays in the bell until dismissed.
+for as long as the state lasts: `NotificationService.purgeOld` keeps a row with
+this prefix (read or dismissed, past the 30 day retention) because the dedupe row
+is the only memory that the event was raised, and forgets it only once it was
+dismissed more than 365 days ago (a very old resolved event may be forgotten).
 
 ### 3.5 Item 5, new benchmark observation
 
@@ -136,11 +145,16 @@ Per security, the causes the valuation reports for its OPEN and REFUSED lots:
 | `OBSERVATION_MISSING` | `valuation.missing[]` (`benchmarkId`, `observation`, `publisher`) with the security's `benchmarkCoverage` (`coveredThrough`, `lastFetchedAt`) | not published yet by the publisher, or the feed has not been fetched since `lastFetchedAt`: refresh on the bond page |
 | `TERMS_INCOMPLETE` | `dataCompleteness.termsComplete === false` | refresh the series on the bond page |
 | `PURCHASE_OUTSIDE_SALE_WINDOW` | `status === "REFUSED"`, `refusal.params` (`from`, `to`, `purchaseDate`) | correct the purchase date of the transaction |
-| `LOTS_UNDERIVABLE` | `v.refusal` | correct the ledger (the refusal code is carried) |
+| `LOTS_UNDERIVABLE` | `v.refusal` (`code`, `params.action`, `params.date`, `params.quantity`, `rowId`) | names the row (its action and date) and by code: `SERIES_NOT_DETERMINED` / `SERIES_REQUIRED` choose the series on that transaction; `REMOVAL_EXCEEDS_SERIES` the removal exceeds what the account holds of that series; any other code correct the transaction |
 
 `data.causes` is the sorted, de-duplicated list. Dedupe:
 `bond:missing:<securityId>:<sha256 of the canonical causes, first 16 hex>`, so a
-gap is reported once, and a changed gap is a new row. A rate that is null for
+gap is reported once, and a changed gap is a new row. For `LOTS_UNDERIVABLE` the
+hash covers the refusal code, the row id, the date and the action, never the
+quantity or any translated text. Like item 4 the row is raised once for as long
+as the state lasts: `purgeOld` keeps `bond:missing:` rows and forgets one only
+once it was dismissed more than 365 days ago (a very old resolved event may be
+forgotten). A rate that is null for
 the current period appears here as `OBSERVATION_MISSING`.
 
 ## 4. Type, category and copy registration
@@ -186,9 +200,17 @@ the current period appears here as `OBSERVATION_MISSING`.
 
 - **Fixed notice window.** 14 days before maturity, no per-person setting: a
   setting needs a column and a migration; it can follow when asked for.
-- **A missed cron day loses an interest notice.** Item 2 looks at today only;
-  catching up would need a stored "last notified" date. Items 1, 4, 5 and 6 are
-  window or state based and recover on the next run.
+- **A cron outage of more than 3 days loses an interest or period notice.**
+  Items 2 and 3 look back 3 days (a skipped local day is caught up, the
+  date-scoped keys make the look-back idempotent); catching up further would need
+  a stored "last notified" date. Items 1, 4, 5 and 6 are window or state based
+  and recover on the next run.
+- **State-keyed rows are kept, not re-raised.** Items 4 and 6 are raised once
+  while their state lasts, so their dedupe rows outlive the 30 day purge; one is
+  forgotten only when dismissed more than 365 days ago, which bounds the growth
+  and means a very old resolved event may be raised again if its state returns.
+- **The interest title says "today"** even when a look-back row is raised a day or
+  two late; the message carries the payment date.
 - **One daily run at a fixed hour** after the bond jobs, not per the person's
   time zone; the day evaluated is the person's own financial today.
 - **No new deep link.** The target is the security page, where the person books

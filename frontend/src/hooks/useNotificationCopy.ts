@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
-import { benchmarkLabel } from '@/components/securities/detail/bond-labels';
+import { ACTION_LABEL_KEYS, benchmarkLabel } from '@/components/securities/detail/bond-labels';
 
 /** Shared display copy for bell rows and reminder templates, including legacy fallback. */
 type Notification = {
@@ -106,6 +106,7 @@ function joinList(items: string[], locale: string): string {
 
 export function useNotificationCopy() {
   const t = useTranslations('notifications');
+  const tInv = useTranslations('investments');
   const locale = useLocale();
   const { formatCurrency, formatNumber, formatPercent } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -608,7 +609,24 @@ export function useNotificationCopy() {
         }
         case 'LOTS_UNDERIVABLE': {
           const code = text(c.refusalCode);
-          return code ? t('bond.cause.lots', { code }) : null;
+          if (!code) return null;
+          const rowAction = text(c.action);
+          const rowDate = day(c.date);
+          // A row raised before the cause named its transaction keeps the older line.
+          if (!rowAction || !rowDate) return t('bond.cause.lots', { code });
+          const key = ACTION_LABEL_KEYS[rowAction];
+          const args = {
+            action: key === undefined ? rowAction : tInv(`transactionList.${key}`),
+            date: rowDate,
+            code,
+          };
+          if (code === 'SERIES_NOT_DETERMINED' || code === 'SERIES_REQUIRED') {
+            return t('bond.cause.lotsRowSeries', args);
+          }
+          return t(
+            code === 'REMOVAL_EXCEEDS_SERIES' ? 'bond.cause.lotsRowRemoval' : 'bond.cause.lotsRow',
+            args,
+          );
         }
         default:
           return null;
@@ -670,11 +688,14 @@ export function useNotificationCopy() {
           if (!code || !date) return null;
           const annual = e.annualRate === null ? null : rate(e.annualRate);
           if (e.annualRate !== null && annual === null) return null;
-          lines.push(
+          // A projected rate is an assumption, never shown as a known one.
+          const line =
             annual === null
-              ? t('bond.benchmarkSeriesUnknown', { series: code, date })
-              : t('bond.benchmarkSeries', { series: code, date, rate: annual }),
-          );
+              ? 'bond.benchmarkSeriesUnknown'
+              : e.rateSource === 'PROJECTED'
+                ? 'bond.benchmarkSeriesProjected'
+                : 'bond.benchmarkSeries';
+          lines.push(t(line, { series: code, date, rate: annual ?? '' }));
         }
         if (lines.length === 0) return null;
         const figure = decimal(value);

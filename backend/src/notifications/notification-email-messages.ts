@@ -115,7 +115,7 @@ export const NOTIFICATION_EMAIL_MESSAGES = {
   "bond.maturitySoonTitle": "{{ series }} matures on {{ date }}",
   "bond.maturitySoonMessage":
     "{{ quantity }} x {{ series }} mature on {{ date }}. {{ payout }}",
-  "bond.interestTitle": "{{ series }}: interest payment today",
+  "bond.interestTitle": "{{ series }}: interest payment on {{ date }}",
   "bond.interestMessage":
     "{{ quantity }} x {{ series }} pay {{ amount }} of interest on {{ date }}. Book it on the security page if it is not in your account yet.",
   "bond.interestMessageUnknown":
@@ -153,4 +153,19 @@ export const NOTIFICATION_EMAIL_MESSAGES = {
     "a purchase of {{ series }} on {{ date }} is outside its sale window ({{ from }} to {{ to }}); correct the purchase date",
   "bond.cause.lots":
     "the lots cannot be derived from the ledger ({{ code }}); correct the ledger",
+  "bond.cause.lotsRow":
+    "the {{ action }} dated {{ date }} makes the lots impossible to derive ({{ code }}); correct the transaction",
+  "bond.cause.lotsRowSeries":
+    "the {{ action }} dated {{ date }} is not placed in a series ({{ code }}); choose the series on that transaction",
+  "bond.cause.lotsRowRemoval":
+    "the {{ action }} dated {{ date }} removes more than the account holds of that series ({{ code }}); correct the transaction",
+  "bond.action.BUY": "purchase",
+  "bond.action.SELL": "sale",
+  "bond.action.REINVEST": "reinvestment",
+  "bond.action.ADD_SHARES": "share addition",
+  "bond.action.REMOVE_SHARES": "share removal",
+  "bond.action.SPLIT": "split",
+  "bond.action.TRANSFER_IN": "incoming transfer",
+  "bond.action.TRANSFER_OUT": "outgoing transfer",
+  "bond.action.other": "transaction",
 } as const;
