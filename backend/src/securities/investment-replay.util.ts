@@ -163,6 +163,101 @@ export const CASH_INCOME_ACTIONS: readonly InvestmentAction[] = [
 ];
 
 /**
+ * The income each reinvestment records. A reinvest is a distribution paid in
+ * shares rather than cash: it is income of the same kind as its cash twin (it
+ * is on the 1099-DIV like one, and Money counted it as one), and it buys the
+ * shares at the same moment, so no cash moves.
+ *
+ * Income surfaces count it through {@link incomeKind}. A formula whose market
+ * value already holds the reinvested shares and whose base does not hold their
+ * cost (a period return, net invested) reads `CASH_INCOME_ACTIONS` instead,
+ * because adding the distribution there counts the same value twice.
+ */
+const INCOME_KIND_BY_REINVEST_ACTION: ReadonlyMap<
+  InvestmentAction | string,
+  InvestmentAction
+> = new Map([
+  [InvestmentAction.REINVEST, InvestmentAction.DIVIDEND],
+  [InvestmentAction.REINVEST_INTEREST, InvestmentAction.INTEREST],
+  [
+    InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+    InvestmentAction.CAPITAL_GAIN_SHORT,
+  ],
+  [
+    InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+    InvestmentAction.CAPITAL_GAIN_LONG,
+  ],
+]);
+
+/** The actions that record a distribution paid in shares. */
+export const REINVESTED_INCOME_ACTIONS: readonly InvestmentAction[] = [
+  ...INCOME_KIND_BY_REINVEST_ACTION.keys(),
+] as InvestmentAction[];
+
+/**
+ * The kind of income `action` records, as the cash-income action it equals
+ * (DIVIDEND, INTEREST, CAPITAL_GAIN or a short/long refinement), or `null` for
+ * an action that records none. `baseInvestmentAction` of the answer collapses
+ * the kinds for a surface that only needs dividend / interest / capital gain.
+ */
+export function incomeKind(
+  action: InvestmentAction | string,
+): InvestmentAction | null {
+  if (CASH_INCOME_ACTIONS.includes(action as InvestmentAction)) {
+    return action as InvestmentAction;
+  }
+  return INCOME_KIND_BY_REINVEST_ACTION.get(action) ?? null;
+}
+
+/**
+ * What a reinvested distribution came to, in the security's currency, unsigned.
+ *
+ * The stored total is the fact when the row has one -- an imported reinvest
+ * keeps the file's amount, and some files carry no price beside it. A row
+ * created in the app stores no total for a reinvest, so it is valued as its
+ * shares entered the basis: quantity x price + commission (`acquisitionCost`
+ * without a rate). Either way a gain measured as `value + income - cost` nets
+ * the reinvestment to the distribution it was. `null` when the row carries
+ * neither a total nor a price.
+ */
+export function reinvestedIncomeAmount(tx: {
+  quantity?: number | string | null;
+  price?: number | string | null;
+  commission?: number | string | null;
+  totalAmount?: number | string | null;
+}): number | null {
+  const total = Number(tx.totalAmount);
+  if (Number.isFinite(total) && total !== 0) return Math.abs(total);
+  return acquisitionCost(tx);
+}
+
+/**
+ * The income one row records, in the security's currency: a cash distribution's
+ * `totalAmount`, a reinvested one's {@link reinvestedIncomeAmount}, and 0 for a
+ * row that records no income.
+ *
+ * A legacy reinvest with neither a total nor a price counts 0: the cost basis
+ * leaves the same row out (`acquisitionCost` returns `null`), and a gain read
+ * as `value + income - cost` stays consistent only if income leaves it out too.
+ * A VOID row is the caller's to drop, as every total over these rows does.
+ */
+export function investmentIncomeAmount(tx: {
+  action: InvestmentAction | string;
+  quantity?: number | string | null;
+  price?: number | string | null;
+  commission?: number | string | null;
+  totalAmount?: number | string | null;
+}): number {
+  if (CASH_INCOME_ACTIONS.includes(tx.action as InvestmentAction)) {
+    return Number(tx.totalAmount) || 0;
+  }
+  if (INCOME_KIND_BY_REINVEST_ACTION.has(tx.action)) {
+    return reinvestedIncomeAmount(tx) ?? 0;
+  }
+  return 0;
+}
+
+/**
  * What an action does to the INVESTED part of a portfolio -- the securities,
  * with the cash beside them left out.
  *
@@ -176,9 +271,13 @@ export const CASH_INCOME_ACTIONS: readonly InvestmentAction[] = [
  *   what the position came to, and the cash they become earns nothing after.
  * - `income` -- cash the invested part paid out and therefore EARNED. It leaves
  *   as cash and stays in the result.
- * - `none` -- SPLIT moves no value (it is a ratio), and REINVEST's shares
- *   simply appear: the distribution never landed as cash, so counting it as
- *   capital would subtract the return the reader actually received.
+ * - `reinvestedIncome` -- REINVEST and its refinements: a distribution the
+ *   invested part earned and put straight back into shares, the DIVIDEND and
+ *   BUY it stands for in one row. A surface prints it in BOTH the income and
+ *   the capital figure, so the result they add up to is unchanged; the return
+ *   chains read neither, because its shares are already in the day's value and
+ *   no value crossed the boundary.
+ * - `none` -- SPLIT moves no value (it is a ratio).
  *
  * Keyed by BASE action, so a Money-vocabulary refinement cannot fall out of the
  * classification by being forgotten here -- `investedFlowKind` normalizes
@@ -186,7 +285,12 @@ export const CASH_INCOME_ACTIONS: readonly InvestmentAction[] = [
  * to a kind, so a new action is a failing test rather than a silent zero in a
  * capital flow.
  */
-export type InvestedFlowKind = "capitalIn" | "capitalOut" | "income" | "none";
+export type InvestedFlowKind =
+  | "capitalIn"
+  | "capitalOut"
+  | "income"
+  | "reinvestedIncome"
+  | "none";
 
 export const INVESTED_FLOW_KIND_BY_BASE_ACTION: ReadonlyMap<
   InvestmentAction,
@@ -201,8 +305,8 @@ export const INVESTED_FLOW_KIND_BY_BASE_ACTION: ReadonlyMap<
   [InvestmentAction.DIVIDEND, "income" as const],
   [InvestmentAction.INTEREST, "income" as const],
   [InvestmentAction.CAPITAL_GAIN, "income" as const],
+  [InvestmentAction.REINVEST, "reinvestedIncome" as const],
   [InvestmentAction.SPLIT, "none" as const],
-  [InvestmentAction.REINVEST, "none" as const],
 ]);
 
 /** What `action` does to the invested part; `none` for anything that moves no value. */

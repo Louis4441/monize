@@ -204,7 +204,7 @@
     "empty": "Aún no hay historial de inversiones para mostrar.",
     "refresh": "Actualizar valor actual",
     "investmentResult": "Resultado de la inversión",
-    "periodBreakdownInvestedTooltip": "El valor de los títulos varió {valueChange} en este período. De eso, {netInvested} fue dinero aportado, descontadas las ventas, y pagaron {income} en dividendos e intereses. La cifra de arriba es lo que ganaron las inversiones por sí mismas, sin contar el efectivo no invertido.",
+    "periodBreakdownInvestedTooltip": "El valor de los títulos varió {valueChange} en este período. De eso, {netInvested} fue dinero aportado, descontadas las ventas, y pagaron {income} en dividendos e intereses. Una distribución reinvertida en acciones cuenta en ambas cifras. La cifra de arriba es lo que ganaron las inversiones por sí mismas, sin contar el efectivo no invertido.",
     "notAvailable": "N/A"
   },
   "spendingByPayee": {

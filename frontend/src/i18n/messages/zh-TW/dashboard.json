@@ -204,7 +204,7 @@
     "empty": "尚無投資歷史可顯示。",
     "refresh": "重新整理目前價值",
     "investmentResult": "投資結果",
-    "periodBreakdownInvestedTooltip": "本期證券價值變動了 {valueChange}。其中 {netInvested} 是扣除賣出後的投入資金，證券支付了 {income} 的股息和利息。上方數字是投資本身的收益，不含未投資的現金。",
+    "periodBreakdownInvestedTooltip": "本期證券價值變動了 {valueChange}。其中 {netInvested} 是扣除賣出後的投入資金，證券支付了 {income} 的股息和利息。再投資為股份的分配同時計入這兩項。上方數字是投資本身的收益，不含未投資的現金。",
     "notAvailable": "不適用"
   },
   "spendingByPayee": {

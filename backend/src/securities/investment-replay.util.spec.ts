@@ -6,10 +6,14 @@ import {
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
   FUNDING_ACCOUNT_ACTIONS,
+  incomeKind,
+  investmentIncomeAmount,
   INVESTED_FLOW_KIND_BY_BASE_ACTION,
   investedFlowKind,
   isQuantityOnlyAction,
   MARKET_PRICED_TRADE_ACTIONS,
+  reinvestedIncomeAmount,
+  REINVESTED_INCOME_ACTIONS,
   SHARE_MOVING_ACTIONS,
 } from "./investment-replay.util";
 
@@ -416,13 +420,146 @@ describe("INVESTED_FLOW_KIND_BY_BASE_ACTION", () => {
       CAPITAL_GAIN: "income",
       CAPITAL_GAIN_SHORT: "income",
       CAPITAL_GAIN_LONG: "income",
-      // A split is a ratio and a reinvestment's shares simply appear: counting
-      // either as capital would subtract a return the reader actually received.
+      // A reinvestment is a distribution earned and put straight back into
+      // shares: income AND capital, so the result they add up to is unchanged.
+      REINVEST: "reinvestedIncome",
+      REINVEST_INTEREST: "reinvestedIncome",
+      REINVEST_CAPITAL_GAIN_SHORT: "reinvestedIncome",
+      REINVEST_CAPITAL_GAIN_LONG: "reinvestedIncome",
+      // A split is a ratio: no value crosses anything.
       SPLIT: "none",
-      REINVEST: "none",
-      REINVEST_INTEREST: "none",
-      REINVEST_CAPITAL_GAIN_SHORT: "none",
-      REINVEST_CAPITAL_GAIN_LONG: "none",
     });
+  });
+});
+
+describe("incomeKind", () => {
+  it("records every distribution, in cash or in shares, as the cash kind it equals", () => {
+    const kinds = Object.fromEntries(
+      Object.values(InvestmentAction).map((action) => [
+        action,
+        incomeKind(action),
+      ]),
+    );
+
+    expect(kinds).toEqual({
+      DIVIDEND: "DIVIDEND",
+      INTEREST: "INTEREST",
+      CAPITAL_GAIN: "CAPITAL_GAIN",
+      CAPITAL_GAIN_SHORT: "CAPITAL_GAIN_SHORT",
+      CAPITAL_GAIN_LONG: "CAPITAL_GAIN_LONG",
+      // A reinvested distribution is income of the same kind as its cash twin.
+      REINVEST: "DIVIDEND",
+      REINVEST_INTEREST: "INTEREST",
+      REINVEST_CAPITAL_GAIN_SHORT: "CAPITAL_GAIN_SHORT",
+      REINVEST_CAPITAL_GAIN_LONG: "CAPITAL_GAIN_LONG",
+      BUY: null,
+      SELL: null,
+      REDEEM: null,
+      TRANSFER_IN: null,
+      TRANSFER_OUT: null,
+      ADD_SHARES: null,
+      REMOVE_SHARES: null,
+      SPLIT: null,
+    });
+  });
+
+  it("keeps the reinvestments out of the cash-income list", () => {
+    // A period return or net invested reads the cash list; a reinvestment's
+    // shares are already in the value those formulas compare.
+    for (const action of REINVESTED_INCOME_ACTIONS) {
+      expect(CASH_INCOME_ACTIONS).not.toContain(action);
+    }
+    expect(REINVESTED_INCOME_ACTIONS).toHaveLength(4);
+  });
+});
+
+describe("reinvestedIncomeAmount", () => {
+  it("is the stored total when the row carries one", () => {
+    expect(
+      reinvestedIncomeAmount({
+        quantity: 2,
+        price: 50,
+        commission: 0,
+        totalAmount: 100.25,
+      }),
+    ).toBe(100.25);
+  });
+
+  it("is quantity times price plus commission for a row created in the app, which stores no total", () => {
+    expect(
+      reinvestedIncomeAmount({
+        quantity: 2,
+        price: 50,
+        commission: 1.5,
+        totalAmount: 0,
+      }),
+    ).toBe(101.5);
+  });
+
+  it("is the stored total of an imported row that carries no price", () => {
+    // A QIF ReinvDiv with a quantity and a total but no price line.
+    expect(
+      reinvestedIncomeAmount({
+        quantity: 10,
+        price: null,
+        commission: 0,
+        totalAmount: 500,
+      }),
+    ).toBe(500);
+  });
+
+  it("is unknown, not zero, for a row with neither a total nor a price", () => {
+    expect(
+      reinvestedIncomeAmount({
+        quantity: 2,
+        price: 0,
+        commission: 0,
+        totalAmount: 0,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("investmentIncomeAmount", () => {
+  it("is a cash distribution's total", () => {
+    expect(
+      investmentIncomeAmount({
+        action: InvestmentAction.DIVIDEND,
+        totalAmount: 12.34,
+      }),
+    ).toBe(12.34);
+  });
+
+  it("is a reinvested distribution's value, though the row stores no total", () => {
+    expect(
+      investmentIncomeAmount({
+        action: InvestmentAction.REINVEST_CAPITAL_GAIN_LONG,
+        quantity: 3,
+        price: 20,
+        totalAmount: 0,
+      }),
+    ).toBe(60);
+  });
+
+  it("leaves out a reinvest the cost basis leaves out", () => {
+    const row = {
+      action: InvestmentAction.REINVEST,
+      quantity: 3,
+      price: 0,
+      totalAmount: 0,
+    };
+    expect(acquisitionCost(row)).toBeNull();
+    expect(investmentIncomeAmount(row)).toBe(0);
+  });
+
+  it("is zero for a row that records no income", () => {
+    expect(
+      investmentIncomeAmount({
+        action: InvestmentAction.BUY,
+        quantity: 1,
+        price: 10,
+        totalAmount: 10,
+      }),
+    ).toBe(0);
   });
 });

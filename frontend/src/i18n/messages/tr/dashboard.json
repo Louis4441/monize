@@ -204,7 +204,7 @@
     "empty": "Henüz gösterilecek yatırım geçmişi yok.",
     "refresh": "Güncel değeri yenile",
     "investmentResult": "Yatırım Sonucu",
-    "periodBreakdownInvestedTooltip": "Menkul kıymetlerin değeri bu dönemde {valueChange} değişti. Bunun {netInvested} kadarı satışlar düşüldükten sonra yatırılan tutardı ve {income} temettü ve faiz olarak ödendi. Yukarıdaki rakam, yatırılmamış nakit hariç, yatırımların kendi kazancıdır.",
+    "periodBreakdownInvestedTooltip": "Menkul kıymetlerin değeri bu dönemde {valueChange} değişti. Bunun {netInvested} kadarı satışlar düşüldükten sonra yatırılan tutardı ve {income} temettü ve faiz olarak ödendi. Hisselere yeniden yatırılan bir dağıtım her ikisinde de sayılır. Yukarıdaki rakam, yatırılmamış nakit hariç, yatırımların kendi kazancıdır.",
     "notAvailable": "Yok"
   },
   "spendingByPayee": {

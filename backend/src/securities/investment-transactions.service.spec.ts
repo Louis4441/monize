@@ -3514,6 +3514,56 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
+    it("counts a reinvested distribution in the total of its kind", async () => {
+      // As the app writes a reinvest: quantity and price, no total.
+      const transactions = [
+        {
+          id: "inv-tx-1",
+          userId,
+          action: InvestmentAction.DIVIDEND,
+          totalAmount: 25,
+          commission: 0,
+        },
+        {
+          id: "inv-tx-2",
+          userId,
+          action: InvestmentAction.REINVEST,
+          quantity: 2,
+          price: 30,
+          totalAmount: 0,
+          commission: 0,
+        },
+        {
+          id: "inv-tx-3",
+          userId,
+          action: InvestmentAction.REINVEST_INTEREST,
+          quantity: 1,
+          price: 4,
+          totalAmount: 0,
+          commission: 0,
+        },
+        {
+          id: "inv-tx-4",
+          userId,
+          action: InvestmentAction.REINVEST_CAPITAL_GAIN_SHORT,
+          quantity: 1,
+          price: 7.5,
+          totalAmount: 0,
+          commission: 0,
+        },
+      ];
+      const mockQB = createMockQueryBuilder(transactions, transactions.length);
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        mockQB,
+      );
+
+      const result = await service.getSummary(userId);
+
+      expect(result.totalDividends).toBe(85);
+      expect(result.totalInterest).toBe(4);
+      expect(result.totalCapitalGains).toBe(7.5);
+    });
+
     it("returns zero values when no transactions exist", async () => {
       const mockQB = createMockQueryBuilder([], 0);
       investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
@@ -3616,9 +3666,74 @@ describe("InvestmentTransactionsService", () => {
         price: 160,
         commission: 9.99,
         totalAmount: 790.01,
+        incomeAmount: 0,
+        incomeCurrency: mockSecurity.currencyCode,
         currency: "USD",
         description: "Sell AAPL",
       });
+      expect(result.incomeByCurrency).toEqual({
+        [mockSecurity.currencyCode]: 25,
+      });
+    });
+
+    it("counts a reinvested distribution as income, though it stores no total", async () => {
+      // Discussion #1670: "what dividends did I receive" summed totalAmount,
+      // and a reinvest created in the app stores 0 there.
+      const reinvest = {
+        ...dividend,
+        id: "inv-tx-reinvest",
+        action: InvestmentAction.REINVEST,
+        quantity: 2,
+        price: 12.5,
+        totalAmount: 0,
+      };
+      const rows = [reinvest, dividend, buy];
+      const mockQB = createMockQueryBuilder(rows, rows.length);
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        mockQB,
+      );
+
+      const result = await service.getLlmInvestmentTransactions(userId, {
+        groupBy: "action",
+      });
+
+      expect(result.incomeByCurrency).toEqual({
+        [mockSecurity.currencyCode]: 50,
+      });
+      expect(result.transactions[0]).toMatchObject({
+        action: "REINVEST",
+        totalAmount: 0,
+        incomeAmount: 25,
+      });
+      expect(
+        result.groups?.find((group) => group.key === "REINVEST")
+          ?.incomeByCurrency,
+      ).toEqual({ [mockSecurity.currencyCode]: 25 });
+      expect(
+        result.groups?.find((group) => group.key === "BUY")?.incomeByCurrency,
+      ).toEqual({});
+    });
+
+    it("keeps income in different currencies apart rather than adding it", async () => {
+      const cadDividend = {
+        ...dividend,
+        id: "inv-tx-cad",
+        totalAmount: 40,
+        security: { ...mockSecurity, id: "sec-cad", currencyCode: "CAD" },
+      };
+      const usdDividend = {
+        ...dividend,
+        security: { ...mockSecurity, currencyCode: "USD" },
+      };
+      const rows = [cadDividend, usdDividend];
+      const mockQB = createMockQueryBuilder(rows, rows.length);
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        mockQB,
+      );
+
+      const result = await service.getLlmInvestmentTransactions(userId, {});
+
+      expect(result.incomeByCurrency).toEqual({ CAD: 40, USD: 25 });
     });
 
     it("applies date, symbol, action and accountId filters", async () => {

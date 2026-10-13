@@ -30,7 +30,9 @@ import { Security } from "./entities/security.entity";
 import {
   applyActionToQuantity,
   baseInvestmentAction,
+  incomeKind,
   INVESTMENT_REPLAY_ORDER,
+  investmentIncomeAmount,
 } from "./investment-replay.util";
 import {
   disposalCashAmount,
@@ -141,6 +143,32 @@ export interface LlmCapitalGainsResult {
   truncatedEntryList: boolean;
 }
 
+/** The currency a row's income is in: the security's, else the account's. */
+function llmIncomeCurrency(row: InvestmentTransaction): string | null {
+  return row.security?.currencyCode ?? row.account?.currencyCode ?? null;
+}
+
+/** Adds a row's income, in ten-thousandths, under the currency it is in. */
+function addIncomeScaled(
+  byCurrency: Map<string, number>,
+  row: InvestmentTransaction,
+): void {
+  const scaled = Math.round(investmentIncomeAmount(row) * 10000);
+  if (scaled === 0) return;
+  const currency = llmIncomeCurrency(row) ?? "";
+  byCurrency.set(currency, (byCurrency.get(currency) ?? 0) + scaled);
+}
+
+function incomeByCurrencyOf(
+  scaledByCurrency: Map<string, number>,
+): Record<string, number> {
+  return Object.fromEntries(
+    [...scaledByCurrency.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([currency, scaled]) => [currency, roundMoney(scaled / 10000)]),
+  );
+}
+
 export interface LlmInvestmentTxRow {
   transactionDate: string;
   action: string;
@@ -151,6 +179,14 @@ export interface LlmInvestmentTxRow {
   price: number | null;
   commission: number;
   totalAmount: number;
+  /**
+   * The dividend, interest or capital-gain distribution this row records, paid
+   * in cash or reinvested in shares; 0 for a row that records none. A reinvest
+   * created in the app stores no total, so this is where its distribution shows.
+   */
+  incomeAmount: number;
+  /** The currency `incomeAmount` is in: the security's, else the account's. */
+  incomeCurrency: string | null;
   currency: string | null;
   description: string | null;
   /**
@@ -166,12 +202,20 @@ export interface LlmInvestmentTxGroup {
   totalQuantity: number;
   totalAmount: number;
   totalCommission: number;
+  /** The rows' `incomeAmount`, summed per `incomeCurrency`. */
+  incomeByCurrency: Record<string, number>;
 }
 
 export interface LlmInvestmentTransactionsResult {
   transactionCount: number;
   totalAmount: number;
   totalCommission: number;
+  /**
+   * Dividends, interest and capital-gain distributions, cash and reinvested,
+   * summed per currency they are in. Never added across currencies: nothing
+   * here is converted, so a single figure would be in no currency at all.
+   */
+  incomeByCurrency: Record<string, number>;
   totalQuantity: number;
   actionCounts: Record<string, number>;
   groupedBy: LlmInvestmentTxGroupBy | null;
@@ -4553,6 +4597,7 @@ export class InvestmentTransactionsService {
     let totalAmountScaled = 0;
     let totalCommissionScaled = 0;
     let totalQuantityScaled = 0;
+    const incomeScaledByCurrency = new Map<string, number>();
     const actionCounts: Record<string, number> = {};
 
     for (const r of rows) {
@@ -4560,6 +4605,7 @@ export class InvestmentTransactionsService {
       // moved no money or shares, so it joins no total.
       if (!investmentRowHasEffect(r)) continue;
       totalAmountScaled += Math.round(Number(r.totalAmount) * 10000);
+      addIncomeScaled(incomeScaledByCurrency, r);
       totalCommissionScaled += Math.round(Number(r.commission || 0) * 10000);
       if (r.quantity !== null && r.quantity !== undefined) {
         totalQuantityScaled += Math.round(Number(r.quantity) * 1e8);
@@ -4586,6 +4632,8 @@ export class InvestmentTransactionsService {
             : null,
         commission: roundMoney(Number(r.commission || 0)),
         totalAmount: roundMoney(Number(r.totalAmount)),
+        incomeAmount: roundMoney(investmentIncomeAmount(r)),
+        incomeCurrency: llmIncomeCurrency(r),
         currency: r.account?.currencyCode ?? null,
         description: r.description ?? null,
         status: r.status,
@@ -4599,6 +4647,7 @@ export class InvestmentTransactionsService {
           amountScaled: number;
           commissionScaled: number;
           quantityScaled: number;
+          incomeScaled: Map<string, number>;
           count: number;
         }
       >();
@@ -4609,9 +4658,11 @@ export class InvestmentTransactionsService {
           amountScaled: 0,
           commissionScaled: 0,
           quantityScaled: 0,
+          incomeScaled: new Map<string, number>(),
           count: 0,
         };
         b.amountScaled += Math.round(Number(r.totalAmount) * 10000);
+        addIncomeScaled(b.incomeScaled, r);
         b.commissionScaled += Math.round(Number(r.commission || 0) * 10000);
         if (r.quantity !== null && r.quantity !== undefined) {
           b.quantityScaled += Math.round(Number(r.quantity) * 1e8);
@@ -4626,6 +4677,7 @@ export class InvestmentTransactionsService {
           totalQuantity: round8(b.quantityScaled / 1e8),
           totalAmount: roundMoney(b.amountScaled / 10000),
           totalCommission: roundMoney(b.commissionScaled / 10000),
+          incomeByCurrency: incomeByCurrencyOf(b.incomeScaled),
         }))
         .sort((a, b) =>
           options.groupBy === "date"
@@ -4638,6 +4690,7 @@ export class InvestmentTransactionsService {
       transactionCount: rows.length,
       totalAmount: roundMoney(totalAmountScaled / 10000),
       totalCommission: roundMoney(totalCommissionScaled / 10000),
+      incomeByCurrency: incomeByCurrencyOf(incomeScaledByCurrency),
       totalQuantity: round8(totalQuantityScaled / 1e8),
       actionCounts,
       groupedBy: options.groupBy ?? null,
@@ -4691,6 +4744,17 @@ export class InvestmentTransactionsService {
       return query.getMany();
     });
 
+    const incomeOfKind = (kind: InvestmentAction): number => {
+      const amounts: number[] = [];
+      for (const t of transactions) {
+        const recorded = incomeKind(t.action);
+        if (recorded !== null && baseInvestmentAction(recorded) === kind) {
+          amounts.push(investmentIncomeAmount(t));
+        }
+      }
+      return sumMoney(amounts);
+    };
+
     const summary = {
       totalTransactions: transactions.length,
       totalBuys: transactions.filter((t) => t.action === InvestmentAction.BUY)
@@ -4700,24 +4764,10 @@ export class InvestmentTransactionsService {
       totalSells: transactions.filter(
         (t) => baseInvestmentAction(t.action) === InvestmentAction.SELL,
       ).length,
-      totalDividends: sumMoney(
-        transactions
-          .filter((t) => t.action === InvestmentAction.DIVIDEND)
-          .map((t) => Number(t.totalAmount)),
-      ),
-      totalInterest: sumMoney(
-        transactions
-          .filter((t) => t.action === InvestmentAction.INTEREST)
-          .map((t) => Number(t.totalAmount)),
-      ),
-      totalCapitalGains: sumMoney(
-        transactions
-          .filter(
-            (t) =>
-              baseInvestmentAction(t.action) === InvestmentAction.CAPITAL_GAIN,
-          )
-          .map((t) => Number(t.totalAmount)),
-      ),
+      // Income by kind, whether it was paid in cash or reinvested in shares.
+      totalDividends: incomeOfKind(InvestmentAction.DIVIDEND),
+      totalInterest: incomeOfKind(InvestmentAction.INTEREST),
+      totalCapitalGains: incomeOfKind(InvestmentAction.CAPITAL_GAIN),
       totalCommissions: sumMoney(
         transactions.map((t) => Number(t.commission || 0)),
       ),

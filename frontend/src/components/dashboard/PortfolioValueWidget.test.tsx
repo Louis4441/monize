@@ -215,7 +215,7 @@ describe('PortfolioValueWidget', () => {
     expect(figure).not.toHaveTextContent('100.0%');
     expect(
       screen.getByLabelText(
-        'The securities moved +$10000 in value over this window. Of that, +$10000 was paid in, net of sales, and they paid out +$0 in dividends and interest. The figure above is what the investments themselves earned, with uninvested cash left out.',
+        'The securities moved +$10000 in value over this window. Of that, +$10000 was paid in, net of sales, and they paid out +$0 in dividends and interest. A distribution reinvested in shares counts in both. The figure above is what the investments themselves earned, with uninvested cash left out.',
       ),
     ).toBeInTheDocument();
   });
@@ -281,7 +281,7 @@ describe('PortfolioValueWidget', () => {
     // The two figures behind it are withheld in the same words, never blank.
     expect(
       screen.getByLabelText(
-        'The securities moved N/A in value over this window. Of that, N/A was paid in, net of sales, and they paid out N/A in dividends and interest. The figure above is what the investments themselves earned, with uninvested cash left out.',
+        'The securities moved N/A in value over this window. Of that, N/A was paid in, net of sales, and they paid out N/A in dividends and interest. A distribution reinvested in shares counts in both. The figure above is what the investments themselves earned, with uninvested cash left out.',
       ),
     ).toBeInTheDocument();
   });

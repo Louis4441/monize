@@ -204,7 +204,7 @@
     "empty": "No investment history to show yet.",
     "refresh": "Refresh current value",
     "investmentResult": "Investment result",
-    "periodBreakdownInvestedTooltip": "The securities moved {valueChange} in value over this window. Of that, {netInvested} was paid in, net of sales, and they paid out {income} in dividends and interest. The figure above is what the investments themselves earned, with uninvested cash left out.",
+    "periodBreakdownInvestedTooltip": "The securities moved {valueChange} in value over this window. Of that, {netInvested} was paid in, net of sales, and they paid out {income} in dividends and interest. A distribution reinvested in shares counts in both. The figure above is what the investments themselves earned, with uninvested cash left out.",
     "notAvailable": "N/A"
   },
   "spendingByPayee": {
