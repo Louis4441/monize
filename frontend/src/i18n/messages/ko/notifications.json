@@ -99,6 +99,10 @@
       "terms": "{series}의 조건이 불완전합니다. 채권 페이지에서 시리즈를 새로고침하세요.",
       "purchase": "{date}의 {series} 매수가 판매 기간({from} ~ {to})을 벗어납니다. 매수일을 수정하세요.",
       "lots": "원장에서 로트를 도출할 수 없습니다({code}). 원장을 수정하세요."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "소비자물가지수, 12개월 (GUS)",
+      "PL_NBP_REFERENCE": "NBP 기준금리"
     }
   },
   "portfolioMovement": {

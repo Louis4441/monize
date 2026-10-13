@@ -99,6 +99,10 @@
       "terms": "Die Konditionen von {series} sind unvollständig. Aktualisieren Sie die Serie auf der Anleiheseite.",
       "purchase": "Ein Kauf von {series} am {date} liegt außerhalb des Verkaufszeitraums ({from} bis {to}). Korrigieren Sie das Kaufdatum.",
       "lots": "Die Lots lassen sich nicht aus dem Buchungsverlauf ableiten ({code}). Korrigieren Sie den Buchungsverlauf."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Inflationsrate (VPI), 12 Monate (GUS)",
+      "PL_NBP_REFERENCE": "NBP-Referenzzins"
     }
   },
   "portfolioMovement": {

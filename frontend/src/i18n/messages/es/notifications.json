@@ -99,6 +99,10 @@
       "terms": "Las condiciones de {series} están incompletas. Actualice la serie en la página del bono.",
       "purchase": "Una compra de {series} el {date} queda fuera de su periodo de venta ({from} a {to}). Corrija la fecha de compra.",
       "lots": "Los lotes no se pueden derivar del libro de transacciones ({code}). Corrija el libro."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "IPC, 12 meses (GUS)",
+      "PL_NBP_REFERENCE": "Tipo de referencia del NBP"
     }
   },
   "portfolioMovement": {

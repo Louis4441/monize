@@ -99,6 +99,10 @@
       "terms": "[XX-The terms of {series} are incomplete. Refresh the series on the bond page.-XX]",
       "purchase": "[XX-A purchase of {series} on {date} is outside its sale window ({from} to {to}). Correct the purchase date.-XX]",
       "lots": "[XX-The lots cannot be derived from the ledger ({code}). Correct the ledger.-XX]"
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "[XX-CPI, 12 months (GUS)-XX]",
+      "PL_NBP_REFERENCE": "[XX-NBP reference rate-XX]"
     }
   },
   "emailReceiptsAttention": {

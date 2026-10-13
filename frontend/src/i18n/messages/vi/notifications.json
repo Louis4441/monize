@@ -99,6 +99,10 @@
       "terms": "Điều khoản của {series} chưa đầy đủ. Hãy làm mới đợt phát hành trên trang trái phiếu.",
       "purchase": "Lần mua {series} vào {date} nằm ngoài thời gian bán ({from} đến {to}). Hãy sửa ngày mua.",
       "lots": "Không thể suy ra các lô từ sổ cái ({code}). Hãy sửa sổ cái."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "CPI, 12 tháng (GUS)",
+      "PL_NBP_REFERENCE": "Lãi suất tham chiếu NBP"
     }
   },
   "portfolioMovement": {

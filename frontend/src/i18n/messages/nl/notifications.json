@@ -99,6 +99,10 @@
       "terms": "De voorwaarden van {series} zijn onvolledig. Vernieuw de serie op de obligatiepagina.",
       "purchase": "Een aankoop van {series} op {date} valt buiten de verkoopperiode ({from} tot {to}). Corrigeer de aankoopdatum.",
       "lots": "De partijen kunnen niet uit het grootboek worden afgeleid ({code}). Corrigeer het grootboek."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "CPI, 12 maanden (GUS)",
+      "PL_NBP_REFERENCE": "NBP-referentierente"
     }
   },
   "portfolioMovement": {

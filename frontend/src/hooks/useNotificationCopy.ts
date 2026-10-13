@@ -106,7 +106,6 @@ function joinList(items: string[], locale: string): string {
 
 export function useNotificationCopy() {
   const t = useTranslations('notifications');
-  const tDetail = useTranslations('securityDetail');
   const locale = useLocale();
   const { formatCurrency, formatNumber, formatPercent } = useNumberFormat();
   const { formatDate } = useDateFormat();
@@ -586,12 +585,12 @@ export function useNotificationCopy() {
           return publisher
             ? t('bond.cause.observation', {
                 observation: observation(label),
-                benchmark: benchmarkLabel(tDetail, benchmark),
+                benchmark: benchmarkLabel(t, benchmark),
                 publisher,
               })
             : t('bond.cause.observationNoPublisher', {
                 observation: observation(label),
-                benchmark: benchmarkLabel(tDetail, benchmark),
+                benchmark: benchmarkLabel(t, benchmark),
               });
         }
         case 'TERMS_INCOMPLETE': {
@@ -681,7 +680,7 @@ export function useNotificationCopy() {
         const figure = decimal(value);
         if (figure === null) return null;
         const args = {
-          benchmark: benchmarkLabel(tDetail, benchmark),
+          benchmark: benchmarkLabel(t, benchmark),
           publisher,
           observation: observation(label),
           // A rate series stores a fraction; any other unit is shown as a plain number.

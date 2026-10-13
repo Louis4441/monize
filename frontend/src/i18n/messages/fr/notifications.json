@@ -99,6 +99,10 @@
       "terms": "Les conditions de {series} sont incomplètes. Actualisez la série sur la page de l'obligation.",
       "purchase": "Un achat de {series} le {date} est en dehors de sa période de vente ({from} au {to}). Corrigez la date d'achat.",
       "lots": "Les lots ne peuvent pas être déduits du registre ({code}). Corrigez le registre."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Inflation IPC, 12 mois (GUS)",
+      "PL_NBP_REFERENCE": "Taux de référence de la NBP"
     }
   },
   "portfolioMovement": {

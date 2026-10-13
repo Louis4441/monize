@@ -99,6 +99,10 @@
       "terms": "Ketentuan {series} belum lengkap. Segarkan seri di halaman obligasi.",
       "purchase": "Pembelian {series} pada {date} berada di luar masa penjualannya ({from} sampai {to}). Perbaiki tanggal pembelian.",
       "lots": "Lot tidak dapat diturunkan dari buku besar ({code}). Perbaiki buku besar."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "IHK, 12 bulan (GUS)",
+      "PL_NBP_REFERENCE": "Suku bunga acuan NBP"
     }
   },
   "portfolioMovement": {

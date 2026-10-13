@@ -99,6 +99,10 @@
       "terms": "Warunki serii {series} są niekompletne. Odśwież serię na stronie obligacji.",
       "purchase": "Zakup serii {series} z dnia {date} wypada poza okresem sprzedaży (od {from} do {to}). Popraw datę zakupu.",
       "lots": "Nie można ustalić partii na podstawie historii transakcji ({code}). Popraw historię transakcji."
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Inflacja CPI r/r (GUS)",
+      "PL_NBP_REFERENCE": "Stopa referencyjna NBP"
     }
   },
   "portfolioMovement": {
