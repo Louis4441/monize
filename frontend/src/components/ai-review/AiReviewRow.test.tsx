@@ -255,9 +255,14 @@ describe('AiReviewRow', () => {
       expect(screen.getByRole('checkbox')).toBeChecked();
     });
 
-    it('leaves the cell empty for a request that cannot be approved', () => {
-      renderSelectable(emailReceiptItem());
+    it('leaves the cell empty for a request that can be neither approved nor sent', () => {
+      renderSelectable(emailReceiptItem({ status: 'applied' }));
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
+
+    it('offers a checkbox on a pending request, to send it to the assistant', () => {
+      renderSelectable(emailReceiptItem({ status: 'pending' }));
+      expect(screen.getByRole('checkbox')).toBeInTheDocument();
     });
 
     it('spans the card row across the extra column', () => {

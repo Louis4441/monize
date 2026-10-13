@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ExclamationTriangleIcon, InboxIcon } from '@heroicons/react/24/outline';
 import { AiReviewRow } from '@/components/ai-review/AiReviewRow';
+import { SendPendingToAssistantButton } from '@/components/ai-review/SendPendingToAssistantButton';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -44,6 +45,8 @@ export function AiReviewInbox() {
     shownItems,
     approvable,
     selected,
+    sendable,
+    selectedSendable,
     toggleSelected,
     clearSelection,
     batching,
@@ -77,12 +80,15 @@ export function AiReviewInbox() {
     if (target) void approveBatch(target);
   };
 
-  const allApprovableSelected = approvable.length > 0 && selected.length === approvable.length;
+  // One column of checkboxes serves both bulk actions: approving proposals and sending pending requests.
+  const checkable = [...approvable, ...sendable];
+  const checked = [...selected, ...selectedSendable];
+  const allSelected = checkable.length > 0 && checked.length === checkable.length;
   const toggleAll = () => {
-    if (allApprovableSelected) clearSelection();
-    else approvable.filter((item) => !selected.includes(item)).forEach((item) => toggleSelected(item.id));
+    if (allSelected) clearSelection();
+    else checkable.filter((item) => !checked.includes(item)).forEach((item) => toggleSelected(item.id));
   };
-  const selectable = approvable.length > 0;
+  const selectable = checkable.length > 0;
   const nameOf = (id: string) => {
     const item = items?.find((candidate) => candidate.id === id);
     return (item ? reviewItemLabel(item) : null) ?? t('bulk.unknownRequest');
@@ -127,7 +133,7 @@ export function AiReviewInbox() {
                 <Th className="w-10 px-2 sm:px-4">
                   <input
                     type="checkbox"
-                    checked={allApprovableSelected}
+                    checked={allSelected}
                     onChange={toggleAll}
                     aria-label={t('bulk.selectAll')}
                     className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500 dark:border-gray-600"
@@ -150,7 +156,7 @@ export function AiReviewInbox() {
                 card={cards[item.id]}
                 dismissing={dismissing.has(item.id)}
                 selectable={selectable}
-                selected={selected.includes(item)}
+                selected={checked.includes(item)}
                 onToggleSelected={(row) => toggleSelected(row.id)}
                 onApprove={approve}
                 onDismiss={setDismissTarget}
@@ -190,6 +196,9 @@ export function AiReviewInbox() {
               {t(`kindFilter.${option}`)}
             </button>
           ))}
+        </div>
+        <div className="sm:ml-auto">
+          <SendPendingToAssistantButton pending={sendable} selected={selectedSendable} />
         </div>
       </div>
       {approvable.length > 0 && (

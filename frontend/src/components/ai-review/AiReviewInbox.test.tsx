@@ -316,8 +316,8 @@ describe('AiReviewInbox', () => {
       expect(screen.getByRole('button', { name: 'Email receipts' })).toHaveAttribute('aria-pressed', 'true');
     });
 
-    it('offers no selection when nothing can be approved', async () => {
-      api.list.mockResolvedValue([makeReviewItem()]);
+    it('offers no selection when nothing can be approved or sent', async () => {
+      api.list.mockResolvedValue([makeReviewItem({ status: 'applied' })]);
       await renderInbox();
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Approve selected/ })).not.toBeInTheDocument();
@@ -374,9 +374,21 @@ describe('AiReviewInbox', () => {
     it('selects every approvable row with the header checkbox', async () => {
       api.list.mockResolvedValue([receipt('r1'), receipt('r2')]);
       await renderInbox();
-      await click(screen.getByRole('checkbox', { name: 'Select all approvable requests shown' }));
+      await click(screen.getByRole('checkbox', { name: 'Select all requests shown that can be approved or sent' }));
       expect(screen.getByRole('button', { name: 'Approve selected (2)' })).toBeEnabled();
-      await click(screen.getByRole('checkbox', { name: 'Select all approvable requests shown' }));
+      await click(screen.getByRole('checkbox', { name: 'Select all requests shown that can be approved or sent' }));
+      expect(screen.getByRole('button', { name: 'Approve selected (0)' })).toBeDisabled();
+    });
+
+    it('offers a checkbox on a pending row that picks what goes to the assistant, not what is approved', async () => {
+      api.list.mockResolvedValue([receipt('r1'), makeReviewItem({ id: 'p1', status: 'pending' })]);
+      await renderInbox();
+      expect(screen.getByRole('button', { name: 'Send 1 pending request to the AI assistant' })).toBeInTheDocument();
+      const boxes = screen.getAllByRole('checkbox');
+      // The header and one per row: the proposal and the pending request.
+      expect(boxes).toHaveLength(3);
+      await click(boxes[2]);
+      expect(screen.getByRole('button', { name: 'Send 1 selected request to the AI assistant' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Approve selected (0)' })).toBeDisabled();
     });
 

@@ -62,7 +62,7 @@
   },
   "bulk": {
     "selectRow": "Chọn {name}",
-    "selectAll": "Chọn tất cả yêu cầu có thể phê duyệt đang hiển thị",
+    "selectAll": "Chọn tất cả yêu cầu đang hiển thị có thể duyệt hoặc gửi",
     "approveSelected": "Phê duyệt mục đã chọn ({count})",
     "approveAllShown": "Phê duyệt tất cả mục đang hiển thị ({count})",
     "summary": "Đã áp dụng {approved, plural, one {# đề xuất} other {# đề xuất}}, {failed, plural, one {# chưa được áp dụng} other {# chưa được áp dụng}}.",
@@ -76,6 +76,14 @@
       "message": "Mỗi đề xuất được kiểm tra với giao dịch ở trạng thái hiện tại và được áp dụng riêng. Đề xuất nào không còn phù hợp sẽ bị bỏ qua và được báo cáo, còn các đề xuất khác vẫn được áp dụng. Hãy xem xét các đề xuất trước khi phê duyệt.",
       "confirm": "{count, plural, one {Áp dụng # đề xuất} other {Áp dụng # đề xuất}}"
     }
+  },
+  "sendToAssistant": {
+    "button": "Gửi {count, plural, other {# yêu cầu đang chờ}} cho trợ lý AI",
+    "buttonSelected": "Gửi {count, plural, other {# yêu cầu đã chọn}} cho trợ lý AI",
+    "prompt": "Xử lý các yêu cầu đánh giá AI đang chờ của tôi bằng công cụ ai_review_requests: liệt kê, nhận từng yêu cầu, làm theo hướng dẫn và gửi đề xuất. Với yêu cầu bản nháp hồ sơ, hãy tạo hồ sơ bằng công cụ email_receipt_parsers. Không có gì thay đổi cho đến khi tôi duyệt các đề xuất trong hộp đánh giá AI.",
+    "promptSelected": "Xử lý {count, plural, other {# yêu cầu đánh giá AI này}} bằng công cụ ai_review_requests: {ids}. Nhận từng yêu cầu theo id, làm theo hướng dẫn và gửi đề xuất. Với yêu cầu bản nháp hồ sơ, hãy tạo hồ sơ bằng công cụ email_receipt_parsers. Không động đến các yêu cầu khác. Không có gì thay đổi cho đến khi tôi duyệt các đề xuất trong hộp đánh giá AI.",
+    "opened": "Đã mở trò chuyện với tin nhắn được chuẩn bị sẵn. Hãy đọc và nhấn Gửi.",
+    "unavailable": "Trợ lý AI hiện không thể trả lời. Hãy kết nối nhà cung cấp AI trong Cài đặt hoặc kết nối ứng dụng MCP của bạn. Các yêu cầu vẫn chờ ở đây."
   },
   "dismissDialog": {
     "title": "Bỏ qua yêu cầu này?",

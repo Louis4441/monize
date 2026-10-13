@@ -62,7 +62,7 @@
   },
   "bulk": {
     "selectRow": "{name} auswählen",
-    "selectAll": "Alle angezeigten freigabefähigen Anfragen auswählen",
+    "selectAll": "Alle angezeigten Anfragen auswählen, die bestätigt oder gesendet werden können",
     "approveSelected": "Ausgewählte freigeben ({count})",
     "approveAllShown": "Alle angezeigten freigeben ({count})",
     "summary": "{approved, plural, one {# Vorschlag} other {# Vorschläge}} angewendet, {failed, plural, one {# nicht angewendet} other {# nicht angewendet}}.",
@@ -76,6 +76,14 @@
       "message": "Jeder Vorschlag wird mit dem aktuellen Stand seiner Buchung abgeglichen und einzeln angewendet. Ein Vorschlag, der nicht mehr passt, wird übersprungen und gemeldet, die übrigen werden trotzdem angewendet. Die Vorschläge sollten vor der Freigabe geprüft werden.",
       "confirm": "{count, plural, one {# Vorschlag anwenden} other {# Vorschläge anwenden}}"
     }
+  },
+  "sendToAssistant": {
+    "button": "{count, plural, one {# offene Anfrage} other {# offene Anfragen}} an den KI-Assistenten senden",
+    "buttonSelected": "{count, plural, one {# ausgewählte Anfrage} other {# ausgewählte Anfragen}} an den KI-Assistenten senden",
+    "prompt": "Arbeite meine offenen KI-Prüfanfragen mit dem Tool ai_review_requests ab: liste sie auf, übernimm jede, befolge ihre Anweisung und reiche einen Vorschlag ein. Für eine Anfrage zu einem Profilentwurf erstelle das Profil stattdessen mit dem Tool email_receipt_parsers. Nichts wird geändert, bevor ich die Vorschläge im KI-Prüfeingang bestätige.",
+    "promptSelected": "Arbeite {count, plural, one {diese KI-Prüfanfrage} other {diese # KI-Prüfanfragen}} mit dem Tool ai_review_requests ab: {ids}. Übernimm jede über ihre ID, befolge ihre Anweisung und reiche einen Vorschlag ein. Für eine Anfrage zu einem Profilentwurf erstelle das Profil stattdessen mit dem Tool email_receipt_parsers. Lass die anderen Anfragen unberührt. Nichts wird geändert, bevor ich die Vorschläge im KI-Prüfeingang bestätige.",
+    "opened": "Der Chat wurde mit einer vorbereiteten Nachricht geöffnet. Lies sie und drücke auf Senden.",
+    "unavailable": "Der KI-Assistent kann gerade nicht antworten. Verbinde einen KI-Anbieter in den Einstellungen oder verbinde deinen MCP-Client. Die Anfragen warten weiter hier."
   },
   "dismissDialog": {
     "title": "Diese Anfrage verwerfen?",

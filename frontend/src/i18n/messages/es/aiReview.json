@@ -62,7 +62,7 @@
   },
   "bulk": {
     "selectRow": "Seleccionar {name}",
-    "selectAll": "Seleccionar todas las solicitudes aprobables mostradas",
+    "selectAll": "Seleccionar todas las solicitudes mostradas que se pueden aprobar o enviar",
     "approveSelected": "Aprobar las seleccionadas ({count})",
     "approveAllShown": "Aprobar todas las mostradas ({count})",
     "summary": "{approved, plural, one {# propuesta aplicada} other {# propuestas aplicadas}}, {failed, plural, one {# no aplicada} other {# no aplicadas}}.",
@@ -76,6 +76,14 @@
       "message": "Cada propuesta se comprueba con su transacción tal como está ahora y se aplica por separado. Una que ya no encaja se omite y se notifica, y las demás se aplican igualmente. Revisa las propuestas antes de aprobarlas.",
       "confirm": "{count, plural, one {Aplicar # propuesta} other {Aplicar # propuestas}}"
     }
+  },
+  "sendToAssistant": {
+    "button": "Enviar {count, plural, one {# solicitud pendiente} other {# solicitudes pendientes}} al asistente de IA",
+    "buttonSelected": "Enviar {count, plural, one {# solicitud seleccionada} other {# solicitudes seleccionadas}} al asistente de IA",
+    "prompt": "Procesa mis solicitudes de revisión por IA pendientes con la herramienta ai_review_requests: enuméralas, reclama cada una, sigue su instrucción y envía una propuesta. Para una solicitud de borrador de perfil, crea el perfil con la herramienta email_receipt_parsers. No se cambia nada hasta que apruebe las propuestas en la bandeja de revisión por IA.",
+    "promptSelected": "Procesa {count, plural, one {esta solicitud de revisión por IA} other {estas # solicitudes de revisión por IA}} con la herramienta ai_review_requests: {ids}. Reclama cada una por su id, sigue su instrucción y envía una propuesta. Para una solicitud de borrador de perfil, crea el perfil con la herramienta email_receipt_parsers. No toques las demás solicitudes. No se cambia nada hasta que apruebe las propuestas en la bandeja de revisión por IA.",
+    "opened": "Se abrió el chat con un mensaje preparado. Léelo y pulsa Enviar.",
+    "unavailable": "El asistente de IA no puede responder ahora. Conecta un proveedor de IA en Configuración o conecta tu cliente MCP. Las solicitudes siguen esperando aquí."
   },
   "dismissDialog": {
     "title": "¿Descartar esta solicitud?",
