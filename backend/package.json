@@ -165,7 +165,7 @@
       "<rootDir>/src/test-helpers/silence-nest-logger.setup.ts"
     ],
     "transform": {
-      "^.+\\.(t|j)s$": [
+      "^.+\\.(t|j|mj)s$": [
         "<rootDir>/scripts/esm-interop-transformer.cjs",
         {
           "tsconfig": {
@@ -199,7 +199,7 @@
     ],
     "coverageDirectory": "./coverage",
     "transformIgnorePatterns": [
-      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs)/)"
+      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs|he)/)"
     ],
     "coverageThreshold": {
       "global": {
