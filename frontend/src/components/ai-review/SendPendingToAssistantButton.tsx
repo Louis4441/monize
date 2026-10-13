@@ -9,19 +9,27 @@ import { stageChatHandoff } from '@/lib/ai-chat-handoff';
 import { assistantCanAnswerNow } from '@/lib/assistant-ready';
 import type { AiReviewItem } from '@/types/ai-review';
 
+interface SendPendingToAssistantButtonProps {
+  /** The pending requests shown. */
+  pending: readonly AiReviewItem[];
+  /** The pending requests the user checked; when there are any, only they are sent. */
+  selected: readonly AiReviewItem[];
+}
+
 /**
- * Hands the pending requests to the assistant in the chat: it stages a prompt
+ * Hands pending requests to the assistant in the chat: it stages a prompt
  * that asks the assistant to work them with the `ai_review_requests` tool and
- * opens the chat page. The same hand-off the receipts page uses: the prompt is
- * staged on the composer and the user still presses Send (INV-SHARE-002).
- * Nothing is applied by the assistant; its proposals come back here to approve.
+ * opens the chat page. With a selection the prompt names the checked requests'
+ * ids; without one it asks for every pending request. The same hand-off the
+ * receipts page uses: the prompt is staged on the composer and the user still
+ * presses Send (INV-SHARE-002). Nothing is applied by the assistant; its
+ * proposals come back here to approve.
  */
-export function SendPendingToAssistantButton({ items }: { items: readonly AiReviewItem[] | null }) {
+export function SendPendingToAssistantButton({ pending, selected }: SendPendingToAssistantButtonProps) {
   const t = useTranslations('aiReview.sendToAssistant');
   const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const pending = (items ?? []).filter((item) => item.status === 'pending').length;
-  if (pending === 0) return null;
+  if (pending.length === 0) return null;
 
   const send = async () => {
     setChecking(true);
@@ -32,7 +40,11 @@ export function SendPendingToAssistantButton({ items }: { items: readonly AiRevi
         toast.error(t('unavailable'));
         return;
       }
-      const id = stageChatHandoff({ files: [], draft: t('prompt') });
+      const draft =
+        selected.length > 0
+          ? t('promptSelected', { count: selected.length, ids: selected.map((item) => item.id).join(', ') })
+          : t('prompt');
+      const id = stageChatHandoff({ files: [], draft });
       toast.success(t('opened'));
       router.push(`/ai?handoff=${id}`);
     } finally {
@@ -42,7 +54,9 @@ export function SendPendingToAssistantButton({ items }: { items: readonly AiRevi
 
   return (
     <Button size="sm" variant="outline" onClick={() => void send()} isLoading={checking} disabled={checking}>
-      {t('button', { count: pending })}
+      {selected.length > 0
+        ? t('buttonSelected', { count: selected.length })
+        : t('button', { count: pending.length })}
     </Button>
   );
 }

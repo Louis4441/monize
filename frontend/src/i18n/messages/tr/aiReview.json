@@ -62,7 +62,7 @@
   },
   "bulk": {
     "selectRow": "{name} öğesini seç",
-    "selectAll": "Gösterilen onaylanabilir tüm istekleri seç",
+    "selectAll": "Gösterilen ve onaylanabilen ya da gönderilebilen tüm istekleri seç",
     "approveSelected": "Seçilenleri onayla ({count})",
     "approveAllShown": "Gösterilenlerin tümünü onayla ({count})",
     "summary": "{approved, plural, one {# öneri} other {# öneri}} uygulandı, {failed, plural, one {# uygulanmadı} other {# uygulanmadı}}.",
@@ -79,7 +79,9 @@
   },
   "sendToAssistant": {
     "button": "{count, plural, other {# bekleyen isteği}} yapay zeka asistanına gönder",
+    "buttonSelected": "{count, plural, other {# seçili isteği}} yapay zeka asistanına gönder",
     "prompt": "Bekleyen yapay zeka inceleme isteklerimi ai_review_requests aracıyla işle: listele, her birini üstlen, talimatını uygula ve bir öneri gönder. Profil taslağı isteği için profili bunun yerine email_receipt_parsers aracıyla oluştur. Ben önerileri yapay zeka inceleme kutusunda onaylayana kadar hiçbir şey değişmez.",
+    "promptSelected": "ai_review_requests aracıyla {count, plural, other {şu # yapay zeka inceleme isteğini}} işle: {ids}. Her birini kimliğiyle üstlen, talimatını uygula ve bir öneri gönder. Profil taslağı isteği için profili bunun yerine email_receipt_parsers aracıyla oluştur. Diğer isteklere dokunma. Ben önerileri yapay zeka inceleme kutusunda onaylayana kadar hiçbir şey değişmez.",
     "opened": "Sohbet hazırlanmış bir mesajla açıldı. Okuyun ve Gönder'e basın.",
     "unavailable": "Yapay zeka asistanı şu anda yanıt veremiyor. Ayarlar'dan bir yapay zeka sağlayıcısı bağlayın veya MCP istemcinizi bağlayın. İstekler burada beklemeye devam ediyor."
   },

@@ -62,7 +62,7 @@
   },
   "bulk": {
     "selectRow": "Sélectionner {name}",
-    "selectAll": "Sélectionner toutes les demandes approuvables affichées",
+    "selectAll": "Sélectionner toutes les demandes affichées qui peuvent être approuvées ou envoyées",
     "approveSelected": "Approuver la sélection ({count})",
     "approveAllShown": "Approuver toutes celles affichées ({count})",
     "summary": "{approved, plural, one {# proposition appliquée} other {# propositions appliquées}}, {failed, plural, one {# non appliquée} other {# non appliquées}}.",
@@ -79,7 +79,9 @@
   },
   "sendToAssistant": {
     "button": "Envoyer {count, plural, one {# demande en attente} other {# demandes en attente}} à l'assistant IA",
+    "buttonSelected": "Envoyer {count, plural, one {# demande sélectionnée} other {# demandes sélectionnées}} à l'assistant IA",
     "prompt": "Traite mes demandes de revue par l'IA en attente avec l'outil ai_review_requests : liste-les, prends chacune en charge, suis son instruction et soumets une proposition. Pour une demande de brouillon de profil, crée plutôt le profil avec l'outil email_receipt_parsers. Rien n'est modifié tant que je n'ai pas approuvé les propositions dans la boîte de revue par l'IA.",
+    "promptSelected": "Traite {count, plural, one {cette demande de revue par l'IA} other {ces # demandes de revue par l'IA}} avec l'outil ai_review_requests : {ids}. Prends chacune en charge par son id, suis son instruction et soumets une proposition. Pour une demande de brouillon de profil, crée plutôt le profil avec l'outil email_receipt_parsers. Ne touche pas aux autres demandes. Rien n'est modifié tant que je n'ai pas approuvé les propositions dans la boîte de revue par l'IA.",
     "opened": "Le chat s'est ouvert avec un message préparé. Lisez-le et appuyez sur Envoyer.",
     "unavailable": "L'assistant IA ne peut pas répondre pour l'instant. Connectez un fournisseur d'IA dans les Paramètres ou connectez votre client MCP. Les demandes restent en attente ici."
   },

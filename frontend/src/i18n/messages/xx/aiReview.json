@@ -62,7 +62,7 @@
   },
   "bulk": {
     "selectRow": "[XX-Select {name}-XX]",
-    "selectAll": "[XX-Select all approvable requests shown-XX]",
+    "selectAll": "[XX-Select all requests shown that can be approved or sent-XX]",
     "approveSelected": "[XX-Approve selected ({count})-XX]",
     "approveAllShown": "[XX-Approve all shown ({count})-XX]",
     "summary": "[XX-{approved, plural, one {# proposal} other {# proposals}} applied, {failed, plural, one {# not applied} other {# not applied}}.-XX]",
@@ -79,7 +79,9 @@
   },
   "sendToAssistant": {
     "button": "[XX-Send {count, plural, one {# pending request} other {# pending requests}} to the AI assistant-XX]",
+    "buttonSelected": "[XX-Send {count, plural, one {# selected request} other {# selected requests}} to the AI assistant-XX]",
     "prompt": "[XX-Work through my pending AI review requests with the ai_review_requests tool: list them, claim each one, follow its instruction and submit a proposal. For a profile draft request, build the profile with the email_receipt_parsers tool instead. Nothing is changed until I approve the proposals in the AI review inbox.-XX]",
+    "promptSelected": "[XX-Work through {count, plural, one {this AI review request} other {these # AI review requests}} with the ai_review_requests tool: {ids}. Claim each one by its id, follow its instruction and submit a proposal. For a profile draft request, build the profile with the email_receipt_parsers tool instead. Leave the other requests alone. Nothing is changed until I approve the proposals in the AI review inbox.-XX]",
     "opened": "[XX-Opened the chat with a prepared message. Read it and press Send.-XX]",
     "unavailable": "[XX-The AI assistant cannot answer now. Connect an AI provider in Settings, or connect your MCP client. The requests keep waiting here.-XX]"
   },

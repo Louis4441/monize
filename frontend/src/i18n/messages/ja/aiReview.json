@@ -62,7 +62,7 @@
   },
   "bulk": {
     "selectRow": "{name} を選択",
-    "selectAll": "表示中の承認可能なリクエストをすべて選択",
+    "selectAll": "表示中の承認または送信できるリクエストをすべて選択",
     "approveSelected": "選択した項目を承認 ({count})",
     "approveAllShown": "表示中の項目をすべて承認 ({count})",
     "summary": "{approved, plural, one {# 件の提案} other {# 件の提案}}を適用、{failed, plural, one {# 件は未適用} other {# 件は未適用}}です。",
@@ -79,7 +79,9 @@
   },
   "sendToAssistant": {
     "button": "保留中のリクエスト {count, plural, other {# 件}}を AI アシスタントに送る",
+    "buttonSelected": "選択したリクエスト {count, plural, other {# 件}}を AI アシスタントに送る",
     "prompt": "ai_review_requests ツールで保留中の AI レビューリクエストを処理してください。一覧を取得し、各リクエストを取得して指示に従い、提案を送信してください。プロファイル下書きのリクエストは、代わりに email_receipt_parsers ツールでプロファイルを作成してください。AI レビューの受信箱で私が提案を承認するまで何も変更されません。",
+    "promptSelected": "ai_review_requests ツールで {count, plural, other {次の # 件の AI レビューリクエスト}}を処理してください: {ids}。各リクエストを ID で取得し、指示に従って提案を送信してください。プロファイル下書きのリクエストは、代わりに email_receipt_parsers ツールでプロファイルを作成してください。その他のリクエストには触れないでください。AI レビューの受信箱で私が提案を承認するまで何も変更されません。",
     "opened": "準備したメッセージでチャットを開きました。内容を確認して送信を押してください。",
     "unavailable": "AI アシスタントは現在応答できません。設定で AI プロバイダーを接続するか、MCP クライアントを接続してください。リクエストはここで待機し続けます。"
   },

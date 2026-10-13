@@ -10,7 +10,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { ProposalCardState } from '@/hooks/useAiReviewInbox';
 import type { PendingAction } from '@/types/ai';
-import { isApprovable, reviewItemLabel, type AiReviewItem, type AiReviewStatus } from '@/types/ai-review';
+import { isApprovable, isSendableToAssistant, reviewItemLabel, type AiReviewItem, type AiReviewStatus } from '@/types/ai-review';
 
 /** Requests still open: the person may dismiss them. */
 const DISMISSIBLE: readonly AiReviewStatus[] = ['pending', 'claimed', 'proposed'];
@@ -31,7 +31,7 @@ export interface AiReviewRowProps {
   item: AiReviewItem;
   card?: ProposalCardState;
   dismissing: boolean;
-  /** Whether the list offers a selection (a column of checkboxes); an unapprovable row gets an empty cell. */
+  /** Whether the list offers a selection (a column of checkboxes); a row that can be neither approved nor sent gets an empty cell. */
   selectable?: boolean;
   selected?: boolean;
   onToggleSelected?: (item: AiReviewItem) => void;
@@ -76,7 +76,7 @@ export function AiReviewRow({
       <tr>
         {selectable && (
           <Td className={`${CELL} w-10`}>
-            {isApprovable(item) && (
+            {(isApprovable(item) || isSendableToAssistant(item)) && (
               <input
                 type="checkbox"
                 checked={selected}
