@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, fireEvent, waitFor } from '@/test/render';
+import { render, screen, act, fireEvent, waitFor, within } from '@/test/render';
 import SecurityDetailPage from './page';
 import type { Security, SecurityDetail } from '@/types/investment';
 
@@ -488,6 +488,15 @@ describe('SecurityDetailPage', () => {
         expect(screen.queryByRole('tab', { name: 'Price history' })).not.toBeInTheDocument();
       });
 
+      it('keeps the manual price controls reachable under Terms history for a linked bond', async () => {
+        await renderPage();
+        await act(async () => {
+          fireEvent.click(screen.getByRole('tab', { name: 'Terms history' }));
+        });
+        expect(await screen.findByRole('heading', { name: 'Price history' })).toBeInTheDocument();
+        expect(await screen.findByText('+ Add Price', undefined, { timeout: 5000 })).toBeInTheDocument();
+      });
+
       it('keeps Price history and offers no Terms history for another security', async () => {
         mockGetSecurityDetail.mockResolvedValue(detailFixture({ security }));
         await renderPage();
@@ -509,7 +518,9 @@ describe('SecurityDetailPage', () => {
           fireEvent.click(screen.getByRole('tab', { name: 'Terms history' }));
         });
         expect(await screen.findByText('Every stored series')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /2026/, expanded: true })).toBeInTheDocument();
+        // Scoped: the manual price history below has its own year groups.
+        const terms = screen.getByRole('region', { name: 'History of RETAIL terms' });
+        expect(within(terms).getByRole('button', { name: /2026/, expanded: true })).toBeInTheDocument();
         expect(screen.getByText('TOS1029')).toBeInTheDocument();
       });
 

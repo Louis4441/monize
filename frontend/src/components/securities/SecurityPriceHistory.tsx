@@ -28,6 +28,7 @@ import {
 } from '@/lib/security-detail';
 import { GroupToggleButton } from '@/components/ui/GroupToggleButton';
 import { SecurityPriceForm } from './SecurityPriceForm';
+import { formatPriceSource } from './SecurityListParts';
 
 interface SecurityPriceHistoryProps {
   security: Security;
@@ -42,9 +43,10 @@ interface SecurityPriceHistoryProps {
   onPricesChanged?: () => void | Promise<void>;
 }
 
-function getSourceLabel(source: string | null): string {
+function getSourceLabel(source: string | null, t: Parameters<typeof formatPriceSource>[1]): string {
   if (!source) return 'Unknown';
   switch (source) {
+    case 'bond_engine': return formatPriceSource(source, t);
     case 'yahoo_finance': return 'Yahoo';
     case 'msn_finance': return 'MSN';
     case 'manual': return 'Manual';
@@ -502,9 +504,7 @@ export function SecurityPriceHistory({
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSourceColor(price.source)}`}>
-                              {price.source === 'bond_engine'
-                                ? t('form.providers.bond_engine')
-                                : getSourceLabel(price.source)}
+                              {getSourceLabel(price.source, t)}
                               </span>
                               </td>
                               <td className="px-3 py-2 text-right whitespace-nowrap hidden sm:table-cell">

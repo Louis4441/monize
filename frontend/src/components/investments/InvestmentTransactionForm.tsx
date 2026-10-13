@@ -405,8 +405,16 @@ function InvestmentTransactionFormFields({
   const isTransfer = (watchedAction as string) === 'TRANSFER';
   // Editing an existing transfer leg (the action is one of the real
   // TRANSFER_IN/OUT values, not the UI-only 'TRANSFER').
+  // An imported TRANSFER_IN with no paired leg is one row, not a pair: it is
+  // edited and saved like any single transaction, so it can be given a series.
+  const isUnpairedTransferIn =
+    !!transaction &&
+    transaction.action === 'TRANSFER_IN' &&
+    !transaction.linkedTransactionId &&
+    (watchedAction as string) === 'TRANSFER_IN';
   const isTransferEditing =
     !!transaction &&
+    !isUnpairedTransferIn &&
     ((watchedAction as string) === 'TRANSFER_IN' ||
       (watchedAction as string) === 'TRANSFER_OUT');
   // Source-account holdings are relevant both when creating a transfer and when
@@ -513,7 +521,6 @@ function InvestmentTransactionFormFields({
   // the form suggests both. A person's own edit of either field stands.
   const priceEditedByPerson = useRef(false);
   const interestEditedByPerson = useRef(false);
-  const lastFilledKey = useRef<string | null>(null);
   const redemptionRequest: RedemptionSplitRequest | null =
     (watchedAction as string) === 'REDEEM' &&
     bondSeries?.kind === 'remove' &&
@@ -546,10 +553,13 @@ function InvestmentTransactionFormFields({
           excludeTransactionId: transaction.id,
         })
       : null;
+  // The opened row's own answer is suppressed once (it seeds the ref); every
+  // later answer, including a return to the opened quantity, fills.
+  const lastFilledKey = useRef<string | null>(openRedemptionKey);
   useEffect(() => {
     const { key, split } = redemption;
     if (key === null || split === null) return;
-    if (key === openRedemptionKey || key === lastFilledKey.current) return;
+    if (key === lastFilledKey.current) return;
     lastFilledKey.current = key;
     if (split.refusal !== null || split.principalReturned === null || split.interest === null) return;
     const quantity = split.quantity;
@@ -562,7 +572,7 @@ function InvestmentTransactionFormFields({
     if (!interestEditedByPerson.current) {
       setValue('accruedInterest', Number(split.interest), { shouldDirty: true, shouldValidate: true });
     }
-  }, [redemption, openRedemptionKey, setValue]);
+  }, [redemption, setValue]);
   const currencySymbol = getCurrencySymbol(transactionCurrency);
   const cashCurrencySymbol = getCurrencySymbol(cashCurrency);
 
@@ -1016,6 +1026,7 @@ function InvestmentTransactionFormFields({
       // Editing an existing transfer: update the pair via the source (OUT) leg.
       if (
         transaction &&
+        !isUnpairedTransferIn &&
         (data.action === 'TRANSFER_IN' || data.action === 'TRANSFER_OUT')
       ) {
         const quantity = Number(data.quantity) || 0;
@@ -1124,7 +1135,7 @@ function InvestmentTransactionFormFields({
         accountId: data.accountId,
         action,
         transactionDate: data.transactionDate,
-        securityId: actionIn(action, securityRequiredActions)
+        securityId: actionIn(action, securityRequiredActions) || isUnpairedTransferIn
           ? data.securityId
           : undefined,
         fundingAccountId:
@@ -1211,7 +1222,7 @@ function InvestmentTransactionFormFields({
     watchedAction === 'TRANSFER_IN' || watchedAction === 'TRANSFER_OUT';
   // Either creating a transfer (combined action) or editing an existing leg.
   // Both render the From/To + security + quantity + cost-per-share UI.
-  const transferMode = isTransfer || isTransferLeg;
+  const transferMode = isTransfer || (isTransferLeg && !isUnpairedTransferIn);
   const canHaveFundingAccount = actionIn(watchedAction, fundingAccountActions);
   const canHaveCashDestination = actionIn(watchedAction, cashDestinationActions);
 
@@ -1345,7 +1356,7 @@ function InvestmentTransactionFormFields({
       )}
 
       {/* Security Selection - only for actions that need it */}
-      {(needsSecurity || transferMode) && (
+      {(needsSecurity || transferMode || isUnpairedTransferIn) && (
         <div className="space-y-2">
           <Select
             label={t('transactionForm.security')}

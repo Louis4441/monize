@@ -1257,6 +1257,20 @@ describe('SecurityForm', () => {
           expect.objectContaining({ symbol: 'TOS', currencyCode: 'PLN', bondProgramId: 'p-tos' }),
         ),
       );
+      // The stored exchange is cleared explicitly: undefined would be stripped
+      // and leave 'NYSE' on a listed bond.
+      expect(onSubmit.mock.calls[0][0].exchange).toBeNull();
+    });
+
+    it('sends no exchange for a listed bond that never had one', async () => {
+      await renderBond({ symbol: 'MYBOND', name: 'My bonds', currencyCode: 'USD', exchange: null });
+      await pickPoland();
+      const select = await programSelect();
+      await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
+      fireEvent.change(select, { target: { value: 'p-edo' } });
+      await waitFor(() => expect((screen.getByLabelText('Symbol') as HTMLInputElement).value).toBe('EDO'));
+      fireEvent.click(screen.getByText('Update Security'));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled());
       expect(onSubmit.mock.calls[0][0].exchange).toBeUndefined();
     });
 

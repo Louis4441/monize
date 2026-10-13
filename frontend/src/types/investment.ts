@@ -823,7 +823,8 @@ export interface CreateSecurityData {
   symbol: string;
   name: string;
   securityType?: string;
-  exchange?: string;
+  /** `null` clears a stored exchange (the backend's IsOptional lets it through). */
+  exchange?: string | null;
   currencyCode: string;
   description?: string;
   /** Empty string clears the stored address; the backend normalises the rest. */

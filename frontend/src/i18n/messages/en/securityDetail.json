@@ -86,6 +86,9 @@
     "documents": "Documents",
     "news": "News"
   },
+  "bondPrices": {
+    "title": "Price history"
+  },
   "about": {
     "title": "About",
     "noDescription": "No description has been saved for this security.",

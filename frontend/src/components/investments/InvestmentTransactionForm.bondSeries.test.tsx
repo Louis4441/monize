@@ -43,6 +43,7 @@ vi.mock('@/lib/investments', () => ({
     getHoldingAt: vi.fn().mockResolvedValue({ quantity: 0, averageCost: 0 }),
     createTransaction: vi.fn().mockResolvedValue({}),
     updateTransaction: vi.fn().mockResolvedValue({}),
+    getTransaction: vi.fn(),
     listBondPrograms: vi.fn(),
     listBondInstruments: vi.fn(),
     fetchBondSeries: vi.fn(),
@@ -667,6 +668,48 @@ describe('InvestmentTransactionForm: the series of a bond program', () => {
       const select = await seriesSelect();
       await waitFor(() => expect(optionLabels(select)).toEqual(['Oldest first', 'EDO0936 (5 held)', 'EDO1036 (25 held)']));
       expect(select.value).toBe('i-0936');
+    });
+
+    describe('an unpaired TRANSFER_IN', () => {
+      const unpaired = {
+        id: 't9',
+        accountId: 'a1',
+        securityId: 'sec-edo',
+        action: 'TRANSFER_IN' as const,
+        transactionDate: '2026-11-05',
+        quantity: 5,
+        price: 100,
+        commission: 0,
+        totalAmount: 0,
+        description: '',
+        linkedTransactionId: null,
+        bondInstrumentId: null,
+      } as any;
+
+      it('shows the series select and saves as a single row sending the series', async () => {
+        await openForm({ transaction: unpaired, defaultDate: undefined });
+        const select = await seriesSelect();
+        await waitFor(() => expect(optionLabels(select)).toEqual(['Choose a series', 'EDO0936', 'EDO1036']));
+        fireEvent.change(select, { target: { value: 'i-0936' } });
+        await act(async () => {
+          fireEvent.click(screen.getByText('Update Transaction'));
+        });
+        await waitFor(() => expect(api.updateTransaction).toHaveBeenCalled());
+        expect(api.getTransaction).not.toHaveBeenCalled();
+        expect(api.updateTransaction.mock.calls[0][0]).toBe('t9');
+        expect(api.updateTransaction.mock.calls[0][1]).toMatchObject({
+          action: 'TRANSFER_IN',
+          bondInstrumentId: 'i-0936',
+          securityId: 'sec-edo',
+        });
+      });
+
+      it('keeps a paired leg on the pair path, with no series select', async () => {
+        api.getTransaction.mockResolvedValue({ ...unpaired, id: 't8', action: 'TRANSFER_OUT', linkedTransactionId: 't9' } as any);
+        await openForm({ transaction: { ...unpaired, linkedTransactionId: 't8' }, defaultDate: undefined });
+        await waitFor(() => expect(api.getTransaction).toHaveBeenCalledWith('t8'));
+        expect(screen.queryByLabelText('Bond series')).not.toBeInTheDocument();
+      });
     });
   });
 });

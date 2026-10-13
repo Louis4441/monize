@@ -184,23 +184,33 @@ function SecuritiesContent() {
       // A linked bond with auto-fetch on gets its data through the list's own
       // Refresh: the server fetches the program's current offer, then recomputes.
       let refreshId: string | null = null;
+      let refreshProgramId: string | null = null;
       if (editingSecurity) {
         await investmentsApi.updateSecurity(editingSecurity.id, data);
         toast.success(t('page.toasts.updated'));
-        // A value difference, not a field being present: the form resends both.
+        // The form omits link fields that did not change, so an absent field
+        // keeps the stored value; only a present, different program is a change.
+        const programId = data.bondProgramId !== undefined ? data.bondProgramId : editingSecurity.bondProgramId;
+        const autoFetch = data.bondAutoFetch !== undefined ? data.bondAutoFetch : editingSecurity.bondAutoFetch;
         const wasOn = !!editingSecurity.bondProgramId && editingSecurity.bondAutoFetch === true;
-        const isOn = !!data.bondProgramId && data.bondAutoFetch === true;
-        const programChanged = data.bondProgramId !== editingSecurity.bondProgramId;
-        if (isOn && (!wasOn || programChanged)) refreshId = editingSecurity.id;
+        const isOn = !!programId && autoFetch === true;
+        const programChanged = data.bondProgramId !== undefined && data.bondProgramId !== editingSecurity.bondProgramId;
+        if (isOn && (!wasOn || programChanged)) {
+          refreshId = editingSecurity.id;
+          refreshProgramId = programId ?? null;
+        }
       } else {
         const created = await investmentsApi.createSecurity(data);
         toast.success(t('page.toasts.created'));
-        if (data.bondProgramId && data.bondAutoFetch === true) refreshId = created.id;
+        if (data.bondProgramId && data.bondAutoFetch === true) {
+          refreshId = created.id;
+          refreshProgramId = data.bondProgramId;
+        }
       }
       close();
       loadData();
-      if (refreshId && data.bondProgramId) {
-        setBondRefreshProgramId(data.bondProgramId);
+      if (refreshId && refreshProgramId) {
+        setBondRefreshProgramId(refreshProgramId);
         void triggerManualRefresh([refreshId]).finally(() => setBondRefreshProgramId(null));
       } else if (refreshId) {
         void triggerManualRefresh([refreshId]);

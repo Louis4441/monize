@@ -104,9 +104,9 @@ const TAB_KEYS = [
 type TabKey = (typeof TAB_KEYS)[number];
 
 /**
- * A program-linked security has no price history to show (its prices are
- * derived) and gets the terms history in its place; every other security has
- * the reverse. A tab the security does not have falls back to Overview.
+ * A program-linked security gets the terms history in place of the Price
+ * history tab (its manual prices sit under the terms); every other security
+ * has the reverse. A tab the security does not have falls back to Overview.
  */
 function tabKeysFor(isBond: boolean): readonly TabKey[] {
   return TAB_KEYS.filter((key) => key !== (isBond ? 'prices' : 'terms'));
@@ -559,6 +559,19 @@ function SecurityDetailContent() {
                     security={security}
                     refreshVersion={bondDataVersion}
                   />
+                  {/* The only place to enter a price by hand; the engine never
+                      replaces one (INV-BOND-005), so a linked bond keeps it. */}
+                  <section className="mt-6">
+                    <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      {t('bondPrices.title')}
+                    </h2>
+                    <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
+                      <SecurityPriceHistory
+                        security={security}
+                        onPricesChanged={reloadAfterPriceRefresh}
+                      />
+                    </div>
+                  </section>
                 </TabPanel>
               ) : (
                 <TabPanel

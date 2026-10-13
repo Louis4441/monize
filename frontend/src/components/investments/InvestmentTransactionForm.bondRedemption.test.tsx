@@ -320,5 +320,25 @@ describe('InvestmentTransactionForm: redemption of a bond splits into principal 
       await waitFor(() => expect(num(/Accrued Interest/)).toBeCloseTo(4.9, 4));
       expect(num(/Price per Share/)).toBeCloseTo(100, 6);
     });
+
+    it('suppresses only the first answer: returning to the opened quantity refills the split for it', async () => {
+      await act(async () => {
+        render(<InvestmentTransactionForm accounts={[account]} transaction={stored} />);
+      });
+      await waitSplitCalls(1);
+      expect(await screen.findByText(/payout PLN 409.80/)).toBeInTheDocument();
+      expect(num(/Accrued Interest/)).toBeCloseTo(7.25, 4);
+
+      api.getBondRedemptionSplit.mockResolvedValue(
+        split({ quantity: 2, interest: '4.90', principalReturned: '200.00', payout: '204.90' }) as any,
+      );
+      await type('Quantity (Shares)', '2');
+      await waitFor(() => expect(num(/Accrued Interest/)).toBeCloseTo(4.9, 4));
+
+      api.getBondRedemptionSplit.mockResolvedValue(split() as any);
+      await type('Quantity (Shares)', '4');
+      await waitFor(() => expect(num(/Accrued Interest/)).toBeCloseTo(9.8, 4));
+      expect(num(/Price per Share/)).toBeCloseTo(100, 6);
+    });
   });
 });

@@ -133,10 +133,19 @@ export const SORT_FIELDS: readonly SecuritySortField[] = (
   Object.keys(SORT_FIELD_ORDER) as SecuritySortField[]
 ).sort((a, b) => SORT_FIELD_ORDER[a] - SORT_FIELD_ORDER[b]);
 
-/** Format a security_prices.source value into a short human label. */
-export function formatPriceSource(source: string | null | undefined): string {
+/**
+ * Format a security_prices.source value into a short human label. The bond
+ * engine's accrual rows have a translated name, so the 'securities' translator
+ * is passed in; the rest are provider names and short codes that read the same
+ * in every language.
+ */
+export function formatPriceSource(
+  source: string | null | undefined,
+  t: (key: 'form.providers.bond_engine') => string,
+): string {
   if (!source) return '';
   switch (source) {
+    case 'bond_engine': return t('form.providers.bond_engine');
     case 'yahoo_finance': return 'Yahoo';
     case 'msn_finance': return 'MSN';
     case 'lse': return 'LSE';
@@ -264,7 +273,7 @@ export function SecurityProviderBadge({
       <span
         className="inline-flex items-center rounded text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
       >
-        {t('form.providers.bond_engine')}
+        {formatPriceSource('bond_engine', t)}
       </span>
     );
   }
@@ -301,16 +310,11 @@ export function SecurityPriceSourceBadge({ security }: { security: Security }) {
   if (!security.lastPriceSource) {
     return <span className="text-sm text-gray-400 dark:text-gray-500">-</span>;
   }
-  // The bond engine's accrual rows have a translated name; the rest are
-  // provider names and short codes that read the same in every language.
-  const label =
-    security.lastPriceSource === 'bond_engine'
-      ? t('form.providers.bond_engine')
-      : formatPriceSource(security.lastPriceSource);
+  const label = formatPriceSource(security.lastPriceSource, t);
   return (
     <span
       className={`inline-flex items-center rounded text-xs font-medium px-2 py-0.5 ${priceSourceBadgeClass(security.lastPriceSource)}`}
-      title={security.lastPriceSource === 'bond_engine' ? label : security.lastPriceSource}
+      title={security.lastPriceSource}
     >
       {label}
     </span>

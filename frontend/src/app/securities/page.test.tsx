@@ -714,6 +714,38 @@ describe('SecuritiesPage', () => {
       await waitFor(() => expect(mockUpdateSecurity).toHaveBeenCalled());
       expect(mockRefreshSelectedPrices).not.toHaveBeenCalled();
     });
+
+    const editLinked = async (stored: Record<string, unknown>, payload: Record<string, unknown>) => {
+      mockUpdateSecurity.mockResolvedValue({ id: 's1', symbol: 'AAPL' });
+      mockGetSecurities.mockResolvedValue([
+        { id: 's1', symbol: 'AAPL', name: 'Apple Inc.', securityType: 'BOND', exchange: null, currencyCode: 'USD', isActive: true, skipPriceUpdates: false, createdAt: '2026-01-01', updatedAt: '2026-01-01', ...stored },
+      ]);
+      form.payload = payload;
+      render(<SecuritiesPage />);
+      await waitFor(() => expect(screen.getByTestId('security-list')).toBeInTheDocument());
+      await act(async () => { fireEvent.click(screen.getByTestId('edit-AAPL')); });
+      await act(async () => { fireEvent.click(screen.getByTestId('submit-form')); });
+    };
+
+    it('refreshes when only auto-fetch is switched on for an already linked security (program omitted)', async () => {
+      await editLinked({ bondProgramId: 'p1', bondAutoFetch: false }, { bondAutoFetch: true });
+      await waitFor(() => expect(mockRefreshSelectedPrices).toHaveBeenCalledWith(['s1']));
+    });
+
+    it('refreshes when only the program changes on a security with auto-fetch on (auto-fetch omitted)', async () => {
+      let finish!: (v: unknown) => void;
+      mockRefreshSelectedPrices.mockReturnValueOnce(new Promise((r) => { finish = r; }));
+      await editLinked({ bondProgramId: 'p1', bondAutoFetch: true }, { bondProgramId: 'p2' });
+      await waitFor(() => expect(mockRefreshSelectedPrices).toHaveBeenCalledWith(['s1']));
+      await waitFor(() => expect(screen.getByTestId('bond-progress')).toHaveTextContent('p2'));
+      await act(async () => { finish({ updated: 1, failed: 0, results: [], lastUpdated: null }); });
+    });
+
+    it('does not refresh an edit that sends neither link field', async () => {
+      await editLinked({ bondProgramId: 'p1', bondAutoFetch: true }, { name: 'Renamed' });
+      await waitFor(() => expect(mockUpdateSecurity).toHaveBeenCalled());
+      expect(mockRefreshSelectedPrices).not.toHaveBeenCalled();
+    });
   });
 
   it('updates a security on edit form submit', async () => {

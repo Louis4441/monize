@@ -572,7 +572,9 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       symbol: data.symbol.toUpperCase().trim(),
       name: data.name.trim(),
       securityType: data.securityType || undefined,
-      exchange: hideExchange ? undefined : data.exchange?.trim() || undefined,
+      // A listed bond has no exchange: null clears a stored one (undefined would
+      // be stripped and leave it), and nothing is sent when there is none.
+      exchange: hideExchange ? (security?.exchange ? null : undefined) : data.exchange?.trim() || undefined,
       currencyCode: data.currencyCode,
       description: data.description?.trim() || undefined,
       tagIds: selectedTagIds,
