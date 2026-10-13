@@ -72,6 +72,12 @@ export interface BondSeriesRecovery {
  * did not come back are restored without it, as before (`unlinkedBondSeries`
  * counts them; the result lists the series and the reason).
  */
+/** Failures that say nothing about the series, only about the moment. */
+const TRANSIENT_REASONS: ReadonlySet<UnrecoveredBondSeriesReason> = new Set([
+  "source-unavailable",
+  "rate-limited",
+]);
+
 @Injectable()
 export class BackupBondSeriesRecoveryService {
   private readonly logger = new Logger(BackupBondSeriesRecoveryService.name);
@@ -121,8 +127,12 @@ export class BackupBondSeriesRecoveryService {
       // asked for in the last day (by a restore, a Refresh or the cron) is not
       // asked for again, so a file that names the same unpublished codes
       // restore after restore costs the issuer one request per code a day.
+      const attemptJob = bondSeriesAttemptJob(
+        identity.issuerCountryCode,
+        identity.seriesCode,
+      );
       const claimed = await this.fetchSync.claim(
-        bondSeriesAttemptJob(identity.issuerCountryCode, identity.seriesCode),
+        attemptJob,
         BACKFILL_ATTEMPT_INTERVAL_MS,
       );
       if (claimed === null) {
@@ -149,6 +159,13 @@ export class BackupBondSeriesRecoveryService {
             })`,
         );
         unrecovered.set(key, describe(identity, reason));
+        // Only a definitive answer (not published, refused) holds the day's
+        // lease. A transient one releases it, so a source outage during one
+        // person's restore does not keep the series from anyone else's
+        // restore, Refresh or backfill for a day.
+        if (TRANSIENT_REASONS.has(reason)) {
+          await this.fetchSync.release(attemptJob, claimed);
+        }
         // A limit answering (the source's own, since the restore is not charged
         // the per-user one) holds for every later request; asking again only
         // spends the allowance. The rest are reported, not tried.

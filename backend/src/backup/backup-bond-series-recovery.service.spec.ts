@@ -75,17 +75,28 @@ function setup(initiallyInCatalog: string[] = []) {
   const claim = jest.fn(async (job: string, _ms: number) => {
     if (leased.has(job)) return null;
     leased.add(job);
-    return { token: job };
+    return `token-${job}`;
+  });
+  const release = jest.fn(async (job: string, _token: string) => {
+    leased.delete(job);
   });
   const service = new BackupBondSeriesRecoveryService(
     dataSource as unknown as DataSource,
     { fetchSeries } as unknown as BondSeriesService,
-    { claim } as unknown as FetchSyncService,
+    { claim, release } as unknown as FetchSyncService,
   );
   const sleep = jest.fn(async (_ms: number) => undefined);
   const recover = (user: string, data: BackupData) =>
     service.recover(user, data, { sleep });
-  return { service: { recover }, fetchSeries, catalog, manager, sleep, claim };
+  return {
+    service: { recover },
+    fetchSeries,
+    catalog,
+    manager,
+    sleep,
+    claim,
+    release,
+  };
 }
 
 const idsOf = (data: BackupData) =>
@@ -129,6 +140,19 @@ describe("BackupBondSeriesRecoveryService", () => {
       BACKFILL_ATTEMPT_INTERVAL_MS,
     );
     expect(second.unrecovered.map((u) => u.reason)).toEqual(["not-attempted"]);
+  });
+
+  it("releases the day's lease after a transient failure, so the series can be asked for again", async () => {
+    const { service, fetchSeries, release } = setup();
+    fetchSeries.mockRejectedValueOnce(new ProviderUnavailableError("down", 1, null));
+    await service.recover(USER, backup(["EDO1036"]));
+    expect(release).toHaveBeenCalledWith(
+      "bond-series-attempt:PL|EDO1036",
+      "token-bond-series-attempt:PL|EDO1036",
+    );
+    const second = await service.recover(USER, backup(["EDO1036"]));
+    expect(fetchSeries).toHaveBeenCalledTimes(2);
+    expect(second.unrecovered).toEqual([]);
   });
 
   it("fetches nothing when every series is already in the catalog", async () => {
