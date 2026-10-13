@@ -1558,6 +1558,7 @@ describe("AccountsController", () => {
     });
 
     describe("request validation (whitelist + forbidNonWhitelisted)", () => {
+      const INTEREST_CATEGORY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
       const pipe = new ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -1636,6 +1637,7 @@ describe("AccountsController", () => {
           paymentFrequency: "MONTHLY",
           sourceAccountId: loanId,
           nextDueDate: "2024-01-01",
+          interestCategoryId: INTEREST_CATEGORY_ID,
         };
         await expect(
           body(SetupLoanPaymentsDto, { ...setup, paymentMatching: matching }),
@@ -1644,6 +1646,17 @@ describe("AccountsController", () => {
           body(SetupLoanPaymentsDto, {
             ...setup,
             paymentMatching: { ...matching, extra: 1 },
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it("refuses a payment setup without an interest category", async () => {
+        await expect(
+          body(SetupLoanPaymentsDto, {
+            paymentAmount: 1333.33,
+            paymentFrequency: "MONTHLY",
+            sourceAccountId: loanId,
+            nextDueDate: "2024-01-01",
           }),
         ).rejects.toBeInstanceOf(BadRequestException);
       });
@@ -1669,6 +1682,7 @@ describe("AccountsController", () => {
             paymentFrequency: "MONTHLY",
             sourceAccountId: loanId,
             nextDueDate: "2024-01-01",
+            interestCategoryId: INTEREST_CATEGORY_ID,
             originalPrincipal: 300000,
           }),
         ).resolves.toMatchObject({ originalPrincipal: 300000 });
