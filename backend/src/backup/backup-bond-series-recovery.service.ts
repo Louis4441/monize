@@ -5,10 +5,15 @@ import { isTransportFailure } from "../common/http/fetch-failure.util";
 import { isProviderUnavailable } from "../provider-health/provider-unavailable.error";
 import { SeriesFetchError } from "../bonds/bond-adapter";
 import {
+  BACKFILL_ATTEMPT_INTERVAL_MS,
   BACKFILL_GAP_MS,
   BondSeriesService,
   defaultSleep,
 } from "../bonds/bond-series.service";
+import {
+  FetchSyncService,
+  bondSeriesAttemptJob,
+} from "../common/jobs/fetch-sync.service";
 import {
   BackupBondSeriesIdentity,
   BackupData,
@@ -74,6 +79,7 @@ export class BackupBondSeriesRecoveryService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly series: BondSeriesService,
+    private readonly fetchSync: FetchSyncService,
   ) {}
 
   /**
@@ -109,6 +115,18 @@ export class BackupBondSeriesRecoveryService {
       }
       if (stoppedBy !== null) {
         unrecovered.set(key, describe(identity, stoppedBy));
+        continue;
+      }
+      // The negative cache the backfill uses, shared by every replica: a series
+      // asked for in the last day (by a restore, a Refresh or the cron) is not
+      // asked for again, so a file that names the same unpublished codes
+      // restore after restore costs the issuer one request per code a day.
+      const claimed = await this.fetchSync.claim(
+        bondSeriesAttemptJob(identity.issuerCountryCode, identity.seriesCode),
+        BACKFILL_ATTEMPT_INTERVAL_MS,
+      );
+      if (claimed === null) {
+        unrecovered.set(key, describe(identity, "not-attempted"));
         continue;
       }
       // Between two requests to the issuer, never before the first.

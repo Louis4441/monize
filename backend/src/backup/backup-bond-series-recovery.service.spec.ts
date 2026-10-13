@@ -5,7 +5,11 @@ import { SeriesFetchError } from "../bonds/bond-adapter";
 import { bondInstrumentId } from "../bonds/bond-instrument-id";
 import { BondSeriesService } from "../bonds/bond-series.service";
 import { ProviderUnavailableError } from "../provider-health/provider-unavailable.error";
-import { BACKFILL_GAP_MS } from "../bonds/bond-series.service";
+import {
+  BACKFILL_ATTEMPT_INTERVAL_MS,
+  BACKFILL_GAP_MS,
+} from "../bonds/bond-series.service";
+import { FetchSyncService } from "../common/jobs/fetch-sync.service";
 import {
   BackupBondSeriesRecoveryService,
   classifyFetchFailure,
@@ -66,14 +70,22 @@ function setup(initiallyInCatalog: string[] = []) {
       return { id: id(code), created: true };
     },
   );
+  // The attempt lease: a series claimed in the last day is not claimed again.
+  const leased = new Set<string>();
+  const claim = jest.fn(async (job: string, _ms: number) => {
+    if (leased.has(job)) return null;
+    leased.add(job);
+    return { token: job };
+  });
   const service = new BackupBondSeriesRecoveryService(
     dataSource as unknown as DataSource,
     { fetchSeries } as unknown as BondSeriesService,
+    { claim } as unknown as FetchSyncService,
   );
   const sleep = jest.fn(async (_ms: number) => undefined);
   const recover = (user: string, data: BackupData) =>
     service.recover(user, data, { sleep });
-  return { service: { recover }, fetchSeries, catalog, manager, sleep };
+  return { service: { recover }, fetchSeries, catalog, manager, sleep, claim };
 }
 
 const idsOf = (data: BackupData) =>
@@ -104,6 +116,19 @@ describe("BackupBondSeriesRecoveryService", () => {
     expect(fetchSeries.mock.calls.every((c) => c[3]?.limiter === "none")).toBe(
       true,
     );
+  });
+
+  it("does not ask the issuer again for a series asked for in the last day", async () => {
+    const { service, fetchSeries, claim } = setup();
+    fetchSeries.mockRejectedValue(new Error("not published"));
+    await service.recover(USER, backup(["EDO0199"]));
+    const second = await service.recover(USER, backup(["EDO0199"]));
+    expect(fetchSeries).toHaveBeenCalledTimes(1);
+    expect(claim).toHaveBeenLastCalledWith(
+      "bond-series-attempt:PL|EDO0199",
+      BACKFILL_ATTEMPT_INTERVAL_MS,
+    );
+    expect(second.unrecovered.map((u) => u.reason)).toEqual(["not-attempted"]);
   });
 
   it("fetches nothing when every series is already in the catalog", async () => {
