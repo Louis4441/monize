@@ -222,7 +222,6 @@ describe("LoanPaymentSetupService", () => {
 
       it("checks the patterns before the schedule, keeps auto-post off and creates the rule after the account points at it", async () => {
         const result = await service.setupLoanPayments("user-1", "loan-1", {
-          interestCategoryId: "interest-cat-1",
           ...setupDto,
           paymentMatching: matching,
         });
@@ -269,7 +268,6 @@ describe("LoanPaymentSetupService", () => {
         });
 
         const result = await service.setupLoanPayments("user-1", "loan-1", {
-          interestCategoryId: "interest-cat-1",
           ...setupDto,
           paymentMatching: matching,
         });
@@ -314,7 +312,6 @@ describe("LoanPaymentSetupService", () => {
 
         await expect(
           service.setupLoanPayments("user-1", "loan-1", {
-            interestCategoryId: "interest-cat-1",
             ...setupDto,
             paymentMatching: matching,
           }),
@@ -330,7 +327,6 @@ describe("LoanPaymentSetupService", () => {
 
         await expect(
           service.setupLoanPayments("user-1", "loan-1", {
-            interestCategoryId: "interest-cat-1",
             ...setupDto,
             paymentMatching: { payeePattern: "A|B*" },
           }),
@@ -341,7 +337,6 @@ describe("LoanPaymentSetupService", () => {
 
       it("stores a loan's originalPrincipal apart from its opening balance", async () => {
         await service.setupLoanPayments("user-1", "loan-1", {
-          interestCategoryId: "interest-cat-1",
           ...setupDto,
           originalPrincipal: 24000,
         });
