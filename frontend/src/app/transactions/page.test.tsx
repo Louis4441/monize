@@ -3028,6 +3028,44 @@ describe('TransactionsPage register sorting', () => {
     ]);
   });
 
+  it('keeps the deep-link target on the read that supersedes the first one', async () => {
+    // A cold load: the accounts answer while the first register read is still
+    // in flight, the account scope changes and a second read replaces the
+    // first. That second read must still ask for the target's page; sent
+    // without it, the register stayed on page 1 and the linked row was only
+    // found when it happened to be there.
+    const target = '11111111-1111-4111-8111-111111111111';
+    mockSearchParams.value = `targetTransactionId=${target}`;
+    mockGetAllAccounts.mockResolvedValue(mockAccounts);
+    let releaseFirst: (value: unknown) => void = () => {};
+    mockGetAll.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = resolve;
+        }),
+    );
+
+    render(<TransactionsPage />);
+    await waitFor(() => expect(mockGetAll.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await act(async () => {
+      releaseFirst({ data: [], pagination: { page: 1, totalPages: 3, total: 120 } });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+
+    const reads = mockGetAll.mock.calls.map(([params]: any[]) => ({
+      page: params.page,
+      target: params.targetTransactionId,
+      accounts: params.accountIds,
+    }));
+    expect(reads[0]).toEqual({ page: 1, target, accounts: undefined });
+    expect(reads[1]).toMatchObject({ page: 1, target });
+    expect(reads[1].accounts).toEqual(expect.arrayContaining(['acc-1', 'acc-2']));
+    // The page the superseding read resolved is the one the register shows.
+    expect(reads[reads.length - 1]).toMatchObject({ page: 3, target: undefined });
+  });
+
   it('reads the register once to follow a transfer to its other leg', async () => {
     // The same shape on the path that goes through a filter change, where the
     // debounce would coalesce a duplicate rather than let it race.
