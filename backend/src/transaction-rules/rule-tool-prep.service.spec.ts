@@ -1299,6 +1299,15 @@ describe("TransactionRuleToolPrepService", () => {
       expect(llm.message).not.toContain("usually wrong");
     });
 
+    it("adds no nothing-would-change note when the run still queues AI reviews", () => {
+      const { service } = build();
+      const llm = service.toLlmTest(
+        { ...already, aiReviewRequests: 7 },
+        already.labels as never,
+      );
+      expect(llm.message).toBeUndefined();
+    });
+
     it("does not call a request_ai_review-only rule wrong", () => {
       // An AI-review-only rule has matchedCount 0 by construction; only the
       // condition count says whether the rule is wrong.
@@ -1307,7 +1316,7 @@ describe("TransactionRuleToolPrepService", () => {
         { ...already, aiReviewRequests: 7 },
         already.labels as never,
       );
-      expect(llm.message).not.toContain("matches none");
+      expect(llm.message ?? "").not.toContain("matches none");
     });
 
     it("still warns when the condition matched nothing, and stays silent when the count is absent", () => {

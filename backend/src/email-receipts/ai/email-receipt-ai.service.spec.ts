@@ -21,7 +21,7 @@ import { EmailReceipt } from "../entities/email-receipt.entity";
 import {
   RECEIPT_AUTOMATIC_AI_INSTRUCTION,
   RECEIPT_CHAT_INSTRUCTION,
-} from "../pipeline/email-receipt-pipeline.service";
+} from "../pipeline/receipt-instructions";
 import { MAX_PARSERS_PER_USER } from "../parsers/email-receipt-parsers.service";
 import {
   AUTOMATIC_AI_CALLS_PER_TICK,

@@ -633,6 +633,18 @@ export class TransactionRulesRunService {
       if (effects.aiReviewRequests.length > 0) asking.push({ unit, effects });
     }
 
+    // A row that already holds this rule's open request gets no new one: the
+    // preview counts, and the fingerprint covers, only the rows a run would
+    // really add to the queue. The commit still enqueues them all so the
+    // dedupe reports the open ones as already queued.
+    const open = await this.applier.openAiReviewTransactionIds(
+      m,
+      userId,
+      rule.id,
+      asking.map(({ unit }) => unit.primary.id),
+    );
+    const adding = asking.filter(({ unit }) => !open.has(unit.primary.id));
+
     const matched: RuleRunMatchedRow[] = writable.map(({ unit, effects }) => ({
       transactionId: unit.primary.id,
       date: unit.primary.transactionDate,
@@ -669,10 +681,10 @@ export class TransactionRulesRunService {
             transactionId: unit.primary.id,
             changes: effects.trace[0].changes,
           })),
-          asking.map(({ unit }) => unit.primary.id),
+          adding.map(({ unit }) => unit.primary.id),
         ),
         labels,
-        aiReviewRequests: asking.length,
+        aiReviewRequests: adding.length,
       },
       writable,
       asking,

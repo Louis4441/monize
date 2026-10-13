@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   RECEIPT_AUTOMATIC_AI_INSTRUCTION,
   RECEIPT_CATEGORIZE_INSTRUCTION,
@@ -21,5 +23,15 @@ describe("receiptInstructionKey", () => {
   it("is null for any other text, a rule's own words included", () => {
     expect(receiptInstructionKey("Split it by product")).toBeNull();
     expect(receiptInstructionKey(`${RECEIPT_PARSED_INSTRUCTION} `)).toBeNull();
+  });
+});
+
+describe("where the fixed instructions are imported from", () => {
+  it("is the leaf file only: the pipeline service does not re-export them", () => {
+    const src = readFileSync(
+      join(__dirname, "email-receipt-pipeline.service.ts"),
+      "utf8",
+    );
+    expect(src).not.toMatch(/export\s*\{[^}]*RECEIPT_\w+_INSTRUCTION/);
   });
 });

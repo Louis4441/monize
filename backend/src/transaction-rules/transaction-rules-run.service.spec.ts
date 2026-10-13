@@ -136,6 +136,9 @@ function setup(
     tags: {},
     rules: {},
   });
+  const openReviews = jest
+    .spyOn(applier, "openAiReviewTransactionIds")
+    .mockResolvedValue(new Set<string>());
   const writeEffects = jest
     .spyOn(applier, "writeEffects")
     .mockImplementation(async (_m, _u, _id, effects) => effects);
@@ -171,6 +174,7 @@ function setup(
     dataSource,
     rulesService,
     writeEffects,
+    openReviews,
     enqueue,
     record,
     loadTagIds,
@@ -829,8 +833,10 @@ describe("TransactionRulesRunService", () => {
         queued: [{ transactionId: "t1", ruleId: RULE_ID }],
         alreadyQueued: [{ transactionId: "t2", ruleId: RULE_ID }],
       });
+      s.openReviews.mockResolvedValue(new Set(["t2"]));
       const preview = await s.service.previewRun(USER, RULE_ID, filters);
-      expect(preview.aiReviewRequests).toBe(2);
+      // Only the row without an open request would get a new one.
+      expect(preview.aiReviewRequests).toBe(1);
 
       const result = await s.service.run(USER, RULE_ID, {
         ...filters,
@@ -839,6 +845,28 @@ describe("TransactionRulesRunService", () => {
 
       expect(result.aiReviewsQueued).toBe(1);
       expect(result.aiReviewsAlreadyQueued).toBe(1);
+    });
+
+    it("previews no review request when every matching row already holds an open one", async () => {
+      const asking = storedRule({
+        actions: [{ type: "request_ai_review", instruction: "split it" }],
+      });
+      const s = setup(
+        [plainUnit(row("t1")), plainUnit(row("t2"))],
+        false,
+        asking,
+      );
+      s.openReviews.mockResolvedValue(new Set(["t1", "t2"]));
+
+      const preview = await s.service.previewRun(USER, RULE_ID, filters);
+
+      expect(preview.aiReviewRequests).toBe(0);
+      expect(preview.matched).toEqual([]);
+      expect(preview.conditionMatchedCount).toBe(2);
+      expect(s.openReviews).toHaveBeenCalledWith(s.manager, USER, RULE_ID, [
+        "t1",
+        "t2",
+      ]);
     });
 
     it("refuses with 409 when the rows to review differ from the preview's, though no field changes", async () => {
