@@ -295,11 +295,6 @@ export class UsersService {
       patch.dashboardWidgetConfig =
         dto.dashboardWidgetConfig as UserPreference["dashboardWidgetConfig"];
     }
-    if (dto.hiddenTableColumns !== undefined) {
-      // A JSONB map, cast for the same reason as dashboardWidgetConfig above.
-      patch.hiddenTableColumns =
-        dto.hiddenTableColumns as UserPreference["hiddenTableColumns"];
-    }
     if (dto.showCreatedAt !== undefined) {
       patch.showCreatedAt = dto.showCreatedAt;
     }
@@ -335,14 +330,18 @@ export class UsersService {
       async (manager) => {
         await ensureUserPreferencesRow(manager, userId);
         const repo = manager.getRepository(UserPreference);
-        // viewDefaults merges into the stored map rather than replacing it, so
-        // a save from a Settings screen opened before another device changed a
-        // different default keeps that default. The merge reads the stored map,
-        // so the row is locked for it: two concurrent saves of different keys
-        // then both land.
+        // viewDefaults and hiddenTableColumns merge into the stored map (by
+        // key, and by table kind) rather than replacing it, so a save from a
+        // Settings screen opened before another device changed a different
+        // default keeps that default. The merge reads the stored map, so the
+        // row is locked for it: two concurrent saves of different keys then
+        // both land.
+        const merges =
+          dto.viewDefaults !== undefined ||
+          dto.hiddenTableColumns !== undefined;
         const before = await repo.findOne({
           where: { userId },
-          ...(dto.viewDefaults !== undefined && {
+          ...(merges && {
             lock: { mode: "pessimistic_write" as const },
           }),
         });
@@ -352,6 +351,13 @@ export class UsersService {
             ...(before?.viewDefaults ?? {}),
             ...dto.viewDefaults,
           } as UserPreference["viewDefaults"];
+        }
+        if (dto.hiddenTableColumns !== undefined) {
+          // A JSONB map, cast for the same reason as dashboardWidgetConfig above.
+          patch.hiddenTableColumns = {
+            ...(before?.hiddenTableColumns ?? {}),
+            ...dto.hiddenTableColumns,
+          } as UserPreference["hiddenTableColumns"];
         }
         // Copy the value out now, not after the write: reading it from `before`
         // later would depend on that object not having been touched by the

@@ -868,6 +868,27 @@ describe("UsersService", () => {
       });
     });
 
+    it("merges hiddenTableColumns by table kind, keeping kinds it was not sent", async () => {
+      // Another device set the holdings default; this save, from a screen that
+      // never saw it, sends only the kind it changed.
+      preferencesRow.seed({
+        ...mockPreferences,
+        hiddenTableColumns: {
+          transactions: ["tags"],
+          investmentHoldings: ["avgCost"],
+        },
+      });
+
+      await service.updatePreferences("user-1", {
+        hiddenTableColumns: { transactions: [] },
+      });
+
+      expect(preferencesRow.row()!.hiddenTableColumns).toEqual({
+        transactions: [],
+        investmentHoldings: ["avgCost"],
+      });
+    });
+
     it("leaves hiddenTableColumns untouched when not provided", async () => {
       preferencesRow.seed({
         ...mockPreferences,
