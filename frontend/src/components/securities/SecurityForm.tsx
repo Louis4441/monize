@@ -14,7 +14,6 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Modal } from '@/components/ui/Modal';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SecurityLookupPicker, LookupCandidate } from './SecurityLookupPicker';
@@ -808,22 +807,26 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         />
       )}
 
-      <div>
-        <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
-          <ToggleSwitch
-            checked={!!watch('skipPriceUpdates')}
-            onChange={(next) => {
-              setValue('skipPriceUpdates', next, { shouldDirty: true });
-              setSkipSwitchTouched(true);
-            }}
-            label={t('form.skipPriceUpdatesLabel')}
-          />
-          {t('form.skipPriceUpdatesLabel')}
-        </label>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {t('form.skipPriceUpdatesHelp')}
-        </p>
-      </div>
+      {/* A bond of a listed country is priced by the engine, never by a quote
+          refresh, so the switch that stops quote refreshes has nothing to stop. */}
+      {!hideExchange && (
+        <div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
+            <ToggleSwitch
+              checked={!!watch('skipPriceUpdates')}
+              onChange={(next) => {
+                setValue('skipPriceUpdates', next, { shouldDirty: true });
+                setSkipSwitchTouched(true);
+              }}
+              label={t('form.skipPriceUpdatesLabel')}
+            />
+            {t('form.skipPriceUpdatesLabel')}
+          </label>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {t('form.skipPriceUpdatesHelp')}
+          </p>
+        </div>
+      )}
 
       {/*
         A threshold is a number the user types, so it goes through
