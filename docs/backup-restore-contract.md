@@ -33,6 +33,7 @@ concerns this document describes:
 | `backend/src/backup/backup-restore.service.ts` | §3 and §6: the processing gate, decryption, decompression, format validation, re-authentication ordering, id remapping, and the one transaction the rest runs inside. |
 | `backend/src/backup/backup-attachment-transfer.service.ts` | §4's restore half: staging carried bytes, the legacy ownership proof, and both object-store cleanup paths. |
 | `backend/src/backup/backup-restore-database.service.ts` | The restore's SQL: teardown, currency preparation, row inserts, deferred-FK repair. |
+| `backend/src/backup/backup-bond-series-recovery.service.ts`, `restore-bond-series.ts`, `export-bond-catalog.ts` | §3a: the catalog-identity member the export writes, and the restore's fetch of the series it names before the transaction. |
 | `backend/src/backup/backup-format.ts` | The file format itself -- version, `BackupData`, the two result types -- shared by all four. |
 | `backend/src/backup/export-table-queries.ts` | §2's other half: what is read, in what order, and what is deliberately not read. |
 | `backend/src/backup/restore-plan.ts` | §2: insertion order and deferred foreign keys, as data. |
@@ -56,6 +57,8 @@ every live table is either exported or named in
 - Attachment **bytes** for every provider, base64-encoded in `attachment_blobs`.
   (This said "only for the `database` provider" long after section 4 stopped
   being true of it.) See section 4.
+- The identity of every bond series the user's rows reference, in the
+  `bondCatalog` member (section 3a); never its terms.
 - Every currency definition the user's data references, whoever created it —
   not just the ones they created. Currencies are shared, and a code without its
   definition means the restore invents a name, symbol and decimal places.
@@ -195,26 +198,95 @@ before re-authentication -- it is free, and it writes nothing:
   catalog holds the row and, for a program link, in the security's currency;
   otherwise it is written NULL and logged
   (`BackupRestoreDatabaseService.severUnavailableCatalogLinks`, which iterates
-  `CATALOG_REFERENCE_COLUMNS`), so a restore never fails on a series this
-  deployment has not seeded. The restore says so: the result carries
+  `CATALOG_REFERENCE_COLUMNS`), so a restore never fails on a row this
+  deployment does not hold. What else a severed link costs is declared beside the
+  column list (`CATALOG_ON_SEVERED`): the file's `bond_engine` price rows of a
+  security it unlinked are not restored, and the series of that security's rows
+  are dropped with the link. The restore says so: the result carries
   `unlinkedBondSecurities: { count, symbols }` (omitted at zero, outside
   `restored`; `symbols` names at most `MAX_UNLINKED_BOND_SYMBOLS` = 50 of them,
   `count` is the full number) and the restore dialogue lists them, because the
-  bond engine no longer prices those securities; the file's `bond_engine` price
-  rows of a security it unlinked are not restored. A transaction whose series
-  the catalog lacks is restored without it and counted in
-  `unlinkedBondSeries: { count }` (omitted at zero, outside `restored`); its lot
-  is then read from the transaction date, as a row written before the link is.
-  The series of the rows of a security restored unlinked are dropped with the
-  link, and after the inserts `clearForeignSeriesOfUser` nulls any series that is
-  not of its own security's program, whatever the file said (INV-BOND-007). The
-  program id and the series id are derived from their codes (`bondProgramId`,
-  `bondInstrumentId`), so each is the same on every deployment.
+  bond engine no longer prices those securities. A transaction whose series the
+  catalog lacks is restored without it and counted in
+  `unlinkedBondSeries: { count }` (omitted at zero, outside `restored`). Such a
+  row is not read "from the transaction date" afterwards: an ADD_SHARES or an
+  unpaired TRANSFER_IN can never be re-inferred, and the security's valuation
+  refuses it until the series is chosen again -- which is why the restore
+  fetches the series first (section 3a) and a NULL is the outcome only for a
+  series the official source could not supply. After the inserts
+  `clearForeignSeriesOfUser` nulls any series that is not of its own security's
+  program, whatever the file said (INV-BOND-007). The program id and the series
+  id are derived from their codes (`bondProgramId`, `bondInstrumentId`), so each
+  is the same on every deployment; programs are seeded at boot (INV-BOND-008
+  allows programs), so a program link resolves on any deployment that installs
+  the country's adapter and needs no recovery of its own.
   The file's `bond_engine` price rows of a security whose link survived came from
   another deployment's catalog and engine, so after the restore commits
-  `BackupRestoreService` calls `BondPriceService.recomputeSecurity` for every
-  bond-linked security of the user (best effort, logged; the daily job repairs a
-  failure) and the engine's own prices replace the file's.
+  `BackupRestoreService` calls `BondPriceService.recomputeLinkedSecurities` with
+  the ids it restored (it keeps the program-linked ones, best effort, logged; the
+  daily job repairs a failure) and the engine's own prices replace the file's.
+
+### 3a. The bond series a backup references are fetched before the restore (INV-BOND-008)
+
+A fresh deployment's catalog holds no series (INV-BOND-008: nothing is fetched or
+stored until a person asks), so a restore onto a new server used to lose every
+series for good. The person's decision to hold those bonds was made when they
+added them, and the restore is the person's own action, so it may fetch the
+series the file references from the official source -- only those, and only
+through the existing door.
+
+- **What travels.** Every backup writes a `bondCatalog` member beside
+  `completeness`: `{ series: [{ bondInstrumentId, issuerCountryCode, issuerCode,
+  programCode, seriesCode }] }`, one entry per series the user's investment
+  transactions reference (`readBondCatalogIdentity`, `export-bond-catalog.ts`,
+  read inside the export's `REPEATABLE READ` snapshot). It is identity only,
+  never terms: a rate enters the catalog only from the official source or an
+  administrator (INV-BOND-006), so a file is never the origin of one. It is a
+  document member, not a table and not a version bump -- `validateBackupFormat`
+  compares `version` for equality, every walker skips a non-array value, and it
+  is added the way `completeness` was. A backup without it (written before it
+  existed, or by the support export, which has none) restores exactly as before.
+- **What the restore does, in order.** After re-authentication and before
+  attachment staging and the transaction, `BackupBondSeriesRecoveryService`
+  keeps the entries some row names, looks each up in the catalog by
+  `(country, issuer, series)`, and fetches the missing ones through
+  `BondSeriesService.fetchSeries` -- the same adapters, the same hardened door, no
+  fetching code of its own -- sequentially, at most
+  `MAX_BOND_SERIES_FETCHES_PER_RESTORE` = 200 per restore, with `BACKFILL_GAP_MS`
+  between two fetches (the pacing toward the issuer is the backfill's; the sleep is
+  injectable). It then looks every
+  identity up again and points each row's `bond_instrument_id` at the catalog's id
+  for that identity; the transaction's `severUnavailableCatalogLinks` finds the
+  series present and keeps the link. The member is untrusted text: an entry that
+  is not five well-formed strings is ignored, an entry no row names fetches
+  nothing, and a series fetched under another issuer than the entry named is not
+  the entry's.
+- **Pacing, not the per-user limit.** A restore is a bounded one-off action of
+  the person, so its fetches pass `{ limiter: "none" }` to `fetchSeries` and are
+  not charged against the interactive 10-per-minute allowance (`bond-series-fetch`);
+  otherwise a restore would recover ten series and report the rest. The option is
+  an internal parameter of `fetchSeries`: the REST route, the assistant and MCP
+  call it with three arguments and no DTO or tool schema reaches it, so they
+  still charge the allowance. The gap and the cap of 200 are what bound the load
+  on the issuer.
+- **Why before the transaction.** A fetch is an external effect that cannot roll
+  back (`docs/external-side-effects.md`) and a network wait does not belong in
+  the transaction holding every one of the user's rows. The catalog store is
+  idempotent and global (an advisory lock per instrument, an immutable first terms
+  version), so a series fetched for a restore that then fails is what the
+  person's next fetch would have stored; nothing fetched is undone.
+- **What a failed fetch leaves.** Nothing but a record. The restore does not
+  fail, the series is not stored, and the rows that named it keep NULL as before.
+  The result lists it in `unrecoveredBondSeries: { count, series: [{
+  issuerCountryCode, seriesCode, reason }] }` (omitted at zero, outside
+  `restored`, `series` capped at `MAX_UNRECOVERED_BOND_SERIES` = 50, `count` the
+  full number), with the reason: `not-published`, `source-unavailable`,
+  `no-adapter` (no installed adapter for the country), `refused` (the source
+  answered and the answer was not acceptable), `rate-limited` (an HTTP 429
+  answered, the source's own, since the restore is not charged the per-user
+  allowance; the pass stops and reports the rest) and
+  `not-attempted` (past the cap). `unlinkedBondSeries` still counts the rows
+  that lost their series.
 
 Every key is then remapped to a fresh id, so the restored graph is closed over
 rows this restore inserted. A UUID nested in a JSONB or array value

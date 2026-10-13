@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { tr } from "../i18n/translate";
 import { canonicalUuid } from "./backup-id-remap.util";
 import { BackupData, backupTables, BackupTables } from "./backup-format";
+import { dropSeveredBondData } from "./restore-engine-prices";
 import { RESTORE_PLAN } from "./restore-plan";
 
 /**
@@ -188,6 +189,20 @@ export const CATALOG_REFERENCE_COLUMNS: Readonly<
 export const CATALOG_CURRENCY_MATCHED_COLUMNS: ReadonlySet<string> = new Set([
   "securities.bond_program_id",
 ]);
+
+/**
+ * What else a restore must not keep once a `table.column` entry above has been
+ * written NULL, keyed `table.column` and called with the document and the ids of
+ * the rows that lost the reference: the engine's price rows of a security that is
+ * no longer program-linked (INV-BOND-005) and the series of its transactions
+ * (INV-BOND-007). Declared beside the column list so a severed link and its
+ * consequences are one reviewed fact, not a branch inside the generic loop
+ * (`BackupRestoreDatabaseService.severUnavailableCatalogLinks`).
+ */
+export const CATALOG_ON_SEVERED: ReadonlyMap<
+  string,
+  (data: BackupData, severedRowIds: ReadonlySet<string>) => void
+> = new Map([["securities.bond_program_id", dropSeveredBondData]]);
 
 /**
  * The references a genuine export can carry without the row they name, keyed

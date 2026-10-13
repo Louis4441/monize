@@ -4,6 +4,7 @@ import { canonicalUuid, collectRowIdRemap } from "./backup-id-remap.util";
 import { BackupData } from "./backup-format";
 import { DEFERRED_FK_COLUMNS, RESTORE_PLAN } from "./restore-plan";
 import {
+  CATALOG_ON_SEVERED,
   CATALOG_REFERENCE_COLUMNS,
   NON_UUID_ID_TABLES,
   remapRestoreRow,
@@ -201,6 +202,13 @@ describe("RESTORE_REFERENCE_COLUMNS against database/schema.sql", () => {
       )
       .map((fk) => `${fk.table}.${fk.column} -> ${fk.referencedTable}`);
     expect(outside).toEqual([]);
+  });
+
+  it("declares a severed-link effect only for a catalog column it severs", () => {
+    for (const key of CATALOG_ON_SEVERED.keys()) {
+      const [table, column] = key.split(".");
+      expect(CATALOG_REFERENCE_COLUMNS[table]?.[column]).toBeDefined();
+    }
   });
 
   it("declares only catalog references the schema has, to tables the restore does not write, on nullable columns", () => {

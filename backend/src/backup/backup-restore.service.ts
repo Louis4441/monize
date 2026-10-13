@@ -45,6 +45,7 @@ import {
   BackupPasswordRequiredError,
   backupTables,
   MAX_UNLINKED_BOND_SYMBOLS,
+  MAX_UNRECOVERED_BOND_SERIES,
   parseArtifactCompleteness,
   renameLegacyTableKeys,
   RestoreBackupInput,
@@ -54,6 +55,7 @@ import { restoreAiProviderKey } from "./ai-provider-key-transport";
 import { keyBearingExportTables } from "./export-table-queries";
 import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
+import { BackupBondSeriesRecoveryService } from "./backup-bond-series-recovery.service";
 import { BondPriceService } from "../bonds/bond-price.service";
 import { clearForeignSeriesOfUser } from "../bonds/bond-series-resolver";
 import { invalidatePortfolioSummary } from "../securities/portfolio-summary-memo";
@@ -84,44 +86,8 @@ export class BackupRestoreService {
     private readonly db: BackupRestoreDatabaseService,
     private readonly maintenance: UserMaintenanceService,
     private readonly bondPrices: BondPriceService,
+    private readonly bondSeries: BackupBondSeriesRecoveryService,
   ) {}
-
-  /**
-   * After the restore commits: recompute the engine prices of every bond-linked
-   * security the user now has. Best effort and logged, because the restore has
-   * committed and the daily job repairs a failure.
-   */
-  private async recomputeLinkedBondPrices(userId: string): Promise<void> {
-    try {
-      const linked: Array<{ id: string }> = await withScopedDb(
-        this.dataSource,
-        (m) =>
-          m.query(
-            `SELECT id FROM securities
-              WHERE user_id = $1 AND bond_program_id IS NOT NULL
-              ORDER BY id`,
-            [userId],
-          ),
-      );
-      for (const { id } of linked) {
-        try {
-          await this.bondPrices.recomputeSecurity(userId, id);
-        } catch (error) {
-          this.logger.warn(
-            `Bond price recompute after restore failed for security ${id}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        }
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Bond price recompute after restore failed for user ${userId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-  }
 
   /**
    * Ceiling on a restore's decompressed payload (see backup-limits.ts).
@@ -246,6 +212,13 @@ export class BackupRestoreService {
 
         this.warnIfArtifactIncomplete(userId, rawData);
 
+        // The bond series the file's rows reference and this catalog lacks are
+        // fetched from the official source now, before anything is deleted or
+        // staged: an external effect that cannot roll back, and a network wait
+        // that does not belong in the transaction (INV-BOND-008, "a restore of
+        // the person's own backup"). A refused fetch is recorded, never fatal.
+        const recovery = await this.bondSeries.recover(userId, references.data);
+
         // Remap every primary key in the backup to a fresh UUID (and rewrite all
         // references to those keys, including ids embedded in JSONB columns) so the
         // restore behaves as if the backup came from an entirely separate system.
@@ -259,8 +232,8 @@ export class BackupRestoreService {
         // form, or a reference to a row the file does not carry, passed through
         // untouched. `resolveRestoreReferences` above is what closes both, and
         // the Phase-3 UPDATEs are additionally scoped to this user's rows.
-        const idRemap = this.buildBackupIdRemap(references.data);
-        const data = this.remapBackupIds(references.data, idRemap);
+        const idRemap = this.buildBackupIdRemap(recovery.data);
+        const data = this.remapBackupIds(recovery.data, idRemap);
         this.rehashGemSignalFingerprints(data, idRemap);
 
         this.logger.log(`Starting backup restore for user ${userId}`);
@@ -400,8 +373,9 @@ export class BackupRestoreService {
                 await clearForeignSeriesOfUser(manager, userId);
 
                 this.logger.log(`Backup restore completed for user ${userId}`);
-                // `skippedAttachments`, `unusableAiProviderKeys` and
-                // `unlinkedBondSecurities` are reported beside `restored`, never
+                // `skippedAttachments`, `unusableAiProviderKeys`,
+                // `unlinkedBondSecurities` and `unrecoveredBondSeries` are
+                // reported beside `restored`, never
                 // inside it: the client sums `restored`'s values to show a row
                 // total, and neither a count of rows that were deliberately not
                 // written, a count of rows whose contents did not survive nor a
@@ -425,6 +399,17 @@ export class BackupRestoreService {
                   ...(unlinkedSeriesCount > 0
                     ? { unlinkedBondSeries: { count: unlinkedSeriesCount } }
                     : {}),
+                  ...(recovery.unrecovered.length > 0
+                    ? {
+                        unrecoveredBondSeries: {
+                          count: recovery.unrecovered.length,
+                          series: recovery.unrecovered.slice(
+                            0,
+                            MAX_UNRECOVERED_BOND_SERIES,
+                          ),
+                        },
+                      }
+                    : {}),
                 };
               }),
             ),
@@ -442,7 +427,12 @@ export class BackupRestoreService {
             // The file's bond_engine price rows were computed by another
             // deployment's catalog and engine; price every linked security
             // here from this one rather than trusting them until the cron.
-            await this.recomputeLinkedBondPrices(userId);
+            await this.bondPrices.recomputeLinkedSecurities(
+              userId,
+              (backupTables(data).securities ?? []).map((row) =>
+                typeof row.id === "string" ? row.id : null,
+              ),
+            );
             return result;
           })
           .catch(async (error) => {

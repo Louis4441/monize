@@ -818,7 +818,20 @@
       "skippedAttachments": "{count, plural, one {# attachment was not restored} other {# attachments were not restored}}: the backup did not carry usable bytes for them — they were missing or failed their checksum when it was exported, or the file predates self-contained backups. Export a fresh backup once attachment storage is healthy to capture them.",
       "unusableAiProviderKeys": "{count, plural, one {# AI provider was restored without a usable API key} other {# AI providers were restored without usable API keys}}: the backup was written before provider keys were included in it, so the stored key belongs to the server that made the file, or this server has no encryption key configured to store one. Open Settings → AI Providers and enter the API key again.",
       "unlinkedBondSecurities": "{count, plural, one {# bond security was restored unlinked from its bond instrument} other {# bond securities were restored unlinked from their bond instruments}}: this server's bond catalog does not carry the series (or carries it in another currency), so the bond engine no longer prices them and their calculated prices were not restored. Open each security and link it to a bond instrument again.",
-      "unlinkedBondSeries": "{count, plural, one {# bond transaction lost its series} other {# bond transactions lost their series}} because this deployment's catalog lacks it; their series will be read from the date where possible, fetch the series to restore them.",
+      "unlinkedBondSeries": "{count, plural, one {# bond transaction lost its series} other {# bond transactions lost their series}} because their series could not be obtained from the official source. They were restored without a series and keep none until you fetch it.",
+      "unrecoveredBondSeries": "{count} bond series named in the backup could not be fetched.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "and {count} more",
+      "unrecoveredBondSeriesAction": "To restore them, open the bond security, fetch the series on its page (Refresh) and choose the series on the transactions that lack it.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "the issuer has not published this series (yet)",
+        "source-unavailable": "the official source did not answer; try again later",
+        "no-adapter": "this server has no source for this issuer's country",
+        "refused": "the official source's answer was not accepted",
+        "rate-limited": "the official source asked to slow down; try again later",
+        "not-attempted": "too many series in one restore; not attempted",
+        "other": "unknown reason"
+      },
       "doneButton": "Done",
       "unlinkedBondSecuritiesList": "Affected securities: {symbols}.",
       "unlinkedBondSecuritiesMore": "and {count} more"

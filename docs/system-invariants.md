@@ -3371,7 +3371,7 @@ Enforcement         Three mechanisms.
                        BOND_ENGINE_PRICE_SOURCE is bound by the delete of days
                        that no longer get a price (it deletes only
                        bond_engine rows). The transaction-price upsert's
-                       replaceable-source list (TRANSACTION_PRICE_REPLACEABLE_SOURCES)
+                       replaceable-source list (TRANSACTION_SOURCES)
                        does not contain bond_engine for a linked security, and
                        the manual-price write sets adjusted_close from its own
                        input, never from the row it replaces.
@@ -3635,8 +3635,10 @@ Status              enforced
 Statement           No series, terms version or benchmark observation of any
                     country is fetched or stored unless a person asked for it:
                     a series fetch or manual entry, the current-offer fetch, a
-                    program switched to auto-fetch (bond_auto_fetch), or a
-                    stored series that reads the benchmark. An adapter ships
+                    program switched to auto-fetch (bond_auto_fetch), a
+                    restore of the person's own backup (only the series that
+                    backup's rows reference), or a stored series that reads
+                    the benchmark. An adapter ships
                     product templates and programs only; the boot seed stores
                     programs and makes no network call.
 Why                 A deployment follows the bonds its people chose (Polish

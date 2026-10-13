@@ -70,9 +70,19 @@ export interface RestoreResult {
   /**
    * Bond transactions restored without their series because this server's
    * catalog does not carry it. The rows were written, so this stays outside
-   * `restored`; the series is read from the date where possible. Absent when none.
+   * `restored`. Rows whose series could not be obtained keep no series.
+   * Absent when none.
    */
   unlinkedBondSeries?: { count: number };
+  /**
+   * The bond series the backup names that the restore could not get from the
+   * official source, with why. `series` is capped by the server (50), so it can
+   * be shorter than `count`. Outside `restored`. Absent when none.
+   */
+  unrecoveredBondSeries?: {
+    count: number;
+    series: { issuerCountryCode: string; seriesCode: string; reason: string }[];
+  };
 }
 
 export type SupportBackupSection =

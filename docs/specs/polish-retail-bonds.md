@@ -683,8 +683,15 @@ therefore points at the same program on any deployment whose catalog has it; a
 restore onto a deployment without it restores the link as `NULL` and says so
 (`unlinkedBondSecurities: { count, symbols }`, symbols capped at 50, omitted
 when zero; the UI lists them and says how to relink), rather than failing the
-restore. A transaction whose series the catalog lacks is restored without it
-and counted in `unlinkedBondSeries: { count }`. After a restore commits, every
+restore. A backup carries the identity of the series its rows
+reference (the `bondCatalog` member: country, issuer, program, series code,
+never terms). Before the restore transaction the missing series are fetched
+from the official source, paced and capped
+(`docs/backup-restore-contract.md` section 3a), and each row is remapped to the
+catalog's id by identity. A transaction whose series could not be obtained is
+restored without it, counted in `unlinkedBondSeries: { count }`, and the
+series are reported in `unrecoveredBondSeries: { count, series: [{
+issuerCountryCode, seriesCode, reason }] }`. After a restore commits, every
 linked security of the user is recomputed. The support backup always writes the
 link and the series as `NULL`.
 

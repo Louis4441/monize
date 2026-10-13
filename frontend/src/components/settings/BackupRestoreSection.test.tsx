@@ -554,9 +554,50 @@ describe('BackupRestoreSection', () => {
       });
       expect(
         screen.getByText(/7 bond transactions lost their series/),
-      ).toHaveTextContent('fetch the series to restore them');
+      ).toHaveTextContent('keep none until you fetch it');
       // Not part of the record total.
       expect(screen.queryByText('11')).not.toBeInTheDocument();
+    });
+
+    it('lists the series the restore could not fetch with a reason each and what to do', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 4 },
+        unrecoveredBondSeries: {
+          count: 4,
+          series: [
+            { issuerCountryCode: 'PL', seriesCode: 'EDO1036', reason: 'not-published' },
+            { issuerCountryCode: 'PL', seriesCode: 'TOS1029', reason: 'source-unavailable' },
+            { issuerCountryCode: 'PL', seriesCode: 'COI0128', reason: 'rate-limited' },
+          ],
+        },
+      });
+      expect(screen.getByText(/4 bond series named in the backup could not be fetched/)).toBeInTheDocument();
+      expect(screen.getByText(/EDO1036 \(PL\): the issuer has not published/)).toBeInTheDocument();
+      expect(screen.getByText(/TOS1029 \(PL\): the official source did not answer/)).toBeInTheDocument();
+      expect(screen.getByText(/COI0128 \(PL\): the official source asked to slow down/)).toBeInTheDocument();
+      expect(screen.getByText(/and 1 more/)).toBeInTheDocument();
+      expect(screen.getByText(/fetch the series on its page \(Refresh\)/)).toBeInTheDocument();
+    });
+
+    it('explains an unknown reason generically and says nothing when none were unrecovered', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+        unrecoveredBondSeries: {
+          count: 1,
+          series: [{ issuerCountryCode: 'PL', seriesCode: 'EDO1036', reason: 'mystery' }],
+        },
+      });
+      expect(screen.getByText(/EDO1036 \(PL\): unknown reason/)).toBeInTheDocument();
+    });
+
+    it('says nothing about unrecovered series when there are none', async () => {
+      await restoreWith({
+        message: 'Backup restored successfully',
+        restored: { accounts: 1 },
+      });
+      expect(screen.queryByText(/could not be fetched/)).not.toBeInTheDocument();
     });
 
     it('says nothing about lost series when none were', async () => {

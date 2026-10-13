@@ -9,6 +9,7 @@ import { BackupExportService } from "@/backup/backup-export.service";
 import { BackupRestoreService } from "@/backup/backup-restore.service";
 import { BackupAttachmentTransferService } from "@/backup/backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "@/backup/backup-restore-database.service";
+import { BackupBondSeriesRecoveryService } from "@/backup/backup-bond-series-recovery.service";
 import { SupportBackupService } from "@/backup/support-backup/support-backup.service";
 import {
   ALWAYS_EXCLUDED_TABLES,
@@ -61,7 +62,20 @@ describe("Support backup (integration)", () => {
         // The restore's bond price recompute is not under test here.
         {
           provide: BondPriceService,
-          useValue: { recomputeSecurity: async () => ({}) },
+          useValue: {
+            recomputeSecurity: async () => ({}),
+            recomputeLinkedSecurities: async () => undefined,
+          },
+        },
+        // The restore's bond series recovery finds nothing to recover here.
+        {
+          provide: BackupBondSeriesRecoveryService,
+          useValue: {
+            recover: async (_userId: string, data: unknown) => ({
+              data,
+              unrecovered: [],
+            }),
+          },
         },
         BackupAttachmentTransferService,
         BackupRestoreDatabaseService,

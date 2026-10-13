@@ -10,6 +10,21 @@ import {
   RESTORABLE_TABLES,
 } from "@/backup/backup.service";
 import { BondPriceService } from "@/bonds/bond-price.service";
+import { BondSeriesService } from "@/bonds/bond-series.service";
+import { BenchmarkRefreshService } from "@/bonds/benchmark-refresh.service";
+import { BondFetch } from "@/bonds/bond-adapter";
+import { SeriesHttp } from "@/bonds/series-http";
+import {
+  fakeFetch,
+  fakePdfText,
+  SLUGS,
+  seriesRoutes,
+} from "@/bonds/adapters/pl/series/fixture-helpers";
+import { extractPdfText } from "@/bonds/adapters/pl/series/pdf-text";
+import { AuthAttemptCounterService } from "@/auth/auth-attempt-counter.service";
+import { CurrenciesService } from "@/currencies/currencies.service";
+import { ProviderHealthService } from "@/provider-health/provider-health.service";
+import { BackupBondSeriesRecoveryService } from "@/backup/backup-bond-series-recovery.service";
 import { BondValuationService } from "@/bonds/bond-valuation.service";
 import { FetchSyncService } from "@/common/jobs/fetch-sync.service";
 import { BondCatalogService } from "@/bonds/bond-catalog.service";
@@ -32,6 +47,12 @@ import {
 import { applyRlsPolicies } from "../helpers/rls-setup";
 import { withUserContext } from "@/common/db/with-context";
 
+// The issuer's letter is read as text: the fake PDF is the magic plus the saved
+// letter text, so the real adapter parses the real fixture without pdfjs.
+jest.mock("@/bonds/adapters/pl/series/pdf-text", () => ({
+  extractPdfText: jest.fn(),
+}));
+
 /**
  * Full backup -> restore round-trip against a real PostgreSQL database.
  *
@@ -52,6 +73,9 @@ describe("Backup export/restore round-trip (integration)", () => {
   let service: BackupService;
   let netWorth: NetWorthService;
   let dataSource: DataSource;
+  // The one network door the restore's series recovery reaches: a fake over the
+  // saved issuer pages and letters, swapped per test. Never the network.
+  let door: jest.MockedFunction<BondFetch>;
 
   // The shared login password createTestUserDirect bakes into every user; the
   // restore flow re-verifies it before touching any data.
@@ -111,6 +135,34 @@ describe("Backup export/restore round-trip (integration)", () => {
         BondPriceService,
         BondValuationService,
         FetchSyncService,
+        // Real: the restore fetches the bond series its file references and this
+        // catalog lacks, through the real service and the real Polish adapter.
+        // Only the HTTP door is faked, so what is stored is what an adapter
+        // parsed, and the catalog's own store, lock and immutability run.
+        BackupBondSeriesRecoveryService,
+        BondSeriesService,
+        BondCatalogService,
+        CurrenciesService,
+        ProviderHealthService,
+        {
+          provide: SeriesHttp,
+          useValue: {
+            gated:
+              () =>
+              (...args: Parameters<BondFetch>) =>
+                door(...args),
+          },
+        },
+        // The first-fetch benchmark refresh and the explicit-fetch allowance are
+        // their own suites' subjects.
+        {
+          provide: BenchmarkRefreshService,
+          useValue: { refreshNeverFetched: async () => undefined },
+        },
+        {
+          provide: AuthAttemptCounterService,
+          useValue: { increment: async () => ({ count: 1 }) },
+        },
         // The REAL re-authentication service, not a double: it is the thing that
         // refuses a restore without a valid artifact, and a mock here would let a
         // future change remove that check with this suite still green. Local-auth
@@ -151,6 +203,10 @@ describe("Backup export/restore round-trip (integration)", () => {
   });
 
   beforeEach(async () => {
+    (extractPdfText as jest.Mock).mockImplementation(async (b: Uint8Array) =>
+      fakePdfText(b),
+    );
+    door = fakeFetch({});
     await dataSource.query(`
       TRUNCATE transaction_tags, transaction_splits, transactions, tags,
         payees, accounts, institutions, categories, user_preferences,
@@ -1145,6 +1201,195 @@ describe("Backup export/restore round-trip (integration)", () => {
       { symbol: "LINKED", source: "bond_engine" },
       { symbol: "UNKNOWN-SERIES", source: "manual" },
     ]);
+  });
+
+  describe("bond series recovery (INV-BOND-008: a restore of the person's own backup)", () => {
+    const CODE = "EDO1036";
+    const SERIES_ID = bondInstrumentId("PL", "PL_MF", CODE);
+    const PROGRAM_ID = bondProgramId("PL", "PL_MF", "EDO");
+
+    /**
+     * User A holds an EDO security linked to its program and two purchases of
+     * `EDO1036`, on a deployment whose catalog holds the series; the backup is
+     * taken, then the catalog is emptied the way a fresh deployment's is
+     * (INV-BOND-008: nothing is stored until a person asks), so the restore into
+     * user B meets a catalog that lacks the series.
+     */
+    async function backupThenEmptyCatalog(email: string) {
+      const userA = await createTestUserDirect(dataSource, { email });
+      const userB = await createTestUserDirect(dataSource, {
+        email: `restore-${email}`,
+      });
+      await dataSource.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active)
+         VALUES ('PLN', 'Zloty', 'zl', 2, true) ON CONFLICT (code) DO NOTHING`,
+      );
+      await dataSource.query(
+        `INSERT INTO bond_programs (id, issuer_country_code, issuer_code, program_code, currency_code)
+         VALUES ($1, 'PL', 'PL_MF', 'EDO', 'PLN')`,
+        [PROGRAM_ID],
+      );
+      await dataSource.query(
+        `INSERT INTO bond_instruments (id, issuer_country_code, issuer_code, program_code, bond_program_id, series_code, currency_code, marketability)
+         VALUES ($1, 'PL', 'PL_MF', 'EDO', $2, $3, 'PLN', 'RETAIL_REDEEMABLE')`,
+        [SERIES_ID, PROGRAM_ID, CODE],
+      );
+      const [{ id: accountId }] = await dataSource.query(
+        `INSERT INTO accounts (user_id, account_type, account_sub_type, name,
+                               currency_code, current_balance, opening_balance)
+         VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', 'Brokerage', 'PLN', 0, 0)
+         RETURNING id`,
+        [userA.id],
+      );
+      const [{ id: securityId }] = await dataSource.query(
+        `INSERT INTO securities (user_id, symbol, name, security_type, currency_code, bond_program_id)
+         VALUES ($1, 'EDO', 'EDO', 'BOND', 'PLN', $2) RETURNING id`,
+        [userA.id, PROGRAM_ID],
+      );
+      for (const [action, date] of [
+        ["BUY", "2026-10-05"],
+        ["ADD_SHARES", "2026-10-06"],
+      ]) {
+        await dataSource.query(
+          `INSERT INTO investment_transactions
+             (user_id, account_id, security_id, bond_instrument_id, action, transaction_date, quantity, price, total_amount, status)
+           VALUES ($1, $2, $3, $4, $5, $6::date, 10, 100, 1000, 'UNRECONCILED')`,
+          [userA.id, accountId, securityId, SERIES_ID, action, date],
+        );
+      }
+
+      const { buffer } = await withUserContext(userA.id, () =>
+        service.exportToBuffer(userA.id),
+      );
+      // The catalog of a fresh deployment: the programs the adapter seeds at
+      // boot, and no series (INV-BOND-008). (CASCADE also removes user A's rows
+      // that referenced the series, which the backup holds.)
+      await dataSource.query(
+        `TRUNCATE bond_instruments, benchmark_series CASCADE`,
+      );
+      return { userB, buffer };
+    }
+
+    const restoredSeries = (userId: string) =>
+      dataSource.query(
+        `SELECT t.action, t.bond_instrument_id
+           FROM investment_transactions t WHERE t.user_id = $1
+          ORDER BY t.transaction_date`,
+        [userId],
+      );
+
+    it("carries the identity of the referenced series in the backup, and no terms", async () => {
+      const { buffer } = await backupThenEmptyCatalog("identity-a@example.com");
+      const exported = JSON.parse(gunzipSync(buffer).toString("utf-8"));
+      expect(exported.bondCatalog).toEqual({
+        series: [
+          {
+            bondInstrumentId: SERIES_ID,
+            issuerCountryCode: "PL",
+            issuerCode: "PL_MF",
+            programCode: "EDO",
+            seriesCode: CODE,
+          },
+        ],
+      });
+      expect(JSON.stringify(exported.bondCatalog)).not.toMatch(
+        /rate|margin|terms/i,
+      );
+    });
+
+    it("fetches the series the catalog lacks, once, and gives the rows their series back", async () => {
+      const { userB, buffer } = await backupThenEmptyCatalog(
+        "recover-a@example.com",
+      );
+      door = fakeFetch(seriesRoutes(CODE, SLUGS.EDO));
+
+      const result = await withUserContext(userB.id, () =>
+        service.restoreData(userB.id, {
+          compressedData: buffer,
+          password: PASSWORD,
+        }),
+      );
+
+      expect(result.unrecoveredBondSeries).toBeUndefined();
+      expect(result.unlinkedBondSeries).toBeUndefined();
+      expect(result.unlinkedBondSecurities).toBeUndefined();
+      // Two rows, one series: the issuer's documents were each read once.
+      const urls = door.mock.calls.map(([url]) => url);
+      expect(urls.length).toBeGreaterThan(0);
+      expect(new Set(urls).size).toBe(urls.length);
+      // The series is in the catalog now, from the official source.
+      const stored = await dataSource.query(
+        `SELECT i.id, v.terms -> 'source' ->> 'provider' AS provider
+           FROM bond_instruments i JOIN bond_terms_versions v ON v.bond_instrument_id = i.id`,
+      );
+      expect(stored).toEqual([
+        { id: SERIES_ID, provider: "obligacjeskarbowe.pl" },
+      ]);
+      // Including an ADD_SHARES row, whose series nothing could re-infer.
+      expect(await restoredSeries(userB.id)).toEqual([
+        { action: "BUY", bond_instrument_id: SERIES_ID },
+        { action: "ADD_SHARES", bond_instrument_id: SERIES_ID },
+      ]);
+      const linked = await dataSource.query(
+        `SELECT bond_program_id FROM securities WHERE user_id = $1`,
+        [userB.id],
+      );
+      expect(linked).toEqual([{ bond_program_id: PROGRAM_ID }]);
+    });
+
+    it("restores the rows without the series and reports it when the official source cannot supply it", async () => {
+      const { userB, buffer } = await backupThenEmptyCatalog(
+        "refused-a@example.com",
+      );
+      // Nothing is served: every request the adapter makes fails.
+      door = fakeFetch({});
+
+      const result = await withUserContext(userB.id, () =>
+        service.restoreData(userB.id, {
+          compressedData: buffer,
+          password: PASSWORD,
+        }),
+      );
+
+      expect(result.unrecoveredBondSeries?.count).toBe(1);
+      expect(result.unrecoveredBondSeries?.series[0]).toMatchObject({
+        issuerCountryCode: "PL",
+        seriesCode: CODE,
+      });
+      expect(result.unlinkedBondSeries?.count).toBe(2);
+      expect(await restoredSeries(userB.id)).toEqual([
+        { action: "BUY", bond_instrument_id: null },
+        { action: "ADD_SHARES", bond_instrument_id: null },
+      ]);
+      // The restore itself succeeded and nothing was stored.
+      expect(
+        await dataSource.query(`SELECT 1 FROM bond_instruments`),
+      ).toHaveLength(0);
+    });
+
+    it("restores a backup without the catalog-identity member exactly as before, fetching nothing", async () => {
+      const { userB, buffer } = await backupThenEmptyCatalog(
+        "legacy-a@example.com",
+      );
+      const legacy = JSON.parse(gunzipSync(buffer).toString("utf-8"));
+      delete legacy.bondCatalog;
+      door = fakeFetch(seriesRoutes(CODE, SLUGS.EDO));
+
+      const result = await withUserContext(userB.id, () =>
+        service.restoreData(userB.id, {
+          compressedData: gzipSync(Buffer.from(JSON.stringify(legacy))),
+          password: PASSWORD,
+        }),
+      );
+
+      expect(door).not.toHaveBeenCalled();
+      expect(result.unrecoveredBondSeries).toBeUndefined();
+      expect(result.unlinkedBondSeries?.count).toBe(2);
+      expect(await restoredSeries(userB.id)).toEqual([
+        { action: "BUY", bond_instrument_id: null },
+        { action: "ADD_SHARES", bond_instrument_id: null },
+      ]);
+    });
   });
 
   it("recomputes the engine prices of a security whose bond link survived, replacing the file's rows (R33)", async () => {

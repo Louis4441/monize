@@ -3,7 +3,6 @@ import { EntityManager } from "typeorm";
 import { resolveCurrencyMetadata } from "../currencies/currency-metadata";
 import { tr } from "../i18n/translate";
 import { boundRestoredNotification } from "./notification-restore-bounds";
-import { dropSeveredBondData } from "./restore-engine-prices";
 import {
   BackupData,
   backupTables,
@@ -12,6 +11,7 @@ import {
 } from "./backup-format";
 import {
   CATALOG_CURRENCY_MATCHED_COLUMNS,
+  CATALOG_ON_SEVERED,
   CATALOG_REFERENCE_COLUMNS,
 } from "./restore-references";
 import {
@@ -518,10 +518,13 @@ export class BackupRestoreDatabaseService {
    * honour, for each entry of `CATALOG_REFERENCE_COLUMNS` (so a column added
    * there is checked here, not just declared).
    *
-   * A catalog table (today `bond_instruments`) is reference data seeded per
-   * deployment and not part of a backup, so a reference survives a restore only
-   * where the same row exists here (a bond instrument's id is derived from its
-   * series, so it is the same id on every deployment). A reference to a row this
+   * A catalog table (`bond_programs`, `bond_instruments`) is reference data
+   * held per deployment and not part of a backup, so a reference survives a
+   * restore only where the same row exists here (a catalog id is derived from
+   * its codes, so it is the same id on every deployment). The series a backup
+   * references are fetched before this runs (`BackupBondSeriesRecoveryService`),
+   * so what is severed here is what this deployment could not obtain.
+   * What else a severed link costs the row is `CATALOG_ON_SEVERED`. A reference to a row this
    * catalog lacks -- a series a newer release seeds, an adapter this build does
    * not install -- is restored as NULL rather than failing the restore on the
    * foreign key. A column in `CATALOG_CURRENCY_MATCHED_COLUMNS` is also dropped
@@ -636,11 +639,10 @@ export class BackupRestoreDatabaseService {
       );
     }
 
-    if (table === "securities" && column === "bond_program_id") {
-      // The engine's rows and the series of rows of a security that is no
-      // longer linked (INV-BOND-005, INV-BOND-007).
-      dropSeveredBondData(data, new Set(severedRows.map((row) => row.id)));
-    }
+    CATALOG_ON_SEVERED.get(`${table}.${column}`)?.(
+      data,
+      new Set(severedRows.map((row) => row.id)),
+    );
     return { count: absent + foreignCurrency, rows: severedRows };
   }
 

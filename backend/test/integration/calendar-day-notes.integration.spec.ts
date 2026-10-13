@@ -22,6 +22,7 @@ import { BackupExportService } from "@/backup/backup-export.service";
 import { BackupRestoreService } from "@/backup/backup-restore.service";
 import { BackupAttachmentTransferService } from "@/backup/backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "@/backup/backup-restore-database.service";
+import { BackupBondSeriesRecoveryService } from "@/backup/backup-bond-series-recovery.service";
 import { NetWorthService } from "@/net-worth/net-worth.service";
 import { OidcReauthService } from "@/auth/oidc/oidc-reauth.service";
 import { EncryptionService } from "@/common/encryption/encryption.service";
@@ -414,7 +415,20 @@ describe("Calendar day notes survive a backup round trip", () => {
         // The restore's bond price recompute is not under test here.
         {
           provide: BondPriceService,
-          useValue: { recomputeSecurity: async () => ({}) },
+          useValue: {
+            recomputeSecurity: async () => ({}),
+            recomputeLinkedSecurities: async () => undefined,
+          },
+        },
+        // The restore's bond series recovery finds nothing to recover here.
+        {
+          provide: BackupBondSeriesRecoveryService,
+          useValue: {
+            recover: async (_userId: string, data: unknown) => ({
+              data,
+              unrecovered: [],
+            }),
+          },
         },
         BackupAttachmentTransferService,
         BackupRestoreDatabaseService,
