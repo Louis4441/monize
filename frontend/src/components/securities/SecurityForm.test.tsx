@@ -1633,7 +1633,7 @@ describe('SecurityForm', () => {
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       expect(screen.getByText('Exchange')).toBeInTheDocument();
       expect(screen.queryByLabelText('Bond kind')).not.toBeInTheDocument();
-      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+      expect(screen.queryByRole('switch', { name: 'Fetch new series of this bond kind automatically' })).not.toBeInTheDocument();
     });
 
     it('shows the program select for Poland, hides Exchange and the GitHub hint, and sends no exchange', async () => {
@@ -1647,7 +1647,7 @@ describe('SecurityForm', () => {
       expect(screen.queryByRole('link', { name: 'GitHub' })).not.toBeInTheDocument();
       await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(3));
       fireEvent.change(select, { target: { value: 'p-edo' } });
-      expect(await screen.findByRole('switch')).toBeInTheDocument();
+      expect(await screen.findByRole('switch', { name: 'Fetch new series of this bond kind automatically' })).toBeInTheDocument();
       fireEvent.click(screen.getByText('Create Security'));
       await waitFor(() => expect(onSubmit).toHaveBeenCalled());
       expect(onSubmit.mock.calls[0][0].exchange).toBeUndefined();
@@ -1697,7 +1697,7 @@ describe('SecurityForm', () => {
       expect(screen.queryByLabelText('Bond kind')).not.toBeInTheDocument();
       fireEvent.change(country, { target: { value: 'PL' } });
       expect((await screen.findByLabelText('Bond kind') as HTMLSelectElement).value).toBe('');
-      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+      expect(screen.queryByRole('switch', { name: 'Fetch new series of this bond kind automatically' })).not.toBeInTheDocument();
     });
   });
 });
