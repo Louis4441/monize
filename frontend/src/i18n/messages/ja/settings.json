@@ -132,7 +132,8 @@
       "datesNumbers": "日付と数値",
       "investments": "投資",
       "transactions": "取引",
-      "application": "アプリケーション"
+      "application": "アプリケーション",
+      "defaultViews": "既定の表示"
     },
     "themeLabel": "テーマ",
     "defaultCurrencyLabel": "デフォルト通貨",
@@ -218,7 +219,23 @@
       "highcontrast": "ハイコントラスト",
       "colorblind": "色覚対応"
     },
-    "timezoneBrowserOption": "ブラウザのタイムゾーンを使用（自動検出: {tz}）"
+    "timezoneBrowserOption": "ブラウザのタイムゾーンを使用（自動検出: {tz}）",
+    "defaultViews": {
+      "intro": "独自の設定がないブラウザ（新しいデバイスやプライベートウィンドウなど）で適用されます。ページ上で変更した設定はそのブラウザに記憶され、こちらより優先されます。",
+      "rowsLabel": "行の密度",
+      "hideRegisterYearLabel": "登録簿の日付で年を非表示にする",
+      "chartCollapsedLabel": "取引ページのグラフを折りたたんだ状態で開始する",
+      "widgetsCollapsedLabel": "口座・支払先・カテゴリの情報を折りたたんだ状態で開始する",
+      "accountOpenTargetLabel": "口座を開くとき",
+      "accountOpenTargetOptions": {
+        "register": "取引を表示する",
+        "dashboard": "ダッシュボードを表示する"
+      },
+      "accountOpenTargetHelp": "口座ページまたはダッシュボードのお気に入りの勘定科目で口座をクリックしたときに適用されます。",
+      "applyHere": "このブラウザでこれらの既定を使用する",
+      "applyHereHelp": "このブラウザに保存されている表示設定を消去し、上記の既定がここでも適用されるようにします。",
+      "appliedHere": "このブラウザで既定の表示を使用するようになりました"
+    }
   },
   "notifications": {
     "heading": "通知",

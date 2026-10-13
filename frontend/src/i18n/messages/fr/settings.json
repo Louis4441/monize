@@ -132,7 +132,8 @@
       "datesNumbers": "Dates et nombres",
       "investments": "Investissements",
       "transactions": "Transactions",
-      "application": "Application"
+      "application": "Application",
+      "defaultViews": "Vues par défaut"
     },
     "themeLabel": "Thème",
     "defaultCurrencyLabel": "Devise par défaut",
@@ -218,7 +219,23 @@
       "highcontrast": "Contraste élevé",
       "colorblind": "Adapté aux daltoniens"
     },
-    "timezoneBrowserOption": "Utiliser le fuseau horaire du navigateur (détecté automatiquement : {tz})"
+    "timezoneBrowserOption": "Utiliser le fuseau horaire du navigateur (détecté automatiquement : {tz})",
+    "defaultViews": {
+      "intro": "Ces réglages s’appliquent dans tout navigateur qui n’a pas de réglage propre, comme un nouvel appareil ou une fenêtre privée. Une modification faite sur une page est mémorisée par ce navigateur et a la priorité.",
+      "rowsLabel": "Densité des lignes",
+      "hideRegisterYearLabel": "Masquer l’année dans les dates du registre",
+      "chartCollapsedLabel": "Afficher d’abord le graphique de la page Transactions replié",
+      "widgetsCollapsedLabel": "Afficher d’abord les informations de compte, de bénéficiaire et de catégorie repliées",
+      "accountOpenTargetLabel": "Quand j’ouvre un compte",
+      "accountOpenTargetOptions": {
+        "register": "Afficher ses transactions",
+        "dashboard": "Afficher son tableau de bord"
+      },
+      "accountOpenTargetHelp": "S’applique lorsque vous cliquez sur un compte dans la page Comptes ou dans Comptes favoris du tableau de bord.",
+      "applyHere": "Utiliser ces réglages dans ce navigateur",
+      "applyHereHelp": "Efface les réglages d’affichage enregistrés par ce navigateur, pour que les valeurs ci-dessus s’appliquent ici aussi.",
+      "appliedHere": "Ce navigateur utilise maintenant vos vues par défaut"
+    }
   },
   "notifications": {
     "heading": "Notifications",

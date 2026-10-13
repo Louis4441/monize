@@ -582,6 +582,11 @@
       "log": "Лог",
       "autoTitle": "Авто ({scale})",
       "scaleTitle": "Масштаб {label}"
+    },
+    "collapse": {
+      "hide": "Скрыть график",
+      "show": "Показать график",
+      "hidden": "График скрыт"
     }
   },
   "toasts": {

@@ -132,7 +132,8 @@
       "datesNumbers": "Ngày & Số",
       "investments": "Đầu tư",
       "transactions": "Giao dịch",
-      "application": "Ứng dụng"
+      "application": "Ứng dụng",
+      "defaultViews": "Chế độ xem mặc định"
     },
     "themeLabel": "Giao diện",
     "defaultCurrencyLabel": "Tiền tệ mặc định",
@@ -218,7 +219,23 @@
       "highcontrast": "Độ tương phản cao",
       "colorblind": "An toàn cho người mù màu"
     },
-    "timezoneBrowserOption": "Sử dụng múi giờ trình duyệt (tự động phát hiện là {tz})"
+    "timezoneBrowserOption": "Sử dụng múi giờ trình duyệt (tự động phát hiện là {tz})",
+    "defaultViews": {
+      "intro": "Áp dụng trong mọi trình duyệt chưa có cài đặt riêng, chẳng hạn thiết bị mới hoặc cửa sổ riêng tư. Thay đổi bạn thực hiện trên một trang sẽ được trình duyệt đó ghi nhớ và được ưu tiên.",
+      "rowsLabel": "Mật độ hàng",
+      "hideRegisterYearLabel": "Ẩn năm trong ngày của sổ giao tác",
+      "chartCollapsedLabel": "Bắt đầu với biểu đồ trên trang Giao tác được thu gọn",
+      "widgetsCollapsedLabel": "Bắt đầu với thông tin tài khoản, người nhận và danh mục được thu gọn",
+      "accountOpenTargetLabel": "Khi tôi mở một tài khoản",
+      "accountOpenTargetOptions": {
+        "register": "Hiển thị giao tác của tài khoản",
+        "dashboard": "Hiển thị bảng điều khiển của tài khoản"
+      },
+      "accountOpenTargetHelp": "Áp dụng khi bạn nhấp vào một tài khoản trên trang Tài khoản hoặc trong Tài khoản yêu thích trên bảng điều khiển.",
+      "applyHere": "Dùng các mặc định này trong trình duyệt này",
+      "applyHereHelp": "Xóa các cài đặt hiển thị mà trình duyệt này đã lưu, để các mặc định ở trên cũng áp dụng tại đây.",
+      "appliedHere": "Trình duyệt này hiện dùng chế độ xem mặc định của bạn"
+    }
   },
   "notifications": {
     "heading": "Thông báo",

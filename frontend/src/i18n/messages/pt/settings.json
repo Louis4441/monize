@@ -132,7 +132,8 @@
       "datesNumbers": "Datas e números",
       "investments": "Investimentos",
       "transactions": "Transações",
-      "application": "Aplicação"
+      "application": "Aplicação",
+      "defaultViews": "Vistas predefinidas"
     },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Moeda Predefinida",
@@ -218,7 +219,23 @@
       "highcontrast": "Alto contraste",
       "colorblind": "Seguro para daltónicos"
     },
-    "timezoneBrowserOption": "Utilizar fuso horário do browser (detetado automaticamente como {tz})"
+    "timezoneBrowserOption": "Utilizar fuso horário do browser (detetado automaticamente como {tz})",
+    "defaultViews": {
+      "intro": "Aplicam-se em qualquer navegador sem definição própria, como um novo dispositivo ou uma janela privada. Uma alteração feita numa página fica memorizada nesse navegador e tem prioridade.",
+      "rowsLabel": "Densidade das linhas",
+      "hideRegisterYearLabel": "Ocultar o ano nas datas do registo",
+      "chartCollapsedLabel": "Começar com o gráfico da página Transações recolhido",
+      "widgetsCollapsedLabel": "Começar com as informações de conta, beneficiário e categoria recolhidas",
+      "accountOpenTargetLabel": "Quando abro uma conta",
+      "accountOpenTargetOptions": {
+        "register": "Mostrar as suas transações",
+        "dashboard": "Mostrar o seu painel"
+      },
+      "accountOpenTargetHelp": "Aplica-se ao clicar numa conta na página Contas ou em Contas Favoritas no painel.",
+      "applyHere": "Usar estas predefinições neste navegador",
+      "applyHereHelp": "Limpa as definições de vista guardadas por este navegador, para que as predefinições acima também se apliquem aqui.",
+      "appliedHere": "Este navegador usa agora as suas vistas predefinidas"
+    }
   },
   "notifications": {
     "heading": "Notificações",

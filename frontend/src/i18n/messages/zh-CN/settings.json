@@ -132,7 +132,8 @@
       "datesNumbers": "日期与数字",
       "investments": "投资",
       "transactions": "交易",
-      "application": "应用"
+      "application": "应用",
+      "defaultViews": "默认视图"
     },
     "themeLabel": "主题",
     "defaultCurrencyLabel": "默认货币",
@@ -218,7 +219,23 @@
       "highcontrast": "高对比度",
       "colorblind": "色盲友好"
     },
-    "timezoneBrowserOption": "使用浏览器时区（自动检测为 {tz}）"
+    "timezoneBrowserOption": "使用浏览器时区（自动检测为 {tz}）",
+    "defaultViews": {
+      "intro": "适用于任何没有自身设置的浏览器，例如新设备或隐私窗口。您在页面上所做的更改会被该浏览器记住，并优先生效。",
+      "rowsLabel": "行密度",
+      "hideRegisterYearLabel": "在登记簿日期中隐藏年份",
+      "chartCollapsedLabel": "交易页面的图表默认折叠",
+      "widgetsCollapsedLabel": "账户、收款人和类别信息默认折叠",
+      "accountOpenTargetLabel": "打开账户时",
+      "accountOpenTargetOptions": {
+        "register": "显示其交易",
+        "dashboard": "显示其仪表板"
+      },
+      "accountOpenTargetHelp": "在“账户”页面或仪表板的“收藏账户”中点击账户时适用。",
+      "applyHere": "在此浏览器中使用这些默认设置",
+      "applyHereHelp": "清除此浏览器已保存的视图设置，使上述默认设置在此处也生效。",
+      "appliedHere": "此浏览器现在使用您的默认视图"
+    }
   },
   "notifications": {
     "heading": "通知",

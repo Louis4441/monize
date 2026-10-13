@@ -132,7 +132,8 @@
       "datesNumbers": "Tanggal & Angka",
       "investments": "Investasi",
       "transactions": "Transaksi",
-      "application": "Aplikasi"
+      "application": "Aplikasi",
+      "defaultViews": "Tampilan default"
     },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Mata Uang Bawaan",
@@ -218,7 +219,23 @@
       "highcontrast": "Kontras tinggi",
       "colorblind": "Aman untuk buta warna"
     },
-    "timezoneBrowserOption": "Gunakan zona waktu browser (terdeteksi otomatis sebagai {tz})"
+    "timezoneBrowserOption": "Gunakan zona waktu browser (terdeteksi otomatis sebagai {tz})",
+    "defaultViews": {
+      "intro": "Ini berlaku di browser mana pun yang tidak memiliki pengaturan sendiri, seperti perangkat baru atau jendela pribadi. Perubahan yang Anda buat di suatu halaman diingat oleh browser tersebut dan diutamakan.",
+      "rowsLabel": "Kepadatan baris",
+      "hideRegisterYearLabel": "Sembunyikan tahun pada tanggal register",
+      "chartCollapsedLabel": "Mulai dengan grafik di halaman Transaksi diciutkan",
+      "widgetsCollapsedLabel": "Mulai dengan info akun, penerima, dan kategori diciutkan",
+      "accountOpenTargetLabel": "Saat saya membuka akun",
+      "accountOpenTargetOptions": {
+        "register": "Tampilkan transaksinya",
+        "dashboard": "Tampilkan dasbornya"
+      },
+      "accountOpenTargetHelp": "Berlaku saat Anda mengklik akun di halaman Akun atau di Akun Favorit pada dasbor.",
+      "applyHere": "Gunakan default ini di browser ini",
+      "applyHereHelp": "Menghapus pengaturan tampilan yang disimpan browser ini, sehingga default di atas juga berlaku di sini.",
+      "appliedHere": "Browser ini sekarang menggunakan tampilan default Anda"
+    }
   },
   "notifications": {
     "heading": "Notifikasi",

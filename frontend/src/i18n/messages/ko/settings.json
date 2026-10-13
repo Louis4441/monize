@@ -132,7 +132,8 @@
       "datesNumbers": "날짜 및 숫자",
       "investments": "투자",
       "transactions": "거래",
-      "application": "애플리케이션"
+      "application": "애플리케이션",
+      "defaultViews": "기본 보기"
     },
     "themeLabel": "테마",
     "defaultCurrencyLabel": "기본 통화",
@@ -218,7 +219,23 @@
       "highcontrast": "고대비",
       "colorblind": "색맹 안전"
     },
-    "timezoneBrowserOption": "브라우저 시간대 사용 ({tz}로 자동 감지됨)"
+    "timezoneBrowserOption": "브라우저 시간대 사용 ({tz}로 자동 감지됨)",
+    "defaultViews": {
+      "intro": "자체 설정이 없는 모든 브라우저(새 기기나 비공개 창 등)에 적용됩니다. 페이지에서 변경한 설정은 해당 브라우저에 저장되며 이 설정보다 우선합니다.",
+      "rowsLabel": "행 밀도",
+      "hideRegisterYearLabel": "거래 목록 날짜에서 연도 숨기기",
+      "chartCollapsedLabel": "거래 페이지의 차트를 접은 상태로 시작",
+      "widgetsCollapsedLabel": "계정, 수취인, 카테고리 정보를 접은 상태로 시작",
+      "accountOpenTargetLabel": "계정을 열 때",
+      "accountOpenTargetOptions": {
+        "register": "거래 내역 표시",
+        "dashboard": "대시보드 표시"
+      },
+      "accountOpenTargetHelp": "계정 페이지나 대시보드의 즐겨찾기 계정에서 계정을 클릭할 때 적용됩니다.",
+      "applyHere": "이 브라우저에서 이 기본값 사용",
+      "applyHereHelp": "이 브라우저에 저장된 보기 설정을 지워 위의 기본값이 여기에서도 적용되도록 합니다.",
+      "appliedHere": "이제 이 브라우저에서 기본 보기를 사용합니다"
+    }
   },
   "notifications": {
     "heading": "알림",

@@ -132,7 +132,8 @@
       "datesNumbers": "Date e numeri",
       "investments": "Investimenti",
       "transactions": "Transazioni",
-      "application": "Applicazione"
+      "application": "Applicazione",
+      "defaultViews": "Viste predefinite"
     },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Valuta predefinita",
@@ -218,7 +219,23 @@
       "highcontrast": "Alto contrasto",
       "colorblind": "Accessibile per daltonici"
     },
-    "timezoneBrowserOption": "Usa fuso orario del browser (rilevato automaticamente: {tz})"
+    "timezoneBrowserOption": "Usa fuso orario del browser (rilevato automaticamente: {tz})",
+    "defaultViews": {
+      "intro": "Si applicano in qualsiasi browser che non abbia un'impostazione propria, come un nuovo dispositivo o una finestra privata. Una modifica fatta in una pagina viene ricordata da quel browser e ha la precedenza.",
+      "rowsLabel": "Densità righe",
+      "hideRegisterYearLabel": "Nascondi l’anno nelle date del registro",
+      "chartCollapsedLabel": "Inizia con il grafico della pagina Transazioni compresso",
+      "widgetsCollapsedLabel": "Inizia con le info di conto, beneficiario e categoria compresse",
+      "accountOpenTargetLabel": "Quando apro un conto",
+      "accountOpenTargetOptions": {
+        "register": "Mostra le sue transazioni",
+        "dashboard": "Mostra la sua dashboard"
+      },
+      "accountOpenTargetHelp": "Si applica quando fai clic su un conto nella pagina Conti o in Conti preferiti nella dashboard.",
+      "applyHere": "Usa queste impostazioni in questo browser",
+      "applyHereHelp": "Cancella le impostazioni di visualizzazione salvate da questo browser, così le impostazioni predefinite qui sopra valgono anche qui.",
+      "appliedHere": "Questo browser ora usa le tue viste predefinite"
+    }
   },
   "notifications": {
     "heading": "Notifiche",

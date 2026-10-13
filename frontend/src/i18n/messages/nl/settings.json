@@ -132,7 +132,8 @@
       "datesNumbers": "Datums & getallen",
       "investments": "Beleggingen",
       "transactions": "Transacties",
-      "application": "Applicatie"
+      "application": "Applicatie",
+      "defaultViews": "Standaardweergaven"
     },
     "themeLabel": "Thema",
     "defaultCurrencyLabel": "Standaardvaluta",
@@ -218,7 +219,23 @@
       "highcontrast": "Hoog contrast",
       "colorblind": "Kleurenblindveilig"
     },
-    "timezoneBrowserOption": "Browsertijdzone gebruiken (automatisch gedetecteerd als {tz})"
+    "timezoneBrowserOption": "Browsertijdzone gebruiken (automatisch gedetecteerd als {tz})",
+    "defaultViews": {
+      "intro": "Deze gelden in elke browser zonder eigen instelling, zoals een nieuw apparaat of een privévenster. Een wijziging die je op een pagina maakt, onthoudt die browser en heeft voorrang.",
+      "rowsLabel": "Rijdichtheid",
+      "hideRegisterYearLabel": "Jaar verbergen in registerdatums",
+      "chartCollapsedLabel": "Beginnen met de grafiek op de pagina Transacties ingeklapt",
+      "widgetsCollapsedLabel": "Beginnen met de rekening-, begunstigde- en categorie-info ingeklapt",
+      "accountOpenTargetLabel": "Als ik een rekening open",
+      "accountOpenTargetOptions": {
+        "register": "De transacties tonen",
+        "dashboard": "Het dashboard tonen"
+      },
+      "accountOpenTargetHelp": "Geldt als je op een rekening klikt op de pagina Rekeningen of bij Favoriete rekeningen op het dashboard.",
+      "applyHere": "Deze standaarden in deze browser gebruiken",
+      "applyHereHelp": "Wist de weergave-instellingen die deze browser heeft opgeslagen, zodat de standaarden hierboven ook hier gelden.",
+      "appliedHere": "Deze browser gebruikt nu je standaardweergaven"
+    }
   },
   "notifications": {
     "heading": "Meldingen",

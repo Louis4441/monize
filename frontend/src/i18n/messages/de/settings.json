@@ -132,7 +132,8 @@
       "datesNumbers": "Datum & Zahlen",
       "investments": "Investitionen",
       "transactions": "Buchungen",
-      "application": "Anwendung"
+      "application": "Anwendung",
+      "defaultViews": "Standardansichten"
     },
     "themeLabel": "Design",
     "defaultCurrencyLabel": "Standardwährung",
@@ -218,7 +219,23 @@
       "highcontrast": "Hoher Kontrast",
       "colorblind": "Farbenblind-sicher"
     },
-    "timezoneBrowserOption": "Browser-Zeitzone verwenden (automatisch erkannt: {tz})"
+    "timezoneBrowserOption": "Browser-Zeitzone verwenden (automatisch erkannt: {tz})",
+    "defaultViews": {
+      "intro": "Diese Einstellungen gelten in jedem Browser ohne eigene Einstellung, etwa auf einem neuen Gerät oder in einem privaten Fenster. Eine Änderung, die Sie auf einer Seite vornehmen, merkt sich der jeweilige Browser, und sie hat Vorrang.",
+      "rowsLabel": "Zeilendichte",
+      "hideRegisterYearLabel": "Jahr bei Buchungsdaten ausblenden",
+      "chartCollapsedLabel": "Diagramm auf der Seite „Buchungen“ zunächst eingeklappt anzeigen",
+      "widgetsCollapsedLabel": "Konto-, Zahlungsempfänger- und Kategorieinformationen zunächst eingeklappt anzeigen",
+      "accountOpenTargetLabel": "Wenn ich ein Konto öffne",
+      "accountOpenTargetOptions": {
+        "register": "Buchungen des Kontos anzeigen",
+        "dashboard": "Kontoübersicht anzeigen"
+      },
+      "accountOpenTargetHelp": "Gilt, wenn Sie auf der Seite „Konten“ oder unter „Favoritenkonten“ im Dashboard auf ein Konto klicken.",
+      "applyHere": "Diese Standards in diesem Browser verwenden",
+      "applyHereHelp": "Löscht die Ansichtseinstellungen, die dieser Browser gespeichert hat, damit die obigen Standards auch hier gelten.",
+      "appliedHere": "Dieser Browser verwendet jetzt Ihre Standardansichten"
+    }
   },
   "notifications": {
     "heading": "Benachrichtigungen",

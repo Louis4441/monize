@@ -132,7 +132,8 @@
       "datesNumbers": "Datas e números",
       "investments": "Investimentos",
       "transactions": "Transações",
-      "application": "Aplicativo"
+      "application": "Aplicativo",
+      "defaultViews": "Visualizações padrão"
     },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Moeda Padrão",
@@ -218,7 +219,23 @@
       "highcontrast": "Alto contraste",
       "colorblind": "Seguro para daltônicos"
     },
-    "timezoneBrowserOption": "Usar fuso horário do navegador (detectado automaticamente como {tz})"
+    "timezoneBrowserOption": "Usar fuso horário do navegador (detectado automaticamente como {tz})",
+    "defaultViews": {
+      "intro": "Valem em qualquer navegador que não tenha uma configuração própria, como um dispositivo novo ou uma janela anônima. Uma alteração que você faz em uma página fica salva nesse navegador e tem prioridade.",
+      "rowsLabel": "Densidade das linhas",
+      "hideRegisterYearLabel": "Ocultar o ano nas datas do registro",
+      "chartCollapsedLabel": "Começar com o gráfico da página Transações recolhido",
+      "widgetsCollapsedLabel": "Começar com as informações de conta, beneficiário e categoria recolhidas",
+      "accountOpenTargetLabel": "Quando eu abrir uma conta",
+      "accountOpenTargetOptions": {
+        "register": "Mostrar suas transações",
+        "dashboard": "Mostrar seu painel"
+      },
+      "accountOpenTargetHelp": "Vale ao clicar em uma conta na página Contas ou em Contas Favoritas no painel.",
+      "applyHere": "Usar estes padrões neste navegador",
+      "applyHereHelp": "Limpa as configurações de visualização salvas por este navegador, para que os padrões acima também valham aqui.",
+      "appliedHere": "Este navegador agora usa suas visualizações padrão"
+    }
   },
   "notifications": {
     "heading": "Notificações",

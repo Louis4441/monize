@@ -582,6 +582,11 @@
       "log": "対数",
       "autoTitle": "自動（{scale}）",
       "scaleTitle": "{label}スケール"
+    },
+    "collapse": {
+      "hide": "グラフを非表示",
+      "show": "グラフを表示",
+      "hidden": "グラフは非表示です"
     }
   },
   "toasts": {

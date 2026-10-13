@@ -582,6 +582,11 @@
       "log": "Logaritmik",
       "autoTitle": "Otomatik ({scale})",
       "scaleTitle": "{label} ölçeği"
+    },
+    "collapse": {
+      "hide": "Grafiği gizle",
+      "show": "Grafiği göster",
+      "hidden": "Grafik gizli"
     }
   },
   "toasts": {

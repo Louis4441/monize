@@ -582,6 +582,11 @@
       "log": "로그",
       "autoTitle": "자동 ({scale})",
       "scaleTitle": "{label} 눈금"
+    },
+    "collapse": {
+      "hide": "차트 숨기기",
+      "show": "차트 표시",
+      "hidden": "차트 숨김"
     }
   },
   "toasts": {

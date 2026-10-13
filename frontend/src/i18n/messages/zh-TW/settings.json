@@ -132,7 +132,8 @@
       "datesNumbers": "日期與數字",
       "investments": "投資",
       "transactions": "交易",
-      "application": "應用程式"
+      "application": "應用程式",
+      "defaultViews": "預設檢視"
     },
     "themeLabel": "主題",
     "defaultCurrencyLabel": "預設貨幣",
@@ -218,7 +219,23 @@
       "highcontrast": "高對比",
       "colorblind": "色盲安全"
     },
-    "timezoneBrowserOption": "使用瀏覽器時區（自動偵測為 {tz}）"
+    "timezoneBrowserOption": "使用瀏覽器時區（自動偵測為 {tz}）",
+    "defaultViews": {
+      "intro": "適用於任何沒有自身設定的瀏覽器，例如新裝置或私密視窗。您在頁面上所做的變更會由該瀏覽器記住，並優先生效。",
+      "rowsLabel": "列間距",
+      "hideRegisterYearLabel": "在登記簿日期中隱藏年份",
+      "chartCollapsedLabel": "交易頁面的圖表預設收合",
+      "widgetsCollapsedLabel": "科目、收款人和類別資訊預設收合",
+      "accountOpenTargetLabel": "開啟科目時",
+      "accountOpenTargetOptions": {
+        "register": "顯示其交易",
+        "dashboard": "顯示其儀表板"
+      },
+      "accountOpenTargetHelp": "在「科目」頁面或儀表板的「我的最愛科目」中點按科目時適用。",
+      "applyHere": "在此瀏覽器中使用這些預設值",
+      "applyHereHelp": "清除此瀏覽器已儲存的檢視設定，使上述預設值在此處也生效。",
+      "appliedHere": "此瀏覽器現在使用您的預設檢視"
+    }
   },
   "notifications": {
     "heading": "通知",

@@ -582,6 +582,11 @@
       "log": "Log",
       "autoTitle": "Auto ({scale})",
       "scaleTitle": "Échelle {label}"
+    },
+    "collapse": {
+      "hide": "Masquer le graphique",
+      "show": "Afficher le graphique",
+      "hidden": "Graphique masqué"
     }
   },
   "toasts": {
