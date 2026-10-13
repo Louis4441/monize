@@ -112,4 +112,43 @@ export const NOTIFICATION_EMAIL_MESSAGES = {
   "budget.seasonalTitle": "Seasonal spike expected for {{ category }}",
   "budget.seasonalMessage":
     "Last {{ month }} you spent {{ increase }}x your usual on {{ category }}. Consider adjusting your budget.",
+  "bond.maturitySoonTitle": "{{ series }} matures on {{ date }}",
+  "bond.maturitySoonMessage":
+    "{{ quantity }} x {{ series }} mature on {{ date }}. {{ payout }}",
+  "bond.interestTitle": "{{ series }}: interest payment today",
+  "bond.interestMessage":
+    "{{ quantity }} x {{ series }} pay {{ amount }} of interest on {{ date }}. Book it on the security page if it is not in your account yet.",
+  "bond.interestMessageUnknown":
+    "{{ quantity }} x {{ series }} pay interest on {{ date }}. The amount is not known yet: a rate it depends on is not published.",
+  "bond.rateResetTitle": "{{ series }}: new interest period",
+  "bond.rateResetMessage":
+    "{{ series }} entered period {{ period }} on {{ date }} at {{ rate }} a year.",
+  "bond.unbookedTitle": "{{ series }}: matured, redemption not booked",
+  "bond.unbookedMessage":
+    "{{ quantity }} x {{ series }} matured on {{ date }} and no redemption is booked. {{ payout }} Book the redemption on the security page.",
+  "bond.payoutKnown": "The payout is {{ payout }}.",
+  "bond.payoutUnknown": "The payout is not known yet: {{ reason }}.",
+  "bond.reason.RATE_UNKNOWN": "a rate it depends on is not published yet",
+  "bond.reason.TERMS_INCOMPLETE": "the terms of the series are incomplete",
+  "bond.reason.PURCHASE_OUTSIDE_SALE_WINDOW":
+    "a purchase date is outside the sale window of the series",
+  "bond.reason.other": "it cannot be worked out from the data stored",
+  "bond.benchmarkTitle": "{{ benchmark }}: new observation {{ observation }}",
+  "bond.benchmarkMessage":
+    "{{ publisher }} published {{ benchmark }} for {{ observation }}: {{ value }}. It is read by {{ series }}.",
+  "bond.benchmarkMessageMore":
+    "{{ publisher }} published {{ benchmark }} for {{ observation }}: {{ value }}. It is read by {{ series }} and {{ more }} more.",
+  "bond.missingTitle": "Bond figures are not known yet",
+  "bond.missingMessage":
+    "Some bond figures cannot be worked out: {{ causes }}.",
+  "bond.cause.observation":
+    "the {{ observation }} observation of {{ benchmark }} ({{ publisher }}) is not stored: it is not published yet, or the feed has not been fetched since; refresh on the bond page",
+  "bond.cause.observationNoPublisher":
+    "the {{ observation }} observation of {{ benchmark }} is not stored: it is not published yet, or the feed has not been fetched since; refresh on the bond page",
+  "bond.cause.terms":
+    "the terms of {{ series }} are incomplete; refresh the series on the bond page",
+  "bond.cause.purchase":
+    "a purchase of {{ series }} on {{ date }} is outside its sale window ({{ from }} to {{ to }}); correct the purchase date",
+  "bond.cause.lots":
+    "the lots cannot be derived from the ledger ({{ code }}); correct the ledger",
 } as const;

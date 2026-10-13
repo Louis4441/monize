@@ -75,6 +75,10 @@ export const PUSH_CATEGORY_COPY: Readonly<
     title: "Email receipts need attention",
     body: "Some emails in your receipts inbox need a profile or a fix. Open Monize for the details.",
   },
+  [NotificationCategory.BONDS]: {
+    title: "Bond notice",
+    body: "One of your bonds has news. Open Monize for the details.",
+  },
 };
 
 export interface NotifyOptions {

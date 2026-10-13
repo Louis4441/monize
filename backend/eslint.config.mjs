@@ -244,6 +244,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   // that reuses the report materializer and dispatches a notification. No
   // request behind it (docs/specs/gem-signal-change-notifications.md).
   "src/strategies/gem-signal-change-alert.service.ts",
+  // Bond notification cron: a deployment-wide fan-out (system context to list
+  // the owners of bond-linked securities) then a per-user body (withUserContext)
+  // that reads the engine valuation and dispatches notifications. No request
+  // behind it (docs/specs/bond-notifications.md).
+  "src/bonds/bond-notification.service.ts",
   // System alerts: every caller is a cron catch, a post-claim hook or a
   // bootstrap hook with no request behind it, so the service seeds its own
   // context -- system for the admin fan-out, user for a per-user alert

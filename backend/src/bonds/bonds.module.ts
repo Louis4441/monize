@@ -1,10 +1,12 @@
 import { CurrenciesModule } from "../currencies/currencies.module";
 import { Module, forwardRef } from "@nestjs/common";
 import { NetWorthModule } from "../net-worth/net-worth.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { ProviderHealthModule } from "../provider-health/provider-health.module";
 import { BenchmarkRefreshService } from "./benchmark-refresh.service";
 import { BondCatalogService } from "./bond-catalog.service";
 import { BondHoldingsService } from "./bond-holdings.service";
+import { BondNotificationService } from "./bond-notification.service";
 import { BondOfferService } from "./bond-offer.service";
 import { BondPriceService } from "./bond-price.service";
 import { BondSeriesService } from "./bond-series.service";
@@ -22,6 +24,8 @@ import { SeriesHttp } from "./series-http";
     forwardRef(() => NetWorthModule),
     // The catalog seed creates an instrument's currency on demand.
     forwardRef(() => CurrenciesModule),
+    // For NotificationDispatchService: the daily bond notification cron.
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [BondsController],
   providers: [
@@ -33,6 +37,7 @@ import { SeriesHttp } from "./series-http";
     BondSeriesService,
     BondOfferService,
     BondHoldingsService,
+    BondNotificationService,
   ],
   exports: [BondValuationService, BondPriceService, BondSeriesService],
 })

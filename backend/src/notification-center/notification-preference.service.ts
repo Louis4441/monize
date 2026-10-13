@@ -34,6 +34,7 @@ export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[]
     NotificationCategory.BANK_SYNC,
     NotificationCategory.BANK_SYNC_ACTIVITY,
     NotificationCategory.EMAIL_RECEIPTS,
+    NotificationCategory.BONDS,
   ];
 
 /**
@@ -147,6 +148,14 @@ export const NOTIFICATION_CATEGORY_CHANNELS: Record<
     push: true,
     unifiedpush: true,
   },
+  // Bond maturities, coupons, rate resets and missing data are user-facing
+  // financial news: every channel is a live control.
+  [NotificationCategory.BONDS]: {
+    email: true,
+    emailNotification: true,
+    push: true,
+    unifiedpush: true,
+  },
 };
 
 /** A category's channel state when the user has stored no row for it. */
@@ -197,6 +206,7 @@ export const NOTIFICATION_CATEGORY_DEFAULTS: Readonly<
   // Receipts waiting for a profile or a fix keep the global rule: the bell and
   // the report email, nothing interrupting until the user turns it on.
   [NotificationCategory.EMAIL_RECEIPTS]: GLOBAL_DEFAULTS,
+  [NotificationCategory.BONDS]: GLOBAL_DEFAULTS,
 };
 
 /**

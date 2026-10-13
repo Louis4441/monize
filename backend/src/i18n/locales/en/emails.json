@@ -328,6 +328,37 @@
       "importedMessage": "Transactions imported from {{ institution }} by the daily sync: {{ imported }}.",
       "importedNoneTitle": "{{ institution }}: no new transactions",
       "importedNoneMessage": "The daily sync of {{ institution }} found no new transactions."
+    },
+    "bond": {
+      "maturitySoonTitle": "{{ series }} matures on {{ date }}",
+      "maturitySoonMessage": "{{ quantity }} x {{ series }} mature on {{ date }}. {{ payout }}",
+      "interestTitle": "{{ series }}: interest payment today",
+      "interestMessage": "{{ quantity }} x {{ series }} pay {{ amount }} of interest on {{ date }}. Book it on the security page if it is not in your account yet.",
+      "interestMessageUnknown": "{{ quantity }} x {{ series }} pay interest on {{ date }}. The amount is not known yet: a rate it depends on is not published.",
+      "rateResetTitle": "{{ series }}: new interest period",
+      "rateResetMessage": "{{ series }} entered period {{ period }} on {{ date }} at {{ rate }} a year.",
+      "unbookedTitle": "{{ series }}: matured, redemption not booked",
+      "unbookedMessage": "{{ quantity }} x {{ series }} matured on {{ date }} and no redemption is booked. {{ payout }} Book the redemption on the security page.",
+      "payoutKnown": "The payout is {{ payout }}.",
+      "payoutUnknown": "The payout is not known yet: {{ reason }}.",
+      "reason": {
+        "RATE_UNKNOWN": "a rate it depends on is not published yet",
+        "TERMS_INCOMPLETE": "the terms of the series are incomplete",
+        "PURCHASE_OUTSIDE_SALE_WINDOW": "a purchase date is outside the sale window of the series",
+        "other": "it cannot be worked out from the data stored"
+      },
+      "benchmarkTitle": "{{ benchmark }}: new observation {{ observation }}",
+      "benchmarkMessage": "{{ publisher }} published {{ benchmark }} for {{ observation }}: {{ value }}. It is read by {{ series }}.",
+      "benchmarkMessageMore": "{{ publisher }} published {{ benchmark }} for {{ observation }}: {{ value }}. It is read by {{ series }} and {{ more }} more.",
+      "missingTitle": "Bond figures are not known yet",
+      "missingMessage": "Some bond figures cannot be worked out: {{ causes }}.",
+      "cause": {
+        "observation": "the {{ observation }} observation of {{ benchmark }} ({{ publisher }}) is not stored: it is not published yet, or the feed has not been fetched since; refresh on the bond page",
+        "observationNoPublisher": "the {{ observation }} observation of {{ benchmark }} is not stored: it is not published yet, or the feed has not been fetched since; refresh on the bond page",
+        "terms": "the terms of {{ series }} are incomplete; refresh the series on the bond page",
+        "purchase": "a purchase of {{ series }} on {{ date }} is outside its sale window ({{ from }} to {{ to }}); correct the purchase date",
+        "lots": "the lots cannot be derived from the ledger ({{ code }}); correct the ledger"
+      }
     }
   },
   "backupOffsite": {
