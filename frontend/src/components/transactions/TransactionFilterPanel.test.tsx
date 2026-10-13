@@ -775,7 +775,7 @@ describe('TransactionFilterPanel', () => {
     it('shows the search placeholder text', () => {
       render(<TransactionFilterPanel {...defaultProps} filtersExpanded={true} />);
 
-      const searchInput = screen.getByPlaceholderText('Search payee, category, amount, tag, description, reference #...');
+      const searchInput = screen.getByPlaceholderText('Search, or try #10 or payee:costco');
       expect(searchInput).toBeInTheDocument();
     });
   });
