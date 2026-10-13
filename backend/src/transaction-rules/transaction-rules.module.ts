@@ -20,7 +20,8 @@ import { TransactionsModule } from "../transactions/transactions.module";
 @Module({
   imports: [
     TypeOrmModule.forFeature([TransactionRule, TransactionRuleApplication]),
-    TagsModule,
+    // forwardRef: TagsModule reaches back here through DelegationModule.
+    forwardRef(() => TagsModule),
     AiReviewModule,
     ActionHistoryModule,
     // Name resolution for the assistant and MCP rule tools. forwardRef: both

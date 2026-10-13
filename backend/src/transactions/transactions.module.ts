@@ -42,7 +42,8 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     // PayeesModule reaches DelegationModule (the payee detail page's delegate
     // scope), which reaches back here -- see `src/module-graph.spec.ts`.
     forwardRef(() => PayeesModule),
-    TagsModule,
+    // forwardRef: TagsModule reaches back here through DelegationModule.
+    forwardRef(() => TagsModule),
     // The rules step of create() and previewCreate().
     // forwardRef: the rules module reaches TransactionsModule back through the
     // assistant's rule tools (AccountsModule, PayeesModule).

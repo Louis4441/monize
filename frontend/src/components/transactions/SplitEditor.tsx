@@ -11,7 +11,7 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Category } from '@/types/category';
 import { Account } from '@/types/account';
-import { Tag } from '@/types/tag';
+import { Tag, TagUsageMap } from '@/types/tag';
 import { CreateSplitData, InvestmentSplitDetails } from '@/types/transaction';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { roundToCents, roundToDecimals, getCurrencySymbol, getDecimalPlacesForCurrency } from '@/lib/format';
@@ -22,6 +22,7 @@ import { InvestmentSplitFields } from './InvestmentSplitFields';
 import { RemoveSplitLineButton } from './SplitLineButtons';
 import { TRANSACTION_NOTE_MAX_LENGTH } from '@/lib/transaction-note';
 import { isUuid } from '@/lib/uuid';
+import { buildTagOptions } from '@/lib/tag-options';
 
 export type SplitType = 'category' | 'transfer' | 'investment';
 
@@ -41,6 +42,8 @@ interface SplitEditorProps {
   onChange: (splits: SplitRow[]) => void;
   categories: Category[];
   tags?: Tag[];
+  /** Orders the tag picker recent-first (`buildTagOptions`); absent means A-Z. */
+  tagUsage?: TagUsageMap;
   accounts?: Account[];
   sourceAccountId?: string;
   /** When the parent account is INVESTMENT_CASH, the investment split kind is enabled. */
@@ -76,11 +79,15 @@ interface SplitEditorProps {
   onCreateCategory?: (name: string) => Promise<Category | null | undefined>;
 }
 
+// A stable default, so an absent prop does not rebuild the tag options every render.
+const NO_TAG_USAGE: TagUsageMap = {};
+
 export function SplitEditor({
   splits,
   onChange,
   categories,
   tags = [],
+  tagUsage = NO_TAG_USAGE,
   accounts = [],
   sourceAccountId = '',
   parentAccountSubType,
@@ -146,12 +153,7 @@ export function SplitEditor({
   }), [categories]);
 
   // Memoize tag options for multiselect
-  const tagOptions = useMemo(() =>
-    [...tags]
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-      .map(tag => ({ value: tag.id, label: tag.name })),
-    [tags]
-  );
+  const tagOptions = useMemo(() => buildTagOptions(tags, tagUsage), [tags, tagUsage]);
 
   // Memoize account options (excluding source account, asset accounts, investment accounts, and closed accounts)
   const accountOptions = useMemo(() => {

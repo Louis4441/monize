@@ -48,6 +48,7 @@ import { Payee } from '@/types/payee';
 import { Category } from '@/types/category';
 import { Account, TransferCandidate } from '@/types/account';
 import { Tag } from '@/types/tag';
+import { useTagPickerOptions } from '@/hooks/useTagPickerOptions';
 import { ReactivatePayeeDialog } from '@/components/payees/ReactivatePayeeDialog';
 import { ContactLookupDialog } from '@/components/payees/ContactLookupDialog';
 import { useContactLookupAvailable } from '@/hooks/useContactLookupAvailable';
@@ -487,12 +488,8 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
   }), [categoryTree, effectiveCategories]);
 
   // Memoize tag options for multiselect
-  const tagOptions = useMemo(() =>
-    [...tags]
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-      .map(tag => ({ value: tag.id, label: tag.name })),
-    [tags]
-  );
+  // Tags are per-user, so the picker (and its usage lookup) is off on a joint account.
+  const { tagOptions, tagUsage } = useTagPickerOptions(tags, !selectedIsJoint);
 
   // Handle mode changes
   const handleModeChange = (newMode: TransactionMode) => {
@@ -1676,6 +1673,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
             onChange={setSplits}
             categories={effectiveCategories}
             tags={tags}
+            tagUsage={tagUsage}
             accounts={accounts}
             sourceAccountId={watchedAccountId || ''}
             parentAccountSubType={

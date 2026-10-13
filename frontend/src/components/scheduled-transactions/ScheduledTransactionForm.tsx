@@ -37,6 +37,7 @@ import { Payee } from '@/types/payee';
 import { Category } from '@/types/category';
 import { Account } from '@/types/account';
 import { Tag } from '@/types/tag';
+import { useTagPickerOptions } from '@/hooks/useTagPickerOptions';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { roundToCents, getCurrencySymbol, FX_RATE_DISPLAY_DECIMALS } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
@@ -552,12 +553,7 @@ export function ScheduledTransactionForm({
   );
 
   // Memoize tag options
-  const tagOptions = useMemo(() =>
-    [...tags]
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-      .map(tag => ({ value: tag.id, label: tag.name })),
-    [tags]
-  );
+  const { tagOptions, tagUsage } = useTagPickerOptions(tags);
 
   // Load securities lazily — only fetch when the user actually enters investment mode.
   useEffect(() => {
@@ -1677,6 +1673,7 @@ export function ScheduledTransactionForm({
               onChange={setSplits}
               categories={categories}
               tags={tags}
+              tagUsage={tagUsage}
               accounts={accounts}
               sourceAccountId={watchedAccountId || ''}
               parentAccountSubType={
