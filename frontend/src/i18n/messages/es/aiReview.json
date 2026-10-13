@@ -77,6 +77,12 @@
       "confirm": "{count, plural, one {Aplicar # propuesta} other {Aplicar # propuestas}}"
     }
   },
+  "sendToAssistant": {
+    "button": "Enviar {count, plural, one {# solicitud pendiente} other {# solicitudes pendientes}} al asistente de IA",
+    "prompt": "Procesa mis solicitudes de revisión por IA pendientes con la herramienta ai_review_requests: enuméralas, reclama cada una, sigue su instrucción y envía una propuesta. Para una solicitud de borrador de perfil, crea el perfil con la herramienta email_receipt_parsers. No se cambia nada hasta que apruebe las propuestas en la bandeja de revisión por IA.",
+    "opened": "Se abrió el chat con un mensaje preparado. Léelo y pulsa Enviar.",
+    "unavailable": "El asistente de IA no puede responder ahora. Conecta un proveedor de IA en Configuración o conecta tu cliente MCP. Las solicitudes siguen esperando aquí."
+  },
   "dismissDialog": {
     "title": "¿Descartar esta solicitud?",
     "message": "Nadie volverá a recibir la petición de trabajar en esta solicitud. No se modifica nada de lo que trataba.",

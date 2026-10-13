@@ -77,6 +77,12 @@
       "confirm": "{count, plural, one {套用 # 則提議} other {套用 # 則提議}}"
     }
   },
+  "sendToAssistant": {
+    "button": "將 {count, plural, other {# 個待處理請求}}傳送給 AI 助理",
+    "prompt": "使用 ai_review_requests 工具處理我待處理的 AI 審核請求：列出它們，逐一認領，依照其指示操作並提交提議。對於設定檔草稿請求，請改用 email_receipt_parsers 工具建立設定檔。在我於 AI 審核收件匣中核准提議之前，不會變更任何內容。",
+    "opened": "已開啟聊天並附上準備好的訊息。請閱讀後按下傳送。",
+    "unavailable": "AI 助理現在無法回答。請在設定中連接 AI 提供者，或連接你的 MCP 用戶端。請求會繼續在這裡等待。"
+  },
   "dismissDialog": {
     "title": "忽略此請求？",
     "message": "不會再有人被要求處理此請求。它所涉及的內容不會變更。",

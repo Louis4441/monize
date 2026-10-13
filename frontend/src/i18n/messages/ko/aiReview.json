@@ -77,6 +77,12 @@
       "confirm": "{count, plural, one {제안 #건 적용} other {제안 #건 적용}}"
     }
   },
+  "sendToAssistant": {
+    "button": "대기 중인 요청 {count, plural, other {#건}}을 AI 도우미에게 보내기",
+    "prompt": "ai_review_requests 도구로 대기 중인 AI 검토 요청을 처리해 주세요. 목록을 확인하고, 각 요청을 가져와 지시를 따르고, 제안을 제출하세요. 프로필 초안 요청은 대신 email_receipt_parsers 도구로 프로필을 만드세요. AI 검토함에서 제가 제안을 승인하기 전에는 아무것도 변경되지 않습니다.",
+    "opened": "준비된 메시지로 채팅을 열었습니다. 읽어 보고 보내기를 누르세요.",
+    "unavailable": "지금은 AI 도우미가 응답할 수 없습니다. 설정에서 AI 제공자를 연결하거나 MCP 클라이언트를 연결하세요. 요청은 여기에서 계속 대기합니다."
+  },
   "dismissDialog": {
     "title": "이 요청을 무시할까요?",
     "message": "이 요청을 처리해 달라는 요청은 더 이상 없습니다. 요청과 관련된 항목은 변경되지 않습니다.",

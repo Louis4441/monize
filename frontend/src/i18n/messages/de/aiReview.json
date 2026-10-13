@@ -77,6 +77,12 @@
       "confirm": "{count, plural, one {# Vorschlag anwenden} other {# Vorschläge anwenden}}"
     }
   },
+  "sendToAssistant": {
+    "button": "{count, plural, one {# offene Anfrage} other {# offene Anfragen}} an den KI-Assistenten senden",
+    "prompt": "Arbeite meine offenen KI-Prüfanfragen mit dem Tool ai_review_requests ab: liste sie auf, übernimm jede, befolge ihre Anweisung und reiche einen Vorschlag ein. Für eine Anfrage zu einem Profilentwurf erstelle das Profil stattdessen mit dem Tool email_receipt_parsers. Nichts wird geändert, bevor ich die Vorschläge im KI-Prüfeingang bestätige.",
+    "opened": "Der Chat wurde mit einer vorbereiteten Nachricht geöffnet. Lies sie und drücke auf Senden.",
+    "unavailable": "Der KI-Assistent kann gerade nicht antworten. Verbinde einen KI-Anbieter in den Einstellungen oder verbinde deinen MCP-Client. Die Anfragen warten weiter hier."
+  },
   "dismissDialog": {
     "title": "Diese Anfrage verwerfen?",
     "message": "Niemand wird erneut gebeten, an dieser Anfrage zu arbeiten. Nichts, worum es dabei ging, wird geändert.",

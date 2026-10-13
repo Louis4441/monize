@@ -77,6 +77,12 @@
       "confirm": "{count, plural, one {Áp dụng # đề xuất} other {Áp dụng # đề xuất}}"
     }
   },
+  "sendToAssistant": {
+    "button": "Gửi {count, plural, other {# yêu cầu đang chờ}} cho trợ lý AI",
+    "prompt": "Xử lý các yêu cầu đánh giá AI đang chờ của tôi bằng công cụ ai_review_requests: liệt kê, nhận từng yêu cầu, làm theo hướng dẫn và gửi đề xuất. Với yêu cầu bản nháp hồ sơ, hãy tạo hồ sơ bằng công cụ email_receipt_parsers. Không có gì thay đổi cho đến khi tôi duyệt các đề xuất trong hộp đánh giá AI.",
+    "opened": "Đã mở trò chuyện với tin nhắn được chuẩn bị sẵn. Hãy đọc và nhấn Gửi.",
+    "unavailable": "Trợ lý AI hiện không thể trả lời. Hãy kết nối nhà cung cấp AI trong Cài đặt hoặc kết nối ứng dụng MCP của bạn. Các yêu cầu vẫn chờ ở đây."
+  },
   "dismissDialog": {
     "title": "Bỏ qua yêu cầu này?",
     "message": "Sẽ không ai được nhờ xử lý yêu cầu này nữa. Những gì yêu cầu nói đến không bị thay đổi.",

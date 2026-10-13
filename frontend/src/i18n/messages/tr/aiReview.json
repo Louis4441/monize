@@ -77,6 +77,12 @@
       "confirm": "{count, plural, one {# öneriyi uygula} other {# öneriyi uygula}}"
     }
   },
+  "sendToAssistant": {
+    "button": "{count, plural, other {# bekleyen isteği}} yapay zeka asistanına gönder",
+    "prompt": "Bekleyen yapay zeka inceleme isteklerimi ai_review_requests aracıyla işle: listele, her birini üstlen, talimatını uygula ve bir öneri gönder. Profil taslağı isteği için profili bunun yerine email_receipt_parsers aracıyla oluştur. Ben önerileri yapay zeka inceleme kutusunda onaylayana kadar hiçbir şey değişmez.",
+    "opened": "Sohbet hazırlanmış bir mesajla açıldı. Okuyun ve Gönder'e basın.",
+    "unavailable": "Yapay zeka asistanı şu anda yanıt veremiyor. Ayarlar'dan bir yapay zeka sağlayıcısı bağlayın veya MCP istemcinizi bağlayın. İstekler burada beklemeye devam ediyor."
+  },
   "dismissDialog": {
     "title": "Bu istek yoksayılsın mı?",
     "message": "Bu istek üzerinde çalışması için artık kimseden istekte bulunulmayacak. İsteğin konusu olan hiçbir şey değişmez.",

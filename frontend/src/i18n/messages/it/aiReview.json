@@ -77,6 +77,12 @@
       "confirm": "{count, plural, one {Applica # proposta} other {Applica # proposte}}"
     }
   },
+  "sendToAssistant": {
+    "button": "Invia {count, plural, one {# richiesta in attesa} other {# richieste in attesa}} all'assistente IA",
+    "prompt": "Lavora sulle mie richieste di revisione IA in attesa con lo strumento ai_review_requests: elencale, prendi in carico ciascuna, segui la sua istruzione e invia una proposta. Per una richiesta di bozza di profilo, crea invece il profilo con lo strumento email_receipt_parsers. Nulla cambia finché non approvo le proposte nella casella di revisione IA.",
+    "opened": "Chat aperta con un messaggio preparato. Leggilo e premi Invia.",
+    "unavailable": "L'assistente IA non può rispondere ora. Collega un fornitore IA nelle Impostazioni o collega il tuo client MCP. Le richieste restano in attesa qui."
+  },
   "dismissDialog": {
     "title": "Ignorare questa richiesta?",
     "message": "A nessuno verrà più chiesto di lavorare a questa richiesta. Nulla di ciò di cui trattava viene modificato.",

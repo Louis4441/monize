@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ExclamationTriangleIcon, InboxIcon } from '@heroicons/react/24/outline';
 import { AiReviewRow } from '@/components/ai-review/AiReviewRow';
+import { SendPendingToAssistantButton } from '@/components/ai-review/SendPendingToAssistantButton';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -190,6 +191,9 @@ export function AiReviewInbox() {
               {t(`kindFilter.${option}`)}
             </button>
           ))}
+        </div>
+        <div className="sm:ml-auto">
+          <SendPendingToAssistantButton items={shownItems} />
         </div>
       </div>
       {approvable.length > 0 && (
