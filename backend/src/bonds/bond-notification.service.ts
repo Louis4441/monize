@@ -93,10 +93,7 @@ export class BondNotificationService {
         this.logger.log(`Raised ${raised} bond notification(s)`);
       }
     } catch (error) {
-      this.logger.error(
-        `Bond notification cron failed: ${describe(error)}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error(`Bond notification cron failed: ${describe(error)}`);
     } finally {
       this.running = false;
     }
@@ -355,7 +352,7 @@ export class BondNotificationService {
               AND security_id = $2
               AND account_id = $3
               AND action = 'INTEREST'
-              AND status <> 'VOID'
+              AND status != 'VOID'
               AND transaction_date = $4::date
             LIMIT 1`,
           [userId, securityId, accountId, date],
