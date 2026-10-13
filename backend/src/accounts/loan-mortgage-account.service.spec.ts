@@ -742,6 +742,7 @@ describe("LoanMortgageAccountService", () => {
           interestRate: 5.5,
           institution: "TD Bank",
           originalPrincipal: 30000,
+          interestCategoryId: "cat-interest",
           paymentMatching: paymentMatchingDto,
         } as CreateAccountDto);
 
