@@ -8,10 +8,10 @@ filter because searching `#10` returns cheques 100, 101, 110 and 1010 and
 every amount or memo containing "10". The task list is
 [`advanced-search-tasks.md`](./advanced-search-tasks.md).
 
-Status: **built** (2026-10-12). B1 to F1 are merged (#1729 to #1733); F2
-(#1734), F3 and Q are open. The decisions in section 3 were agreed in the
-planning session of that date; section 13 records how each open question was
-answered.
+Status: **done** (2026-10-13). B1 to F2 are merged (#1729 to #1734), with the
+review fixes in #1736 and #1742; F3 and Q land in #1741. The decisions in
+section 3 were agreed in the planning session of 2026-10-12; section 13
+records how each open question was answered.
 
 **Answer to the Discussion:** `ref:=10`, or the shorthand `#10`, returns
 cheque 10 and nothing else.

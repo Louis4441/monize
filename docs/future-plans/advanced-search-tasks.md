@@ -35,9 +35,9 @@ There is no migration. B3 is the only **change**, and it swaps every call site i
 | B3 | | Swap every call site to the helper; controller hardening; remove `sanitizeLikePattern`; the guard; the integration spec; the invariant entries | B2 | change | [x] | #1731 |
 | B4 | | The echo on `GET /transactions`; the MCP and assistant `searchText` descriptions; the backend search doc | B3 | inert | [x] | #1732 |
 | F1 | | `quoteSearchValue` and the report deep links (three: the sweep found Uncategorized Transactions too) | B3 | neutral | [x] | #1733 |
-| F2 | | Syntax help, interpretation line, placeholder, header help; the client type for the echo | B4 | none | [ ] | #1734 |
-| F3 | | E2E: `#10` finds one cheque | F2 | none | [ ] | (stacked on F2) |
-| Q | | Release note, plan status (each task translated its own strings, as the parity specs require) | F1, F2, F3 | none | [ ] | (this PR) |
+| F2 | | Syntax help, interpretation line, placeholder, header help; the client type for the echo | B4 | none | [x] | #1734, #1742 |
+| F3 | | E2E: `#10` finds one cheque | F2 | none | [x] | #1741 (was #1737) |
+| Q | | Release note, plan status (each task translated its own strings, as the parity specs require) | F1, F2, F3 | none | [x] | #1741 (was #1738) |
 
 **Why B1 and B2 are separate:** the parser is pure and needs only a unit spec that walks the grammar exhaustively. The builder is SQL and needs the reference-key comparison checked against PostgreSQL. Each is reviewable on its own.
 
