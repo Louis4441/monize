@@ -59,7 +59,7 @@
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "date-fns": "^4.4.0",
-    "he": "^1.2.0",
+    "he": "^2.0.0",
     "helmet": "^8.3.0",
     "htmlparser2": "^10.1.0",
     "http_ece": "1.2.1",
@@ -165,7 +165,7 @@
       "<rootDir>/src/test-helpers/silence-nest-logger.setup.ts"
     ],
     "transform": {
-      "^.+\\.(t|j)s$": [
+      "^.+\\.(t|j|mj)s$": [
         "<rootDir>/scripts/esm-interop-transformer.cjs",
         {
           "tsconfig": {
@@ -199,7 +199,7 @@
     ],
     "coverageDirectory": "./coverage",
     "transformIgnorePatterns": [
-      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs)/)"
+      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs|he)/)"
     ],
     "coverageThreshold": {
       "global": {
