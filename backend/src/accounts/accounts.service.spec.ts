@@ -27,6 +27,8 @@ import { DataSource } from "typeorm";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { ScheduledOccurrenceService } from "../scheduled-transactions/scheduled-occurrence.service";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import { ScheduledTransactionSplit } from "../scheduled-transactions/entities/scheduled-transaction-split.entity";
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 import { LoanRateChange } from "../loan-rate-changes/entities/loan-rate-change.entity";
 import {
   createScopedDbMocks,
@@ -52,7 +54,8 @@ describe("AccountsService", () => {
   let exchangeRateService: Record<string, jest.Mock>;
   let mockActionHistoryService: Record<string, jest.Mock>;
   let scheduledOccurrenceService: { expand: jest.Mock };
-  let scheduleRepository: { find: jest.Mock };
+  let scheduleRepository: { find: jest.Mock; findOne: jest.Mock };
+  let splitRepository: { find: jest.Mock; save: jest.Mock };
   let rateChangeRepository: { find: jest.Mock };
   let loanRateChangesService: Record<string, jest.Mock>;
   // loanMortgageService uses the real class with mocked repositories
@@ -168,7 +171,14 @@ describe("AccountsService", () => {
       getLatestRate: jest.fn().mockResolvedValue(null),
     };
 
-    scheduleRepository = { find: jest.fn().mockResolvedValue([]) };
+    scheduleRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+    splitRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn().mockImplementation((split) => Promise.resolve(split)),
+    };
     rateChangeRepository = { find: jest.fn().mockResolvedValue([]) };
     const { manager: txManager, dataSource } = createScopedDbMocks([
       [Account, accountsRepository],
@@ -179,6 +189,7 @@ describe("AccountsService", () => {
       [ScheduledTransaction, scheduleRepository],
       [LoanRateChange, rateChangeRepository],
       [Category, categoriesRepository],
+      [ScheduledTransactionSplit, splitRepository],
     ]);
     mockDataSource = dataSource;
     txManager.save.mockImplementation((data) => data);
@@ -825,6 +836,132 @@ describe("AccountsService", () => {
 
         expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
         expect(mockQueryRunner.manager.findOne).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("interest category", () => {
+      const mortgage = {
+        ...mockAccount,
+        id: "mortgage-1",
+        accountType: "MORTGAGE",
+        interestCategoryId: "cat-a",
+        scheduledTransactionId: "sched-1",
+      };
+      const principal = {
+        id: "s-principal",
+        kind: SplitKind.TRANSFER,
+        transferAccountId: "mortgage-1",
+        categoryId: null,
+        amount: -800,
+        memo: "Principal",
+      };
+      const interestLine = (categoryId: string | null) => ({
+        id: "s-interest",
+        kind: SplitKind.CATEGORY,
+        transferAccountId: null,
+        categoryId,
+        amount: -200,
+        memo: "Interest",
+      });
+
+      beforeEach(() => {
+        scheduleRepository.findOne.mockResolvedValue({
+          id: "sched-1",
+          userId: "user-1",
+        });
+      });
+
+      it("moves the template's interest line with a changed category, after the account save", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+        splitRepository.find.mockResolvedValue([
+          { ...principal },
+          interestLine("cat-a"),
+        ]);
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: "cat-b",
+        });
+
+        expect(categoriesRepository.findOne).toHaveBeenCalledWith({
+          where: { id: "cat-b", userId: "user-1" },
+        });
+        expect(scheduleRepository.findOne).toHaveBeenCalledWith({
+          where: { id: "sched-1", userId: "user-1" },
+          lock: { mode: "pessimistic_write" },
+        });
+        expect(
+          mockQueryRunner.manager.save.mock.calls[0][0].interestCategoryId,
+        ).toBe("cat-b");
+        expect(splitRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: "s-interest",
+            categoryId: "cat-b",
+            amount: -200,
+          }),
+        );
+        expect(
+          mockQueryRunner.manager.save.mock.invocationCallOrder[0],
+        ).toBeLessThan(splitRepository.save.mock.invocationCallOrder[0]);
+      });
+
+      it("touches nothing when the form resends the stored category", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: "cat-a",
+        });
+
+        expect(categoriesRepository.findOne).not.toHaveBeenCalled();
+        expect(scheduleRepository.findOne).not.toHaveBeenCalled();
+        expect(splitRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("refuses a category the caller does not own before writing", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+        categoriesRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.update("user-1", "mortgage-1", {
+            interestCategoryId: "someone-elses",
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+        expect(splitRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("saves a cleared category without reading the schedule", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({ ...mortgage });
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: null,
+        });
+
+        expect(
+          mockQueryRunner.manager.save.mock.calls[0][0].interestCategoryId,
+        ).toBeNull();
+        expect(scheduleRepository.findOne).not.toHaveBeenCalled();
+        expect(splitRepository.save).not.toHaveBeenCalled();
+      });
+
+      it("saves the account but leaves an escrow line alone when the line is ambiguous", async () => {
+        mockQueryRunner.manager.findOne.mockResolvedValue({
+          ...mortgage,
+          interestCategoryId: null,
+        });
+        splitRepository.find.mockResolvedValue([
+          { ...principal },
+          interestLine(null),
+          { ...interestLine(null), id: "s-escrow", memo: "Escrow" },
+        ]);
+
+        await service.update("user-1", "mortgage-1", {
+          interestCategoryId: "cat-b",
+        });
+
+        expect(
+          mockQueryRunner.manager.save.mock.calls[0][0].interestCategoryId,
+        ).toBe("cat-b");
+        expect(splitRepository.save).not.toHaveBeenCalled();
       });
     });
 

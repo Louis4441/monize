@@ -75,6 +75,12 @@ import {
   reassignLoanSourceAccount,
 } from "./loan-source-account";
 import {
+  applyLoanInterestRelink,
+  assertLoanInterestCategory,
+  LoanInterestRelinkPlan,
+  planLoanInterestRelink,
+} from "./loan-interest-category";
+import {
   DatedInstallment,
   derivedInstallmentFacts,
 } from "./mortgage-installment-facts";
@@ -977,8 +983,28 @@ export class AccountsService {
         }
         if (updateAccountDto.principalCategoryId !== undefined)
           account.principalCategoryId = updateAccountDto.principalCategoryId;
-        if (updateAccountDto.interestCategoryId !== undefined)
-          account.interestCategoryId = updateAccountDto.interestCategoryId;
+        // A value difference, as above. The template's interest line follows
+        // it after the save, or the whole update is refused (INV-LOAN-010).
+        const interestCategoryChanged =
+          updateAccountDto.interestCategoryId !== undefined &&
+          (updateAccountDto.interestCategoryId ?? null) !==
+            (account.interestCategoryId ?? null);
+        let interestRelink: LoanInterestRelinkPlan | null = null;
+        if (interestCategoryChanged) {
+          const nextInterestCategoryId =
+            updateAccountDto.interestCategoryId ?? null;
+          if (nextInterestCategoryId !== null) {
+            await assertLoanInterestCategory(m, userId, nextInterestCategoryId);
+          }
+          interestRelink = await planLoanInterestRelink(
+            m,
+            userId,
+            account,
+            before.interestCategoryId ?? null,
+            nextInterestCategoryId,
+          );
+          account.interestCategoryId = nextInterestCategoryId;
+        }
         if (updateAccountDto.interestBookingMode !== undefined)
           account.interestBookingMode = updateAccountDto.interestBookingMode;
         if (updateAccountDto.overpaymentCategoryId !== undefined)
@@ -1104,6 +1130,9 @@ export class AccountsService {
         }
 
         const saved = await m.save(account);
+        if (interestRelink) {
+          await applyLoanInterestRelink(m, interestRelink);
+        }
         if (sourceAccountChanged) {
           await reassignLoanSourceAccount(
             m,

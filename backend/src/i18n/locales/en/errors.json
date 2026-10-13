@@ -55,6 +55,7 @@
     "loanRequiresInterestCategory": "Loan accounts require an interest category",
     "mortgageRequiresInterestCategory": "Mortgage accounts require an interest category",
     "invalidInterestCategory": "Choose one of your own categories for the interest portion of the payment",
+    "interestCategoryBreaksTemplate": "This loan's scheduled payment could not be moved to the new interest category. Edit the scheduled payment's interest line first.",
     "mortgageRequiredFields": "Mortgage accounts require mortgagePaymentFrequency, paymentStartDate, sourceAccountId, and amortizationMonths",
     "mortgageRequiresInterestRate": "Mortgage accounts require an interest rate",
     "mortgageFrequencyUnsupported": "Canadian mortgages cannot be scheduled at a {frequency} payment frequency",
