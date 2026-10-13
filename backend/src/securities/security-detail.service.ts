@@ -6,6 +6,7 @@ import {
   baseInvestmentAction,
   investmentIncomeAmount,
 } from "./investment-replay.util";
+import { investmentRowHasEffect } from "./investment-row-effects.util";
 import { SecuritiesService } from "./securities.service";
 import { PortfolioService } from "./portfolio.service";
 import {
@@ -354,11 +355,14 @@ export class SecurityDetailService {
     ].sort();
     const hasOneCurrency = currencies.length === 1 && currencies[0] !== "";
 
+    // The history lists a VOID row as a record, which the dates and the count
+    // below still describe; it moved no money, so it joins no money total.
+    const effects = transactions.filter(investmentRowHasEffect);
     const amountsFor = (
       predicate: (tx: SecurityHistoryTransaction) => boolean,
     ): number =>
       sumMoney(
-        transactions.filter(predicate).map((tx) => Number(tx.totalAmount) || 0),
+        effects.filter(predicate).map((tx) => Number(tx.totalAmount) || 0),
       );
 
     return {
@@ -370,7 +374,7 @@ export class SecurityDetailService {
       // in, which still acquire shares and still add to cost basis, so summing
       // it would report nothing invested beside a real cost basis.
       totalInvested: sumMoney(
-        transactions
+        effects
           .filter((tx) =>
             ACQUIRING_ACTIONS.has(
               baseInvestmentAction(tx.action) as InvestmentAction,
@@ -389,8 +393,8 @@ export class SecurityDetailService {
       // Every distribution, paid in cash or reinvested: a reinvestment's shares
       // are in the cost basis this figure is set against, so leaving its
       // income out would read the distribution as no return at all.
-      dividends: sumMoney(transactions.map((tx) => investmentIncomeAmount(tx))),
-      fees: sumMoney(transactions.map((tx) => Number(tx.commission) || 0)),
+      dividends: sumMoney(effects.map((tx) => investmentIncomeAmount(tx))),
+      fees: sumMoney(effects.map((tx) => Number(tx.commission) || 0)),
       // One currency, or nothing: gains realized in a PLN account and in a EUR
       // account are not addable, and their sum would be in no currency at all.
       realizedGain: hasOneCurrency
