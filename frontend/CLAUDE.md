@@ -49,6 +49,7 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 | Category colour and icon | `CategoryGlyph`, `CategoryPill`, `buildCategoryIconMap` / `buildCategoryColorMap` | reading `category.icon` or interpolating it into text |
 | Brand favicon | `InstitutionLogo` / `PayeeLogo` over `BrandLogo` | a third-party favicon URL |
 | Row density | `useDensityPreference(view)` and `DensityToggle` | a local density `useState` or a second store |
+| The account default behind a browser-local view setting | `useViewDefault(key)`, applied after the browser's own choice | reading `preferences.viewDefaults` directly, or a store that cannot tell "never chosen" from the built-in value |
 | Hiding a table column | `useHiddenColumns(table)` in the list (the row takes `hidden` as a prop) and `ColumnChooserMenu` in the toolbar; the cell wrapped in `isVisible('<id>') &&` | a visibility class, a local state, or a second read in the row |
 | Scheduled occurrence amount, date, account | `nextOccurrenceEffectiveAmount`, `nextOccurrenceDueDate`, `occurrenceSettlementAccountId` (`lib/scheduled-effective-amount.ts`) | `nextOverride?.amount ?? amount`, `nextDueDate`, `st.accountId` |
 | Reporting currency fallback | `preferredCurrency` (`lib/default-currency.ts`) | `pref?.defaultCurrency \|\| 'USD'` |

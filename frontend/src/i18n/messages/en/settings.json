@@ -132,7 +132,8 @@
       "datesNumbers": "Dates & Numbers",
       "investments": "Investments",
       "transactions": "Transactions",
-      "application": "Application"
+      "application": "Application",
+      "defaultViews": "Default Views"
     },
     "themeLabel": "Theme",
     "defaultCurrencyLabel": "Default Currency",
@@ -218,7 +219,23 @@
       "highcontrast": "High contrast",
       "colorblind": "Colour-blind safe"
     },
-    "timezoneBrowserOption": "Use browser timezone (auto-detected as {tz})"
+    "timezoneBrowserOption": "Use browser timezone (auto-detected as {tz})",
+    "defaultViews": {
+      "intro": "These apply in any browser that has no setting of its own, such as a new device or a private window. A change you make on a page is remembered by that browser and takes priority.",
+      "rowsLabel": "Row density",
+      "hideRegisterYearLabel": "Hide the year in register dates",
+      "chartCollapsedLabel": "Start with the chart on the Transactions page collapsed",
+      "widgetsCollapsedLabel": "Start with the account, payee and category info collapsed",
+      "accountOpenTargetLabel": "When I open an account",
+      "accountOpenTargetOptions": {
+        "register": "Show its transactions",
+        "dashboard": "Show its dashboard"
+      },
+      "accountOpenTargetHelp": "Applies when you click an account on the Accounts page or in Favourite Accounts on the dashboard.",
+      "applyHere": "Use these defaults in this browser",
+      "applyHereHelp": "Clears the view settings this browser has saved, so the defaults above take effect here too.",
+      "appliedHere": "This browser now uses your default views"
+    }
   },
   "notifications": {
     "heading": "Notifications",
