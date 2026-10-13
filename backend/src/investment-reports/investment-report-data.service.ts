@@ -14,6 +14,7 @@ import {
   baseInvestmentAction,
   CASH_INCOME_ACTIONS,
   INVESTMENT_REPLAY_ORDER,
+  reinvestedIncomeAmount,
 } from "../securities/investment-replay.util";
 import { Account } from "../accounts/entities/account.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -686,7 +687,15 @@ export class InvestmentReportDataService {
         );
         if (tx.action === InvestmentAction.BUY) state.purchases += totalAmount;
         if (baseInvestmentAction(tx.action) === InvestmentAction.REINVEST) {
-          state.reinvestments += totalAmount;
+          // A reinvested distribution is income as surely as a cash one, so
+          // `value + income - cost` nets the reinvestment to the distribution
+          // it was. Not `totalAmount` alone: a reinvest created in the app
+          // stores none, and is valued from its quantity and price.
+          const distribution = reinvestedIncomeAmount(tx);
+          if (distribution !== null) {
+            state.reinvestments += distribution;
+            state.income += distribution;
+          }
         }
         break;
       }
@@ -799,7 +808,14 @@ export class InvestmentReportDataService {
     return s.quantity;
   }
 
-  /** Income (dividends/interest/capital gains) received in (after, upto]. */
+  /**
+   * Cash income (dividends/interest/capital gains) received in (after, upto].
+   *
+   * Cash only, unlike the Income column: a period return compares the market
+   * value, which already holds any shares a reinvestment bought, against the
+   * window's starting value, which holds none of their cost. Adding the
+   * reinvested distribution as well would count it twice.
+   */
   private incomeBetween(
     group: GroupRecord,
     after: string,

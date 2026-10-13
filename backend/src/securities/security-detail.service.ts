@@ -2,7 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { roundMoney, roundToDecimals, sumMoney } from "../common/round.util";
 import { Security } from "./entities/security.entity";
 import { InvestmentAction } from "./entities/investment-transaction.entity";
-import { baseInvestmentAction } from "./investment-replay.util";
+import {
+  baseInvestmentAction,
+  investmentIncomeAmount,
+} from "./investment-replay.util";
 import { SecuritiesService } from "./securities.service";
 import { PortfolioService } from "./portfolio.service";
 import {
@@ -137,13 +140,6 @@ const ACQUIRING_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
   InvestmentAction.BUY,
   InvestmentAction.REINVEST,
   InvestmentAction.TRANSFER_IN,
-]);
-
-/** Actions whose `totalAmount` is income rather than a change of position. */
-const INCOME_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
-  InvestmentAction.DIVIDEND,
-  InvestmentAction.INTEREST,
-  InvestmentAction.CAPITAL_GAIN,
 ]);
 
 /**
@@ -390,9 +386,10 @@ export class SecurityDetailService {
       totalSold: amountsFor(
         (tx) => baseInvestmentAction(tx.action) === InvestmentAction.SELL,
       ),
-      dividends: amountsFor((tx) =>
-        INCOME_ACTIONS.has(baseInvestmentAction(tx.action) as InvestmentAction),
-      ),
+      // Every distribution, paid in cash or reinvested: a reinvestment's shares
+      // are in the cost basis this figure is set against, so leaving its
+      // income out would read the distribution as no return at all.
+      dividends: sumMoney(transactions.map((tx) => investmentIncomeAmount(tx))),
       fees: sumMoney(transactions.map((tx) => Number(tx.commission) || 0)),
       // One currency, or nothing: gains realized in a PLN account and in a EUR
       // account are not addable, and their sum would be in no currency at all.

@@ -338,6 +338,35 @@ the ledger the SPLIT row now belongs to (INV-HOLDING-001).
 `holdings.service.ts` implements this correctly (`qty *= txQty`). Section 9
 records where it is implemented additively instead.
 
+### A reinvested distribution is income
+
+A REINVEST (and REINVEST_INTEREST, REINVEST_CAPITAL_GAIN_SHORT and
+REINVEST_CAPITAL_GAIN_LONG) is a distribution paid in shares: income of the same
+kind as its cash twin (`incomeKind` in
+`backend/src/securities/investment-replay.util.ts`) and a purchase of the
+shares in the same row, with no cash leg. It is on the 1099-DIV like a cash
+dividend, and Microsoft Money counted it as one. Its value is
+`reinvestedIncomeAmount`: the stored total when the row has one (an imported
+row keeps the file's amount, sometimes with no price beside it), otherwise
+quantity x price + commission, which is the cost its shares entered the basis
+at, because a reinvest created in the app stores no total. Every surface that
+reports income reads a row through `incomeKind` and `investmentIncomeAmount`;
+`frontend/src/lib/investment-actions.ts` mirrors both for the client-side
+reports.
+
+Each formula is on one side of the ledger or the other:
+
+| Formula | Reinvested distribution | Why |
+| --- | --- | --- |
+| Income figures, and a gain measured as `value + income - cost` (investment report Income, Gain and all-dates return; security detail; Dividend Income, Dividend Yield and Security Performance reports; the investment transaction summary; the AI and MCP `incomeByCurrency`, kept per currency because nothing there is converted) | counted | the cost basis already holds the reinvested shares' cost, so leaving the income out reads the distribution as no return at all |
+| A return whose market value holds the reinvested shares but whose base does not hold their cost (investment report period returns; portfolio summary Net Invested and CAGR) | not counted: `CASH_INCOME_ACTIONS` only | adding it counts the same value twice |
+| Portfolio period result | in both `investmentIncome` and `investmentCapitalFlows` | it is the DIVIDEND and the BUY it stands for, so the P&L, TWR and MWR are unchanged (`docs/specs/portfolio-period-result.md` section 10.2) |
+
+The built-in income and tax reports are category reports over the cash ledger
+and leave out every investment distribution, cash or reinvested
+(INV-REPORT-001). A legacy reinvest with neither a total nor a price is in no
+cost basis (`acquisitionCost` returns `null`) and in no income.
+
 ### A daily change needs two adjacent closes AND a current one
 
 Every surface that shows a security's day-over-day move reads the two most

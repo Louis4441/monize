@@ -2474,6 +2474,14 @@ export class ToolExecutorService {
       `total amount ${data.totalAmount.toFixed(2)}`,
       `commissions ${data.totalCommission.toFixed(2)}`,
     ];
+    const income = Object.entries(data.incomeByCurrency);
+    if (income.length > 0) {
+      summaryParts.push(
+        `income, cash and reinvested, ${income
+          .map(([currency, amount]) => `${amount.toFixed(2)} ${currency}`)
+          .join(" and ")}`,
+      );
+    }
     if (groupBy && data.groups) {
       summaryParts.push(`grouped by ${groupBy} (${data.groups.length} groups)`);
     }

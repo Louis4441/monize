@@ -278,6 +278,8 @@ export const listInvestmentTransactionsOutput = toolOutput({
   transactionCount: num,
   totalAmount: num,
   totalCommission: num,
+  // Distributions, cash and reinvested, keyed by the currency they are in.
+  incomeByCurrency: z.record(z.string(), num),
   totalQuantity: num,
   actionCounts: z.record(z.string(), num),
   groupedBy: strNull,

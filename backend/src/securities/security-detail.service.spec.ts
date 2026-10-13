@@ -516,6 +516,42 @@ describe("SecurityDetailService", () => {
       expect(activity.totalInvested).toBe(400);
     });
 
+    it("counts a reinvested distribution as income at its shares' cost", async () => {
+      // Discussion #1670: the reinvested shares are in the cost basis the card
+      // sets this figure against, so without their income a DRIP holding's
+      // distributions read as no return at all.
+      given({
+        transactions: [
+          historyTransaction({
+            action: InvestmentAction.REINVEST,
+            quantity: 2,
+            price: 50,
+            totalAmount: 0,
+            commission: 0,
+          }),
+          historyTransaction({
+            id: "tx-2",
+            action: InvestmentAction.REINVEST_INTEREST,
+            quantity: 1,
+            price: 12.5,
+            totalAmount: 0,
+            commission: 0,
+          }),
+          historyTransaction({
+            id: "tx-3",
+            action: InvestmentAction.TRANSFER_IN,
+            quantity: 10,
+            price: 30,
+            totalAmount: 0,
+            commission: 0,
+          }),
+        ],
+      });
+
+      const { activity } = await getDetail();
+      expect(activity.dividends).toBe(112.5);
+    });
+
     it("takes the first and last dates from the ordered history", async () => {
       const { activity } = await getDetail();
       expect(activity.firstTransactionDate).toBe("2022-03-12");
