@@ -204,7 +204,7 @@
     "empty": "Nog geen beleggingsgeschiedenis om te tonen.",
     "refresh": "Huidige waarde vernieuwen",
     "investmentResult": "Beleggingsresultaat",
-    "periodBreakdownInvestedTooltip": "De waarde van de effecten veranderde in deze periode met {valueChange}. Daarvan werd {netInvested} ingelegd, na aftrek van verkopen, en ze keerden {income} uit aan dividenden en rente. Het bedrag hierboven is wat de beleggingen zelf hebben opgebracht, zonder niet-belegd geld.",
+    "periodBreakdownInvestedTooltip": "De waarde van de effecten veranderde in deze periode met {valueChange}. Daarvan werd {netInvested} ingelegd, na aftrek van verkopen, en ze keerden {income} uit aan dividenden en rente. Een uitkering die in aandelen is herbelegd, telt in beide mee. Het bedrag hierboven is wat de beleggingen zelf hebben opgebracht, zonder niet-belegd geld.",
     "notAvailable": "N/A"
   },
   "spendingByPayee": {

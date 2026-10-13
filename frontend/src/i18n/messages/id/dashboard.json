@@ -204,7 +204,7 @@
     "empty": "Belum ada riwayat investasi untuk ditampilkan.",
     "refresh": "Segarkan nilai saat ini",
     "investmentResult": "Hasil Investasi",
-    "periodBreakdownInvestedTooltip": "Nilai sekuritas berubah {valueChange} selama periode ini. Dari jumlah itu, {netInvested} adalah dana yang dimasukkan, setelah dikurangi penjualan, dan sekuritas membayar {income} berupa dividen dan bunga. Angka di atas adalah hasil investasi itu sendiri, tanpa kas yang tidak diinvestasikan.",
+    "periodBreakdownInvestedTooltip": "Nilai sekuritas berubah {valueChange} selama periode ini. Dari jumlah itu, {netInvested} adalah dana yang dimasukkan, setelah dikurangi penjualan, dan sekuritas membayar {income} berupa dividen dan bunga. Distribusi yang diinvestasikan kembali dalam saham dihitung di keduanya. Angka di atas adalah hasil investasi itu sendiri, tanpa kas yang tidak diinvestasikan.",
     "notAvailable": "N/A"
   },
   "spendingByPayee": {
