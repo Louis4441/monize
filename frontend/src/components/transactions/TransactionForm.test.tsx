@@ -280,11 +280,13 @@ vi.mock('@/lib/accounts', () => ({
 }));
 
 const mockTagsGetAll = vi.fn().mockResolvedValue([]);
+const mockTagsGetUsage = vi.fn().mockResolvedValue({});
 const mockTagCreate = vi.fn();
 
 vi.mock('@/lib/tags', () => ({
   tagsApi: {
     getAll: (...args: any[]) => mockTagsGetAll(...args),
+    getUsage: (...args: any[]) => mockTagsGetUsage(...args),
     create: (...args: any[]) => mockTagCreate(...args),
   },
 }));
@@ -4286,6 +4288,48 @@ describe('TransactionForm', () => {
       await waitFor(() => expect(mockCreate).toHaveBeenCalled());
       const payload = mockCreate.mock.calls[0][0];
       expect(payload.payeeId).toBeNull();
+    });
+  });
+
+  describe('tag picker order', () => {
+    const tagFixture = (id: string, name: string) =>
+      ({ id, name, userId: 'user-1', color: null, icon: null, createdAt: '', updatedAt: '' });
+
+    afterEach(() => {
+      mockTagsGetAll.mockResolvedValue([]);
+      mockTagsGetUsage.mockResolvedValue({});
+    });
+
+    const openPicker = async () => {
+      render(<TransactionForm onSuccess={mockOnSuccess} onCancel={mockOnCancel} />);
+      await waitFor(() => expect(mockTagsGetUsage).toHaveBeenCalled());
+      fireEvent.click(screen.getByText('Select tags...'));
+      await waitFor(() => expect(screen.getByText('Holiday 2026')).toBeInTheDocument());
+    };
+
+    const precedes = (first: string, second: string) =>
+      Boolean(
+        screen.getByText(first).compareDocumentPosition(screen.getByText(second)) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+
+    it('lists a recently used tag above an alphabetically earlier one', async () => {
+      mockTagsGetAll.mockResolvedValue([tagFixture('t-art', 'Art'), tagFixture('t-h26', 'Holiday 2026')]);
+      mockTagsGetUsage.mockResolvedValue({ 't-h26': { lastUsed: '2026-10-01', count: 2 } });
+
+      await openPicker();
+
+      expect(precedes('Holiday 2026', 'Art')).toBe(true);
+    });
+
+    it('stays A-Z when the usage lookup fails', async () => {
+      mockTagsGetAll.mockResolvedValue([tagFixture('t-art', 'Art'), tagFixture('t-h26', 'Holiday 2026')]);
+      mockTagsGetUsage.mockRejectedValue(new Error('network'));
+
+      await openPicker();
+
+      expect(precedes('Art', 'Holiday 2026')).toBe(true);
+      expect(toast.error).not.toHaveBeenCalled();
     });
   });
 
