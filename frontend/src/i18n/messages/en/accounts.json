@@ -250,6 +250,7 @@
     "interestRatePlaceholder": "e.g. 5.5",
     "estimatedFromHistory": "Estimated from transaction history: {rate}%",
     "interestExpenseCategory": "Interest Expense Category",
+    "interestExpenseCategoryRequired": "Interest Expense Category (required)",
     "detectedCategory": "Detected: {name}",
     "selectCategory": "Select category...",
     "payeeLender": "Payee / Lender",
@@ -307,6 +308,7 @@
     "paymentFrequency": "Payment Frequency (required)",
     "firstPaymentDate": "First Payment Date (required)",
     "paymentFromAccount": "Payment From Account (required)",
+    "interestCategoryRequired": "Interest Category (required)",
     "paymentFromAccountEditHelp": "Changing this moves the upcoming scheduled payments and the payment matching rule to the new account. Payments already posted are not changed.",
     "interestCategory": "Interest Category",
     "interestBookingMode": {
@@ -452,6 +454,7 @@
     "paymentStartDateRequired": "First payment date is required",
     "paymentAccountRequired": "Payment account is required",
     "amortizationRequired": "Amortization period is required",
+    "interestCategoryRequired": "Choose the category this loan's interest is booked to",
     "acceleratedNeedsAnnuity": "This mortgage is paid on an accelerated schedule, which only an annuity mortgage has. A linear or interest-only mortgage needs a regular payment frequency, so keep an annuity type.",
     "paymentMatchingPayeePatternRequired": "Enter a payee pattern to match the bank's debit",
     "paymentMatchingPayeePatternWildcard": "The payee pattern must include a * wildcard",

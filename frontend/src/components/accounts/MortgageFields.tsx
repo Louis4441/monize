@@ -618,6 +618,7 @@ export function MortgageFields({
         categories={categories}
         selectedInterestCategoryId={selectedInterestCategoryId}
         onInterestCategoryChange={handleInterestCategoryChange}
+        interestCategoryRequired={!isEditing}
         interestBookingMode={interestBookingMode}
         onInterestBookingModeChange={handleInterestBookingModeChange}
         selectedOverpaymentCategoryId={selectedOverpaymentCategoryId}

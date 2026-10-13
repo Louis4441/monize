@@ -166,7 +166,7 @@ describe('MortgageFields', () => {
     expect(screen.getByText('Mortgage Details')).toBeInTheDocument();
     expect(screen.getByText('Payment Frequency (required)')).toBeInTheDocument();
     expect(screen.getByText('First Payment Date (required)')).toBeInTheDocument();
-    expect(screen.getByText('Interest Category')).toBeInTheDocument();
+    expect(screen.getByText('Interest Category (required)')).toBeInTheDocument();
   });
 
   it('renders payment frequency options for mortgages', () => {
@@ -243,7 +243,7 @@ describe('MortgageFields', () => {
 
   it('renders interest category select with sorted categories', () => {
     render(<MortgageFields {...defaultProps} />);
-    expect(screen.getByText('Interest Category')).toBeInTheDocument();
+    expect(screen.getByText('Interest Category (required)')).toBeInTheDocument();
   });
 
   it('renders one Mortgage Type select in place of the two checkboxes', () => {
