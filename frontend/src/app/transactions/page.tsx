@@ -61,7 +61,8 @@ import { Category } from '@/types/category';
 import { Payee } from '@/types/payee';
 import { Tag } from '@/types/tag';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useTransactionsPanelCollapsed } from '@/hooks/useTransactionsPanelCollapsed';
+import { ChartCollapseButton, CollapsedChartStrip } from '@/components/transactions/ChartCollapseControls';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -163,9 +164,14 @@ function TransactionsContent() {
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [showPayeeForm, setShowPayeeForm] = useState(false);
   const [editingPayee, setEditingPayee] = useState<Payee | undefined>();
-  const [accountWidgetCollapsed, setAccountWidgetCollapsed] = useLocalStorage<boolean>('monize-transactions-account-widget-collapsed', false);
-  const [payeeWidgetCollapsed, setPayeeWidgetCollapsed] = useLocalStorage<boolean>('monize-transactions-payee-widget-collapsed', false);
-  const [categoryWidgetCollapsed, setCategoryWidgetCollapsed] = useLocalStorage<boolean>('monize-transactions-category-widget-collapsed', false);
+  const [accountWidgetCollapsed, setAccountWidgetCollapsed] = useTransactionsPanelCollapsed('accountWidget');
+  const [payeeWidgetCollapsed, setPayeeWidgetCollapsed] = useTransactionsPanelCollapsed('payeeWidget');
+  const [categoryWidgetCollapsed, setCategoryWidgetCollapsed] = useTransactionsPanelCollapsed('categoryWidget');
+  // The chart band (the chart and any info widget beside it) folds into one
+  // strip; each widget keeps its own state for when the band comes back.
+  const [chartCollapsed, setChartCollapsed] = useTransactionsPanelCollapsed('chart');
+  const collapseChart = useCallback(() => setChartCollapsed(true), [setChartCollapsed]);
+  const expandChart = useCallback(() => setChartCollapsed(false), [setChartCollapsed]);
   const [showBulkUpdate, setShowBulkUpdate] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
@@ -1179,6 +1185,7 @@ function TransactionsContent() {
           }
         />
         {(() => {
+          if (chartCollapsed) return <CollapsedChartStrip onExpand={expandChart} />;
           const chartKind =
             filters.filterCategoryIds.length > 0 || filters.filterPayeeIds.length > 0 || filters.filterTagIds.length > 0 || filters.filterSearch.length > 0
               ? 'monthlyTotals'
@@ -1200,6 +1207,7 @@ function TransactionsContent() {
                   data={monthlyTotals}
                   isLoading={isLoading}
                   filterLabel={monthlyTotalsFilterLabel}
+                  onCollapse={collapseChart}
                   onMonthClick={(startDate, endDate) => {
                     filters.isFilterChange.current = true;
                     filters.setFilterStartDate(startDate);
@@ -1213,6 +1221,7 @@ function TransactionsContent() {
                   isLoading={isLoading}
                   currencyCode={chartCurrency}
                   onAccountClick={filters.handleAccountFilterClick}
+                  onCollapse={collapseChart}
                 />
               ) : chartKind === 'zeroBalances' ? (
                 isLoading ? (
@@ -1220,8 +1229,11 @@ function TransactionsContent() {
                 ) : (
                   <div
                     data-testid="chart-zero-balances"
-                    className={`${CARD_CLASS} p-3 sm:p-6 mb-6 min-h-[420px] flex items-center justify-center`}
+                    className={`${CARD_CLASS} relative p-3 sm:p-6 mb-6 min-h-[420px] flex items-center justify-center`}
                   >
+                    <div className="absolute top-3 right-3 sm:top-6 sm:right-6">
+                      <ChartCollapseButton onCollapse={collapseChart} />
+                    </div>
                     <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
                       {t('charts.zeroBalances.message')}
                     </p>
@@ -1236,6 +1248,7 @@ function TransactionsContent() {
                   // Only when narrowed to a single liability account is a
                   // negative balance expected; an aggregate of accounts is not.
                   isLiability={isLiabilityAccountType(singleFilteredAccount?.accountType)}
+                  onCollapse={collapseChart}
                 />
               )}
             </div>
