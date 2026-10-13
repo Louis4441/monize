@@ -34,6 +34,7 @@ import {
   NAV_ICONS,
 } from '@/lib/nav-links';
 import toast from 'react-hot-toast';
+import { SearchSyntaxHelp } from '@/components/transactions/SearchSyntaxHelp';
 
 // Labels are translation keys in the `navigation` namespace, resolved at
 // render time. The href doubles as the route, the active-state match, and
@@ -150,12 +151,16 @@ export function AppHeader() {
   const aiRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // The syntax help renders through a portal, so a press inside it is not
+  // inside `searchRef`; it is named here so choosing an example keeps the
+  // search open.
+  const searchHelpRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useClickOutside(toolsRef, () => setToolsOpen(false));
   useClickOutside(aiRef, () => setAiOpen(false));
   useClickOutside(adminRef, () => setAdminOpen(false));
-  useClickOutside(searchRef, () => setSearchOpen(false));
+  useClickOutside([searchRef, searchHelpRef], () => setSearchOpen(false));
 
   // Focus the search input as it slides open.
   useEffect(() => {
@@ -606,6 +611,15 @@ export function AppHeader() {
                       : 'w-0 px-0 py-1.5 border-transparent opacity-0 pointer-events-none'
                   }`}
                 />
+                {searchOpen && (
+                  <SearchSyntaxHelp
+                    popoverRef={searchHelpRef}
+                    onExample={(example) => {
+                      setSearchTerm(example);
+                      searchInputRef.current?.focus();
+                    }}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => {

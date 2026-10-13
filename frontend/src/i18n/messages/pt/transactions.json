@@ -258,7 +258,7 @@
       "statuses": "Todos os estados",
       "amountMin": "Mín",
       "amountMax": "Máx",
-      "search": "Pesquisar beneficiário, categoria, montante, etiqueta, descrição, referência #...",
+      "search": "Pesquisar, ou experimente #10 ou payee:costco",
       "tagKeyValue": "por ex. usa"
     },
     "tagKeyNone": "Qualquer (sem filtro de chave)",
@@ -604,5 +604,69 @@
     "title": "Despesas por {key}",
     "other": "Outros",
     "noData": "Sem despesas etiquetadas para repartir por esta chave."
+  },
+  "searchSyntax": {
+    "open": "Sintaxe de pesquisa",
+    "title": "Sintaxe de pesquisa",
+    "fields": "Campos: payee, memo, cat, tag, account, ref, amount, date, status, is, has. Escolha um exemplo para o colocar na caixa de pesquisa.",
+    "examples": {
+      "allWords": "Cada palavra aparece em algum lado",
+      "phrase": "Esta frase exata",
+      "exclude": "Excluir tudo o que corresponda a refund",
+      "fieldContains": "O beneficiário contém costco",
+      "fieldExact": "O beneficiário é exatamente Costco",
+      "reference": "Número de cheque ou referência exatamente 10",
+      "wildcard": "A referência começa por 10",
+      "amountOver": "Montante superior a 100",
+      "amountRange": "Montante de 50 a 100",
+      "datePeriod": "Qualquer dia de março de 2026",
+      "isSplit": "Transações divididas",
+      "hasAttachment": "Tem um anexo"
+    }
+  },
+  "searchInterpretation": {
+    "label": "A pesquisar:",
+    "negated": "não {phrase}",
+    "malformed": "{raw} (não compreendido, pesquisado como texto)",
+    "empty": "{raw} (vazio, ignorado)",
+    "status": "Estado é {value}",
+    "any": "«{value}» em qualquer campo",
+    "fields": {
+      "payee": "Beneficiário",
+      "memo": "Nota",
+      "cat": "Categoria",
+      "tag": "Etiqueta",
+      "account": "Conta",
+      "ref": "Referência",
+      "amount": "Montante",
+      "date": "Data",
+      "status": "Estado",
+      "is": "Tipo",
+      "has": "Tem"
+    },
+    "ops": {
+      "contains": "{field} contém «{value}»",
+      "exact": "{field} é «{value}»",
+      "glob": "{field} corresponde a «{value}»",
+      "eq": "{field} é {value}",
+      "gt": "{field} superior a {value}",
+      "gte": "{field} {value} ou mais",
+      "lt": "{field} inferior a {value}",
+      "lte": "{field} {value} ou menos",
+      "between": "{field} de {value} a {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Transferências",
+        "split": "Transações divididas",
+        "uncategorized": "Sem categoria"
+      },
+      "has": {
+        "attachment": "Tem um anexo",
+        "ref": "Tem um número de referência",
+        "memo": "Tem uma nota",
+        "tag": "Tem uma etiqueta"
+      }
+    }
   }
 }

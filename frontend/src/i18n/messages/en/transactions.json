@@ -258,7 +258,7 @@
       "statuses": "All statuses",
       "amountMin": "Min",
       "amountMax": "Max",
-      "search": "Search payee, category, amount, tag, description, reference #...",
+      "search": "Search, or try #10 or payee:costco",
       "tagKeyValue": "e.g. usa"
     },
     "tagKeyNone": "Any (no key filter)",
@@ -604,5 +604,69 @@
     "title": "Spending by {key}",
     "other": "Other",
     "noData": "No tagged spending to break down for this key."
+  },
+  "searchSyntax": {
+    "open": "Search syntax",
+    "title": "Search syntax",
+    "fields": "Fields: payee, memo, cat, tag, account, ref, amount, date, status, is and has. Choose an example to put it in the search box.",
+    "examples": {
+      "allWords": "Every word matches somewhere",
+      "phrase": "This exact phrase",
+      "exclude": "Leave out anything matching refund",
+      "fieldContains": "Payee contains costco",
+      "fieldExact": "Payee is exactly Costco",
+      "reference": "Cheque or reference number 10 exactly",
+      "wildcard": "Reference starts with 10",
+      "amountOver": "Amount over 100",
+      "amountRange": "Amount from 50 to 100",
+      "datePeriod": "Any day in March 2026",
+      "isSplit": "Split transactions",
+      "hasAttachment": "Has an attachment"
+    }
+  },
+  "searchInterpretation": {
+    "label": "Searching:",
+    "negated": "not {phrase}",
+    "malformed": "{raw} (not understood, searched as text)",
+    "empty": "{raw} (empty, ignored)",
+    "status": "Status is {value}",
+    "any": "“{value}” anywhere",
+    "fields": {
+      "payee": "Payee",
+      "memo": "Memo",
+      "cat": "Category",
+      "tag": "Tag",
+      "account": "Account",
+      "ref": "Reference",
+      "amount": "Amount",
+      "date": "Date",
+      "status": "Status",
+      "is": "Type",
+      "has": "Has"
+    },
+    "ops": {
+      "contains": "{field} contains “{value}”",
+      "exact": "{field} is “{value}”",
+      "glob": "{field} matches “{value}”",
+      "eq": "{field} is {value}",
+      "gt": "{field} over {value}",
+      "gte": "{field} {value} or more",
+      "lt": "{field} under {value}",
+      "lte": "{field} {value} or less",
+      "between": "{field} from {value} to {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Transfers",
+        "split": "Split transactions",
+        "uncategorized": "Uncategorized"
+      },
+      "has": {
+        "attachment": "Has an attachment",
+        "ref": "Has a reference number",
+        "memo": "Has a memo",
+        "tag": "Has a tag"
+      }
+    }
   }
 }

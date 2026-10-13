@@ -258,7 +258,7 @@
       "statuses": "Tous les statuts",
       "amountMin": "Min",
       "amountMax": "Max",
-      "search": "Rechercher bénéficiaire, catégorie, montant, étiquette, description, référence #...",
+      "search": "Rechercher, ou essayez #10 ou payee:costco",
       "tagKeyValue": "p. ex. usa"
     },
     "tagKeyNone": "Toutes (aucun filtre de clé)",
@@ -604,5 +604,69 @@
     "title": "Dépenses par {key}",
     "other": "Autres",
     "noData": "Aucune dépense étiquetée à répartir pour cette clé."
+  },
+  "searchSyntax": {
+    "open": "Syntaxe de recherche",
+    "title": "Syntaxe de recherche",
+    "fields": "Champs : payee, memo, cat, tag, account, ref, amount, date, status, is, has. Choisissez un exemple pour le placer dans la zone de recherche.",
+    "examples": {
+      "allWords": "Chaque mot apparaît quelque part",
+      "phrase": "Cette expression exacte",
+      "exclude": "Exclure tout ce qui correspond à refund",
+      "fieldContains": "Le bénéficiaire contient costco",
+      "fieldExact": "Le bénéficiaire est exactement Costco",
+      "reference": "Numéro de chèque ou de référence exactement 10",
+      "wildcard": "La référence commence par 10",
+      "amountOver": "Montant supérieur à 100",
+      "amountRange": "Montant de 50 à 100",
+      "datePeriod": "N’importe quel jour de mars 2026",
+      "isSplit": "Opérations ventilées",
+      "hasAttachment": "Possède une pièce jointe"
+    }
+  },
+  "searchInterpretation": {
+    "label": "Recherche :",
+    "negated": "pas {phrase}",
+    "malformed": "{raw} (non compris, recherché comme texte)",
+    "empty": "{raw} (vide, ignoré)",
+    "status": "Statut est {value}",
+    "any": "« {value} » partout",
+    "fields": {
+      "payee": "Bénéficiaire",
+      "memo": "Note",
+      "cat": "Catégorie",
+      "tag": "Étiquette",
+      "account": "Compte",
+      "ref": "Référence",
+      "amount": "Montant",
+      "date": "Date",
+      "status": "Statut",
+      "is": "Type",
+      "has": "Possède"
+    },
+    "ops": {
+      "contains": "{field} contient « {value} »",
+      "exact": "{field} est « {value} »",
+      "glob": "{field} correspond à « {value} »",
+      "eq": "{field} est {value}",
+      "gt": "{field} supérieur à {value}",
+      "gte": "{field} {value} ou plus",
+      "lt": "{field} inférieur à {value}",
+      "lte": "{field} {value} ou moins",
+      "between": "{field} de {value} à {valueTo}"
+    },
+    "enum": {
+      "is": {
+        "transfer": "Virements",
+        "split": "Opérations ventilées",
+        "uncategorized": "Sans catégorie"
+      },
+      "has": {
+        "attachment": "Possède une pièce jointe",
+        "ref": "Possède un numéro de référence",
+        "memo": "Possède une note",
+        "tag": "Possède une étiquette"
+      }
+    }
   }
 }
