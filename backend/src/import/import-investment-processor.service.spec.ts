@@ -244,6 +244,62 @@ describe("ImportInvestmentProcessorService", () => {
         expect(lookups).toHaveLength(1);
       });
 
+      it("infers the series on sale once per (program, date), not once per row", async () => {
+        const ctx = makeCtx();
+        linked(ctx, { onSale: [SERIES] });
+        await service.processTransaction(ctx, buy);
+        await service.processTransaction(ctx, buy);
+        await service.processTransaction(ctx, { ...buy, action: "ReinvDiv" });
+        const sameDay = managerOf(ctx).query.mock.calls.filter(([sql]) =>
+          String(sql).includes("ORDER BY s.series_code"),
+        );
+        expect(sameDay).toHaveLength(1);
+        const saved = managerOf(ctx)
+          .save.mock.calls.map((c) => c[0])
+          .filter((e) => e instanceof InvestmentTransaction);
+        expect(saved.length).toBeGreaterThanOrEqual(3);
+        expect(new Set(saved.map((e) => e.bondInstrumentId))).toEqual(
+          new Set([SERIES]),
+        );
+
+        await service.processTransaction(ctx, { ...buy, date: "2026-10-16" });
+        expect(
+          managerOf(ctx).query.mock.calls.filter(([sql]) =>
+            String(sql).includes("ORDER BY s.series_code"),
+          ),
+        ).toHaveLength(2);
+      });
+
+      it("remembers a date with no series on sale too (null is an answer)", async () => {
+        const ctx = makeCtx();
+        linked(ctx, { onSale: [] });
+        await service.processTransaction(ctx, buy);
+        await service.processTransaction(ctx, buy);
+        expect(
+          managerOf(ctx).query.mock.calls.filter(([sql]) =>
+            String(sql).includes("ORDER BY s.series_code"),
+          ),
+        ).toHaveLength(1);
+        expect(ctx.importResult.bondRowsWithoutSeries).toBe(2);
+      });
+
+      it("does not count a row without a series whose cash leg then fails (the caller rolls the row back)", async () => {
+        const ctx = makeCtx();
+        linked(ctx, { onSale: [] });
+        const cash = jest
+          .spyOn(service as any, "processCashTransaction")
+          .mockRejectedValueOnce(new Error("cash leg failed"));
+
+        await expect(service.processTransaction(ctx, buy)).rejects.toThrow(
+          "cash leg failed",
+        );
+        expect(ctx.importResult.bondRowsWithoutSeries).toBeUndefined();
+
+        cash.mockResolvedValue(undefined as never);
+        await service.processTransaction(ctx, buy);
+        expect(ctx.importResult.bondRowsWithoutSeries).toBe(1);
+      });
+
       it("the run's guard refuses the file after which a removal is not covered, once it is checked", async () => {
         const ctx = makeCtx();
         const sell = {

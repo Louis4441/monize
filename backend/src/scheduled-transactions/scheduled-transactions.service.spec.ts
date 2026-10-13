@@ -29,6 +29,7 @@ import { ActionHistoryService } from "../action-history/action-history.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { SystemAlertService } from "../system-alerts/system-alert.service";
 import { getRequestContext } from "../common/request-context";
+import { addDaysYMD, todayInTimezone } from "../common/date-utils";
 import {
   createScopedDbMocks,
   DataSourceMock,
@@ -3994,6 +3995,91 @@ describe("ScheduledTransactionsService", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    describe("a bond-linked security", () => {
+      const linkBond = () =>
+        mockDataSource.query.mockImplementation(async (sql: string) =>
+          String(sql).includes("bond_program_id")
+            ? [{ id: "prog-edo", program_code: "EDO" }]
+            : [],
+        );
+
+      beforeEach(() => {
+        accountsService.findOne.mockResolvedValue({
+          id: "acc-inv",
+          userId,
+          accountSubType: "INVESTMENT_BROKERAGE",
+        });
+      });
+
+      it.each(["ADD_SHARES", "TRANSFER_IN"])(
+        "refuses a scheduled %s on create (a schedule cannot name a series)",
+        async (action) => {
+          linkBond();
+
+          await expect(
+            service.create(userId, {
+              ...investmentBaseDto,
+              investmentAction: action as any,
+            }),
+          ).rejects.toMatchObject({
+            response: expect.objectContaining({
+              errorCode: "SERIES_REQUIRED",
+              message: expect.stringContaining(action),
+            }),
+          });
+          expect(scheduledRepo.save).not.toHaveBeenCalled();
+        },
+      );
+
+      it("refuses an update that turns a schedule into an ADD_SHARES of it", async () => {
+        linkBond();
+        stubFindOne(
+          makeScheduled({
+            isInvestment: true,
+            investmentAction: "BUY" as any,
+            investmentSecurityId: "sec-voo",
+            investmentQuantity: 1,
+            investmentPrice: 500,
+          }),
+        );
+
+        await expect(
+          service.update(userId, stId, {
+            investmentAction: "ADD_SHARES" as any,
+          } as any),
+        ).rejects.toMatchObject({
+          response: expect.objectContaining({ errorCode: "SERIES_REQUIRED" }),
+        });
+      });
+
+      it("allows a scheduled BUY of it (the series is inferred when it posts)", async () => {
+        linkBond();
+        const saved = makeScheduled({ isInvestment: true });
+        scheduledRepo.save.mockResolvedValue(saved);
+        stubFindOne(saved);
+
+        await expect(
+          service.create(userId, investmentBaseDto),
+        ).resolves.toBeDefined();
+      });
+
+      it("leaves a scheduled ADD_SHARES of an unlinked security alone", async () => {
+        mockDataSource.query.mockImplementation(async () => [
+          { id: null, program_code: null },
+        ]);
+        const saved = makeScheduled({ isInvestment: true });
+        scheduledRepo.save.mockResolvedValue(saved);
+        stubFindOne(saved);
+
+        await expect(
+          service.create(userId, {
+            ...investmentBaseDto,
+            investmentAction: "ADD_SHARES" as any,
+          }),
+        ).resolves.toBeDefined();
+      });
+    });
+
     it("validateInvestmentFields rejects DIVIDEND without totalAmount or qty+price", async () => {
       accountsService.findOne.mockResolvedValue({
         id: "acc-inv",
@@ -5286,6 +5372,114 @@ describe("ScheduledTransactionsService", () => {
         }),
       );
       postSpy.mockRestore();
+    });
+
+    describe("a bond purchase waiting for its series", () => {
+      const seriesError = () =>
+        new BadRequestException({
+          message: "The series of this EDO purchase could not be determined",
+          errorCode: "SERIES_NOT_DETERMINED",
+        });
+      const dueAgo = (days: number) =>
+        addDaysYMD(todayInTimezone("UTC") as string, -days);
+      const bondBuy = (daysOverdue: number) =>
+        makeScheduled({
+          id: "st-bond",
+          autoPost: true,
+          nextDueDate: dueAgo(daysOverdue) as any,
+          isInvestment: true,
+          investmentAction: "BUY" as any,
+          investmentSecurityId: "sec-edo",
+          investmentQuantity: 2,
+          investmentPrice: 100,
+        });
+      const arm = (scheduled: ScheduledTransaction) => {
+        scheduledRepo.find.mockResolvedValue([scheduled]);
+        stubFindOne(scheduled);
+        const overrideQb = mockQueryBuilder();
+        overrideQb.getOne.mockResolvedValue(null);
+        overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      };
+
+      it.each([0, 1, 2])(
+        "retries without an alert on day %i past due",
+        async (days) => {
+          arm(bondBuy(days));
+          investmentTransactionsService.create.mockRejectedValue(seriesError());
+          const errorSpy = jest
+            .spyOn((service as any).logger, "error")
+            .mockImplementation(() => undefined);
+
+          await service.processAutoPostTransactions();
+
+          expect(investmentTransactionsService.create).toHaveBeenCalledTimes(1);
+          expect(mockSystemAlerts.raiseUserAlert).not.toHaveBeenCalled();
+          expect(errorSpy).not.toHaveBeenCalled();
+          errorSpy.mockRestore();
+        },
+      );
+
+      it("raises one alert naming the missing series month on day 3, with a key that does not change by run date", async () => {
+        const scheduled = bondBuy(3);
+        arm(scheduled);
+        investmentTransactionsService.create.mockRejectedValue(seriesError());
+        const errorSpy = jest
+          .spyOn((service as any).logger, "error")
+          .mockImplementation(() => undefined);
+
+        await service.processAutoPostTransactions();
+        await service.processAutoPostTransactions();
+
+        const month = String(scheduled.nextDueDate).slice(0, 7);
+        expect(mockSystemAlerts.raiseUserAlert).toHaveBeenCalledTimes(2);
+        const [, first] = mockSystemAlerts.raiseUserAlert.mock.calls[0];
+        const [, second] = mockSystemAlerts.raiseUserAlert.mock.calls[1];
+        expect(first.type).toBe("SCHEDULED_POST_FAILED");
+        expect(first.message).toContain(month);
+        expect(first.message).toContain("Fetch the series");
+        expect(first.dedupeKey).toBe(
+          `SCHEDULED_POST_FAILED:st-bond:${scheduled.nextDueDate}:series`,
+        );
+        // The alert service dedupes on the key, so repeats of this hourly
+        // retry raise the alert once.
+        expect(second.dedupeKey).toBe(first.dedupeKey);
+        errorSpy.mockRestore();
+      });
+
+      it("posts with the inferred series once it appears, without an alert", async () => {
+        arm(bondBuy(1));
+        investmentTransactionsService.create
+          .mockRejectedValueOnce(seriesError())
+          .mockResolvedValueOnce({ id: "inv-tx-1" });
+
+        await service.processAutoPostTransactions();
+        await service.processAutoPostTransactions();
+
+        expect(investmentTransactionsService.create).toHaveBeenCalledTimes(2);
+        // The schedule names no series: the write infers it from the date.
+        const dto = investmentTransactionsService.create.mock.calls[1][1];
+        expect(dto.bondInstrumentId).toBeUndefined();
+        expect(dto.bondSeriesReference).toBeUndefined();
+        expect(mockSystemAlerts.raiseUserAlert).not.toHaveBeenCalled();
+      });
+
+      it("still alerts at once for any other refusal of a bond purchase", async () => {
+        arm(bondBuy(0));
+        investmentTransactionsService.create.mockRejectedValue(
+          new BadRequestException({
+            message: "Series EDO0136 does not belong",
+            errorCode: "SERIES_NOT_IN_PROGRAM",
+          }),
+        );
+        const errorSpy = jest
+          .spyOn((service as any).logger, "error")
+          .mockImplementation(() => undefined);
+
+        await service.processAutoPostTransactions();
+
+        expect(mockSystemAlerts.raiseUserAlert).toHaveBeenCalledTimes(1);
+        errorSpy.mockRestore();
+      });
     });
 
     it("raises nothing for a ConflictException -- losing the claim means the winner posted it", async () => {

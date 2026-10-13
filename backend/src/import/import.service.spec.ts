@@ -1095,7 +1095,11 @@ describe("ImportService", () => {
             "processTransaction",
           )
           .mockImplementation(async (ctx) => {
-            ctx.bond = { programCache: new Map(), guard: { verify } as never };
+            ctx.bond = {
+              programCache: new Map(),
+              seriesMemo: new Map(),
+              guard: { verify } as never,
+            };
           });
         try {
           await expect(

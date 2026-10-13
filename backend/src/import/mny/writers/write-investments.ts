@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { BondProgramCache } from "../../../bonds/bond-series-resolver";
 import {
-  BondProgramCache,
-  resolveImportedSeries,
-} from "../../../bonds/bond-series-resolver";
+  ImportSeriesMemo,
+  resolveImportedSeriesMemo,
+} from "../../import-context";
 import { createBondWriteGuard } from "../../../bonds/bond-write-guard";
 import { EntityManager } from "typeorm";
 import { Security } from "../../../securities/entities/security.entity";
@@ -205,21 +206,13 @@ export async function writeInvestments(
   // a security the user already had (reused by symbol) can be linked. The
   // program is looked up once per security per run, and the guard refuses the
   // import after which a removal is not covered by the lots.
-  const linkedSecurityIds = new Set(
-    (
-      (await manager.query(
-        `SELECT id FROM securities WHERE user_id = $1 AND bond_program_id IS NOT NULL`,
-        [userId],
-      )) as Array<{ id: string }>
-    ).map((row) => row.id),
-  );
   const programCache: BondProgramCache = new Map();
+  const seriesMemo: ImportSeriesMemo = new Map();
   const bondGuard = createBondWriteGuard(manager, userId, programCache);
-  await bondGuard.track(
-    [...input.securityIdByHandle.values()].filter((id) =>
-      linkedSecurityIds.has(id),
-    ),
-  );
+  // An unlinked security needs no filter here: the program lookup (cached per
+  // security) answers null for it, and the guard and the resolver both leave it
+  // untouched, exactly as the QIF path does.
+  await bondGuard.track(input.securityIdByHandle.values());
   const insertedIds = new Set(writable.map((transaction) => transaction.id));
   let bondRowsWithoutSeries = 0;
 
@@ -319,26 +312,23 @@ export async function writeInvestments(
 
       const securityId =
         input.securityIdByHandle.get(transaction.securityHandle) ?? null;
-      let bondInstrumentId: string | null = null;
-      if (securityId !== null && linkedSecurityIds.has(securityId)) {
-        const series = await resolveImportedSeries(
-          manager,
-          userId,
-          {
-            securityId,
-            action: transaction.action,
-            transactionDate: transaction.transactionDate,
-            // A transfer leg whose partner is written too moves the partner's
-            // lots; it adds nothing of its own and names no series.
-            pairedTransfer:
-              transaction.linkedInvestmentId !== null &&
-              insertedIds.has(transaction.linkedInvestmentId),
-          },
-          programCache,
-        );
-        bondInstrumentId = series.id;
-        if (series.unresolved) bondRowsWithoutSeries += 1;
-      }
+      const series = await resolveImportedSeriesMemo(
+        manager,
+        userId,
+        {
+          securityId,
+          action: transaction.action,
+          transactionDate: transaction.transactionDate,
+          // A transfer leg whose partner is written too moves the partner's
+          // lots; it adds nothing of its own and names no series.
+          pairedTransfer:
+            transaction.linkedInvestmentId !== null &&
+            insertedIds.has(transaction.linkedInvestmentId),
+        },
+        { programCache, seriesMemo },
+      );
+      const bondInstrumentId = series.id;
+      if (series.unresolved) bondRowsWithoutSeries += 1;
 
       investmentRows.push({
         id: transaction.id,

@@ -100,6 +100,21 @@ the series a share-moving row of a program-linked security acts on.
   rather than the import dropping it. A removal the file leaves uncovered
   refuses the import as a whole (the guard runs once per file, which is not in
   date order). The program of a security is looked up once per import run.
+  The series on sale for a date is inferred once per (program, date) per import
+  run.
+- **Scheduled transactions** cannot name a series. A scheduled BUY or REINVEST of
+  a linked security takes the series on sale on its posting date when it posts;
+  a due occurrence whose series is not stored yet (the 1st of a month, before the
+  new series is fetched) is not failed: the post refuses with
+  `SERIES_NOT_DETERMINED` inside its one transaction, so nothing is written and
+  `next_due_date` stays, and the next hourly auto-post run retries it (the
+  schedule row lock and the occurrence's claim row keep it to one post across
+  replicas). No `SCHEDULED_POST_FAILED` alert is raised until the occurrence is 3
+  days past due; then one alert (keyed by schedule and due date) names the
+  missing series month and that the series must be fetched (Refresh on the
+  security page, or auto-fetch). A scheduled ADD_SHARES or TRANSFER_IN of a
+  linked security, whose series must be named, is refused when the schedule is
+  created or updated (`SERIES_REQUIRED`).
 - **Paired transfers** move lots with their series and purchase dates.
 - Every write path sets it the same way: the UI service, bulk, AI action, MCP,
   import, undo/redo (the snapshot carries the column), and every one runs the

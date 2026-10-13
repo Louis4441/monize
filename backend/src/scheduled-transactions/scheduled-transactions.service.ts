@@ -93,6 +93,11 @@ import {
 } from "../common/converting-total";
 import { resolveUserDefaultCurrency } from "../common/default-currency.util";
 import { tr } from "../i18n/translate";
+import {
+  programOfSecurity,
+  seriesRoleOf,
+  infersSeriesFromDate,
+} from "../bonds/bond-series-resolver";
 
 /**
  * What one scheduled occurrence is, for a model reading the list.
@@ -383,6 +388,24 @@ function scheduledSplitBasis(split: ScheduledTransactionSplit): string {
   });
 }
 
+/**
+ * Days an auto-post of a bond-linked purchase may wait for its month's series
+ * before the failure alert fires (the series is fetched by a person or by the
+ * auto-fetch, so the 00:05 run on the 1st routinely precedes it).
+ */
+const BOND_SERIES_WAIT_DAYS = 3;
+
+/** The refusal of a bond purchase whose series cannot be inferred yet. */
+function isSeriesNotDetermined(error: unknown): boolean {
+  if (!(error instanceof BadRequestException)) return false;
+  const body = error.getResponse();
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    (body as { errorCode?: unknown }).errorCode === "SERIES_NOT_DETERMINED"
+  );
+}
+
 function sameScheduledSplitBasis(
   before: ScheduledTransactionSplit[],
   current: ScheduledTransactionSplit[],
@@ -485,6 +508,7 @@ export class ScheduledTransactionsService {
       let totalSuccess = 0;
       let totalError = 0;
       let totalSkipped = 0;
+      let totalDeferred = 0;
 
       for (const [tz, userIds] of userIdsByTz) {
         const today = todayInTimezone(tz);
@@ -600,11 +624,42 @@ export class ScheduledTransactionsService {
               totalSkipped++;
               continue;
             }
+            // A bond-linked BUY/REINVEST due on the 1st posts at ~00:05, before
+            // the new month's series exists (the series is fetched by a person
+            // or by the 07:15 auto-fetch). That refusal is "wait", not
+            // "failed": nothing was written (the claim, the lock and the
+            // investment write share one transaction in post(), so the
+            // refusal rolled all of it back), `next_due_date` did not advance,
+            // and the next hourly run selects the occurrence again. No alert
+            // until it is BOND_SERIES_WAIT_DAYS past due. Double-posting stays
+            // impossible: the schedule row's pessimistic_write lock plus the
+            // `scheduled_transaction_postings` claim key (one row per
+            // occurrence) are taken in post() on every attempt, so a retry on
+            // any replica either posts exactly once or writes nothing.
+            const seriesWait = isSeriesNotDetermined(error);
+            const dueYmd = ensureYMD(scheduled.nextDueDate);
+            const daysOverdue = daysBetweenYMD(dueYmd, today);
+            if (seriesWait && daysOverdue < BOND_SERIES_WAIT_DAYS) {
+              totalDeferred++;
+              this.logger.log(
+                `Auto-post of "${scheduled.name}" (ID: ${scheduled.id}) waits ` +
+                  `for its bond series (due ${dueYmd}, ${daysOverdue} day(s) ` +
+                  "overdue); retried by the next run",
+              );
+              continue;
+            }
             totalError++;
             this.logger.error(
               `Failed to auto-post "${scheduled.name}" (ID: ${scheduled.id}): ${error.message}`,
               error.stack,
             );
+            const seriesMonth = dueYmd.slice(0, 7);
+            const failureText = seriesWait
+              ? `the bond series for ${seriesMonth} is missing, so the series ` +
+                `of this purchase cannot be determined (${daysOverdue} days ` +
+                "overdue). Fetch the series first (Refresh on the security " +
+                "page, or switch on auto-fetch)"
+              : String(error.message);
             // Tell the affected user in-app -- this is their money not moving,
             // actionable by them (post it manually from Bills), so it is a
             // per-user alert and not an admin one. `raiseUserAlert` never
@@ -617,7 +672,7 @@ export class ScheduledTransactionsService {
               message:
                 `Your scheduled transaction "${scheduled.name}" due ` +
                 `${scheduled.nextDueDate} failed to post automatically: ` +
-                `${String(error.message).slice(0, 300)}. You can post it ` +
+                `${failureText.slice(0, 300)}. You can post it ` +
                 "manually from Bills.",
               // Where the bell -- and now the push / email fan-out -- sends the
               // reader: the Bills page the copy tells them to post from. Without
@@ -628,11 +683,14 @@ export class ScheduledTransactionsService {
                 scheduledId: scheduled.id,
                 scheduledName: scheduled.name,
                 dueDate: scheduled.nextDueDate,
-                error: String(error.message).slice(0, 300),
+                error: failureText.slice(0, 300),
               },
-              dedupeKey:
-                `SCHEDULED_POST_FAILED:${scheduled.id}:` +
-                new Date().toISOString().slice(0, 10),
+              // A waiting series alert is once per occurrence (the key has no
+              // run date), not once per day like any other failure.
+              dedupeKey: seriesWait
+                ? `SCHEDULED_POST_FAILED:${scheduled.id}:${dueYmd}:series`
+                : `SCHEDULED_POST_FAILED:${scheduled.id}:` +
+                  new Date().toISOString().slice(0, 10),
             });
           }
         }
@@ -640,7 +698,10 @@ export class ScheduledTransactionsService {
 
       this.logger.log(
         `Auto-post processing complete: ${totalSuccess} succeeded, ` +
-          `${totalSkipped} already claimed elsewhere, ${totalError} failed`,
+          `${totalSkipped} already claimed elsewhere, ${totalError} failed` +
+          (totalDeferred > 0
+            ? `, ${totalDeferred} waiting for a bond series`
+            : ""),
       );
     } catch (error) {
       this.logger.error("Auto-post processing failed", error.stack);
@@ -809,6 +870,7 @@ export class ScheduledTransactionsService {
         );
       }
       this.validateInvestmentFields(createDto);
+      await this.assertBondSeriesNameable(userId, createDto);
       // Only validate a funding account the action will actually use; a value
       // supplied for a non-BUY/SELL action is dropped at persist time, so
       // rejecting it here would refuse a request the write would have cleaned.
@@ -1006,6 +1068,45 @@ export class ScheduledTransactionsService {
         ? roundFxRate(Number(dto.exchangeRate))
         : 1,
     };
+  }
+
+  /**
+   * A schedule cannot name a bond series, so an action that must name one
+   * (ADD_SHARES, TRANSFER_IN: no purchase date to infer it from) of a
+   * bond-linked security would fail at every posting. Refused when the
+   * schedule is written, not at the first due date. BUY and REINVEST infer the
+   * series from the posting date and are allowed (they wait for it, see the
+   * auto-post cron).
+   */
+  private async assertBondSeriesNameable(
+    userId: string,
+    dto: {
+      investmentAction?: InvestmentAction | null;
+      investmentSecurityId?: string | null;
+    },
+  ): Promise<void> {
+    const action = dto.investmentAction;
+    if (
+      !action ||
+      !dto.investmentSecurityId ||
+      seriesRoleOf(action, false) !== "acquisition" ||
+      infersSeriesFromDate(action)
+    ) {
+      return;
+    }
+    const securityId = dto.investmentSecurityId;
+    const program = await withScopedDb(this.dataSource, (m) =>
+      programOfSecurity(m, userId, securityId),
+    );
+    if (program === null) return;
+    throw new BadRequestException({
+      message: tr(
+        "errors.scheduled.bondSeriesNotNameable",
+        `A scheduled ${action} of a bond-linked security cannot name the bond series of its shares. Record it as a transaction and choose the series, or schedule a BUY, which takes the series on sale on its date.`,
+        { action },
+      ),
+      errorCode: "SERIES_REQUIRED",
+    });
   }
 
   private validateInvestmentFields(dto: {
@@ -2017,6 +2118,7 @@ export class ScheduledTransactionsService {
         ),
       };
       this.validateInvestmentFields(merged);
+      await this.assertBondSeriesNameable(userId, merged);
       // Only validate a funding account that will actually be used: a stale one
       // on a non-BUY/SELL action is cleared below, so it need not resolve.
       const effectiveFundingAccountId = suppliedOrStored(

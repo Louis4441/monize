@@ -93,7 +93,7 @@ function doubles(
   const transactions = {
     insert: jest.fn().mockResolvedValue(undefined),
   } as unknown as Record<string, jest.Mock>;
-  const query = jest.fn(async (sql: string) => {
+  const query = jest.fn(async (sql: string, params: unknown[] = []) => {
     if (sql.includes("bond_auto_fetch")) {
       return [
         {
@@ -112,11 +112,11 @@ function doubles(
       ledgerReads += 1;
       return rows;
     }
-    if (sql.includes("bond_program_id IS NOT NULL")) {
-      return bond.linked.map((id) => ({ id }));
-    }
     if (sql.includes("s.bond_program_id AS id")) {
-      return [{ id: "program-1", program_code: "EDO" }];
+      // The real lookup: a security that is not linked has no program.
+      return bond.linked.includes(params[0] as string)
+        ? [{ id: "program-1", program_code: "EDO" }]
+        : [{ id: null, program_code: null }];
     }
     if (sql.includes("saleWindow")) return bond.onSale.map((id) => ({ id }));
     return [[], 0];
@@ -487,6 +487,58 @@ describe("writeInvestments", () => {
         String(sql).includes("s.bond_program_id AS id"),
       );
       expect(programLookups).toHaveLength(1);
+    });
+
+    it("infers the series on sale once per (program, date) across the whole import", async () => {
+      const { manager, query } = doubles([], {
+        linked: [linkedId],
+        onSale: ["series-1"],
+      });
+      await writeInvestments(manager, "user-1", {
+        ...baseInput,
+        transactions: [
+          investment(),
+          investment({ id: "22222222-2222-2222-2222-222222222222", handle: 2 }),
+          investment({ id: "33333333-3333-3333-3333-333333333333", handle: 3 }),
+          investment({
+            id: "44444444-4444-4444-4444-444444444444",
+            handle: 4,
+            transactionDate: "2026-02-02",
+          }),
+        ],
+      });
+      const inferences = query.mock.calls.filter(([sql]) =>
+        String(sql).includes("ORDER BY s.series_code"),
+      );
+      expect(inferences).toHaveLength(2);
+    });
+
+    it("leaves an unlinked security untouched: no inference, no ledger read, no count", async () => {
+      const { manager, query, investments } = doubles([], {
+        linked: [],
+        onSale: ["series-1"],
+      });
+      const result = await writeInvestments(manager, "user-1", {
+        ...baseInput,
+        transactions: [
+          investment(),
+          investment({
+            id: "22222222-2222-2222-2222-222222222222",
+            handle: 2,
+            action: InvestmentAction.ADD_SHARES,
+            cashAmount: 0,
+          }),
+        ],
+      });
+      expect(investments.insert).toHaveBeenCalledWith([
+        expect.objectContaining({ bondInstrumentId: null }),
+        expect.objectContaining({ bondInstrumentId: null }),
+      ]);
+      expect(result.bondRowsWithoutSeries).toBe(0);
+      const bondReads = query.mock.calls.filter(([sql]) =>
+        /ORDER BY s.series_code|counterpart_account_id/.test(String(sql)),
+      );
+      expect(bondReads).toHaveLength(0);
     });
 
     it("refuses the import as a whole when a removal is not covered by the lots after it (OVER_REMOVAL), and not one that already was", async () => {

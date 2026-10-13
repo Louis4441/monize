@@ -4,7 +4,14 @@ import { applyAccountBalanceDelta } from "../accounts/accounts.service";
 import { roundMoney } from "../common/round.util";
 import { TransactionRule } from "../transaction-rules/transaction-rule.entity";
 import { ImportResultDto } from "./dto/import.dto";
-import { BondProgramCache } from "../bonds/bond-series-resolver";
+import {
+  BondProgramCache,
+  inferSeriesForDate,
+  infersSeriesFromDate,
+  programOfSecurity,
+  resolveImportedSeries,
+  seriesRoleOf,
+} from "../bonds/bond-series-resolver";
 import {
   BondWriteGuard,
   createBondWriteGuard,
@@ -19,6 +26,48 @@ import {
 export interface ImportBondState {
   readonly programCache: BondProgramCache;
   readonly guard: BondWriteGuard;
+  /** The run's `inferSeriesForDate` answers, see `resolveImportedSeriesMemo`. */
+  readonly seriesMemo: ImportSeriesMemo;
+}
+
+/**
+ * Per-run memo of the series on sale on a date, keyed `programId|YYYY-MM-DD`;
+ * null is a remembered "none or more than one on sale" (also never a guess).
+ * A file holds thousands of rows on far fewer dates, and the answer cannot
+ * change inside the import's transaction (no series is written by it).
+ */
+export type ImportSeriesMemo = Map<string, string | null>;
+
+/**
+ * `resolveImportedSeries` with the date inference memoized for the run: the
+ * resolver itself infers once per row, so the memo wraps the call. A row that
+ * infers nothing (no program, not a BUY/REINVEST acquisition) takes the
+ * resolver's own path unchanged.
+ */
+export async function resolveImportedSeriesMemo(
+  m: EntityManager,
+  userId: string,
+  row: Parameters<typeof resolveImportedSeries>[2],
+  state: Pick<ImportBondState, "programCache" | "seriesMemo">,
+): Promise<{ id: string | null; unresolved: boolean }> {
+  const program = row.securityId
+    ? await programOfSecurity(m, userId, row.securityId, state.programCache)
+    : null;
+  if (
+    program === null ||
+    seriesRoleOf(row.action, row.pairedTransfer ?? false) !== "acquisition" ||
+    !infersSeriesFromDate(row.action)
+  ) {
+    return resolveImportedSeries(m, userId, row, state.programCache);
+  }
+  const date = String(row.transactionDate).slice(0, 10);
+  const key = `${program.id}|${date}`;
+  let id = state.seriesMemo.get(key);
+  if (id === undefined) {
+    id = await inferSeriesForDate(m, program.id, date);
+    state.seriesMemo.set(key, id);
+  }
+  return { id, unresolved: id === null };
 }
 
 export interface ImportContext {
@@ -61,6 +110,7 @@ export function bondStateOf(ctx: ImportContext): ImportBondState {
     ctx.bond = {
       programCache,
       guard: createBondWriteGuard(ctx.manager, ctx.userId, programCache),
+      seriesMemo: new Map(),
     };
   }
   return ctx.bond;

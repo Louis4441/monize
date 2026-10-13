@@ -1,6 +1,5 @@
 import { statusFromQifFlags } from "./qif-status.util";
 import { Injectable, Logger } from "@nestjs/common";
-import { resolveImportedSeries } from "../bonds/bond-series-resolver";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { Security } from "../securities/entities/security.entity";
 import {
@@ -14,6 +13,7 @@ import {
 import {
   ImportContext,
   bondStateOf,
+  resolveImportedSeriesMemo,
   updateAccountBalance,
 } from "./import-context";
 import { roundMoney, roundToDecimals } from "../common/round.util";
@@ -230,11 +230,11 @@ export class ImportInvestmentProcessorService {
     // end of the block, because a file is not in date order).
     const bond = bondStateOf(ctx);
     if (securityId) await bond.guard.track([securityId]);
-    const series = await resolveImportedSeries(
+    const series = await resolveImportedSeriesMemo(
       ctx.manager,
       ctx.userId,
       { securityId, action, transactionDate: qifTx.date },
-      bond.programCache,
+      bond,
     );
     investmentTx.bondInstrumentId = series.id;
     investmentTx.action = action;
@@ -247,10 +247,6 @@ export class ImportInvestmentProcessorService {
     investmentTx.status = status;
 
     await ctx.manager.save(investmentTx);
-    if (series.unresolved) {
-      ctx.importResult.bondRowsWithoutSeries =
-        (ctx.importResult.bondRowsWithoutSeries ?? 0) + 1;
-    }
 
     // Handle cash transaction
     await this.processCashTransaction(
@@ -262,6 +258,14 @@ export class ImportInvestmentProcessorService {
       totalAmount,
       securityId,
     );
+
+    // Counted only now, once nothing after the row's write can throw: the
+    // caller rolls the whole row back to its savepoint on a failure, and a
+    // count taken before the cash leg stayed behind for a row that is gone.
+    if (series.unresolved) {
+      ctx.importResult.bondRowsWithoutSeries =
+        (ctx.importResult.bondRowsWithoutSeries ?? 0) + 1;
+    }
 
     // Holdings are NOT written per row. An import arrives in file order, which
     // is not date order, and an incremental average cost blended in file order

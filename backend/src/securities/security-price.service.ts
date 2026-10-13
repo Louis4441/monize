@@ -61,22 +61,18 @@ export { SecurityLookupResult } from "./providers/quote-provider.interface";
 // Lowercased action names a transaction-derived price row is stored under.
 // Derived from the shared trade list so a new Money-vocabulary action cannot
 // write a source this guard list does not recognize (an unlisted source would
-// never be overwritten or cleaned up again).
+// never be overwritten or cleaned up again). It is also the whole list of rows
+// a transaction-derived price may replace: another transaction price, and
+// nothing else. A bond-engine row is not among them (INV-BOND-005): a
+// transaction price is one lot's trade price, not the holding's value, so for a
+// linked security the engine's row replaces a transaction-derived one and never
+// the reverse; the engine's own upsert replaces every non-manual row, so the
+// two orders end the same.
 const TRANSACTION_SOURCES = [
   ...MARKET_PRICED_TRADE_ACTIONS.map((action) => action.toLowerCase()),
   "transfer_in",
   "transfer_out",
 ];
-
-/**
- * The rows a transaction-derived price may replace: another transaction price,
- * and nothing else. A bond-engine row is not among them (INV-BOND-005): a
- * transaction price is one lot's trade price, not the holding's value, so for a
- * linked security the engine's row replaces a transaction-derived one and never
- * the reverse; the engine's own upsert replaces every non-manual row, so the
- * two orders end the same.
- */
-const TRANSACTION_PRICE_REPLACEABLE_SOURCES = [...TRANSACTION_SOURCES];
 
 /**
  * A provider write is re-checked against the link at the moment of the write,
@@ -1621,10 +1617,6 @@ export class SecurityPriceService {
       // A `manual` row is a correction the user typed, and a `bond_engine` row
       // is a linked security's own price, so the provider overwrites neither;
       // and a security linked since the list was loaded gets no row at all.
-      // A `manual` row is a correction the user typed, so the provider does not
-      // get to overwrite it. `refreshAllPricesGlobally` used to be the only
-      // place that respected manual entries, which meant a backfill silently
-      // undid every one of them.
       await withScopedDb(this.dataSource, (m) =>
         m.query(
           `INSERT INTO security_prices (security_id, price_date, open_price, high_price, low_price, close_price, adjusted_close, volume, source)
@@ -2374,13 +2366,7 @@ export class SecurityPriceService {
        ON CONFLICT (security_id, price_date)
        DO UPDATE SET close_price = $3, source = $4
        WHERE security_prices.source = ANY($5)`,
-        [
-          securityId,
-          transactionDate,
-          avgPrice,
-          source,
-          TRANSACTION_PRICE_REPLACEABLE_SOURCES,
-        ],
+        [securityId, transactionDate, avgPrice, source, TRANSACTION_SOURCES],
       ),
     );
   }
@@ -2448,7 +2434,7 @@ export class SecurityPriceService {
          ON CONFLICT (security_id, price_date)
          DO UPDATE SET close_price = EXCLUDED.close_price, source = EXCLUDED.source
          WHERE security_prices.source = ANY($${params.length + 1})`,
-          [...params, TRANSACTION_PRICE_REPLACEABLE_SOURCES],
+          [...params, TRANSACTION_SOURCES],
         ),
       );
 
