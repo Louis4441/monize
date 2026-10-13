@@ -61,7 +61,7 @@
     "date-fns": "^4.4.0",
     "he": "^2.0.0",
     "helmet": "^8.3.0",
-    "htmlparser2": "^10.1.0",
+    "htmlparser2": "^12.0.0",
     "http_ece": "1.2.1",
     "imapflow": "^2.1.2",
     "libphonenumber-js": "^1.13.14",
@@ -199,7 +199,7 @@
     ],
     "coverageDirectory": "./coverage",
     "transformIgnorePatterns": [
-      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs|he)/)"
+      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs|he|htmlparser2|domhandler|domutils|dom-serializer|domelementtype|entities)/)"
     ],
     "coverageThreshold": {
       "global": {

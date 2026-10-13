@@ -21,7 +21,7 @@
     "^@/(.*)$": "<rootDir>/src/$1"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs|he)/)"
+    "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader|@nestjs|he|htmlparser2|domhandler|domutils|dom-serializer|domelementtype|entities)/)"
   ],
   "testEnvironment": "node",
   "testTimeout": 30000,
