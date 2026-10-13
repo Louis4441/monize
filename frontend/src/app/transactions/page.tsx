@@ -349,10 +349,14 @@ function TransactionsContent() {
     // a deep link had just resolved. Only the newest request may write state.
     const seq = ++requestSeqRef.current;
     const isCurrentRequest = () => seq === requestSeqRef.current;
+    // Read, not consumed: the target is cleared only once the reply that
+    // carried it is adopted (below). On a cold load the accounts arrive while
+    // this read is in flight, the account scope changes and a newer read
+    // supersedes this one; consuming the target here sent that newer read
+    // without it, so the register stayed on page 1 and the row the link
+    // pointed at was never shown.
+    const targetTransactionId = filters.targetTransactionIdRef.current;
     try {
-      const targetTransactionId = filters.targetTransactionIdRef.current;
-      filters.targetTransactionIdRef.current = null;
-
       // A row's page is counted by comparing it with the register's order, and
       // only the date order has a comparison to make -- the server refuses the
       // pair outright. Arriving at a row therefore drops back to the date
@@ -437,6 +441,12 @@ function TransactionsContent() {
       // written over half of the newer one's state.
       if (!isCurrentRequest()) return;
 
+      // A newer deep link may have replaced the target while this read was in
+      // flight; that one is still owed its own read.
+      if (targetTransactionId && filters.targetTransactionIdRef.current === targetTransactionId) {
+        filters.targetTransactionIdRef.current = null;
+      }
+
       setTransactions(transactionsResponse.data);
       setPagination(transactionsResponse.pagination);
       setStartingBalance(transactionsResponse.startingBalance);
@@ -477,6 +487,11 @@ function TransactionsContent() {
       // reader is waiting on a newer one, and a toast for the one they
       // abandoned only tells them something is broken that is not.
       if (!isCurrentRequest()) return;
+      // A target the newest read failed on is dropped, as before, so every
+      // later read does not repeat the same failing request.
+      if (filters.targetTransactionIdRef.current === targetTransactionId) {
+        filters.targetTransactionIdRef.current = null;
+      }
       showErrorToast(error, t('toasts.loadFailed'));
       logger.error(error);
     } finally {
