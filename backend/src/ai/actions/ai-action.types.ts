@@ -345,6 +345,22 @@ export interface DeleteSecurityDescriptor extends BaseDescriptor {
   securityId: string;
 }
 
+/**
+ * What a bond redemption pays, split into returned principal and interest
+ * (`BondHoldingsService.redemptionSplit`), in the security's currency, for a
+ * confirmation card. `outcome` says where the row's price and accrued interest
+ * came from: `filled` (the server set them from the split), `matches` (the
+ * caller's own agree with it) or `differs` (the caller's own were kept and
+ * differ from the split by more than rounding: the card warns).
+ */
+export interface BondRedemptionSplitPreview {
+  principal: number;
+  interest: number;
+  deduction: number;
+  payout: number;
+  outcome: "filled" | "matches" | "differs";
+}
+
 export interface CreateInvestmentTransactionDescriptor extends BaseDescriptor {
   type: "create_investment_transaction";
   accountId: string;
@@ -357,6 +373,8 @@ export interface CreateInvestmentTransactionDescriptor extends BaseDescriptor {
   quantity: number | null;
   price: number | null;
   commission: number;
+  /** REDEEM only: the interest the card showed, written as the linked INTEREST row. */
+  accruedInterest: number;
   /** Resolved at preview time so confirm persists the rate the user approved. */
   exchangeRate: number;
   description: string | null;
@@ -401,6 +419,8 @@ export interface InvestmentTransactionRowDescriptor {
   quantity: number | null;
   price: number | null;
   commission: number;
+  /** REDEEM only: the interest the card showed, written as the linked INTEREST row. */
+  accruedInterest: number;
   exchangeRate: number;
   description: string | null;
   bondInstrumentId: string | null;
@@ -472,6 +492,8 @@ export interface UpdateInvestmentTransactionDescriptor extends BaseDescriptor {
   quantity: number | null;
   price: number | null;
   commission: number;
+  /** REDEEM only: the interest the card showed, written as the linked INTEREST row. */
+  accruedInterest: number;
   exchangeRate: number;
   description: string | null;
   bondInstrumentId: string | null;
@@ -945,8 +967,12 @@ export interface AiActionPreview {
   cashAccountName?: string | null;
   cashCurrency?: string | null;
   cashAmount?: number | null;
+  /** REDEEM: the accrued interest riding on the cash movement. */
+  accruedInterest?: number;
   /** The bond series a program-linked security's row acts on (e.g. EDO1036). */
   bondSeriesCode?: string | null;
+  /** REDEEM of a bond-linked security: the redemption split the card shows. */
+  bondRedemptionSplit?: BondRedemptionSplitPreview | null;
   // create_security display fields (symbol/securityName/securityCurrency above
   // are reused for the ticker, full name, and currency).
   securityType?: string | null;
@@ -1022,8 +1048,12 @@ export interface AiActionPreviewRow {
   cashAccountName?: string | null;
   cashCurrency?: string | null;
   cashAmount?: number | null;
+  /** REDEEM: the accrued interest riding on the cash movement. */
+  accruedInterest?: number;
   /** The bond series a program-linked security's row acts on (e.g. EDO1036). */
   bondSeriesCode?: string | null;
+  /** REDEEM of a bond-linked security: the redemption split the card shows. */
+  bondRedemptionSplit?: BondRedemptionSplitPreview | null;
   // Transfer-row display fields (batch_actions with operation: "create_transfer").
   // The "from" leg reuses accountName/amount/currencyCode.
   fromAccountName?: string;

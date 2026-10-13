@@ -133,6 +133,44 @@ describe('BulkConfirmationCard', () => {
     expect(screen.getByText(/Buy AAPL/)).toBeInTheDocument();
   });
 
+  it('names the bond series and the accrued interest of a redemption row, and flags a difference from the split', () => {
+    render(
+      <BulkConfirmationCard
+        action={makeAction({
+          type: 'create_investment_transactions',
+          preview: {
+            rows: [
+              {
+                status: 'ok',
+                investmentAction: 'REDEEM',
+                symbol: 'EDO',
+                transactionDate: '2023-04-01',
+                quantity: 10,
+                price: 100,
+                totalAmount: 1000,
+                accruedInterest: 470.5,
+                securityCurrency: 'PLN',
+                bondSeriesCode: 'EDO0423',
+                bondRedemptionSplit: {
+                  principal: 1000,
+                  interest: 470.5,
+                  deduction: 0,
+                  payout: 1470.5,
+                  outcome: 'differs',
+                },
+              },
+            ],
+          },
+        })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Series EDO0423/)).toBeInTheDocument();
+    expect(screen.getByText(/Accrued interest/)).toBeInTheDocument();
+    expect(screen.getByText(/Check them before approving/)).toBeInTheDocument();
+  });
+
   describe('batch_actions envelope', () => {
     it('renders an update batch with the edit title and success copy', () => {
       const { rerender } = render(

@@ -835,7 +835,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
     description:
       "Create, update, or delete the user's brokerage/investment-account transactions (any type: buy, sell, dividend, interest, capital gain, stock split, transfer in/out, dividend reinvestment, or share add/remove). This does NOT change anything immediately: it shows the user one or more confirmation cards they must explicitly approve before anything is saved. Use it only when the user clearly asks to record, edit, or delete an investment transaction in their latest message. Accepts NAMES for account, funding account, and security -- they are resolved internally (security matched by ticker symbol or name), so you do NOT need to look up IDs first. " +
       "operation = 'create' | 'update' | 'delete'. Provide an 'items' array (1-25 rows). " +
-      "create: { accountName, action, date, security?, quantity?, price?, commission?, accruedInterest?, bondSeriesCode?, fundingAccountName?, description? } -- security is required for BUY, SELL, REDEEM, SPLIT, REINVEST (and the REINVEST_*/CAPITAL_GAIN_* refinements), ADD_SHARES, and REMOVE_SHARES; optional for cash-only INTEREST. price is the per-share price, or the total cash for a DIVIDEND/INTEREST/CAPITAL_GAIN with no quantity. accruedInterest applies to REDEEM alone: it rides on the same cash movement and is recorded as a linked INTEREST transaction, so never record a second transaction for it. Buys debit, and sells/dividends/interest/capital gains credit, the brokerage's linked cash account automatically -- do not also record a separate cash transaction; fundingAccountName overrides which cash account is used. " +
+      "create: { accountName, action, date, security?, quantity?, price?, commission?, accruedInterest?, bondSeriesCode?, fundingAccountName?, description? } -- security is required for BUY, SELL, REDEEM, SPLIT, REINVEST (and the REINVEST_*/CAPITAL_GAIN_* refinements), ADD_SHARES, and REMOVE_SHARES; optional for cash-only INTEREST. price is the per-share price, or the total cash for a DIVIDEND/INTEREST/CAPITAL_GAIN with no quantity. accruedInterest applies to REDEEM alone: it rides on the same cash movement and is recorded as a linked INTEREST transaction, so never record a second transaction for it. REDEEM of a security linked to a bond program (e.g. EDO): omit price and accruedInterest and name the series with bondSeriesCode when the account holds more than one -- the server fills price (principal returned per bond) and accruedInterest from the redemption split (net of any early-redemption fee), refuses the card when it cannot work the split out, and a price equal to the full payout per bond is split the same way; values you give for both are kept and the card flags a difference from the split. Buys debit, and sells/dividends/interest/capital gains credit, the brokerage's linked cash account automatically -- do not also record a separate cash transaction; fundingAccountName overrides which cash account is used. " +
       "update: { transactionId, action?, date?, security?, quantity?, price?, commission?, accruedInterest?, bondSeriesCode?, description? } -- provide only the fields to change (at least one); omitted fields keep their current value; the total and cash impact are recomputed. First call list_investment_transactions to obtain the transactionId. " +
       "delete: { transactionId } -- deleting one leg of a security transfer removes the paired leg too and reverses any linked cash impact. First call list_investment_transactions to obtain the transactionId. " +
       "approvalMode controls the confirmation: by default a batch of 6 or more items shows one card for the whole batch, while 1-5 items show one card per item the user approves separately. Pass 'individual' to force one card per item at any count. Ignored for a single item. Maximum 25 items per call; if the user pastes more, process the first 25 and tell them to send the rest. After calling this tool, briefly tell the user to review and approve the card(s); never claim the change was applied.",
@@ -902,7 +902,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
               price: {
                 type: "number",
                 description:
-                  "Price per share (up to 6 decimals). For DIVIDEND/INTEREST/CAPITAL_GAIN with no quantity, the total cash amount.",
+                  "Price per share (up to 6 decimals). For DIVIDEND/INTEREST/CAPITAL_GAIN with no quantity, the total cash amount. REDEEM of a bond-linked security: omit it; the server sets it to the principal returned per bond.",
               },
               commission: {
                 type: "number",
@@ -912,7 +912,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
               accruedInterest: {
                 type: "number",
                 description:
-                  "REDEEM only: accrued interest paid out with the redemption (up to 4 decimals). Recorded as a linked INTEREST transaction and included in the single cash movement, so do not record it separately. Defaults to 0.",
+                  "REDEEM only: accrued interest paid out with the redemption (up to 4 decimals). Recorded as a linked INTEREST transaction and included in the single cash movement, so do not record it separately. Defaults to 0. REDEEM of a bond-linked security: omit it; the server fills it from the redemption split.",
               },
               bondSeriesCode: {
                 type: "string",
@@ -1275,7 +1275,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "fetch_bond_series",
     description:
-      "Add a bond series that the catalog lacks by reading its terms from the issuer's official source. Takes ONLY a country code and a series code (e.g. countryCode 'PL', seriesCode 'EDO1036'); never supply or guess a rate, margin, fee or date -- the terms come from the source and are cross-checked. Returns the catalog instrument and created=true when this call stored it, created=false when it was already in the catalog. Use it when the user wants to link a bond security to a series that is not in the catalog. An error names why (not published, source unavailable, the source disagrees with itself, or stored with different terms); relay it and do not retry in a loop.",
+      "Add a bond series that the catalog lacks by reading its terms from the issuer's official source. Takes ONLY a country code and a series code (e.g. countryCode 'PL', seriesCode 'EDO1036'); never supply or guess a rate, margin, fee or date -- the terms come from the source and are cross-checked. Returns the catalog instrument and created=true when this call stored it, created=false when it was already in the catalog. Use it when the user wants to record a transaction of a bond security (one linked to a bond program) in a series that is not in the catalog yet. An error names why (not published, source unavailable, the source disagrees with itself, or stored with different terms); relay it and do not retry in a loop.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1291,4 +1291,14 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
       required: ["countryCode", "seriesCode"],
     },
   },
+];
+
+/**
+ * Tools that make an outbound request and store what they read (reference
+ * data, no confirmation card). A run whose prompt carries untrusted content
+ * (the email parser generator reads email bodies) never offers them: an
+ * injected instruction could otherwise make the run fetch.
+ */
+export const NETWORK_WRITING_TOOL_NAMES: readonly string[] = [
+  "fetch_bond_series",
 ];

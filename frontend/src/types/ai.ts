@@ -369,6 +369,12 @@ export interface PendingActionPreview {
   cashAccountName?: string | null;
   cashCurrency?: string | null;
   cashAmount?: number | null;
+  /** REDEEM: the accrued interest riding on the cash movement. */
+  accruedInterest?: number;
+  /** The bond series a program-linked security's row acts on (e.g. EDO1036). */
+  bondSeriesCode?: string | null;
+  /** REDEEM of a bond-linked security: what the redemption pays, split. */
+  bondRedemptionSplit?: PendingActionRedemptionSplit | null;
   // create_security display fields (symbol/securityName/securityCurrency above
   // are reused for the ticker, full name, and currency).
   securityType?: string | null;
@@ -519,6 +525,23 @@ export interface PendingActionPreviewRow {
   cashAccountName?: string | null;
   cashCurrency?: string | null;
   cashAmount?: number | null;
+  accruedInterest?: number;
+  bondSeriesCode?: string | null;
+  bondRedemptionSplit?: PendingActionRedemptionSplit | null;
+}
+
+/**
+ * A bond redemption's payout split into returned principal and interest, in the
+ * security's currency. `outcome`: `filled` (the server set price and accrued
+ * interest from it), `matches`, or `differs` (the figures the card shows differ
+ * from it by more than rounding).
+ */
+export interface PendingActionRedemptionSplit {
+  principal: number;
+  interest: number;
+  deduction: number;
+  payout: number;
+  outcome: 'filled' | 'matches' | 'differs';
 }
 
 /**

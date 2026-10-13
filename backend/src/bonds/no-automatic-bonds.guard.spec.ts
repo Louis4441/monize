@@ -153,6 +153,7 @@ describe("no bond data without a person's action (INV-BOND-008)", () => {
       fetchSync as never,
       { recomputeLinkedSecuritiesOfSeries: jest.fn() } as never,
       { refreshNeverFetched: jest.fn() } as never,
+      { increment: jest.fn() } as never,
     );
     await service.scheduledCurrentOffer();
     expect(fetchSync.withLease).toHaveBeenCalled();

@@ -224,9 +224,13 @@ export class BondsController {
     status: 503,
     description: "The official source is unavailable",
   })
-  fetchSeries(@Body() dto: FetchBondSeriesDto): Promise<BondSeriesResult> {
+  fetchSeries(
+    @Request() req,
+    @Body() dto: FetchBondSeriesDto,
+  ): Promise<BondSeriesResult> {
     return this.mapSeriesErrors(
-      () => this.series.fetchSeries(dto.countryCode, dto.seriesCode),
+      () =>
+        this.series.fetchSeries(req.user.id, dto.countryCode, dto.seriesCode),
       false,
     );
   }

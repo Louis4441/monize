@@ -32,6 +32,7 @@ import { AiActionBuilderService } from "../../ai/actions/ai-action-builder.servi
 import {
   ApprovalMode,
   PendingAiAction,
+  BondRedemptionSplitPreview,
   resolveApprovalMode,
 } from "../../ai/actions/ai-action.types";
 import { RELAY_PREVIEW_SHOWN, emitRelayCard } from "../mcp-relay-confirm";
@@ -66,7 +67,11 @@ import {
   dryRun,
   itemsArray,
 } from "./schema-fragments";
-import { numberArg, booleanArg } from "../../common/tool-schemas";
+import {
+  numberArg,
+  booleanArg,
+  bondSeriesCodeSchema,
+} from "../../common/tool-schemas";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 type ManageInvOperation = "create" | "update" | "delete";
@@ -553,7 +558,7 @@ export class McpInvestmentsTools {
               accruedInterest: numberArg(z.number().min(0).max(999999999999))
                 .optional()
                 .describe(
-                  "REDEEM: accrued interest paid with it; booked as a linked INTEREST row in the same cash movement, never separately.",
+                  "REDEEM: accrued interest, a linked INTEREST row. Bond-linked: omit it and price (the redemption split fills them).",
                 ),
               exchangeRate: numberArg(z.number().min(0).max(999999999999))
                 .optional()
@@ -565,9 +570,7 @@ export class McpInvestmentsTools {
                 .max(TRANSACTION_NOTE_MAX_LENGTH)
                 .optional()
                 .describe("Description or memo."),
-              bondSeriesCode: z
-                .string()
-                .max(40)
+              bondSeriesCode: bondSeriesCodeSchema
                 .optional()
                 .describe("Bond series code, e.g. EDO1036."),
               transactionId: uuidString()
@@ -710,6 +713,7 @@ export class McpInvestmentsTools {
         quantity: preview.quantity ?? undefined,
         price: preview.price ?? undefined,
         commission: preview.commission,
+        accruedInterest: preview.accruedInterest,
         exchangeRate: preview.exchangeRate,
         description: preview.description ?? undefined,
         bondInstrumentId: preview.bondInstrumentId ?? undefined,
@@ -776,6 +780,7 @@ export class McpInvestmentsTools {
         quantity: preview.quantity ?? undefined,
         price: preview.price ?? undefined,
         commission: preview.commission,
+        accruedInterest: preview.accruedInterest,
         exchangeRate: preview.exchangeRate,
         description: preview.description ?? undefined,
         bondInstrumentId: preview.bondInstrumentId ?? undefined,
@@ -848,6 +853,7 @@ export class McpInvestmentsTools {
           quantity: preview.quantity ?? undefined,
           price: preview.price ?? undefined,
           commission: preview.commission,
+          accruedInterest: preview.accruedInterest,
           exchangeRate: preview.exchangeRate,
           description: preview.description ?? undefined,
           bondInstrumentId: preview.bondInstrumentId ?? undefined,
@@ -933,6 +939,7 @@ export class McpInvestmentsTools {
           quantity: row.quantity ?? undefined,
           price: row.price ?? undefined,
           commission: row.commission,
+          accruedInterest: row.accruedInterest,
           exchangeRate: row.exchangeRate,
           description: row.description ?? undefined,
           bondInstrumentId: row.bondInstrumentId ?? undefined,
@@ -1125,6 +1132,7 @@ export class McpInvestmentsTools {
           quantity: d.quantity ?? undefined,
           price: d.price ?? undefined,
           commission: d.commission,
+          accruedInterest: d.accruedInterest,
           exchangeRate: d.exchangeRate,
           description: d.description ?? undefined,
           bondInstrumentId: d.bondInstrumentId ?? undefined,
@@ -1144,6 +1152,7 @@ export class McpInvestmentsTools {
             quantity: d.quantity ?? undefined,
             price: d.price ?? undefined,
             commission: d.commission,
+            accruedInterest: d.accruedInterest,
             exchangeRate: d.exchangeRate,
             description: d.description ?? undefined,
             bondInstrumentId: d.bondInstrumentId ?? undefined,
@@ -1167,7 +1176,9 @@ export class McpInvestmentsTools {
 
   private confirmLineFor(card: PendingAiAction): string {
     const p = card.preview;
-    const sec = p.symbol ? `\nSecurity: ${p.symbol}` : "";
+    const sec =
+      (p.symbol ? `\nSecurity: ${p.symbol}` : "") +
+      (p.bondSeriesCode ? `\nSeries: ${p.bondSeriesCode}` : "");
     switch (card.type) {
       case "delete_investment_transaction":
         return `Delete this investment transaction?\nAccount: ${p.accountName}\nType: ${p.investmentAction}\nDate: ${p.transactionDate}${sec}`;
@@ -1190,6 +1201,9 @@ export class McpInvestmentsTools {
     cashAccountName: string | null;
     cashCurrency: string | null;
     cashAmount: number | null;
+    accruedInterest?: number;
+    bondSeriesCode?: string | null;
+    redemptionSplit?: BondRedemptionSplitPreview | null;
   }): string[] {
     return ["Create this investment transaction?", ...this.editLines(preview)];
   }
@@ -1207,6 +1221,9 @@ export class McpInvestmentsTools {
     cashAccountName: string | null;
     cashCurrency: string | null;
     cashAmount: number | null;
+    accruedInterest?: number;
+    bondSeriesCode?: string | null;
+    redemptionSplit?: BondRedemptionSplitPreview | null;
   }): string[] {
     const lines: string[] = [
       `Account: ${preview.accountName}`,
@@ -1218,9 +1235,26 @@ export class McpInvestmentsTools {
         `Security: ${preview.symbol}${preview.securityName ? ` (${preview.securityName})` : ""}`,
       );
     }
+    if (preview.bondSeriesCode) {
+      lines.push(`Series: ${preview.bondSeriesCode}`);
+    }
     if (preview.quantity !== null) lines.push(`Quantity: ${preview.quantity}`);
     if (preview.price !== null) lines.push(`Price: ${preview.price}`);
     if (preview.commission) lines.push(`Commission: ${preview.commission}`);
+    if (preview.accruedInterest) {
+      lines.push(`Accrued interest: ${preview.accruedInterest}`);
+    }
+    const split = preview.redemptionSplit;
+    if (split) {
+      lines.push(
+        `Redemption split: principal ${split.principal}, interest ${split.interest}, deduction ${split.deduction}, payout ${split.payout}`,
+      );
+      if (split.outcome === "differs") {
+        lines.push(
+          "Warning: the price and accrued interest differ from the redemption split.",
+        );
+      }
+    }
     if (preview.cashAccountName && preview.cashAmount !== null) {
       lines.push(
         `Cash: ${preview.cashAmount} ${preview.cashCurrency} in ${preview.cashAccountName}`,

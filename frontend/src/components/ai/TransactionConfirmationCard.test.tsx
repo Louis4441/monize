@@ -331,6 +331,81 @@ describe('TransactionConfirmationCard', () => {
     expect(screen.getByText('10')).toBeInTheDocument();
   });
 
+  it('shows the resolved bond series, the accrued interest and the redemption split of a bond redemption', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeInvestmentAction({
+          investmentAction: 'REDEEM',
+          symbol: 'EDO',
+          securityName: 'EDO bonds',
+          securityCurrency: 'PLN',
+          quantity: 10,
+          price: 100,
+          commission: 0,
+          totalAmount: 1000,
+          cashCurrency: 'PLN',
+          cashAmount: 1470.5,
+          accruedInterest: 470.5,
+          bondSeriesCode: 'EDO0423',
+          bondRedemptionSplit: {
+            principal: 1000,
+            interest: 470.5,
+            deduction: 0,
+            payout: 1470.5,
+            outcome: 'filled',
+          },
+        })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Series')).toBeInTheDocument();
+    expect(screen.getByText('EDO0423')).toBeInTheDocument();
+    expect(screen.getByText('Accrued interest')).toBeInTheDocument();
+    expect(screen.getByText('Redemption split')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Principal .*1,000\.00.* \+ interest .*470\.50.* = payout .*1,470\.50/),
+    ).toBeInTheDocument();
+    // No fee was taken out, and the figures agree with the split: no warning.
+    expect(screen.queryByText('Early-redemption fee deducted')).toBeNull();
+    expect(screen.queryByText(/Check them before approving/)).toBeNull();
+  });
+
+  it('names the early-redemption fee, and warns when the figures differ from the split', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeInvestmentAction({
+          investmentAction: 'REDEEM',
+          securityCurrency: 'PLN',
+          bondSeriesCode: 'EDO1036',
+          bondRedemptionSplit: {
+            principal: 100,
+            interest: 7.2,
+            deduction: 3,
+            payout: 107.2,
+            outcome: 'differs',
+          },
+        })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Early-redemption fee deducted')).toBeInTheDocument();
+    expect(screen.getByText(/Check them before approving/)).toBeInTheDocument();
+  });
+
+  it('shows no series or split row for an ordinary investment transaction', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeInvestmentAction()}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Series')).toBeNull();
+    expect(screen.queryByText('Redemption split')).toBeNull();
+  });
+
   it('omits cash and security rows for a share-only action', () => {
     render(
       <TransactionConfirmationCard

@@ -5,6 +5,7 @@ import { todayInTimezone } from "@/common/date-utils";
 import { withSystemContext, withUserContext } from "@/common/db/with-context";
 import { FetchSyncService } from "@/common/jobs/fetch-sync.service";
 import { CurrenciesService } from "@/currencies/currencies.service";
+import { AuthAttemptCounterService } from "@/auth/auth-attempt-counter.service";
 import { ProviderHealthService } from "@/provider-health/provider-health.service";
 import { POLISH_BOND_ADAPTER } from "@/bonds/adapters/pl/index";
 import {
@@ -328,6 +329,7 @@ describe("bond offer, history and backfill (integration)", () => {
         {
           refreshNeverFetched: async () => undefined,
         } as unknown as BenchmarkRefreshService,
+        new AuthAttemptCounterService(dataSource),
       );
     const adapterFor = (...codes: string[]): BondAdapter => ({
       ...POLISH_BOND_ADAPTER,

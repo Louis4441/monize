@@ -19,7 +19,10 @@ const WRITE_TOOLS = new Set([
   "enter_bond_series_manually",
 ]);
 // Write tools whose repeated calls converge to the same state.
-const IDEMPOTENT_WRITES = new Set<string>([]);
+// A repeat of fetch_bond_series finds the stored series (created=false).
+const IDEMPOTENT_WRITES = new Set<string>(["fetch_bond_series"]);
+// The only tool that reads an external site; every other tool is closed-world.
+const OPEN_WORLD_TOOLS = new Set<string>(["fetch_bond_series"]);
 // Write tools that remove data (destructiveHint: true). The manage_* tools can
 // delete, so they are destructive (and non-idempotent because they can also
 // create).
@@ -56,9 +59,9 @@ describe("MCP tool spec compliance", () => {
       expect(config.outputSchema).toBeDefined();
     });
 
-    it("declares annotations over a closed (non-open-world) dataset", () => {
+    it("declares annotations over a closed (non-open-world) dataset, but for the tool that reads an external site", () => {
       expect(config.annotations).toBeDefined();
-      expect(config.annotations.openWorldHint).toBe(false);
+      expect(config.annotations.openWorldHint).toBe(OPEN_WORLD_TOOLS.has(name));
     });
 
     it("explicitly declares all four behavioural hints (no implicit defaults)", () => {

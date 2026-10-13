@@ -174,6 +174,7 @@ describe("AiActionsService", () => {
       quantity: 10,
       price: 150,
       commission: 4.99,
+      accruedInterest: 0,
       exchangeRate: 1,
       description: null,
       bondInstrumentId: null,
@@ -866,6 +867,88 @@ describe("AiActionsService", () => {
     expect(result).toMatchObject({ type: "batch_actions", count: 1 });
   });
 
+  it("an approved bond REDEEM writes its accrued interest on every commit path (R2-1)", async () => {
+    const SERIES = "11111111-1111-5111-8111-111111111111";
+    await service.confirm(
+      USER,
+      dtoFor(
+        createInvestmentDescriptor({
+          action: InvestmentAction.REDEEM,
+          quantity: 10,
+          price: 100,
+          commission: 0,
+          accruedInterest: 47.05,
+          bondInstrumentId: SERIES,
+        }),
+      ),
+    );
+    expect(investments.create).toHaveBeenLastCalledWith(
+      USER,
+      expect.objectContaining({
+        action: InvestmentAction.REDEEM,
+        price: 100,
+        accruedInterest: 47.05,
+      }),
+    );
+
+    investments.createBulk.mockResolvedValue({
+      created: [{ id: "inv-1" }],
+      skipped: [],
+    });
+    const bulk: CreateInvestmentTransactionsDescriptor = {
+      type: "create_investment_transactions",
+      userId: USER,
+      actionId: "act-bulk-inv-redeem",
+      expiresAt: Date.now() + 60_000,
+      rows: [
+        {
+          accountId: ACC,
+          action: InvestmentAction.REDEEM,
+          transactionDate: "2026-04-01",
+          securityId: SEC,
+          fundingAccountId: null,
+          quantity: 10,
+          price: 100,
+          commission: 0,
+          accruedInterest: 47.05,
+          exchangeRate: 1,
+          description: null,
+          bondInstrumentId: SERIES,
+        },
+      ],
+    };
+    await service.confirm(USER, dtoFor(bulk));
+    expect(investments.createBulk).toHaveBeenLastCalledWith(USER, [
+      expect.objectContaining({ price: 100, accruedInterest: 47.05 }),
+    ]);
+
+    const update: UpdateInvestmentTransactionDescriptor = {
+      type: "update_investment_transaction",
+      userId: USER,
+      actionId: "act-update-inv-redeem",
+      expiresAt: Date.now() + 60_000,
+      transactionId: TX,
+      accountId: ACC,
+      action: InvestmentAction.REDEEM,
+      transactionDate: "2026-04-01",
+      securityId: SEC,
+      fundingAccountId: null,
+      quantity: 10,
+      price: 100,
+      commission: 0,
+      accruedInterest: 47.05,
+      exchangeRate: 1,
+      description: null,
+      bondInstrumentId: SERIES,
+    };
+    await service.confirm(USER, dtoFor(update));
+    expect(investments.update).toHaveBeenLastCalledWith(
+      USER,
+      TX,
+      expect.objectContaining({ accruedInterest: 47.05 }),
+    );
+  });
+
   it("carries the series the preview resolved into the create, update and bulk commits (INV-BOND-007)", async () => {
     const SERIES = "11111111-1111-5111-8111-111111111111";
     await service.confirm(
@@ -891,6 +974,7 @@ describe("AiActionsService", () => {
       quantity: 5,
       price: 160,
       commission: 0,
+      accruedInterest: 0,
       exchangeRate: 1,
       description: null,
       bondInstrumentId: SERIES,
@@ -921,6 +1005,7 @@ describe("AiActionsService", () => {
           quantity: 10,
           price: 150,
           commission: 0,
+          accruedInterest: 0,
           exchangeRate: 1,
           description: null,
           bondInstrumentId: SERIES,
@@ -1218,6 +1303,7 @@ describe("AiActionsService", () => {
       quantity: 5,
       price: 160,
       commission: 0,
+      accruedInterest: 0,
       exchangeRate: 1,
       description: null,
       bondInstrumentId: null,
@@ -1563,6 +1649,7 @@ describe("AiActionsService", () => {
         quantity: 10,
         price: 150,
         commission: 0,
+        accruedInterest: 0,
         exchangeRate: 1,
         description: null,
         bondInstrumentId: null,

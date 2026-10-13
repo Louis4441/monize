@@ -303,7 +303,7 @@ export class ToolExecutorService {
           result = await this.lookupSecuritiesAction(userId, validatedInput);
           break;
         case "fetch_bond_series":
-          result = await this.fetchBondSeriesAction(validatedInput);
+          result = await this.fetchBondSeriesAction(userId, validatedInput);
           break;
         case "manage_investment_transactions":
           result = await this.manageInvestmentTransactions(
@@ -1919,12 +1919,17 @@ export class ToolExecutorService {
    * whether it was stored. A refusal is the translated message, never a retry.
    */
   private async fetchBondSeriesAction(
+    userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
     const countryCode = input.countryCode as string;
     const seriesCode = input.seriesCode as string;
     try {
-      const data = await this.bondSeries.fetchSeries(countryCode, seriesCode);
+      const data = await this.bondSeries.fetchSeries(
+        userId,
+        countryCode,
+        seriesCode,
+      );
       return {
         data,
         summary: data.created

@@ -15,7 +15,7 @@ import {
 import { confirmWrite, isAsk } from "../mcp-confirm";
 import { McpWriteLimiter } from "../mcp-write-limiter";
 import { bondSeriesOutput } from "../tool-output-schemas";
-import { CREATE } from "../mcp-annotations";
+import { CREATE, FETCH_EXTERNAL } from "../mcp-annotations";
 import { ymdDate } from "./schema-fragments";
 
 const DECIMAL = /^\d{1,3}(\.\d{1,6})?$/;
@@ -49,7 +49,7 @@ export class McpBondSeriesTools {
       "fetch_bond_series",
       {
         title: "Fetch bond series",
-        annotations: CREATE,
+        annotations: FETCH_EXTERNAL,
         description:
           "Add a bond series missing from the catalog from the issuer's " +
           "official source. Pass only the country and series codes, never " +
@@ -67,6 +67,7 @@ export class McpBondSeriesTools {
           const limited = await this.writeLimiter.reserve(user.userId, 1);
           if (limited) return limited;
           const result = await this.series.fetchSeries(
+            user.userId,
             args.countryCode,
             args.seriesCode,
           );

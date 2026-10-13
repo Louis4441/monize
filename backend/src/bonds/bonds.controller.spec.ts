@@ -663,12 +663,12 @@ describe("BondsController", () => {
   describe("POST /bonds/instruments/fetch", () => {
     const dto = { countryCode: "PL", seriesCode: "EDO1036" };
 
-    it("hands only the country and the series code to the service", async () => {
-      await expect(controller.fetchSeries(dto)).resolves.toEqual({
+    it("hands the caller and only the country and the series code to the service", async () => {
+      await expect(controller.fetchSeries(req, dto)).resolves.toEqual({
         id: "i1",
         created: true,
       });
-      expect(series.fetchSeries).toHaveBeenCalledWith("PL", "EDO1036");
+      expect(series.fetchSeries).toHaveBeenCalledWith(USER, "PL", "EDO1036");
     });
 
     it("is throttled to 10 requests a minute", () => {
@@ -704,7 +704,7 @@ describe("BondsController", () => {
         series.fetchSeries.mockRejectedValue(
           new SeriesFetchError(code, { series: "EDO1036", country: "PL" }),
         );
-        await expect(controller.fetchSeries(dto)).rejects.toBeInstanceOf(
+        await expect(controller.fetchSeries(req, dto)).rejects.toBeInstanceOf(
           exception,
         );
         expect((tr as jest.Mock).mock.calls[0][0]).toBe(`errors.bonds.${code}`);
@@ -716,7 +716,7 @@ describe("BondsController", () => {
 
     it("lets anything that is not a refusal through", async () => {
       series.fetchSeries.mockRejectedValue(new Error("db down"));
-      await expect(controller.fetchSeries(dto)).rejects.toThrow("db down");
+      await expect(controller.fetchSeries(req, dto)).rejects.toThrow("db down");
     });
   });
 

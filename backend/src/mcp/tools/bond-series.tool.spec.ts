@@ -1,3 +1,4 @@
+import { HttpException } from "@nestjs/common";
 import { SeriesFetchError } from "../../bonds/bond-adapter";
 import { AuthAttemptCounterService } from "../../auth/auth-attempt-counter.service";
 import { createAuthAttemptCounterMock } from "../../test-helpers/auth-attempt-counter-testing";
@@ -58,7 +59,7 @@ describe("McpBondSeriesTools", () => {
     ctx = mcpTestCtx({ userId: "u1", scopes: "read,write" }, { elicitInput });
   });
 
-  it("registers the two tools with the five required fields and a non-destructive write annotation", () => {
+  it("registers the two tools with the required fields and a non-destructive write annotation", () => {
     expect(Object.keys(handlers)).toEqual([
       "fetch_bond_series",
       "enter_bond_series_manually",
@@ -68,13 +69,22 @@ describe("McpBondSeriesTools", () => {
       expect(config.description).toEqual(expect.any(String));
       expect(config.inputSchema).toBeDefined();
       expect(config.outputSchema).toBeDefined();
-      expect(config.annotations).toEqual({
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false,
-      });
     }
+  });
+
+  it("annotates the fetch as open-world (it reads the issuer's site) and idempotent (a repeat returns created=false), the manual entry as closed", () => {
+    expect(configs.fetch_bond_series.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    });
+    expect(configs.enter_bond_series_manually.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    });
   });
 
   describe("fetch_bond_series", () => {
@@ -93,12 +103,30 @@ describe("McpBondSeriesTools", () => {
 
     it("calls the service for the caller and counts a stored series as a write", async () => {
       const result = await handlers.fetch_bond_series(args, ctx);
-      expect(series.fetchSeries).toHaveBeenCalledWith("PL", "EDO1036");
+      expect(series.fetchSeries).toHaveBeenCalledWith("u1", "PL", "EDO1036");
       expect(result.structuredContent).toMatchObject({
         id: "i1",
         created: true,
       });
       expect(limiter.record).toHaveBeenCalledWith("u1", "fetch_bond_series");
+    });
+
+    it("relays the per-user rate limit (429) as a tool error with its translated message", async () => {
+      series.fetchSeries.mockRejectedValue(
+        new HttpException(
+          {
+            message: "At most 10 bond series can be fetched per minute.",
+            errorCode: "SERIES_FETCH_RATE_LIMITED",
+          },
+          429,
+        ),
+      );
+      const result = await handlers.fetch_bond_series(args, ctx);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(
+        "At most 10 bond series can be fetched per minute.",
+      );
+      expect(limiter.record).not.toHaveBeenCalled();
     });
 
     it("asks for no confirmation", async () => {

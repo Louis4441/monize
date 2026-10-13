@@ -28,6 +28,7 @@ import { BondSeriesService } from "@/bonds/bond-series.service";
 import { BondsController } from "@/bonds/bonds.controller";
 import { SeriesHttp } from "@/bonds/series-http";
 import { CurrenciesService } from "@/currencies/currencies.service";
+import { AuthAttemptCounterService } from "@/auth/auth-attempt-counter.service";
 import { ProviderHealthService } from "@/provider-health/provider-health.service";
 import { FetchSyncService } from "@/common/jobs/fetch-sync.service";
 import {
@@ -90,13 +91,14 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
         recomputeLinkedSecuritiesOfSeries: async () => undefined,
       } as unknown as BondPriceService,
       benchmarks,
+      new AuthAttemptCounterService(dataSource),
     );
 
   /** A request as a signed-in user makes it. */
   const asUser = <T>(id: string, fn: () => Promise<T>) =>
     withUserContext(id, fn);
   const fetchAs = (id: string, code = CODE, adapters = [adapter]) =>
-    asUser(id, () => service.fetchSeries("PL", code, { adapters }));
+    asUser(id, () => service.fetchSeries(id, "PL", code, { adapters }));
   const enterAs = (
     id: string,
     values: ManualSeriesValues = VALUES,
@@ -165,11 +167,31 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
        VALUES ('PLN', 'Zloty', 'z', 2, true)
        ON CONFLICT (code) DO NOTHING`,
     );
+    await dataSource.query(
+      `DELETE FROM auth_attempt_counters WHERE scope = 'bond-series-fetch'`,
+    );
     door = fakeFetch(seriesRoutes(CODE, SLUGS.EDO));
     service = build();
   });
 
   afterEach(() => jest.restoreAllMocks());
+
+  describe("the per-user limit on explicit fetches (L2)", () => {
+    it("refuses the 11th fetch in a minute with a 429 and no request, counting a repeat that found the series stored; another user is not limited", async () => {
+      await fetchAs(userId);
+      door.mockClear();
+      for (let i = 1; i < 10; i++) await fetchAs(userId);
+
+      await expect(fetchAs(userId)).rejects.toMatchObject({
+        status: 429,
+        response: { errorCode: "SERIES_FETCH_RATE_LIMITED" },
+      });
+      expect(door).not.toHaveBeenCalled();
+      await expect(fetchAs(otherId)).resolves.toMatchObject({
+        created: false,
+      });
+    });
+  });
 
   describe("Write", () => {
     it("a fetch inserts one instrument and terms version 1, naming the official source", async () => {
@@ -236,7 +258,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       door.mockClear();
       await expect(
         asUser(userId, () =>
-          service.fetchSeries("PL", "EDO1036", { adapters: [adapter] }),
+          service.fetchSeries(userId, "PL", "EDO1036", { adapters: [adapter] }),
         ),
       ).resolves.toMatchObject({ created: false, termsProvider: "PL_MF" });
       expect(door).not.toHaveBeenCalled();
@@ -300,7 +322,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
     it("an unsupported country is refused before anything is fetched", async () => {
       const error = await refusalOf(
         asUser(userId, () =>
-          service.fetchSeries("DE", CODE, { adapters: [adapter] }),
+          service.fetchSeries(userId, "DE", CODE, { adapters: [adapter] }),
         ),
       );
       expect(error.code).toBe("SERIES_FETCH_UNSUPPORTED");
@@ -552,7 +574,7 @@ describe("bond series fetch (integration, INV-BOND-006)", () => {
       [
         "a rate that is not a decimal",
         { ...VALUES, firstPeriodRate: "5,35%" },
-        "SOURCE_FORMAT_CHANGED",
+        "MANUAL_ENTRY_INVALID",
       ],
     ])("%s is refused and leaves no row", async (_label, values, code) => {
       const error = await refusalOf(enterAs(adminId, values));

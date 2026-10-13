@@ -1,3 +1,4 @@
+import { AuthAttemptCounterModule } from "../auth/auth-attempt-counter.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
 import { Module, forwardRef } from "@nestjs/common";
 import { NetWorthModule } from "../net-worth/net-worth.module";
@@ -17,6 +18,8 @@ import { SeriesHttp } from "./series-http";
 @Module({
   imports: [
     ProviderHealthModule,
+    // The per-user cap on explicit series fetches (BondSeriesService).
+    AuthAttemptCounterModule,
     // BondPriceService dispatches the net-worth recompute after a price write.
     // SecuritiesModule imports this module (a link recomputes the security's
     // prices) and NetWorthModule reaches SecuritiesModule back through
@@ -39,6 +42,12 @@ import { SeriesHttp } from "./series-http";
     BondHoldingsService,
     BondNotificationService,
   ],
-  exports: [BondValuationService, BondPriceService, BondSeriesService],
+  exports: [
+    BondValuationService,
+    BondPriceService,
+    BondSeriesService,
+    // The investment preview fills a bond redemption from its split.
+    BondHoldingsService,
+  ],
 })
 export class BondsModule {}

@@ -5,6 +5,7 @@ import {
   positiveIntSchema,
   numberArg,
   booleanArg,
+  bondSeriesCodeSchema,
 } from "../../common/tool-schemas";
 import { isCalendarDate } from "../../common/validators/is-calendar-date.validator";
 import { MAX_BULK_ACTION_ROWS } from "../actions/ai-action.types";
@@ -539,7 +540,7 @@ const manageInvestmentItemSchema = z
     exchangeRate: nonNegativeAmountSchema.optional(),
     description: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
     transactionId: z.string().uuid().optional(),
-    bondSeriesCode: z.string().trim().min(1).max(40).optional(),
+    bondSeriesCode: bondSeriesCodeSchema.optional(),
   })
   .passthrough();
 

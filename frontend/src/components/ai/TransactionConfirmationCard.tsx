@@ -37,6 +37,7 @@ export function TransactionConfirmationCard({
   const { formatCurrency, formatCurrencyPrecise, formatQuantity, formatBytes } =
     useNumberFormat();
   const { preview, type, status } = action;
+  const redemptionSplit = preview.bondRedemptionSplit ?? null;
 
   // Create, update, and delete share the same field layout per domain (cash vs
   // investment); only the title and success copy differ.
@@ -185,6 +186,11 @@ export function TransactionConfirmationCard({
           ? `${preview.symbol} (${preview.securityName})`
           : preview.symbol,
       });
+    if (preview.bondSeriesCode)
+      rows.push({
+        label: t('confirmAction.bondSeries'),
+        value: preview.bondSeriesCode,
+      });
     if (preview.quantity !== undefined && preview.quantity !== null)
       rows.push({
         label: t('confirmAction.shares'),
@@ -199,6 +205,14 @@ export function TransactionConfirmationCard({
       rows.push({
         label: t('confirmAction.commission'),
         value: formatCurrency(preview.commission, preview.securityCurrency ?? undefined),
+      });
+    if (preview.accruedInterest)
+      rows.push({
+        label: t('confirmAction.accruedInterest'),
+        value: formatCurrency(
+          preview.accruedInterest,
+          preview.securityCurrency ?? undefined,
+        ),
       });
     // Share-only actions (transfers, splits, share adjustments) carry no cash
     // total, so only surface it when there is one.
@@ -216,6 +230,24 @@ export function TransactionConfirmationCard({
         label: t('confirmAction.cashImpact'),
         value: `${formatCurrency(preview.cashAmount, preview.cashCurrency ?? undefined)} (${preview.cashAccountName})`,
       });
+    // A bond redemption: what it pays, as returned principal and interest (a
+    // fee taken out of the interest is named when there is one).
+    if (redemptionSplit) {
+      const currency = preview.securityCurrency ?? undefined;
+      rows.push({
+        label: t('confirmAction.redemptionSplit'),
+        value: t('confirmAction.redemptionSplitValue', {
+          principal: formatCurrency(redemptionSplit.principal, currency),
+          interest: formatCurrency(redemptionSplit.interest, currency),
+          payout: formatCurrency(redemptionSplit.payout, currency),
+        }),
+      });
+      if (redemptionSplit.deduction > 0)
+        rows.push({
+          label: t('confirmAction.redemptionDeduction'),
+          value: formatCurrency(redemptionSplit.deduction, currency),
+        });
+    }
     if (preview.description)
       rows.push({
         label: t('confirmAction.description'),
@@ -431,6 +463,11 @@ export function TransactionConfirmationCard({
               {t('confirmAction.reconciledWarning')}
             </p>
           )}
+        {redemptionSplit?.outcome === 'differs' && isInvestmentTxType && (
+          <p className="text-xs text-amber-700 dark:text-amber-400 pt-1">
+            {t('confirmAction.redemptionSplitDiffers')}
+          </p>
+        )}
         <RuleEffectsLines effects={preview.ruleEffects} currencyCode={preview.currencyCode} />
       </div>
       <div className="px-3 py-2 border-t border-blue-200 dark:border-blue-900/60">

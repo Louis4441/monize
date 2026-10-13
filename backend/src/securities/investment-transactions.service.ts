@@ -1,4 +1,5 @@
 import {
+  HttpException,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -13,9 +14,15 @@ import {
   createBondWriteGuard,
 } from "../bonds/bond-write-guard";
 import {
+  programOfSecurity,
   resolveTransactionSeries,
   seriesCodeOf,
 } from "../bonds/bond-series-resolver";
+import { BondHoldingsService } from "../bonds/bond-holdings.service";
+import {
+  applyRedemptionSplit,
+  FilledRedemption,
+} from "./bond-redemption-fill.util";
 import { tr } from "../i18n/translate";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -100,6 +107,7 @@ import {
   AiActionPreviewRow,
   BatchUpdateInvestmentTransactionRow,
   BatchDeleteInvestmentTransactionRow,
+  BondRedemptionSplitPreview,
 } from "../ai/actions/ai-action.types";
 
 export type LlmInvestmentTxGroupBy = "account" | "date" | "security" | "action";
@@ -318,6 +326,13 @@ export interface CreateInvestmentTransactionPreview {
   bondInstrumentId: string | null;
   /** Its code (`EDO1036`), for the confirmation card. */
   bondSeriesCode: string | null;
+  /**
+   * REDEEM of a bond-linked security: what the redemption pays, split into
+   * principal and interest, and where the row's price and accrued interest came
+   * from (INV-BOND-009). Null for any other row, or when the caller stated both
+   * figures and the split could not be worked out.
+   */
+  redemptionSplit: BondRedemptionSplitPreview | null;
 }
 
 /**
@@ -472,6 +487,7 @@ export class InvestmentTransactionsService {
     private actionHistoryService: ActionHistoryService,
     private exchangeRateService: ExchangeRateService,
     private currenciesService: CurrenciesService,
+    private bondHoldingsService: BondHoldingsService,
   ) {}
 
   /**
@@ -1401,6 +1417,132 @@ export class InvestmentTransactionsService {
   }
 
   /**
+   * The split of a bond redemption applied to what the caller supplied
+   * (`applyRedemptionSplit`), or null when the security is not linked to a bond
+   * program, or the caller stated both price and accrued interest and the split
+   * cannot be worked out (the write guard still refuses what is wrong). With
+   * no series named, the one series the account holds is used and (for a new
+   * row) named on it; none or several are refused, because the split is of one
+   * series' lots. A refused split refuses the preview: no price or interest is
+   * ever guessed.
+   */
+  private async fillBondRedemption(
+    userId: string,
+    row: {
+      accountId: string;
+      securityId: string;
+      transactionDate: string;
+      quantity: number;
+      price: number | null;
+      totalAmount: number | undefined;
+      commission: number;
+      accruedInterest: number;
+      series: { id: string | null; code: string | null };
+      excludeTransactionId?: string;
+      pinSeries: boolean;
+    },
+  ): Promise<{
+    series: { id: string | null; code: string | null };
+    filled: FilledRedemption;
+  } | null> {
+    const linked = await withScopedDb(
+      this.dataSource,
+      async (m) =>
+        (await programOfSecurity(m, userId, row.securityId)) !== null,
+    );
+    if (!linked || !Number.isInteger(row.quantity) || row.quantity <= 0) {
+      return null;
+    }
+    const bothStated =
+      row.accruedInterest > 0 &&
+      (row.price !== null || row.totalAmount !== undefined);
+    const date = String(row.transactionDate).slice(0, 10);
+
+    let series = row.series;
+    let splitSeriesId = series.id;
+    if (splitSeriesId === null) {
+      const { holdings } = await this.bondHoldingsService.seriesHoldings(
+        userId,
+        row.securityId,
+        row.accountId,
+        date,
+        row.excludeTransactionId,
+      );
+      if (holdings.length !== 1) {
+        if (bothStated) return null;
+        throw new BadRequestException({
+          message: tr(
+            "errors.bonds.REDEEM_SERIES_REQUIRED",
+            `Name the bond series being redeemed (bondSeriesCode): the account holds ${holdings.length} series of this security on ${date}, so the price and accrued interest cannot be worked out from the redemption split.`,
+            { count: String(holdings.length), date },
+          ),
+          errorCode: "REDEEM_SERIES_REQUIRED",
+        });
+      }
+      splitSeriesId = holdings[0].instrumentId;
+      if (row.pinSeries) {
+        series = { id: splitSeriesId, code: holdings[0].seriesCode };
+      }
+    }
+
+    let split;
+    try {
+      split = await this.bondHoldingsService.redemptionSplit(
+        userId,
+        row.securityId,
+        row.accountId,
+        splitSeriesId,
+        date,
+        row.quantity,
+        row.excludeTransactionId,
+      );
+    } catch (error) {
+      // A removal the account cannot cover is the write guard's refusal; when
+      // the caller stated both figures the split is only a comparison.
+      if (bothStated && error instanceof HttpException) return null;
+      throw error;
+    }
+    if (
+      split.refusal !== null ||
+      split.payout === null ||
+      split.interest === null ||
+      split.principalReturned === null ||
+      split.principal === null ||
+      split.deduction === null
+    ) {
+      if (bothStated) return null;
+      const code = split.refusal ?? "RATE_UNKNOWN";
+      throw new BadRequestException({
+        message: tr(
+          "errors.bonds.REDEMPTION_SPLIT_REFUSED",
+          `The redemption of series ${series.code ?? ""} on ${date} cannot be split into returned principal and interest (${code}), so no price or accrued interest was filled in. Correct the date or quantity, or enter both the price and the accrued interest yourself.`,
+          { series: series.code ?? "", date, code },
+        ),
+        errorCode: code,
+      });
+    }
+    return {
+      series,
+      filled: applyRedemptionSplit(
+        {
+          principal: Number(split.principal),
+          deduction: Number(split.deduction),
+          interest: Number(split.interest),
+          principalReturned: Number(split.principalReturned),
+          payout: Number(split.payout),
+        },
+        {
+          quantity: row.quantity,
+          price: row.price,
+          totalAmount: row.totalAmount,
+          commission: row.commission,
+          accruedInterest: row.accruedInterest,
+        },
+      ),
+    };
+  }
+
+  /**
    * Validate and resolve a proposed investment transaction WITHOUT persisting
    * it. Used by the MCP `create_investment_transaction` dry-run/confirm path and
    * the AI Assistant confirmation flow so both surfaces validate, match the
@@ -1431,6 +1573,18 @@ export class InvestmentTransactionsService {
       bondSeriesCode?: string;
       /** A series the row already stores (an edit): kept unless it no longer fits. */
       bondInstrumentId?: string | null;
+      /**
+       * The row an edit starts from. With no series named, a change of none of
+       * the security, action or date keeps its stored series as it is, NULL
+       * included (what `update()` does, INV-BOND-007).
+       */
+      editing?: {
+        transactionId: string;
+        securityId: string | null;
+        action: string;
+        transactionDate: string;
+        bondInstrumentId: string | null;
+      };
     },
   ): Promise<CreateInvestmentTransactionPreview> {
     const account = await this.accountsService.findOne(userId, input.accountId);
@@ -1522,31 +1676,28 @@ export class InvestmentTransactionsService {
         ? roundToDecimals(Number(input.quantity), 8)
         : null;
     const commission = roundToDecimals(Number(input.commission ?? 0), 4);
-    const accruedInterest = roundToDecimals(
+    const suppliedInterest = roundToDecimals(
       Number(input.accruedInterest ?? 0),
       4,
     );
-    this.assertAccruedInterestAllowed(input.action, accruedInterest, false);
-
-    // The same door the write goes through, so a preview of a trade entered by
-    // its executed total shows the total the commit will store and the price it
-    // will derive -- at the price column's own ten decimals, not six.
-    const { totalAmount, price } = resolveInvestmentAmounts({
-      action: input.action,
-      quantity,
-      price:
-        input.price !== undefined && input.price !== null
-          ? roundToDecimals(Number(input.price), INVESTMENT_PRICE_DECIMALS)
-          : null,
-      commission,
-      totalAmount: input.totalAmount,
-    });
+    this.assertAccruedInterestAllowed(input.action, suppliedInterest, false);
 
     // The series the commit will store, resolved by the same function and
     // refused the same way (INV-BOND-007), so the person is not asked to confirm
-    // what cannot be written.
-    const series = await withScopedDb(this.dataSource, async (m) => {
+    // what cannot be written. An edit that changes none of the security, the
+    // action and the date, and names no series, keeps the stored one as it is.
+    const keepStored =
+      input.editing !== undefined &&
+      !input.bondSeriesCode?.trim() &&
+      keepsStoredSeries(input.editing, {
+        securityId: security?.id ?? null,
+        action: input.action,
+        transactionDate: input.transactionDate,
+        bondInstrumentId: undefined,
+      });
+    let series = await withScopedDb(this.dataSource, async (m) => {
       const id = await resolveTransactionSeries(m, userId, {
+        keepStored,
         securityId: security?.id,
         action: input.action,
         transactionDate: input.transactionDate,
@@ -1555,6 +1706,56 @@ export class InvestmentTransactionsService {
         requested: false,
       });
       return { id, code: await seriesCodeOf(m, id) };
+    });
+
+    // A redemption of a bond-linked security: the server works out the split of
+    // what it pays into returned principal and interest, so the interest is not
+    // booked as a capital gain (INV-BOND-009). A preview is the commit's code.
+    let suppliedPrice: number | null =
+      input.price !== undefined && input.price !== null
+        ? roundToDecimals(Number(input.price), INVESTMENT_PRICE_DECIMALS)
+        : null;
+    let suppliedTotal = input.totalAmount;
+    let accruedInterest = suppliedInterest;
+    let redemptionSplit: BondRedemptionSplitPreview | null = null;
+    if (
+      input.action === InvestmentAction.REDEEM &&
+      security &&
+      quantity !== null
+    ) {
+      const redemption = await this.fillBondRedemption(userId, {
+        accountId: input.accountId,
+        securityId: security.id,
+        transactionDate: input.transactionDate,
+        quantity,
+        price: suppliedPrice,
+        totalAmount: suppliedTotal,
+        commission,
+        accruedInterest,
+        series,
+        excludeTransactionId: input.editing?.transactionId,
+        // A new row names the series its split was worked out for; an edit
+        // keeps the stored one as it is (INV-BOND-007).
+        pinSeries: input.editing === undefined,
+      });
+      if (redemption) {
+        series = redemption.series;
+        suppliedPrice = redemption.filled.price;
+        suppliedTotal = redemption.filled.totalAmount;
+        accruedInterest = redemption.filled.accruedInterest;
+        redemptionSplit = redemption.filled.split;
+      }
+    }
+
+    // The same door the write goes through, so a preview of a trade entered by
+    // its executed total shows the total the commit will store and the price it
+    // will derive -- at the price column's own ten decimals, not six.
+    const { totalAmount, price } = resolveInvestmentAmounts({
+      action: input.action,
+      quantity,
+      price: suppliedPrice,
+      commission,
+      totalAmount: suppliedTotal,
     });
 
     const exchangeRate = await this.resolveCashExchangeRate(
@@ -1618,6 +1819,7 @@ export class InvestmentTransactionsService {
       description: stripHtml(input.description) || null,
       bondInstrumentId: series.id,
       bondSeriesCode: series.code,
+      redemptionSplit,
     };
   }
 
@@ -1696,6 +1898,15 @@ export class InvestmentTransactionsService {
       bondSeriesCode: input.bondSeriesCode,
       // Kept as stored unless the edit names another (or no longer fits).
       bondInstrumentId: existing.bondInstrumentId,
+      // With no series named, an edit that changes none of the security, the
+      // action and the date keeps the stored series as it is, NULL included.
+      editing: {
+        transactionId,
+        securityId: existing.securityId,
+        action: existing.action,
+        transactionDate: existing.transactionDate,
+        bondInstrumentId: existing.bondInstrumentId,
+      },
     });
 
     return { ...preview, transactionId };
@@ -1759,7 +1970,9 @@ export class InvestmentTransactionsService {
       cashCurrency: preview.cashCurrency,
       cashAmount: preview.cashAmount,
       description: preview.description,
+      accruedInterest: preview.accruedInterest,
       bondSeriesCode: preview.bondSeriesCode,
+      bondRedemptionSplit: preview.redemptionSplit,
     };
   }
 

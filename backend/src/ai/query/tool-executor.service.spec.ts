@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, HttpException } from "@nestjs/common";
 import { ToolExecutorService } from "./tool-executor.service";
 import { AccountsService } from "../../accounts/accounts.service";
 import { CategoriesService } from "../../categories/categories.service";
@@ -2771,7 +2771,11 @@ describe("ToolExecutorService", () => {
         seriesCode: "EDO1036",
       });
 
-      expect(bondSeries.fetchSeries).toHaveBeenCalledWith("PL", "EDO1036");
+      expect(bondSeries.fetchSeries).toHaveBeenCalledWith(
+        userId,
+        "PL",
+        "EDO1036",
+      );
       expect(result.pendingAction).toBeUndefined();
       expect(result.isError).toBeFalsy();
       expect(result.data).toMatchObject({ created: true });
@@ -2816,6 +2820,26 @@ describe("ToolExecutorService", () => {
       expect(result.isError).toBe(true);
       expect(result.summary).toBe(
         "The official source for series EDO1036 could not be read right now; try again later",
+      );
+    });
+
+    it("relays the per-user rate limit (429) in its translated words", async () => {
+      bondSeries.fetchSeries.mockRejectedValueOnce(
+        new HttpException(
+          {
+            message: "At most 10 bond series can be fetched per minute.",
+            errorCode: "SERIES_FETCH_RATE_LIMITED",
+          },
+          429,
+        ),
+      );
+      const result = await service.execute(userId, "fetch_bond_series", {
+        countryCode: "PL",
+        seriesCode: "EDO1036",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.summary).toBe(
+        "At most 10 bond series can be fetched per minute.",
       );
     });
 

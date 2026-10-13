@@ -167,7 +167,9 @@ export function investmentPreviewRow(
     cashCurrency: preview.cashCurrency,
     cashAmount: preview.cashAmount,
     description: preview.description,
+    accruedInterest: preview.accruedInterest,
     bondSeriesCode: preview.bondSeriesCode,
+    bondRedemptionSplit: preview.redemptionSplit,
   };
 }
 
@@ -525,6 +527,7 @@ export class AiActionBuilderService {
       quantity: preview.quantity,
       price: preview.price,
       commission: preview.commission,
+      accruedInterest: preview.accruedInterest,
       exchangeRate: preview.exchangeRate,
       description: preview.description,
       bondInstrumentId: preview.bondInstrumentId,
@@ -550,7 +553,9 @@ export class AiActionBuilderService {
         cashCurrency: preview.cashCurrency,
         cashAmount: preview.cashAmount,
         description: preview.description,
+        accruedInterest: preview.accruedInterest,
         bondSeriesCode: preview.bondSeriesCode,
+        bondRedemptionSplit: preview.redemptionSplit,
       },
     };
   }
@@ -671,6 +676,7 @@ export class AiActionBuilderService {
       quantity: preview.quantity,
       price: preview.price,
       commission: preview.commission,
+      accruedInterest: preview.accruedInterest,
       exchangeRate: preview.exchangeRate,
       description: preview.description,
       bondInstrumentId: preview.bondInstrumentId,
@@ -696,7 +702,9 @@ export class AiActionBuilderService {
         cashCurrency: preview.cashCurrency,
         cashAmount: preview.cashAmount,
         description: preview.description,
+        accruedInterest: preview.accruedInterest,
         bondSeriesCode: preview.bondSeriesCode,
+        bondRedemptionSplit: preview.redemptionSplit,
       },
     };
   }
@@ -799,6 +807,7 @@ export class AiActionBuilderService {
         quantity: preview.quantity,
         price: preview.price,
         commission: preview.commission,
+        accruedInterest: preview.accruedInterest,
         exchangeRate: preview.exchangeRate,
         description: preview.description,
         bondInstrumentId: preview.bondInstrumentId,

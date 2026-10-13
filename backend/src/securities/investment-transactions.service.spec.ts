@@ -48,6 +48,7 @@ describe("InvestmentTransactionsService", () => {
   let netWorthService: Record<string, jest.Mock>;
   let exchangeRateService: Record<string, jest.Mock>;
   let currenciesService: Record<string, jest.Mock>;
+  let bondHoldingsService: Record<string, jest.Mock>;
   let dataSource: DataSourceMock;
   let mockQueryRunner: Record<string, any>;
   let mockActionHistoryService: Record<string, jest.Mock>;
@@ -401,6 +402,13 @@ describe("InvestmentTransactionsService", () => {
     });
     mockQueryRunner = { manager: mocks.manager };
 
+    // A bond redemption's split and the series an account holds; a spec that
+    // exercises them sets the answers.
+    bondHoldingsService = {
+      seriesHoldings: jest.fn().mockResolvedValue({ holdings: [] }),
+      redemptionSplit: jest.fn(),
+    };
+
     service = new InvestmentTransactionsService(
       dataSource as never,
       accountsService as never,
@@ -413,6 +421,7 @@ describe("InvestmentTransactionsService", () => {
       mockActionHistoryService as never,
       exchangeRateService as never,
       currenciesService as never,
+      bondHoldingsService as never,
     );
   });
 
@@ -9069,6 +9078,329 @@ describe("InvestmentTransactionsService", () => {
         ).resolves.toMatchObject({
           bondInstrumentId: null,
           bondSeriesCode: null,
+        });
+      });
+    });
+
+    describe("the preview of an edit of a legacy row with no stored series (L4)", () => {
+      beforeEach(() => {
+        securitiesService.resolveBySymbolOrName.mockResolvedValue({
+          match: mockSecurity,
+          candidates: [],
+        });
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+      });
+      const legacy = (action: InvestmentAction) =>
+        investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+          createMockQueryBuilder({
+            ...mockBuyTransaction,
+            action,
+            bondInstrumentId: null,
+          }),
+        );
+
+      it.each([InvestmentAction.ADD_SHARES, InvestmentAction.BUY])(
+        "keeps the NULL series of a %s on a description-only edit instead of refusing it, as update() does",
+        async (action) => {
+          bondDatabase({ onSale: [] });
+          legacy(action);
+          await expect(
+            service.previewUpdateInvestmentTransaction(userId, transactionId, {
+              description: "renamed",
+            }),
+          ).resolves.toMatchObject({
+            bondInstrumentId: null,
+            bondSeriesCode: null,
+            description: "renamed",
+          });
+        },
+      );
+
+      it("still resolves the series when the edit changes the date, the action or names a series", async () => {
+        bondDatabase({ onSale: [] });
+        legacy(InvestmentAction.BUY);
+        await expect(
+          service.previewUpdateInvestmentTransaction(userId, transactionId, {
+            transactionDate: "2025-02-20",
+          }),
+        ).rejects.toMatchObject({
+          response: { errorCode: "SERIES_NOT_DETERMINED" },
+        });
+        legacy(InvestmentAction.BUY);
+        await expect(
+          service.previewUpdateInvestmentTransaction(userId, transactionId, {
+            action: InvestmentAction.ADD_SHARES,
+          }),
+        ).rejects.toMatchObject({
+          response: { errorCode: "SERIES_REQUIRED" },
+        });
+      });
+    });
+
+    /**
+     * INV-BOND-009: a bond-linked REDEEM through the assistant or MCP is split
+     * into returned principal and interest by the server, never left to the
+     * caller to book as a capital gain.
+     */
+    describe("the redemption split of a bond REDEEM in the preview (INV-BOND-009)", () => {
+      const EDO0423 = "33333333-3333-5333-8333-333333333333";
+      // 10 x EDO0423 redeemed at maturity: 147.05 per bond, i.e. 100.00 of
+      // principal and 47.05 of interest each.
+      const AT_MATURITY = {
+        date: "2023-04-01",
+        quantity: 10,
+        principal: "1000.00",
+        grossInterest: "470.50",
+        deduction: "0.00",
+        interest: "470.50",
+        principalReturned: "1000.00",
+        payout: "1470.50",
+        refusal: null,
+      };
+      const redeem = {
+        accountId,
+        action: InvestmentAction.REDEEM,
+        transactionDate: "2023-04-01",
+        securityQuery: "AAPL",
+        quantity: 10,
+      };
+
+      beforeEach(() => {
+        securitiesService.resolveBySymbolOrName.mockResolvedValue({
+          match: mockSecurity,
+          candidates: [],
+        });
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+        bondDatabase({});
+        bondHoldingsService.seriesHoldings.mockResolvedValue({
+          holdings: [
+            { instrumentId: EDO0423, seriesCode: "EDO0423", quantity: 10 },
+          ],
+        });
+        bondHoldingsService.redemptionSplit.mockResolvedValue(AT_MATURITY);
+      });
+
+      it("fills price 100.00 and accrued interest 470.50 when the caller gave neither, and names the series the split was worked out for", async () => {
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          redeem,
+        );
+        expect(bondHoldingsService.redemptionSplit).toHaveBeenCalledWith(
+          userId,
+          securityId,
+          accountId,
+          EDO0423,
+          "2023-04-01",
+          10,
+          undefined,
+        );
+        expect(preview).toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          totalAmount: 1000,
+          // The one cash row is the payout.
+          cashAmount: 1470.5,
+          bondInstrumentId: EDO0423,
+          bondSeriesCode: "EDO0423",
+          redemptionSplit: {
+            principal: 1000,
+            interest: 470.5,
+            deduction: 0,
+            payout: 1470.5,
+            outcome: "filled",
+          },
+        });
+      });
+
+      it("splits a price that is the whole payout per bond (147.05) instead of booking its interest as a gain", async () => {
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 147.05 },
+        );
+        expect(preview).toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          totalAmount: 1000,
+          cashAmount: 1470.5,
+        });
+        expect(preview.redemptionSplit?.outcome).toBe("filled");
+
+        // The same payout stated as an executed total.
+        const byTotal = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, totalAmount: 1470.5 },
+        );
+        expect(byTotal).toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          totalAmount: 1000,
+        });
+      });
+
+      it("fills only the price when the caller gave the interest", async () => {
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, accruedInterest: 470.5 },
+        );
+        expect(preview).toMatchObject({ price: 100, accruedInterest: 470.5 });
+        expect(preview.redemptionSplit?.outcome).toBe("filled");
+      });
+
+      it("keeps both figures the caller gave and flags a difference from the split instead of overriding", async () => {
+        const matching = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100, accruedInterest: 470.5 },
+        );
+        expect(matching.redemptionSplit?.outcome).toBe("matches");
+
+        const differing = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100, accruedInterest: 400 },
+        );
+        expect(differing).toMatchObject({
+          price: 100,
+          accruedInterest: 400,
+          cashAmount: 1400,
+          redemptionSplit: {
+            interest: 470.5,
+            payout: 1470.5,
+            outcome: "differs",
+          },
+        });
+
+        // A price that is not the payout, with no interest: kept, flagged.
+        const principalOnly = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100 },
+        );
+        expect(principalOnly).toMatchObject({
+          price: 100,
+          accruedInterest: 0,
+          redemptionSplit: { outcome: "differs" },
+        });
+      });
+
+      it("refuses the preview when the split cannot be worked out, guessing nothing", async () => {
+        bondHoldingsService.redemptionSplit.mockResolvedValue({
+          ...AT_MATURITY,
+          interest: null,
+          grossInterest: null,
+          principalReturned: null,
+          payout: null,
+          refusal: "RATE_UNKNOWN",
+        });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, redeem),
+        ).rejects.toMatchObject({
+          response: { errorCode: "RATE_UNKNOWN" },
+        });
+        // Both figures stated: the split is only a comparison, so no refusal.
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, {
+            ...redeem,
+            price: 100,
+            accruedInterest: 470.5,
+          }),
+        ).resolves.toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          redemptionSplit: null,
+        });
+      });
+
+      it("asks for the series when the account holds none or several, unless both figures were given", async () => {
+        bondHoldingsService.seriesHoldings.mockResolvedValue({
+          holdings: [
+            { instrumentId: EDO0423, seriesCode: "EDO0423", quantity: 5 },
+            { instrumentId: OTHER_SERIES, seriesCode: "EDO0523", quantity: 5 },
+          ],
+        });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, redeem),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REDEEM_SERIES_REQUIRED" },
+        });
+        expect(bondHoldingsService.redemptionSplit).not.toHaveBeenCalled();
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, {
+            ...redeem,
+            price: 100,
+            accruedInterest: 470.5,
+          }),
+        ).resolves.toMatchObject({ redemptionSplit: null });
+      });
+
+      it("takes the split of the series the caller named, whatever else the account holds", async () => {
+        bondDatabase({ inProgram: [EDO0423] });
+        const original = mockQueryRunner.manager.query.getMockImplementation()!;
+        mockQueryRunner.manager.query.mockImplementation(
+          async (sql: string, params?: unknown[]) =>
+            String(sql).includes("UPPER(series_code) = UPPER($2)")
+              ? [{ id: EDO0423 }]
+              : original(sql, params),
+        );
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, bondSeriesCode: "EDO0423" },
+        );
+        expect(bondHoldingsService.seriesHoldings).not.toHaveBeenCalled();
+        expect(bondHoldingsService.redemptionSplit).toHaveBeenCalledWith(
+          userId,
+          securityId,
+          accountId,
+          EDO0423,
+          "2023-04-01",
+          10,
+          undefined,
+        );
+        expect(preview).toMatchObject({ price: 100, accruedInterest: 470.5 });
+      });
+
+      it("leaves a security that is not linked to a bond program alone", async () => {
+        bondDatabase({ linked: false });
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100 },
+        );
+        expect(bondHoldingsService.redemptionSplit).not.toHaveBeenCalled();
+        expect(preview).toMatchObject({
+          price: 100,
+          accruedInterest: 0,
+          redemptionSplit: null,
+        });
+      });
+
+      it("works the split of an edit without the row being edited, keeps its stored series and pins none", async () => {
+        investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+          createMockQueryBuilder({
+            ...mockBuyTransaction,
+            action: InvestmentAction.REDEEM,
+            quantity: 10,
+            price: 100,
+            transactionDate: "2023-04-01",
+            bondInstrumentId: null,
+          }),
+        );
+        const preview = await service.previewUpdateInvestmentTransaction(
+          userId,
+          transactionId,
+          { description: "renamed" },
+        );
+        expect(bondHoldingsService.redemptionSplit).toHaveBeenCalledWith(
+          userId,
+          securityId,
+          accountId,
+          EDO0423,
+          "2023-04-01",
+          10,
+          transactionId,
+        );
+        // The stored row books the interest as a gain: the card says so.
+        expect(preview).toMatchObject({
+          bondInstrumentId: null,
+          price: 100,
+          accruedInterest: 0,
+          redemptionSplit: { interest: 470.5, outcome: "differs" },
         });
       });
     });

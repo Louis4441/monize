@@ -1,4 +1,5 @@
-import { Logger } from "@nestjs/common";
+import { HttpException, Logger } from "@nestjs/common";
+import { AuthAttemptCounterService } from "../auth/auth-attempt-counter.service";
 import { DataSource } from "typeorm";
 import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { withSystemContext } from "../common/db/with-context";
@@ -43,6 +44,7 @@ jest.mock("../common/db/locks", () => ({
 /** Any parsed catalog entry: the service stores whatever the adapter built. */
 const ENTRY: CatalogEntry = FIXTURE_CATALOG[0];
 const INSTRUMENT_ID = bondInstrumentId("PL", "PL_MF", "OTS0127");
+const USER = "user-1";
 const SUMMARY = {
   id: INSTRUMENT_ID,
   issuerCountryCode: "PL",
@@ -137,6 +139,15 @@ function build() {
   manager.query.mockResolvedValue([]);
   const prices = { recomputeLinkedSecuritiesOfSeries: jest.fn() };
   const benchmarks = { refreshNeverFetched: jest.fn() };
+  // The shared counter's fixed-window arithmetic: one count per scope and key.
+  const counts = new Map<string, number>();
+  const attempts = {
+    increment: jest.fn(async (scope: string, key: string) => {
+      const count = (counts.get(`${scope}|${key}`) ?? 0) + 1;
+      counts.set(`${scope}|${key}`, count);
+      return { count, windowExpiresAt: new Date() };
+    }),
+  };
   const service = new BondSeriesService(
     dataSource as unknown as DataSource,
     catalog as unknown as BondCatalogService,
@@ -145,9 +156,11 @@ function build() {
     fetchSync as unknown as FetchSyncService,
     prices as unknown as BondPriceService,
     benchmarks as unknown as BenchmarkRefreshService,
+    attempts as unknown as AuthAttemptCounterService,
   );
   return {
     service,
+    attempts,
     prices,
     benchmarks,
     catalog,
@@ -192,7 +205,9 @@ describe("BondSeriesService: recompute after a series is stored", () => {
     prices.recomputeLinkedSecuritiesOfSeries.mockImplementation(async () => {
       order.push("recompute");
     });
-    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await service.fetchSeries(USER, "PL", "ots0127", {
+      adapters: [adapterOf()],
+    });
     await flush();
     expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenCalledWith([
       INSTRUMENT_ID,
@@ -208,7 +223,9 @@ describe("BondSeriesService: recompute after a series is stored", () => {
     prices.recomputeLinkedSecuritiesOfSeries.mockImplementation(async () => {
       order.push("recompute");
     });
-    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await service.fetchSeries(USER, "PL", "ots0127", {
+      adapters: [adapterOf()],
+    });
     await flush();
     expect(benchmarks.refreshNeverFetched).toHaveBeenCalledWith([
       INSTRUMENT_ID,
@@ -219,7 +236,9 @@ describe("BondSeriesService: recompute after a series is stored", () => {
   it("dispatches no benchmark refresh for a series that was already stored or refused", async () => {
     const { service, catalog, benchmarks } = build();
     catalog.findStoredSeries.mockResolvedValue(SUMMARY);
-    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await service.fetchSeries(USER, "PL", "ots0127", {
+      adapters: [adapterOf()],
+    });
     await flush();
     catalog.findStoredSeries.mockResolvedValue(null);
     catalog.storeEntry.mockResolvedValue({
@@ -227,7 +246,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       named: "PL PL_MF OTS0127",
     } as never);
     await expect(
-      service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] }),
+      service.fetchSeries(USER, "PL", "ots0127", { adapters: [adapterOf()] }),
     ).rejects.toBeInstanceOf(SeriesFetchError);
     expect(benchmarks.refreshNeverFetched).toHaveBeenLastCalledWith([]);
     expect(benchmarks.refreshNeverFetched).toHaveBeenCalledTimes(1);
@@ -252,14 +271,16 @@ describe("BondSeriesService: recompute after a series is stored", () => {
     const adapter = adapterOf({
       fetchSeries: jest.fn(async () => ({ entry: edo, sources: [] })),
     });
-    await service.fetchSeries("PL", "edo1036", { adapters: [adapter] });
+    await service.fetchSeries(USER, "PL", "edo1036", { adapters: [adapter] });
     await flush();
     expect(catalog.seedBenchmarkSeries).toHaveBeenCalledWith(
       [adapter],
       new Set(["PL_CPI_GUS_YOY"]),
     );
     catalog.seedBenchmarkSeries.mockClear();
-    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await service.fetchSeries(USER, "PL", "ots0127", {
+      adapters: [adapterOf()],
+    });
     await flush();
     expect(catalog.seedBenchmarkSeries).not.toHaveBeenCalled();
   });
@@ -267,7 +288,9 @@ describe("BondSeriesService: recompute after a series is stored", () => {
   it("recomputes nothing for a series that was already stored", async () => {
     const { service, catalog, prices } = build();
     catalog.findStoredSeries.mockResolvedValue(SUMMARY);
-    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await service.fetchSeries(USER, "PL", "ots0127", {
+      adapters: [adapterOf()],
+    });
     await flush();
     catalog.findStoredSeries.mockResolvedValue(null);
     catalog.storeEntry.mockResolvedValue({
@@ -275,7 +298,9 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       named: "PL PL_MF OTS0127",
       instrumentId: INSTRUMENT_ID,
     });
-    await service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] });
+    await service.fetchSeries(USER, "PL", "ots0127", {
+      adapters: [adapterOf()],
+    });
     await flush();
     expect(prices.recomputeLinkedSecuritiesOfSeries).toHaveBeenLastCalledWith(
       [],
@@ -289,7 +314,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       named: "PL PL_MF OTS0127",
     } as never);
     await expect(
-      service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] }),
+      service.fetchSeries(USER, "PL", "ots0127", { adapters: [adapterOf()] }),
     ).rejects.toBeInstanceOf(SeriesFetchError);
     expect(prices.recomputeLinkedSecuritiesOfSeries).not.toHaveBeenCalled();
   });
@@ -345,7 +370,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
     prices.recomputeLinkedSecuritiesOfSeries.mockImplementation(
       () => new Promise<void>(() => undefined),
     );
-    const result = await service.fetchSeries("PL", "ots0127", {
+    const result = await service.fetchSeries(USER, "PL", "ots0127", {
       adapters: [adapterOf()],
     });
     expect(result).toMatchObject({ id: INSTRUMENT_ID, created: true });
@@ -362,7 +387,7 @@ describe("BondSeriesService: recompute after a series is stored", () => {
       new Error("recompute broke"),
     );
     await expect(
-      service.fetchSeries("PL", "ots0127", { adapters: [adapterOf()] }),
+      service.fetchSeries(USER, "PL", "ots0127", { adapters: [adapterOf()] }),
     ).resolves.toMatchObject({ created: true });
     await flush();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("network down"));
@@ -387,7 +412,7 @@ describe("BondSeriesService", () => {
       catalog.findStoredSeries.mockResolvedValue(SUMMARY);
 
       await expect(
-        service.fetchSeries("pl", "ots0127", { adapters: [adapter] }),
+        service.fetchSeries(USER, "pl", "ots0127", { adapters: [adapter] }),
       ).resolves.toEqual({ ...SUMMARY, created: false });
 
       expect(catalog.findStoredSeries).toHaveBeenCalledWith(
@@ -405,7 +430,7 @@ describe("BondSeriesService", () => {
       const adapter = adapterOf();
 
       await expect(
-        service.fetchSeries("PL", "ots0127", { adapters: [adapter] }),
+        service.fetchSeries(USER, "PL", "ots0127", { adapters: [adapter] }),
       ).resolves.toEqual({ ...SUMMARY, created: true });
 
       expect(http.gated).toHaveBeenCalledWith("obligacjeskarbowe", undefined);
@@ -418,6 +443,75 @@ describe("BondSeriesService", () => {
       // The lock is the first statement of the write; the store reads inside it.
       expect(order).toEqual(["lock", "store"]);
       expect(catalog.storeEntry).toHaveBeenCalledWith(manager, ENTRY);
+    });
+
+    describe("the per-user limit on explicit fetches (L2)", () => {
+      const attempt = (
+        service: BondSeriesService,
+        user: string,
+        a: BondAdapter,
+      ) => service.fetchSeries(user, "PL", "OTS0127", { adapters: [a] });
+      const code = async (promise: Promise<unknown>) => {
+        try {
+          await promise;
+        } catch (error) {
+          return error as HttpException;
+        }
+        throw new Error("expected a refusal");
+      };
+
+      it("counts each attempt on the user's own key, in a one-minute fixed window", async () => {
+        const { service, attempts } = build();
+        await attempt(service, USER, adapterOf());
+        expect(attempts.increment).toHaveBeenCalledWith(
+          "bond-series-fetch",
+          USER,
+          60_000,
+          "fixed",
+        );
+      });
+
+      it("refuses the 11th attempt in a minute with a translated 429 and sends no request for it", async () => {
+        const { service, http } = build();
+        const adapter = adapterOf();
+        for (let i = 0; i < 10; i++) await attempt(service, USER, adapter);
+        expect(adapter.fetchSeries).toHaveBeenCalledTimes(10);
+
+        const refused = await code(attempt(service, USER, adapter));
+        expect(refused.getStatus()).toBe(429);
+        expect(refused.getResponse()).toMatchObject({
+          errorCode: "SERIES_FETCH_RATE_LIMITED",
+          message: expect.stringContaining("10"),
+        });
+        expect(adapter.fetchSeries).toHaveBeenCalledTimes(10);
+        expect(http.gated).toHaveBeenCalledTimes(10);
+      });
+
+      it("charges a failed fetch like a successful one", async () => {
+        const { service } = build();
+        const adapter = adapterOf({
+          fetchSeries: jest.fn(async () => {
+            throw new SeriesFetchError("SOURCE_UNAVAILABLE", { series: "X" });
+          }),
+        });
+        for (let i = 0; i < 10; i++) {
+          await expect(attempt(service, USER, adapter)).rejects.toBeInstanceOf(
+            SeriesFetchError,
+          );
+        }
+        const refused = await code(attempt(service, USER, adapter));
+        expect(refused.getStatus()).toBe(429);
+        expect(adapter.fetchSeries).toHaveBeenCalledTimes(10);
+      });
+
+      it("limits each user on their own", async () => {
+        const { service } = build();
+        const adapter = adapterOf();
+        for (let i = 0; i < 10; i++) await attempt(service, USER, adapter);
+        await expect(
+          attempt(service, "user-2", adapter),
+        ).resolves.toMatchObject({ created: true });
+      });
     });
 
     it("keeps the lock key on the deterministic instrument id of the entry", () => {
@@ -433,7 +527,7 @@ describe("BondSeriesService", () => {
         instrumentId: INSTRUMENT_ID,
       });
       await expect(
-        service.fetchSeries("PL", "OTS0127", { adapters: [adapterOf()] }),
+        service.fetchSeries(USER, "PL", "OTS0127", { adapters: [adapterOf()] }),
       ).resolves.toMatchObject({ created: false });
       expect(logLog).not.toHaveBeenCalledWith(
         expect.stringContaining("Stored terms version 1"),
@@ -451,7 +545,9 @@ describe("BondSeriesService", () => {
           fields: [],
         } as StoreOutcome);
         const error = await refusal(
-          service.fetchSeries("PL", "OTS0127", { adapters: [adapterOf()] }),
+          service.fetchSeries(USER, "PL", "OTS0127", {
+            adapters: [adapterOf()],
+          }),
         );
         expect(error).toBeInstanceOf(SeriesFetchError);
         expect(error.code).toBe("SERIES_TERMS_CONFLICT");
@@ -475,7 +571,7 @@ describe("BondSeriesService", () => {
         }),
       });
       const error = await refusal(
-        service.fetchSeries("PL", "OTS0127", { adapters: [adapter] }),
+        service.fetchSeries(USER, "PL", "OTS0127", { adapters: [adapter] }),
       );
       expect(error.code).toBe("SOURCE_INCONSISTENT");
       // The request is named on the params, the adapter's own values kept.
@@ -501,7 +597,7 @@ describe("BondSeriesService", () => {
         }),
       });
       const error = await refusal(
-        service.fetchSeries("PL", "OTS0127", { adapters: [adapter] }),
+        service.fetchSeries(USER, "PL", "OTS0127", { adapters: [adapter] }),
       );
       expect(error.cause).toBe(cause);
     });
@@ -515,26 +611,26 @@ describe("BondSeriesService", () => {
         }),
       });
       await expect(
-        service.fetchSeries("PL", "OTS0127", { adapters: [adapter] }),
+        service.fetchSeries(USER, "PL", "OTS0127", { adapters: [adapter] }),
       ).rejects.toBe(boom);
     });
 
     it("answers SERIES_FETCH_UNSUPPORTED for a country without an adapter, or without a fetch", async () => {
       const { service, http } = build();
       const none = await refusal(
-        service.fetchSeries("DE", "ABC1", { adapters: [adapterOf()] }),
+        service.fetchSeries(USER, "DE", "ABC1", { adapters: [adapterOf()] }),
       );
       expect(none.code).toBe("SERIES_FETCH_UNSUPPORTED");
       expect(none.params).toEqual({ country: "DE", series: "ABC1" });
 
       const noFetch = await refusal(
-        service.fetchSeries("PL", "OTS0127", {
+        service.fetchSeries(USER, "PL", "OTS0127", {
           adapters: [adapterOf({ fetchSeries: undefined })],
         }),
       );
       expect(noFetch.code).toBe("SERIES_FETCH_UNSUPPORTED");
       const noProvider = await refusal(
-        service.fetchSeries("PL", "OTS0127", {
+        service.fetchSeries(USER, "PL", "OTS0127", {
           adapters: [adapterOf({ seriesProviderId: undefined })],
         }),
       );
@@ -551,7 +647,7 @@ describe("BondSeriesService", () => {
         })),
       });
       const error = await refusal(
-        service.fetchSeries("PL", "OTS0127", { adapters: [adapter] }),
+        service.fetchSeries(USER, "PL", "OTS0127", { adapters: [adapter] }),
       );
       expect(error.code).toBe("SOURCE_FORMAT_CHANGED");
       expect(error.params).toMatchObject({ field: "terms" });
@@ -562,7 +658,7 @@ describe("BondSeriesService", () => {
       const { service, catalog } = build();
       catalog.storeEntry.mockResolvedValue({ kind: "invalid", message: "x" });
       const error = await refusal(
-        service.fetchSeries("PL", "OTS0127", { adapters: [adapterOf()] }),
+        service.fetchSeries(USER, "PL", "OTS0127", { adapters: [adapterOf()] }),
       );
       expect(error.code).toBe("SOURCE_FORMAT_CHANGED");
     });
