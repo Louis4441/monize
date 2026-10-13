@@ -28,6 +28,9 @@ import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { DensityToggleBar } from '@/components/ui/DensityToggle';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useViewDefault } from '@/hooks/useViewDefault';
+import { opensAccountDashboard } from '@/lib/account-detail-views';
+import { BUILT_IN_VIEW_DEFAULTS } from '@/lib/view-defaults';
 
 type SortField = 'name' | 'type' | 'balance' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -325,14 +328,21 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
   // /investments matches its `accountId` query against, the filter is silently
   // dropped and the user lands on whatever selection was already stored. The
   // full portfolio view stays one click away, from the row's View Transactions
-  // action and from the detail page's own link.
+  // action and from the detail page's own link. A reader who chose the
+  // dashboard in Settings (`accountOpenTarget`) gets every account's detail
+  // page, its register still one click away from the same action.
+  const accountOpenTarget =
+    useViewDefault('accountOpenTarget') ?? BUILT_IN_VIEW_DEFAULTS.accountOpenTarget;
   const handleRowClick = useCallback((account: Account) => {
-    if (account.accountSubType === 'INVESTMENT_BROKERAGE') {
+    if (
+      account.accountSubType === 'INVESTMENT_BROKERAGE' ||
+      opensAccountDashboard(account.accountType, accountOpenTarget)
+    ) {
       router.push(`/accounts/${account.id}`);
     } else {
       router.push(`/transactions?accountId=${account.id}`);
     }
-  }, [router]);
+  }, [router, accountOpenTarget]);
 
   const { getRowHandlers } = useLongPress<Account>({
     onLongPress: setContextAccount,

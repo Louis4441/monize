@@ -132,7 +132,8 @@
       "datesNumbers": "Tarih ve Sayılar",
       "investments": "Yatırımlar",
       "transactions": "İşlemler",
-      "application": "Uygulama"
+      "application": "Uygulama",
+      "defaultViews": "Varsayılan görünümler"
     },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Varsayılan Para Birimi",
@@ -218,7 +219,23 @@
       "highcontrast": "Yüksek kontrast",
       "colorblind": "Renk körü uyumlu"
     },
-    "timezoneBrowserOption": "Tarayıcı saat dilimini kullan (otomatik algılandı: {tz})"
+    "timezoneBrowserOption": "Tarayıcı saat dilimini kullan (otomatik algılandı: {tz})",
+    "defaultViews": {
+      "intro": "Kendi ayarı olmayan her tarayıcıda (yeni bir cihaz veya gizli pencere gibi) uygulanır. Bir sayfada yaptığınız değişiklik o tarayıcı tarafından hatırlanır ve önceliklidir.",
+      "rowsLabel": "Satır yoğunluğu",
+      "hideRegisterYearLabel": "Kayıt tarihlerinde yılı gizle",
+      "chartCollapsedLabel": "İşlemler sayfasındaki grafik daraltılmış olarak başlasın",
+      "widgetsCollapsedLabel": "Hesap, alacaklı ve kategori bilgileri daraltılmış olarak başlasın",
+      "accountOpenTargetLabel": "Bir hesabı açtığımda",
+      "accountOpenTargetOptions": {
+        "register": "İşlemlerini göster",
+        "dashboard": "Panosunu göster"
+      },
+      "accountOpenTargetHelp": "Hesaplar sayfasında veya panodaki Favori Hesaplar'da bir hesaba tıkladığınızda geçerlidir.",
+      "applyHere": "Bu varsayılanları bu tarayıcıda kullan",
+      "applyHereHelp": "Bu tarayıcının kaydettiği görünüm ayarlarını temizler, böylece yukarıdaki varsayılanlar burada da geçerli olur.",
+      "appliedHere": "Bu tarayıcı artık varsayılan görünümlerinizi kullanıyor"
+    }
   },
   "notifications": {
     "heading": "Bildirimler",

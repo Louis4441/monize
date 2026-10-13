@@ -582,6 +582,11 @@
       "log": "लॉग",
       "autoTitle": "स्वत: ({scale})",
       "scaleTitle": "{label} स्केल"
+    },
+    "collapse": {
+      "hide": "चार्ट छिपाएँ",
+      "show": "चार्ट दिखाएँ",
+      "hidden": "चार्ट छिपा हुआ है"
     }
   },
   "toasts": {

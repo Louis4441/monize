@@ -582,6 +582,11 @@
       "log": "Log",
       "autoTitle": "Auto ({scale})",
       "scaleTitle": "{label} schaal"
+    },
+    "collapse": {
+      "hide": "Grafiek verbergen",
+      "show": "Grafiek tonen",
+      "hidden": "Grafiek verborgen"
     }
   },
   "toasts": {

@@ -108,6 +108,18 @@ export class UserPreference {
   })
   hiddenTableColumns: Record<string, any>;
 
+  // Account-level defaults for the browser-local view settings (density,
+  // hideRegisterYear, widgetsCollapsed, chartCollapsed) and accountOpenTarget;
+  // `src/users/view-defaults.ts` declares the keys and values. A browser that
+  // has saved its own choice keeps it. Empty object = no defaults. Typed as
+  // Record<string, any> for the DeepPartial reason given on hiddenTableColumns.
+  @Column({
+    name: "view_defaults",
+    type: "jsonb",
+    default: {},
+  })
+  viewDefaults: Record<string, any>;
+
   @Column({ name: "show_created_at", default: false })
   showCreatedAt: boolean;
 

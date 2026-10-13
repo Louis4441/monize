@@ -70,12 +70,18 @@ vi.mock('next/dynamic', () => ({
       }
       // Chart components all receive `data` + `isLoading`; distinguish by their
       // unique click handlers / currency code prop.
+      // Every chart the page draws is handed `onCollapse`; the mocks expose it
+      // as the header button the real cards draw.
+      const hideButton = props.onCollapse ? (
+        <button type="button" onClick={props.onCollapse}>Hide chart</button>
+      ) : null;
       if (props.onMonthClick !== undefined) {
         return (
           <div data-testid="chart-monthly-totals">
             <span data-testid="chart-monthly-totals-filter-label">
               {props.filterLabel ?? ''}
             </span>
+            {hideButton}
           </div>
         );
       }
@@ -87,6 +93,7 @@ vi.mock('next/dynamic', () => ({
                 {a.accountName}:{a.balance}
               </span>
             ))}
+            {hideButton}
           </div>
         );
       }
@@ -96,6 +103,7 @@ vi.mock('next/dynamic', () => ({
             <span data-testid="chart-balance-history-account-name">
               {props.accountName ?? ''}
             </span>
+            {hideButton}
           </div>
         );
       }
@@ -1517,6 +1525,139 @@ describe('TransactionsPage', () => {
         expect(screen.getByText('Current Balance')).toBeInTheDocument();
       });
       expect(screen.getByText('$5000.00')).toBeInTheDocument();
+    });
+  });
+
+  describe('Folding the chart band', () => {
+    beforeEach(async () => {
+      window.localStorage.clear();
+      // The real hook, so a fold is remembered and an absent key reads as no
+      // choice: the stateless default could prove neither.
+      const actual = await vi.importActual<typeof import('@/hooks/useLocalStorage')>(
+        '@/hooks/useLocalStorage',
+      );
+      mockUseLocalStorage.mockImplementation(actual.useLocalStorage as any);
+    });
+    afterEach(() => {
+      mockPreferences.value = undefined;
+      mockUseLocalStorage.mockImplementation((_key: string, defaultValue: any) => [
+        defaultValue,
+        vi.fn(),
+      ]);
+    });
+
+    it('folds the chart into a strip, remembers it, and brings it back from the strip', async () => {
+      mockGetAllAccounts.mockResolvedValue(mockAccounts);
+      mockGetDailyBalances.mockResolvedValue([
+        { date: '2026-02-01', balance: 1000, accountId: 'acc-1', currencyCode: 'USD' },
+      ]);
+
+      await act(async () => {
+        render(<TransactionsPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('chart-balance-history')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Hide chart' }));
+      });
+
+      expect(screen.queryByTestId('chart-balance-history')).not.toBeInTheDocument();
+      expect(screen.getByTestId('chart-collapsed-strip')).toHaveTextContent('Chart hidden');
+      expect(window.localStorage.getItem('monize-transactions-chart-collapsed')).toBe('true');
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Show chart' }));
+      });
+
+      expect(screen.getByTestId('chart-balance-history')).toBeInTheDocument();
+      expect(screen.queryByTestId('chart-collapsed-strip')).not.toBeInTheDocument();
+      expect(window.localStorage.getItem('monize-transactions-chart-collapsed')).toBe('false');
+    });
+
+    it('offers the fold on the zero-balances banner too', async () => {
+      mockGetAllAccounts.mockResolvedValue(mockAccounts);
+      mockGetDailyBalances.mockResolvedValue([
+        { date: '2026-02-01', balance: 0, accountId: 'acc-1', currencyCode: 'USD' },
+        { date: '2026-02-01', balance: 0, accountId: 'acc-2', currencyCode: 'USD' },
+      ]);
+
+      render(<TransactionsPage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('chart-zero-balances')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide chart' }));
+
+      expect(screen.queryByTestId('chart-zero-balances')).not.toBeInTheDocument();
+      expect(screen.getByTestId('chart-collapsed-strip')).toBeInTheDocument();
+    });
+
+    it("starts folded on the account's default when this browser has no choice", async () => {
+      mockPreferences.value = { defaultCurrency: 'USD', viewDefaults: { chartCollapsed: true } };
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('chart-collapsed-strip')).toBeInTheDocument();
+      });
+    });
+
+    it("keeps this browser's choice over the account's default", async () => {
+      mockPreferences.value = { defaultCurrency: 'USD', viewDefaults: { chartCollapsed: true } };
+      window.localStorage.setItem('monize-transactions-chart-collapsed', 'false');
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('chart-balance-history')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('chart-collapsed-strip')).not.toBeInTheDocument();
+    });
+
+    it('folds the info widget with the chart, and brings back both', async () => {
+      mockGetAllAccounts.mockResolvedValue(mockAccounts);
+      mockGetDailyBalances.mockResolvedValue([]);
+
+      render(<TransactionsPage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('set-account-filter'));
+      await waitFor(() => {
+        expect(screen.getByText('Current Balance')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hide chart' }));
+
+      expect(screen.queryByText('Current Balance')).not.toBeInTheDocument();
+      // The widget's own state is untouched: it comes back open with the band.
+      expect(window.localStorage.getItem('monize-transactions-account-widget-collapsed')).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show chart' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Current Balance')).toBeInTheDocument();
+      });
+    });
+
+    it("starts the info widget folded on the account's widget default", async () => {
+      mockPreferences.value = { defaultCurrency: 'USD', viewDefaults: { widgetsCollapsed: true } };
+      mockGetAllAccounts.mockResolvedValue(mockAccounts);
+      mockGetDailyBalances.mockResolvedValue([]);
+
+      render(<TransactionsPage />);
+      await waitFor(() => {
+        expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('set-account-filter'));
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Show account info' })).toBeInTheDocument();
+      });
+      const widgetColumn = screen.getByText('Current Balance').closest('[aria-hidden]');
+      expect(widgetColumn).toHaveAttribute('aria-hidden', 'true');
     });
   });
 

@@ -582,6 +582,11 @@
       "log": "Logarithmisch",
       "autoTitle": "Automatisch ({scale})",
       "scaleTitle": "{label}-Skalierung"
+    },
+    "collapse": {
+      "hide": "Diagramm ausblenden",
+      "show": "Diagramm anzeigen",
+      "hidden": "Diagramm ausgeblendet"
     }
   },
   "toasts": {

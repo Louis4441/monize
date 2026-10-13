@@ -582,6 +582,11 @@
       "log": "對數",
       "autoTitle": "自動（{scale}）",
       "scaleTitle": "{label} 刻度"
+    },
+    "collapse": {
+      "hide": "隱藏圖表",
+      "show": "顯示圖表",
+      "hidden": "圖表已隱藏"
     }
   },
   "toasts": {

@@ -132,7 +132,8 @@
       "datesNumbers": "Daty i liczby",
       "investments": "Inwestycje",
       "transactions": "Transakcje",
-      "application": "Aplikacja"
+      "application": "Aplikacja",
+      "defaultViews": "Widoki domyślne"
     },
     "themeLabel": "Motyw",
     "defaultCurrencyLabel": "Domyślna waluta",
@@ -218,7 +219,23 @@
       "highcontrast": "Wysoki kontrast",
       "colorblind": "Bezpieczny dla daltonistów"
     },
-    "timezoneBrowserOption": "Użyj strefy czasowej przeglądarki (wykryto {tz})"
+    "timezoneBrowserOption": "Użyj strefy czasowej przeglądarki (wykryto {tz})",
+    "defaultViews": {
+      "intro": "Obowiązują w każdej przeglądarce, która nie ma własnego ustawienia, np. na nowym urządzeniu lub w oknie prywatnym. Zmianę wprowadzoną na stronie zapamiętuje dana przeglądarka i ma ona pierwszeństwo.",
+      "rowsLabel": "Gęstość wierszy",
+      "hideRegisterYearLabel": "Ukryj rok w datach rejestru",
+      "chartCollapsedLabel": "Zaczynaj ze zwiniętym wykresem na stronie Transakcje",
+      "widgetsCollapsedLabel": "Zaczynaj ze zwiniętymi informacjami o koncie, odbiorcy i kategorii",
+      "accountOpenTargetLabel": "Gdy otwieram konto",
+      "accountOpenTargetOptions": {
+        "register": "Pokaż jego transakcje",
+        "dashboard": "Pokaż jego pulpit"
+      },
+      "accountOpenTargetHelp": "Dotyczy kliknięcia konta na stronie Konta lub w sekcji Ulubione konta na pulpicie.",
+      "applyHere": "Użyj tych ustawień domyślnych w tej przeglądarce",
+      "applyHereHelp": "Czyści ustawienia widoku zapisane przez tę przeglądarkę, aby powyższe ustawienia domyślne obowiązywały także tutaj.",
+      "appliedHere": "Ta przeglądarka używa teraz Twoich widoków domyślnych"
+    }
   },
   "notifications": {
     "heading": "Powiadomienia",

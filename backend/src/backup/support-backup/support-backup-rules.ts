@@ -98,6 +98,7 @@ export const RULES: Record<string, TableRules> = {
     dashboard_widgets: keep,
     dashboard_widget_config: keep,
     hidden_table_columns: keep,
+    view_defaults: keep,
     show_created_at: keep,
     time_format: keep,
     preferred_exchanges: keep,

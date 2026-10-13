@@ -582,6 +582,11 @@
       "log": "Logarytmiczna",
       "autoTitle": "Auto ({scale})",
       "scaleTitle": "Skala {label}"
+    },
+    "collapse": {
+      "hide": "Ukryj wykres",
+      "show": "Pokaż wykres",
+      "hidden": "Wykres ukryty"
     }
   },
   "toasts": {

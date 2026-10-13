@@ -191,3 +191,48 @@ describe("UpdatePreferencesDto hiddenTableColumns validation", () => {
     expect(errors[0].constraints).toHaveProperty("whitelistValidation");
   });
 });
+
+async function viewDefaultsErrors(payload: Record<string, unknown>) {
+  const dto = plainToInstance(UpdatePreferencesDto, payload);
+  return validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+}
+
+describe("UpdatePreferencesDto viewDefaults validation", () => {
+  it.each<[string, Record<string, unknown>]>([
+    ["omitted", {}],
+    ["an empty map", { viewDefaults: {} }],
+    [
+      "every key set",
+      {
+        viewDefaults: {
+          density: "dense",
+          hideRegisterYear: true,
+          widgetsCollapsed: false,
+          chartCollapsed: true,
+          accountOpenTarget: "dashboard",
+        },
+      },
+    ],
+  ])("accepts %s", async (_label, payload) => {
+    expect(await viewDefaultsErrors(payload)).toEqual([]);
+  });
+
+  it.each<[string, unknown]>([
+    ["an unknown key", { rowHeight: "dense" }],
+    ["an unknown density", { density: "tiny" }],
+    ["a string where a flag belongs", { chartCollapsed: "true" }],
+    ["an array at the top level", ["density"]],
+    // The column is NOT NULL: a null that passed would be a 500, not a 400.
+    ["null", null],
+    // A real own key, as a JSON body carries it; class-transformer alone would
+    // skip it and leave `{}`.
+    ["a __proto__ key", JSON.parse('{"__proto__": true}')],
+  ])("refuses %s with an error naming the field", async (_label, value) => {
+    const errors = await viewDefaultsErrors({ viewDefaults: value });
+    expect(errors).toHaveLength(1);
+    expect(errors[0].property).toBe("viewDefaults");
+    expect(Object.values(errors[0].constraints ?? {}).join(" ")).toContain(
+      "viewDefaults",
+    );
+  });
+});

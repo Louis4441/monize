@@ -582,6 +582,11 @@
       "log": "[XX-Log-XX]",
       "autoTitle": "[XX-Auto ({scale})-XX]",
       "scaleTitle": "[XX-{label} scale-XX]"
+    },
+    "collapse": {
+      "hide": "[XX-Hide chart-XX]",
+      "show": "[XX-Show chart-XX]",
+      "hidden": "[XX-Chart hidden-XX]"
     }
   },
   "toasts": {

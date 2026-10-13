@@ -132,7 +132,8 @@
       "datesNumbers": "Fechas y números",
       "investments": "Inversiones",
       "transactions": "Transacciones",
-      "application": "Aplicación"
+      "application": "Aplicación",
+      "defaultViews": "Vistas predeterminadas"
     },
     "themeLabel": "Tema",
     "defaultCurrencyLabel": "Moneda predeterminada",
@@ -218,7 +219,23 @@
       "highcontrast": "Alto contraste",
       "colorblind": "Seguro para daltonismo"
     },
-    "timezoneBrowserOption": "Usar zona horaria del navegador (detectada automáticamente como {tz})"
+    "timezoneBrowserOption": "Usar zona horaria del navegador (detectada automáticamente como {tz})",
+    "defaultViews": {
+      "intro": "Se aplican en cualquier navegador que no tenga una configuración propia, como un dispositivo nuevo o una ventana privada. Un cambio que hagas en una página lo recuerda ese navegador y tiene prioridad.",
+      "rowsLabel": "Densidad de filas",
+      "hideRegisterYearLabel": "Ocultar el año en las fechas del registro",
+      "chartCollapsedLabel": "Empezar con el gráfico de la página Transacciones contraído",
+      "widgetsCollapsedLabel": "Empezar con la información de cuenta, beneficiario y categoría contraída",
+      "accountOpenTargetLabel": "Al abrir una cuenta",
+      "accountOpenTargetOptions": {
+        "register": "Mostrar sus transacciones",
+        "dashboard": "Mostrar su panel"
+      },
+      "accountOpenTargetHelp": "Se aplica al hacer clic en una cuenta en la página Cuentas o en Cuentas favoritas del panel.",
+      "applyHere": "Usar estos valores en este navegador",
+      "applyHereHelp": "Borra la configuración de vistas que este navegador ha guardado, para que los valores anteriores también se apliquen aquí.",
+      "appliedHere": "Este navegador ya usa tus vistas predeterminadas"
+    }
   },
   "notifications": {
     "heading": "Notificaciones",

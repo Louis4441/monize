@@ -582,6 +582,11 @@
       "log": "Logarit",
       "autoTitle": "Tự động ({scale})",
       "scaleTitle": "Thang đo {label}"
+    },
+    "collapse": {
+      "hide": "Ẩn biểu đồ",
+      "show": "Hiện biểu đồ",
+      "hidden": "Biểu đồ đã ẩn"
     }
   },
   "toasts": {

@@ -17,6 +17,9 @@ import { useDragReorder, DropIndicatorLine } from '@/hooks/useDragReorder';
 import { WidgetHeading } from './widget-meta';
 import { CARD_CLASS } from '@/components/ui/Card';
 import { preferredCurrency } from '@/lib/default-currency';
+import { useViewDefault } from '@/hooks/useViewDefault';
+import { opensAccountDashboard } from '@/lib/account-detail-views';
+import { BUILT_IN_VIEW_DEFAULTS } from '@/lib/view-defaults';
 
 interface FavouriteAccountsProps {
   accounts: Account[];
@@ -33,6 +36,8 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, unpricedHol
   const tAccounts = useTranslations('accounts');
   const router = useRouter();
   const preferences = usePreferencesStore((s) => s.preferences);
+  const accountOpenTarget =
+    useViewDefault('accountOpenTarget') ?? BUILT_IN_VIEW_DEFAULTS.accountOpenTarget;
   const { formatCurrency } = useNumberFormat();
   const defaultCurrency = preferredCurrency(preferences?.defaultCurrency);
   const [reordering, setReordering] = useState(false);
@@ -71,17 +76,21 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, unpricedHol
       .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder);
 
   /**
-   * Where a card goes when it is clicked. Nothing moves while the list is being
-   * reordered -- a drag that ends over a card must not navigate.
+   * Where a card goes when it is clicked: the account's register, or its
+   * detail page for a reader who chose the dashboard in Settings
+   * (`accountOpenTarget`). Nothing moves while the list is being reordered --
+   * a drag that ends over a card must not navigate.
    */
   const navigateTo = (account: Account) => () => {
     if (reordering) return;
     const logical = logicalByMemberId.get(account.id);
     const target = logical?.primary ?? account;
     router.push(
-      target.accountSubType === 'INVESTMENT_BROKERAGE'
-        ? `/investments?accountId=${target.id}`
-        : `/transactions?accountId=${target.id}`,
+      opensAccountDashboard(target.accountType, accountOpenTarget)
+        ? `/accounts/${target.id}`
+        : target.accountSubType === 'INVESTMENT_BROKERAGE'
+          ? `/investments?accountId=${target.id}`
+          : `/transactions?accountId=${target.id}`,
     );
   };
 

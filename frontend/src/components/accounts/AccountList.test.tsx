@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act, within } from '@/test/render';
+import { render, screen, fireEvent, waitFor, act, within, cleanup } from '@/test/render';
 import * as nextNavigation from 'next/navigation';
 import { AccountList } from './AccountList';
 import { Account } from '@/types/account';
+import type { UserPreferences } from '@/types/auth';
+import { usePreferencesStore } from '@/store/preferencesStore';
 import { accountsApi } from '@/lib/accounts';
 import { useDensityStore } from '@/store/densityStore';
 
@@ -1643,6 +1645,32 @@ describe('AccountList', () => {
       fireEvent.click(screen.getByText('Main Chequing'));
 
       expect(mockPush).toHaveBeenCalledWith('/transactions?accountId=chequing-1');
+    });
+
+    describe('when the reader chose to open accounts on their dashboard', () => {
+      beforeEach(() => {
+        usePreferencesStore.setState({
+          preferences: { viewDefaults: { accountOpenTarget: 'dashboard' } } as unknown as UserPreferences,
+        });
+      });
+      afterEach(() => {
+        // Unmount first: this hook runs before Testing Library's own cleanup,
+        // and a store write to a mounted list re-renders it outside act.
+        cleanup();
+        usePreferencesStore.setState({ preferences: null });
+      });
+
+      it('opens a chequing account on its dashboard', () => {
+        const account = createAccount({ id: 'chequing-1', name: 'Main Chequing', accountType: 'CHEQUING' });
+
+        render(
+          <AccountList accounts={[account]} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+        );
+
+        fireEvent.click(screen.getByText('Main Chequing'));
+
+        expect(mockPush).toHaveBeenCalledWith('/accounts/chequing-1');
+      });
     });
   });
 

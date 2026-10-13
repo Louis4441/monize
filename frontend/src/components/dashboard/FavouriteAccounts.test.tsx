@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, createEvent, act } from "@/test/render";
 import { FavouriteAccounts } from "./FavouriteAccounts";
 import { accountsApi } from "@/lib/accounts";
@@ -8,6 +8,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+const mockPreferences = vi.hoisted(() => ({
+  viewDefaults: undefined as Record<string, unknown> | undefined,
+}));
+
 vi.mock("@/store/preferencesStore", () => ({
   // The selector has to be applied. Returning the whole state object regardless
   // meant `usePreferencesStore((s) => s.preferences)` got `{ preferences: ... }`,
@@ -15,7 +19,9 @@ vi.mock("@/store/preferencesStore", () => ({
   // the fallback while the fixture claimed to set CAD -- a mock that cannot do
   // what the real hook does, hiding the branch the fixture was written to pin.
   usePreferencesStore: (selector?: (state: unknown) => unknown) => {
-    const state = { preferences: { defaultCurrency: "CAD" } };
+    const state = {
+      preferences: { defaultCurrency: "CAD", viewDefaults: mockPreferences.viewDefaults },
+    };
     return selector ? selector(state) : state;
   },
 }));
@@ -289,6 +295,53 @@ describe("FavouriteAccounts", () => {
     render(<FavouriteAccounts accounts={accounts} isLoading={false} />);
     fireEvent.click(screen.getByText("My Brokerage"));
     expect(mockPush).toHaveBeenCalledWith("/investments?accountId=brok-1");
+  });
+
+  describe("when the reader chose to open accounts on their dashboard", () => {
+    beforeEach(() => {
+      mockPush.mockClear();
+      mockPreferences.viewDefaults = { accountOpenTarget: "dashboard" };
+    });
+    afterEach(() => {
+      mockPreferences.viewDefaults = undefined;
+    });
+
+    it("opens a regular account on its dashboard", () => {
+      const accounts = [
+        {
+          id: "acc-1",
+          name: "Checking",
+          currentBalance: 1500,
+          currencyCode: "CAD",
+          isFavourite: true, favouriteSortOrder: 0,
+          isClosed: false,
+          accountType: "CHEQUING",
+        },
+      ] as any[];
+
+      render(<FavouriteAccounts accounts={accounts} isLoading={false} />);
+      fireEvent.click(screen.getByText("Checking"));
+      expect(mockPush).toHaveBeenCalledWith("/accounts/acc-1");
+    });
+
+    it("opens a brokerage account on its dashboard rather than the portfolio", () => {
+      const accounts = [
+        {
+          id: "brok-1",
+          name: "My Brokerage",
+          currentBalance: 0,
+          currencyCode: "CAD",
+          isFavourite: true, favouriteSortOrder: 0,
+          isClosed: false,
+          accountType: "INVESTMENT",
+          accountSubType: "INVESTMENT_BROKERAGE",
+        },
+      ] as any[];
+
+      render(<FavouriteAccounts accounts={accounts} isLoading={false} />);
+      fireEvent.click(screen.getByText("My Brokerage"));
+      expect(mockPush).toHaveBeenCalledWith("/accounts/brok-1");
+    });
   });
 
   it("navigates from the statement line, which the card's hover promises", () => {
