@@ -1418,8 +1418,10 @@ export class TransactionBulkUpdateService {
     }
 
     if (filters.search && filters.search.trim()) {
-      // Split grain: bulk update acts on the matching lines, as the register
-      // draws them. The category filter joins `filterSplits` only for real
+      // Split grain, so the selection is the transactions the register lists.
+      // Which lines of a selected split a category change rewrites is still
+      // `resolveCategoryRestriction`'s decision, read from the category filter
+      // alone. The category filter joins `filterSplits` only for real
       // category ids; with none (no filter, or only the uncategorized and
       // transfer pseudo-ids) the search joins its own alias.
       if (!categorySplitsJoined) {

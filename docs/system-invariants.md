@@ -179,7 +179,7 @@ implied.
 | INV-RECEIPT-005 | A mailbox password or OAuth token is encrypted at rest and never returned | enforced |
 | INV-RECEIPT-006 | One poll per mailbox at a time across replicas | enforced |
 | INV-RECEIPT-007 | An OAuth callback completes only the flow the same user started, once | enforced |
-| INV-SEARCH-001 | A transaction search string has one door: one parser, one clause builder, escaped once | enforced |
+| INV-SEARCH-001 | A transaction search string has one door: one parser, one clause builder, escaped once | partial |
 | INV-SEARCH-002 | A single bare search term finds exactly what it found before the search syntax | enforced |
 | INV-SEARCH-003 | Every term of a search holds on the row the query counts; every call site searches at split grain | enforced |
 | INV-SEARCH-004 | Matching a search never multiplies a counted row | enforced |
@@ -6656,7 +6656,11 @@ Source of truth     backend/src/transactions/apply-transaction-search.ts
 Enforcement         transaction-search.guard.spec.ts fails an import of the
                     parser or the builder outside the door's three files, and a
                     hand-built `%${...search...}%` pattern in the
-                    transactions module.
+                    transactions module. The pattern scan is narrow: it catches
+                    a template literal whose interpolation names a search
+                    value, not a concatenated `'%' + q + '%'` or a template
+                    over a differently named variable; those are left to
+                    review.
                     The controller reads `search` through one searchParam
                     (string check, cut at MAX_SEARCH_LENGTH) on every endpoint.
 Concurrency scope   --
@@ -6665,8 +6669,13 @@ Crash semantics     --
 Failure response    A non-string `search` is a 400; more than 12 terms is a 400
                     (errors.transactions.searchTooManyTerms).
 Required tests      Source scan (the guard); unit cases for the controller cap.
-Status              enforced
+Status              partial
 ```
+
+Status is `partial` because the import ban holds the door and the pattern scan
+does not hold every spelling of a hand-built pattern. It becomes `enforced` when
+the scan matches any `%` wrapped around a non-literal in a query parameter
+outside the builder.
 
 ### INV-SEARCH-002 -- a single bare term finds what it always found
 
@@ -6694,9 +6703,11 @@ Status              enforced
 Statement           Every term of a search must hold on the same row the query
                     counts. Every call site searches at split grain: a split
                     transaction matches line by line, the register draws only
-                    the matching lines with a filtered total, bulk update acts
-                    on matching lines, and a negated term drops only the lines
-                    it matches.
+                    the matching lines with a filtered total, and a negated term
+                    drops only the lines it matches. Bulk update selects the
+                    transactions the register lists; which lines of a selected
+                    split a category change rewrites is decided by the category
+                    filter (resolveCategoryRestriction), not by the search.
 Source of truth     The `grain` each call passes to the builder, correlated to
                     the split alias that call site already joins.
 Enforcement         SearchClauseOptions.grain is required, so no call site can
