@@ -120,6 +120,8 @@ export function createTransaction(
     currencyCode?: string;
     categoryId?: string;
     status?: string;
+    /** A cheque or confirmation number, as the search's `ref:` field reads it. */
+    referenceNumber?: string;
   },
 ): Promise<CreatedTransaction> {
   return api.post<CreatedTransaction>('/transactions', {
@@ -131,6 +133,7 @@ export function createTransaction(
     ...(data.payeeId !== undefined ? { payeeId: data.payeeId } : {}),
     ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
     ...(data.status !== undefined ? { status: data.status } : {}),
+    ...(data.referenceNumber !== undefined ? { referenceNumber: data.referenceNumber } : {}),
   });
 }
 
