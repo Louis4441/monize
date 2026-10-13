@@ -56,7 +56,7 @@
   },
   "bulk": {
     "selectRow": "Selecionar {name}",
-    "selectAll": "Selecionar todos os pedidos aprováveis apresentados",
+    "selectAll": "Selecionar todos os pedidos mostrados que podem ser aprovados ou enviados",
     "approveSelected": "Aprovar os selecionados ({count})",
     "approveAllShown": "Aprovar todos os apresentados ({count})",
     "summary": "{approved, plural, one {# proposta aplicada} other {# propostas aplicadas}}, {failed, plural, one {# não aplicada} other {# não aplicadas}}.",
@@ -73,7 +73,9 @@
   },
   "sendToAssistant": {
     "button": "Enviar {count, plural, one {# pedido pendente} other {# pedidos pendentes}} ao assistente de IA",
+    "buttonSelected": "Enviar {count, plural, one {# pedido selecionado} other {# pedidos selecionados}} ao assistente de IA",
     "prompt": "Trata os meus pedidos de revisão por IA pendentes com a ferramenta ai_review_requests: lista-os, assume cada um, segue a sua instrução e submete uma proposta. Para um pedido de rascunho de perfil, cria antes o perfil com a ferramenta email_receipt_parsers. Nada é alterado até eu aprovar as propostas na caixa de revisão por IA.",
+    "promptSelected": "Trata {count, plural, one {este pedido de revisão por IA} other {estes # pedidos de revisão por IA}} com a ferramenta ai_review_requests: {ids}. Assume cada um pelo seu id, segue a sua instrução e submete uma proposta. Para um pedido de rascunho de perfil, cria antes o perfil com a ferramenta email_receipt_parsers. Não mexas nos outros pedidos. Nada é alterado até eu aprovar as propostas na caixa de revisão por IA.",
     "opened": "O chat foi aberto com uma mensagem preparada. Leia-a e prima Enviar.",
     "unavailable": "O assistente de IA não pode responder agora. Ligue um fornecedor de IA nas Definições ou ligue o seu cliente MCP. Os pedidos continuam à espera aqui."
   },

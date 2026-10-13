@@ -56,7 +56,7 @@
   },
   "bulk": {
     "selectRow": "{name} selecteren",
-    "selectAll": "Alle getoonde goed te keuren verzoeken selecteren",
+    "selectAll": "Alle getoonde verzoeken selecteren die kunnen worden goedgekeurd of verzonden",
     "approveSelected": "Geselecteerde goedkeuren ({count})",
     "approveAllShown": "Alle getoonde goedkeuren ({count})",
     "summary": "{approved, plural, one {# voorstel} other {# voorstellen}} toegepast, {failed, plural, one {# niet toegepast} other {# niet toegepast}}.",
@@ -73,7 +73,9 @@
   },
   "sendToAssistant": {
     "button": "{count, plural, one {# openstaand verzoek} other {# openstaande verzoeken}} naar de AI-assistent sturen",
+    "buttonSelected": "{count, plural, one {# geselecteerd verzoek} other {# geselecteerde verzoeken}} naar de AI-assistent sturen",
     "prompt": "Werk mijn openstaande verzoeken voor AI-beoordeling af met de tool ai_review_requests: geef ze weer, neem elk verzoek in behandeling, volg de instructie en dien een voorstel in. Maak voor een verzoek om een profielconcept het profiel in plaats daarvan met de tool email_receipt_parsers. Er verandert niets totdat ik de voorstellen goedkeur in de inbox voor AI-beoordeling.",
+    "promptSelected": "Werk {count, plural, one {dit verzoek voor AI-beoordeling} other {deze # verzoeken voor AI-beoordeling}} af met de tool ai_review_requests: {ids}. Neem elk verzoek in behandeling via zijn id, volg de instructie en dien een voorstel in. Maak voor een verzoek om een profielconcept het profiel in plaats daarvan met de tool email_receipt_parsers. Laat de andere verzoeken ongemoeid. Er verandert niets totdat ik de voorstellen goedkeur in de inbox voor AI-beoordeling.",
     "opened": "De chat is geopend met een voorbereid bericht. Lees het en druk op Verzenden.",
     "unavailable": "De AI-assistent kan nu niet antwoorden. Koppel een AI-provider in Instellingen of verbind uw MCP-client. De verzoeken blijven hier wachten."
   },

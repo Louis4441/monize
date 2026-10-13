@@ -56,7 +56,7 @@
   },
   "bulk": {
     "selectRow": "Pilih {name}",
-    "selectAll": "Pilih semua permintaan yang dapat disetujui yang ditampilkan",
+    "selectAll": "Pilih semua permintaan yang ditampilkan yang dapat disetujui atau dikirim",
     "approveSelected": "Setujui yang dipilih ({count})",
     "approveAllShown": "Setujui semua yang ditampilkan ({count})",
     "summary": "{approved, plural, one {# usulan} other {# usulan}} diterapkan, {failed, plural, one {# tidak diterapkan} other {# tidak diterapkan}}.",
@@ -73,7 +73,9 @@
   },
   "sendToAssistant": {
     "button": "Kirim {count, plural, other {# permintaan tertunda}} ke asisten AI",
+    "buttonSelected": "Kirim {count, plural, other {# permintaan terpilih}} ke asisten AI",
     "prompt": "Kerjakan permintaan tinjauan AI saya yang tertunda dengan alat ai_review_requests: daftarkan, klaim masing-masing, ikuti instruksinya, dan kirim usulan. Untuk permintaan draf profil, buat profil dengan alat email_receipt_parsers. Tidak ada yang diubah sampai saya menyetujui usulan di kotak masuk tinjauan AI.",
+    "promptSelected": "Kerjakan {count, plural, other {# permintaan tinjauan AI ini}} dengan alat ai_review_requests: {ids}. Klaim masing-masing berdasarkan id-nya, ikuti instruksinya, dan kirim usulan. Untuk permintaan draf profil, buat profil dengan alat email_receipt_parsers. Jangan sentuh permintaan lainnya. Tidak ada yang diubah sampai saya menyetujui usulan di kotak masuk tinjauan AI.",
     "opened": "Obrolan dibuka dengan pesan yang sudah disiapkan. Baca lalu tekan Kirim.",
     "unavailable": "Asisten AI tidak dapat menjawab sekarang. Hubungkan penyedia AI di Pengaturan, atau hubungkan klien MCP Anda. Permintaan tetap menunggu di sini."
   },

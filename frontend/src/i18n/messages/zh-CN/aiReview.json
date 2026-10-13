@@ -56,7 +56,7 @@
   },
   "bulk": {
     "selectRow": "选择 {name}",
-    "selectAll": "选择显示的所有可批准请求",
+    "selectAll": "选择所有显示的可批准或可发送的请求",
     "approveSelected": "批准所选（{count}）",
     "approveAllShown": "批准显示的全部（{count}）",
     "summary": "已应用 {approved, plural, one {# 条提议} other {# 条提议}}，{failed, plural, one {# 条未应用} other {# 条未应用}}。",
@@ -73,7 +73,9 @@
   },
   "sendToAssistant": {
     "button": "将 {count, plural, other {# 个待处理请求}}发送给 AI 助手",
+    "buttonSelected": "将 {count, plural, other {# 个所选请求}}发送给 AI 助手",
     "prompt": "使用 ai_review_requests 工具处理我待处理的 AI 审核请求：列出它们，逐个认领，按照其指示操作并提交提议。对于配置文件草稿请求，请改用 email_receipt_parsers 工具创建配置文件。在我于 AI 审核收件箱中批准提议之前，不会更改任何内容。",
+    "promptSelected": "使用 ai_review_requests 工具处理{count, plural, other {这 # 个 AI 审核请求}}：{ids}。按 ID 逐个认领，按照其指示操作并提交提议。对于配置文件草稿请求，请改用 email_receipt_parsers 工具创建配置文件。不要处理其他请求。在我于 AI 审核收件箱中批准提议之前，不会更改任何内容。",
     "opened": "已打开聊天并附上准备好的消息。请阅读后点击发送。",
     "unavailable": "AI 助手现在无法回答。请在设置中连接 AI 提供商，或连接你的 MCP 客户端。请求会继续在这里等待。"
   },

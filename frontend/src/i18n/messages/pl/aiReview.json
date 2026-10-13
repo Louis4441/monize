@@ -56,7 +56,7 @@
   },
   "bulk": {
     "selectRow": "Zaznacz: {name}",
-    "selectAll": "Zaznacz wszystkie pokazane prośby, które można zatwierdzić",
+    "selectAll": "Zaznacz wszystkie widoczne żądania, które można zatwierdzić lub wysłać",
     "approveSelected": "Zatwierdź zaznaczone ({count})",
     "approveAllShown": "Zatwierdź wszystkie pokazane ({count})",
     "summary": "{approved, plural, one {Zastosowano # propozycję} few {Zastosowano # propozycje} many {Zastosowano # propozycji} other {Zastosowano # propozycji}}, nie zastosowano: {failed}.",
@@ -73,7 +73,9 @@
   },
   "sendToAssistant": {
     "button": "Skieruj {count, plural, one {# oczekujące żądanie} few {# oczekujące żądania} many {# oczekujących żądań} other {# oczekującego żądania}} do asystenta AI",
+    "buttonSelected": "Skieruj {count, plural, one {# zaznaczone żądanie} few {# zaznaczone żądania} many {# zaznaczonych żądań} other {# zaznaczonego żądania}} do asystenta AI",
     "prompt": "Przetwórz moje oczekujące żądania przeglądu AI narzędziem ai_review_requests: wyświetl ich listę, przejmij każde z nich, wykonaj jego instrukcję i prześlij propozycję. Dla żądania szkicu profilu utwórz profil narzędziem email_receipt_parsers. Nic nie zostanie zmienione, dopóki nie zatwierdzę propozycji w skrzynce przeglądu AI.",
+    "promptSelected": "Przetwórz narzędziem ai_review_requests {count, plural, one {to żądanie przeglądu AI} few {te # żądania przeglądu AI} many {tych # żądań przeglądu AI} other {te # żądania przeglądu AI}}: {ids}. Przejmij każde z nich po identyfikatorze, wykonaj jego instrukcję i prześlij propozycję. Dla żądania szkicu profilu utwórz profil narzędziem email_receipt_parsers. Nie ruszaj pozostałych żądań. Nic nie zostanie zmienione, dopóki nie zatwierdzę propozycji w skrzynce przeglądu AI.",
     "opened": "Otwarto czat z przygotowaną wiadomością. Przeczytaj ją i naciśnij Wyślij.",
     "unavailable": "Asystent AI nie może teraz odpowiedzieć. Połącz dostawcę AI w Ustawieniach albo połącz klienta MCP. Żądania nadal czekają tutaj."
   },

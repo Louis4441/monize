@@ -12,17 +12,18 @@ vi.mock('@/lib/assistant-ready', () => ({ assistantCanAnswerNow: assistant.canAn
 // The mocked router is one object for the whole run (`test/setup.ts`).
 const router = vi.mocked(renderHook(() => useRouter()).result.current);
 
-const items = [
-  makeReviewItem({ id: 'a', status: 'pending' }),
-  makeReviewItem({ id: 'b', status: 'pending' }),
-  makeReviewItem({ id: 'c', status: 'proposed' }),
-];
+const pending = [makeReviewItem({ id: 'a', status: 'pending' }), makeReviewItem({ id: 'b', status: 'pending' })];
 
-async function press() {
+async function press(name = 'Send 2 pending requests to the AI assistant') {
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Send 2 pending requests to the AI assistant' }));
+    fireEvent.click(screen.getByRole('button', { name }));
   });
 }
+
+const stagedDraft = (): string | undefined => {
+  const id = (router.push.mock.calls.at(-1)?.[0] as string).replace('/ai?handoff=', '');
+  return peekChatHandoff(id)?.draft;
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -30,15 +31,13 @@ beforeEach(() => {
 });
 
 describe('SendPendingToAssistantButton', () => {
-  it('is not offered while nothing is pending, loaded or not', () => {
-    const { rerender } = render(<SendPendingToAssistantButton items={null} />);
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    rerender(<SendPendingToAssistantButton items={[makeReviewItem({ status: 'proposed' })]} />);
+  it('is not offered while nothing is pending', () => {
+    render(<SendPendingToAssistantButton pending={[]} selected={[]} />);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('stages the prompt for the chat and opens it, so the user still presses Send', async () => {
-    render(<SendPendingToAssistantButton items={items} />);
+    render(<SendPendingToAssistantButton pending={pending} selected={[]} />);
     await press();
 
     expect(router.push).toHaveBeenCalledWith(expect.stringMatching(/^\/ai\?handoff=[0-9a-f-]{36}$/));
@@ -49,9 +48,19 @@ describe('SendPendingToAssistantButton', () => {
     expect(toast.success).toHaveBeenCalledWith('Opened the chat with a prepared message. Read it and press Send.');
   });
 
+  it('sends only the checked requests, named by id, when some are checked', async () => {
+    render(<SendPendingToAssistantButton pending={pending} selected={[pending[1]]} />);
+    await press('Send 1 selected request to the AI assistant');
+
+    const draft = stagedDraft();
+    expect(draft).toContain('this AI review request with the ai_review_requests tool: b.');
+    expect(draft).not.toContain(': a');
+    expect(draft).toContain('Leave the other requests alone.');
+  });
+
   it('keeps the requests here and says why when the assistant cannot answer now', async () => {
     assistant.canAnswer.mockResolvedValue(false);
-    render(<SendPendingToAssistantButton items={items} />);
+    render(<SendPendingToAssistantButton pending={pending} selected={[]} />);
     await press();
 
     expect(router.push).not.toHaveBeenCalled();

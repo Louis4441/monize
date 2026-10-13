@@ -56,7 +56,7 @@
   },
   "bulk": {
     "selectRow": "Seleziona {name}",
-    "selectAll": "Seleziona tutte le richieste approvabili mostrate",
+    "selectAll": "Seleziona tutte le richieste mostrate che possono essere approvate o inviate",
     "approveSelected": "Approva le selezionate ({count})",
     "approveAllShown": "Approva tutte quelle mostrate ({count})",
     "summary": "{approved, plural, one {# proposta applicata} other {# proposte applicate}}, {failed, plural, one {# non applicata} other {# non applicate}}.",
@@ -73,7 +73,9 @@
   },
   "sendToAssistant": {
     "button": "Invia {count, plural, one {# richiesta in attesa} other {# richieste in attesa}} all'assistente IA",
+    "buttonSelected": "Invia {count, plural, one {# richiesta selezionata} other {# richieste selezionate}} all'assistente IA",
     "prompt": "Lavora sulle mie richieste di revisione IA in attesa con lo strumento ai_review_requests: elencale, prendi in carico ciascuna, segui la sua istruzione e invia una proposta. Per una richiesta di bozza di profilo, crea invece il profilo con lo strumento email_receipt_parsers. Nulla cambia finché non approvo le proposte nella casella di revisione IA.",
+    "promptSelected": "Lavora su {count, plural, one {questa richiesta di revisione IA} other {queste # richieste di revisione IA}} con lo strumento ai_review_requests: {ids}. Prendi in carico ciascuna tramite il suo id, segui la sua istruzione e invia una proposta. Per una richiesta di bozza di profilo, crea invece il profilo con lo strumento email_receipt_parsers. Non toccare le altre richieste. Nulla cambia finché non approvo le proposte nella casella di revisione IA.",
     "opened": "Chat aperta con un messaggio preparato. Leggilo e premi Invia.",
     "unavailable": "L'assistente IA non può rispondere ora. Collega un fornitore IA nelle Impostazioni o collega il tuo client MCP. Le richieste restano in attesa qui."
   },

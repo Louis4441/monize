@@ -107,6 +107,11 @@ export function isApprovable(item: AiReviewItem): boolean {
   return item.status === 'proposed' && item.proposal !== undefined && 'action' in item.proposal;
 }
 
+/** Whether a request still waits for an agent, so it can be handed to the assistant. */
+export function isSendableToAssistant(item: AiReviewItem): boolean {
+  return item.status === 'pending';
+}
+
 /**
  * What names a request in a list or a message: the sender domain of a parser
  * draft, the email's subject, the transaction's payee or the rule, in that order;

@@ -14,6 +14,7 @@ import type { PendingAction } from '@/types/ai';
 import {
   AI_REVIEW_APPROVE_BATCH_MAX,
   isApprovable,
+  isSendableToAssistant,
   type AiReviewApproveBatchItemResult,
   type AiReviewFilter,
   type AiReviewItem,
@@ -105,6 +106,9 @@ export function useAiReviewInbox(initialKind: AiReviewKindFilter = 'all') {
   const shownItems = items === null ? null : itemsOfKind(items, kind);
   const approvable = (shownItems ?? []).filter(isApprovable);
   const selected = approvable.filter((item) => selectedIds.has(item.id));
+  // Pending rows share the selection: their checkboxes pick what goes to the assistant.
+  const sendable = (shownItems ?? []).filter(isSendableToAssistant);
+  const selectedSendable = sendable.filter((item) => selectedIds.has(item.id));
 
   const toggleSelected = (id: string) =>
     setSelectedIds((previous) => {
@@ -229,6 +233,8 @@ export function useAiReviewInbox(initialKind: AiReviewKindFilter = 'all') {
     shownItems,
     approvable,
     selected,
+    sendable,
+    selectedSendable,
     toggleSelected,
     clearSelection,
     batching,
