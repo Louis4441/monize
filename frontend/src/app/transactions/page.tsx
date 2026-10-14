@@ -52,7 +52,6 @@ import {
   type TransactionSort,
   type TransactionSortField,
 } from '@/lib/transaction-sort';
-import { useStaleReconciliation } from '@/hooks/useStaleReconciliation';
 import { useHiddenColumns } from '@/hooks/useHiddenColumns';
 import { BulkSelectionBanner } from '@/components/transactions/BulkSelectionBanner';
 import { Account, isLiabilityAccountType } from '@/types/account';
@@ -184,7 +183,6 @@ function TransactionsContent() {
   const filters = useTransactionFilters({ accounts, categories, payees, tags, weekStartsOn });
   // Which register rows are overdue for reconciliation. Undefined until known,
   // and left undefined on failure, so a lookup that did not answer marks no row.
-  const staleReconciliation = useStaleReconciliation();
 
   // Accounts every query should cover: an explicit account filter wins;
   // otherwise narrow to filteredAccounts (which strips brokerage and honours
@@ -1618,7 +1616,6 @@ function TransactionsContent() {
             <TransactionList
               transactions={transactions}
               jointPermissionsByAccount={jointPermissionsByAccount}
-              staleContext={staleReconciliation}
               onEdit={handleEdit}
               onDuplicate={handleDuplicate}
               onScheduleRecurring={handleScheduleRecurring}

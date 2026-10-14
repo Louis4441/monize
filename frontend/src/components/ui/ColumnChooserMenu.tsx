@@ -168,7 +168,7 @@ export function ColumnChooserMenu<C extends string>({
           role="menu"
           aria-label={t('columns.menuLabel')}
           onKeyDown={handleMenuKeyDown}
-          className="absolute right-0 mt-1 w-56 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50"
+          className="absolute right-0 mt-1 w-56 max-sm:fixed max-sm:inset-x-2 max-sm:w-auto py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50"
         >
           {columns.map((column) => {
             const visible = !hidden.has(column.id);

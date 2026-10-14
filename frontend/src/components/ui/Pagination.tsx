@@ -135,7 +135,7 @@ export function Pagination({
         </button>
 
         {/* Page input */}
-        <div className="inline-flex items-center gap-1 px-1 whitespace-nowrap flex-shrink-0">
+        <div className="inline-flex items-center gap-1 px-0.5 whitespace-nowrap flex-shrink-0">
           <input
             type="text"
             inputMode="numeric"
@@ -145,7 +145,7 @@ export function Pagination({
             onBlur={handleInputBlur}
             maxLength={4}
             size={4}
-            className="w-10 h-[26px] px-1 py-0 text-xs text-center font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-16! h-[26px] px-0! py-0! text-xs! text-center font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             title={t('pagination.enterPageNumber')}
           />
           <span className="text-sm text-gray-500 dark:text-gray-400">
