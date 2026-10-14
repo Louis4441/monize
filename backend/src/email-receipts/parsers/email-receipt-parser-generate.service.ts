@@ -9,6 +9,7 @@ import { DataSource, EntityManager, In } from "typeorm";
 import { AiBaseUrlRefusedError } from "../../ai/ai-base-url-policy";
 import { AiService } from "../../ai/ai.service";
 import { AiQueryService } from "../../ai/query/ai-query.service";
+import { NETWORK_WRITING_TOOL_NAMES } from "../../ai/query/tool-definitions";
 import { AiReviewRequestsService } from "../../ai-review/ai-review-requests.service";
 import { loadQualifiedCategoryNames } from "../../categories/category-name.util";
 import { withScopedDb } from "../../common/db/scoped-db";
@@ -58,6 +59,10 @@ interface Prepared {
   knownParserIds: ReadonlySet<string>;
 }
 
+/** The tools the generator's assistant run is never offered (untrusted email content in its prompt). */
+export const PARSER_RUN_EXCLUDED_TOOLS: readonly string[] =
+  NETWORK_WRITING_TOOL_NAMES;
+
 /**
  * "Generate a profile with AI" (the wizard's step 2): run the assistant
  * synchronously over the sample emails and the transactions they paid for, with
@@ -105,7 +110,16 @@ export class EmailReceiptParserGenerateService {
     });
     // The assistant's own door: a user with no tool-capable provider is refused
     // here exactly as in the chat.
-    const { answer } = await this.aiQuery.executeQuery(userId, prompt);
+    // The prompt carries email bodies, which are untrusted: a tool that makes an
+    // outbound request and stores the result is withdrawn from this run, so an
+    // instruction hidden in an email cannot make it fetch.
+    const { answer } = await this.aiQuery.executeQuery(
+      userId,
+      prompt,
+      undefined,
+      undefined,
+      { excludeTools: PARSER_RUN_EXCLUDED_TOOLS },
+    );
 
     const saved = await withScopedDb(this.dataSource, (m) =>
       this.findSavedDraft(m, userId, prepared),

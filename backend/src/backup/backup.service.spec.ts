@@ -1,5 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { gemConfigFingerprint } from "../strategies/gem-signal.service";
+import { BondPriceService } from "../bonds/bond-price.service";
 import { DataSource } from "typeorm";
 import {
   UnauthorizedException,
@@ -21,6 +22,8 @@ import { BackupExportService } from "./backup-export.service";
 import { BackupRestoreService } from "./backup-restore.service";
 import { BackupAttachmentTransferService } from "./backup-attachment-transfer.service";
 import { BackupRestoreDatabaseService } from "./backup-restore-database.service";
+import { BackupBondSeriesRecoveryService } from "./backup-bond-series-recovery.service";
+import { BackupData } from "./backup-format";
 import { buildExportTableQueries } from "./export-table-queries";
 import { ATTACHMENT_EXPORT_SQL } from "./export-attachments";
 import { AttachmentStorageRegistry } from "../attachments/storage/attachment-storage.registry";
@@ -701,6 +704,17 @@ describe("BackupService", () => {
         BackupRestoreService,
         BackupAttachmentTransferService,
         BackupRestoreDatabaseService,
+        // The restore's bond series recovery is its own spec's subject; here it
+        // finds nothing to recover.
+        {
+          provide: BackupBondSeriesRecoveryService,
+          useValue: {
+            recover: jest.fn(async (_userId: string, data: BackupData) => ({
+              data,
+              unrecovered: [],
+            })),
+          },
+        },
         {
           provide: DataSource,
           useValue: mockDataSource,
@@ -711,6 +725,13 @@ describe("BackupService", () => {
         // survived (P2-005).
         OidcReauthService,
         userMaintenanceProvider(maintenance),
+        {
+          provide: BondPriceService,
+          useValue: {
+            recomputeSecurity: jest.fn().mockResolvedValue({}),
+            recomputeLinkedSecurities: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         // Two ciphers, deliberately: `EncryptionService` still owns the
         // provider API keys the export carries, while the stored backup password
         // moved to `EncryptionService` (whose key does not depend on optional
@@ -1708,6 +1729,39 @@ describe("BackupService", () => {
       const { buffer: buf } = await service.exportToBuffer(userId, "pw");
       expect(buf.subarray(0, 4).toString("ascii")).toBe("MZBE");
     });
+
+    it("writes the identity of the bond series the rows reference, never their terms", async () => {
+      const identity = {
+        bondInstrumentId: "4a893370-246b-5a51-9930-6d098aea37e1",
+        issuerCountryCode: "PL",
+        issuerCode: "PL_MF",
+        programCode: "EDO",
+        seriesCode: "EDO1036",
+      };
+      const sqls: string[] = [];
+      mockDataSource.query.mockImplementation(async (sql: string) => {
+        sqls.push(String(sql));
+        return String(sql).includes("FROM bond_instruments i")
+          ? [{ ...identity, annual_rate: "0.0535", terms: { margin: 1 } }]
+          : [];
+      });
+      const { buffer } = await service.exportToBuffer(userId);
+      const artifact = JSON.parse(gunzipSync(buffer).toString("utf-8"));
+      // Exactly the five identity fields, even if the row carried more.
+      expect(artifact.bondCatalog).toEqual({ series: [identity] });
+      const read = sqls.find((sql) => sql.includes("FROM bond_instruments i"))!;
+      expect(read).toMatch(/investment_transactions/);
+      expect(read).not.toMatch(/bond_terms_versions|bond_period_rates|terms/);
+      // The version is unchanged: the member is added the way `completeness` was.
+      expect(artifact.version).toBe(1);
+    });
+
+    it("writes an empty identity list for a user holding no bond series", async () => {
+      mockDataSource.query.mockResolvedValue([]);
+      const { buffer } = await service.exportToBuffer(userId);
+      const artifact = JSON.parse(gunzipSync(buffer).toString("utf-8"));
+      expect(artifact.bondCatalog).toEqual({ series: [] });
+    });
   });
 
   describe("resolveStoredBackupPassword", () => {
@@ -1830,6 +1884,193 @@ describe("BackupService", () => {
         await expect(
           service.restoreData(userId, makeInput({ oidcIdToken: artifact })),
         ).resolves.toHaveProperty("message", "Backup restored successfully");
+      });
+
+      it("recomputes the engine prices of the restored securities through BondPriceService after the commit", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const bondPrices = (
+          service as unknown as {
+            restoreService: {
+              bondPrices: { recomputeLinkedSecurities: jest.Mock };
+            };
+          }
+        ).restoreService.bondPrices;
+        bondPrices.recomputeLinkedSecurities.mockClear();
+        const data = {
+          ...validBackupData,
+          securities: [
+            { id: "5ec00000-0000-4000-8000-000000000001", user_id: userId },
+            { id: "5ec00000-0000-4000-8000-000000000002", user_id: userId },
+          ],
+        };
+        await service.restoreData(
+          userId,
+          makeInput({ password: "test", data }),
+        );
+        // One call, with the ids the restore wrote (remapped), not a lookup of its
+        // own: the linked-only filter is BondPriceService's.
+        expect(bondPrices.recomputeLinkedSecurities).toHaveBeenCalledTimes(1);
+        const [calledUser, ids] =
+          bondPrices.recomputeLinkedSecurities.mock.calls[0];
+        expect(calledUser).toBe(userId);
+        expect(ids).toHaveLength(2);
+        expect(ids).not.toContain("5ec00000-0000-4000-8000-000000000001");
+      });
+
+      it("keeps only the series of the user's own program after the restore, in the restore's transaction (INV-BOND-007)", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        await service.restoreData(userId, makeInput({ password: "test" }));
+        const calls = mockQueryRunner.query.mock.calls.map(([sql]: [string]) =>
+          String(sql),
+        );
+        const clear = calls.findIndex((sql) =>
+          /UPDATE investment_transactions t\s+SET bond_instrument_id = NULL/.test(
+            sql,
+          ),
+        );
+        expect(clear).toBeGreaterThan(-1);
+        expect(mockQueryRunner.query.mock.calls[clear][1]).toEqual([userId]);
+        // After every table was inserted, before the transaction ends.
+        const lastInsert = calls.reduce(
+          (last, sql, i) => (/^\s*INSERT INTO/.test(sql) ? i : last),
+          -1,
+        );
+        expect(clear).toBeGreaterThan(lastInsert);
+      });
+
+      describe("bond series recovery", () => {
+        const recovery = () =>
+          (
+            service as unknown as {
+              restoreService: {
+                bondSeries: { recover: jest.Mock };
+              };
+            }
+          ).restoreService.bondSeries.recover;
+
+        it("recovers the referenced series after re-authentication and before the restore transaction", async () => {
+          mockUserRepo.findOne.mockResolvedValue(mockUser);
+          (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+          const order: string[] = [];
+          (bcrypt.compare as jest.Mock).mockImplementationOnce(async () => {
+            order.push("authenticated");
+            return true;
+          });
+          recovery().mockClear();
+          recovery().mockImplementationOnce(
+            async (_user: string, data: unknown) => {
+              order.push("recovered");
+              return { data, unrecovered: [] };
+            },
+          );
+          const originalTransaction =
+            mockDataSource.transaction.getMockImplementation()!;
+          mockDataSource.transaction.mockImplementation(
+            (...args: unknown[]) => {
+              order.push("transaction");
+              return originalTransaction(...(args as [never]));
+            },
+          );
+          await service.restoreData(userId, makeInput({ password: "test" }));
+          expect(recovery()).toHaveBeenCalledTimes(1);
+          expect(recovery().mock.calls[0][0]).toBe(userId);
+          // The user lookup opens a transaction of its own first; the restore's
+          // transaction is the one that follows the recovery.
+          const recovered = order.indexOf("recovered");
+          expect(order.indexOf("authenticated")).toBeLessThan(recovered);
+          expect(order.slice(recovered + 1)).toContain("transaction");
+        });
+
+        it("fetches nothing for a restore whose authentication is refused", async () => {
+          mockUserRepo.findOne.mockResolvedValue(mockUser);
+          (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+          recovery().mockClear();
+          await expect(
+            service.restoreData(userId, makeInput({ password: "wrong" })),
+          ).rejects.toThrow();
+          expect(recovery()).not.toHaveBeenCalled();
+        });
+
+        it("reports the series that could not be restored beside restored, naming at most the cap", async () => {
+          mockUserRepo.findOne.mockResolvedValue(mockUser);
+          (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+          const unrecovered = Array.from({ length: 60 }, (_, i) => ({
+            issuerCountryCode: "PL",
+            seriesCode: `EDO${String(i).padStart(4, "0")}`,
+            reason: "source-unavailable" as const,
+          }));
+          recovery().mockImplementationOnce(
+            async (_user: string, data: unknown) => ({ data, unrecovered }),
+          );
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test" }),
+          );
+          expect(result.unrecoveredBondSeries?.count).toBe(60);
+          expect(result.unrecoveredBondSeries?.series).toHaveLength(50);
+          expect(result.unrecoveredBondSeries?.series[0]).toEqual(
+            unrecovered[0],
+          );
+          expect(Object.keys(result.restored)).not.toContain(
+            "unrecoveredBondSeries",
+          );
+        });
+
+        it("omits the field when every series came back", async () => {
+          mockUserRepo.findOne.mockResolvedValue(mockUser);
+          (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+          const result = await service.restoreData(
+            userId,
+            makeInput({ password: "test" }),
+          );
+          expect(result.unrecoveredBondSeries).toBeUndefined();
+        });
+      });
+
+      it("reports the transactions restored without a series this catalog lacks, beside restored", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const ABSENT = "22222222-2222-5222-8222-222222222222";
+        const base = mockQueryRunner.query.getMockImplementation()!;
+        mockQueryRunner.query.mockImplementation((sql: string, params) =>
+          String(sql).includes("FROM bond_instruments WHERE id = ANY")
+            ? Promise.resolve([])
+            : base(sql, params),
+        );
+        const result = await service.restoreData(
+          userId,
+          makeInput({
+            password: "test",
+            data: {
+              ...validBackupData,
+              accounts: [
+                {
+                  id: "44444444-4444-4444-8444-444444444444",
+                  user_id: userId,
+                  name: "Brokerage",
+                  account_type: "INVESTMENT",
+                  currency_code: "PLN",
+                },
+              ],
+              investment_transactions: [
+                {
+                  id: "33333333-3333-4333-8333-333333333333",
+                  user_id: userId,
+                  account_id: "44444444-4444-4444-8444-444444444444",
+                  action: "BUY",
+                  transaction_date: "2026-10-15",
+                  total_amount: 1,
+                  bond_instrument_id: ABSENT,
+                },
+              ],
+            } as never,
+          }),
+        );
+        expect(result).toMatchObject({ unlinkedBondSeries: { count: 1 } });
+        // Beside `restored`, never inside it.
+        expect(JSON.stringify(result.restored)).not.toContain("unlinkedBond");
       });
 
       it.each(["notifications", "budget_alerts"])(
@@ -5206,6 +5447,21 @@ describe("BackupService", () => {
         return originalTransaction(...(args as [never]));
       });
 
+      let recomputeFlag: boolean | undefined;
+      let recomputeRan = false;
+      (
+        service as unknown as {
+          restoreService: {
+            bondPrices: { recomputeLinkedSecurities: jest.Mock };
+          };
+        }
+      ).restoreService.bondPrices.recomputeLinkedSecurities.mockImplementationOnce(
+        async () => {
+          recomputeRan = true;
+          recomputeFlag = getRequestContext()?.preserveTimestamps;
+        },
+      );
+
       await service.restoreData(
         userId,
         makeInput({ password: "test", data: backupWithFks }),
@@ -5214,7 +5470,12 @@ describe("BackupService", () => {
       // The user lookup runs under the caller's plain context; the restore
       // transaction itself carries the flag.
       expect(flagsSeen[0]).toBeUndefined();
-      expect(flagsSeen[flagsSeen.length - 1]).toBe(true);
+      expect(flagsSeen).toContain(true);
+      // The post-commit bond price recompute runs outside the restore's
+      // transaction and must not inherit the flag.
+      expect(recomputeFlag).toBeUndefined();
+      expect(recomputeFlag).not.toBe(true);
+      expect(recomputeRan).toBe(true);
 
       const allCalls = mockQueryRunner.query.mock.calls.map(
         (call: unknown[]) => call[0] as string,

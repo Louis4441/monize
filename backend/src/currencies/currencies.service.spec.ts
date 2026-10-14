@@ -393,6 +393,36 @@ describe("CurrenciesService", () => {
     });
   });
 
+  describe("ensureCatalogCurrency()", () => {
+    it("creates a missing currency inactive, so no user is offered it", async () => {
+      mockCurrencyRepo.findOne!.mockResolvedValue(null);
+
+      await service.ensureCatalogCurrency("pln");
+
+      const [sql, params] = mockDataSource.query.mock.calls[0];
+      expect(sql).toMatch(/VALUES \(\$1, \$2, \$3, \$4, false, NULL\)/);
+      expect(params[0]).toBe("PLN");
+    });
+
+    it("leaves an existing currency alone, active or not", async () => {
+      mockCurrencyRepo.findOne!.mockResolvedValue(mockCurrency);
+
+      await service.ensureCatalogCurrency("CAD");
+
+      expect(mockDataSource.query).not.toHaveBeenCalled();
+    });
+
+    it("ensureSystemCurrency still creates an active one", async () => {
+      mockCurrencyRepo.findOne!.mockResolvedValue(null);
+
+      await service.ensureSystemCurrency("eur");
+
+      expect(mockDataSource.query.mock.calls[0][0]).toMatch(
+        /VALUES \(\$1, \$2, \$3, \$4, true, NULL\)/,
+      );
+    });
+  });
+
   describe("findOne()", () => {
     it("returns a currency by code", async () => {
       mockCurrencyRepo.findOne!.mockResolvedValue(mockCurrency);

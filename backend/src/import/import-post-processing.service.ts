@@ -5,6 +5,7 @@ import { repriceSettledLoanTemplates } from "../loan-installments/reprice-templa
 import { lockAccountsForBalanceWrite } from "../common/db/locks";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityPriceService } from "../securities/security-price.service";
+import { SecuritiesService } from "../securities/securities.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { roundMoney } from "../common/round.util";
 import { LEDGER_MOVEMENT_PREDICATE } from "../common/ledger-balance.sql";
@@ -36,6 +37,8 @@ export class ImportPostProcessingService {
     private securityPriceService: SecurityPriceService,
     @Inject(forwardRef(() => ExchangeRateService))
     private exchangeRateService: ExchangeRateService,
+    @Inject(forwardRef(() => SecuritiesService))
+    private securitiesService: SecuritiesService,
   ) {}
 
   async run(
@@ -133,6 +136,20 @@ export class ImportPostProcessingService {
       } catch (err) {
         this.logger.warn(
           `Post-import transaction price backfill failed: ${err.message}`,
+        );
+      }
+
+      // The imported trades changed the lots of any bond-linked security they
+      // touch, so its engine prices are recomputed (after the transaction-derived
+      // backfill: the engine's row wins its days either way). Logged, not thrown.
+      try {
+        await this.securitiesService.recomputeBondPricesOfAccounts(
+          userId,
+          Array.from(affectedAccountIds),
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Post-import bond price recompute failed: ${err.message}`,
         );
       }
     }

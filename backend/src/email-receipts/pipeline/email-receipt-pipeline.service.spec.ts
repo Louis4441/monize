@@ -23,13 +23,15 @@ import {
   autoApplyAllowed,
   describeFailure,
   EmailReceiptPipelineService,
-  RECEIPT_AUTOMATIC_AI_INSTRUCTION,
-  RECEIPT_CHAT_INSTRUCTION,
   RECEIPT_NO_HTML_REASON,
   RECEIPT_SCHEMA_ORG_REASON,
   type AutoApplyFacts,
   type ProcessReceiptOptions,
 } from "./email-receipt-pipeline.service";
+import {
+  RECEIPT_AUTOMATIC_AI_INSTRUCTION,
+  RECEIPT_CHAT_INSTRUCTION,
+} from "./receipt-instructions";
 
 jest.mock("../../common/db/scoped-db", () =>
   jest

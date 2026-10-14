@@ -296,7 +296,30 @@
     "toastSaveFailed": "Не вдалося зберегти транзакцію",
     "exchangeRateUnresolved": "Немає курсу {from} до {to}. Перед збереженням введіть курс або конвертовану підсумкову суму.",
     "toastExchangeRateRequired": "Введіть курс обміну перед збереженням угоди між валютами.",
-    "notAvailable": "Недоступно"
+    "notAvailable": "Недоступно",
+    "bondSeries": {
+      "label": "Серія облігацій",
+      "fromDate": "Визначається за датою",
+      "oldestFirst": "Спочатку найстаріші",
+      "loading": "Завантаження серій...",
+      "loadFailed": "Не вдалося завантажити серії.",
+      "retry": "Повторити",
+      "fromDateCode": "За датою: {code}",
+      "noneOnSale": "На цю дату немає серії в продажу",
+      "choose": "Виберіть серію",
+      "required": "Виберіть серію цих паперів.",
+      "heldOption": "{code} (в наявності: {quantity})",
+      "noLongerHeld": "{code} (на цю дату вже не числиться)",
+      "noLongerHeldUnknown": "Збережена серія (на цю дату вже не числиться)",
+      "storedSeries": "Збережена серія",
+      "seriesOnSaleMonth": "{code} — у продажу {month}",
+      "seriesOnSaleRange": "{code} — у продажу з {from} по {to}"
+    },
+    "bondRedemption": {
+      "summary": "Відсотки {interest}, утримання за дострокове погашення {deduction}, виплата {payout}",
+      "outsideSaleWindow": "Лот цієї серії куплено поза періодом її продажу, тому погашення не можна розділити.",
+      "failed": "Не вдалося розрахувати розбивку погашення."
+    }
   },
   "newTransactionButton": {
     "label": "+ Нова транзакція",

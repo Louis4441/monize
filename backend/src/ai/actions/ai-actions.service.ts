@@ -646,6 +646,7 @@ export class AiActionsService {
           accruedInterest: r.accruedInterest,
           exchangeRate: r.exchangeRate,
           description: r.description ?? undefined,
+          bondInstrumentId: r.bondInstrumentId ?? undefined,
         });
         const transaction = await this.investmentTransactionsService.update(
           userId,
@@ -815,8 +816,10 @@ export class AiActionsService {
       quantity: descriptor.quantity ?? undefined,
       price: descriptor.price ?? undefined,
       commission: descriptor.commission,
+      accruedInterest: descriptor.accruedInterest,
       exchangeRate: descriptor.exchangeRate,
       description: descriptor.description ?? undefined,
+      bondInstrumentId: descriptor.bondInstrumentId ?? undefined,
     });
     const transaction = await this.investmentTransactionsService.update(
       userId,
@@ -1051,8 +1054,10 @@ export class AiActionsService {
       quantity: descriptor.quantity ?? undefined,
       price: descriptor.price ?? undefined,
       commission: descriptor.commission,
+      accruedInterest: descriptor.accruedInterest,
       exchangeRate: descriptor.exchangeRate,
       description: descriptor.description ?? undefined,
+      bondInstrumentId: descriptor.bondInstrumentId ?? undefined,
     });
     const transaction = await this.investmentTransactionsService.create(
       userId,
@@ -1134,8 +1139,10 @@ export class AiActionsService {
           quantity: row.quantity ?? undefined,
           price: row.price ?? undefined,
           commission: row.commission,
+          accruedInterest: row.accruedInterest,
           exchangeRate: row.exchangeRate,
           description: row.description ?? undefined,
+          bondInstrumentId: row.bondInstrumentId ?? undefined,
         },
       );
       if (validated) {

@@ -1,4 +1,5 @@
 import {
+  HttpException,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -7,6 +8,21 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
+import {
+  beginBondWriteGuard,
+  BondWriteGuard,
+  createBondWriteGuard,
+} from "../bonds/bond-write-guard";
+import {
+  programOfSecurity,
+  resolveTransactionSeries,
+  seriesCodeOf,
+} from "../bonds/bond-series-resolver";
+import { BondHoldingsService } from "../bonds/bond-holdings.service";
+import {
+  applyRedemptionSplit,
+  FilledRedemption,
+} from "./bond-redemption-fill.util";
 import { tr } from "../i18n/translate";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
@@ -91,6 +107,7 @@ import {
   AiActionPreviewRow,
   BatchUpdateInvestmentTransactionRow,
   BatchDeleteInvestmentTransactionRow,
+  BondRedemptionSplitPreview,
 } from "../ai/actions/ai-action.types";
 
 export type LlmInvestmentTxGroupBy = "account" | "date" | "security" | "action";
@@ -302,6 +319,20 @@ export interface CreateInvestmentTransactionPreview {
   /** Signed cash impact in the cash account's currency (negative = cash out). */
   cashAmount: number | null;
   description: string | null;
+  /**
+   * The bond series of a program-linked security as it will be stored
+   * (INV-BOND-007): the one given, or inferred from the date; null otherwise.
+   */
+  bondInstrumentId: string | null;
+  /** Its code (`EDO1036`), for the confirmation card. */
+  bondSeriesCode: string | null;
+  /**
+   * REDEEM of a bond-linked security: what the redemption pays, split into
+   * principal and interest, and where the row's price and accrued interest came
+   * from (INV-BOND-009). Null for any other row, or when the caller stated both
+   * figures and the split could not be worked out.
+   */
+  redemptionSplit: BondRedemptionSplitPreview | null;
 }
 
 /**
@@ -333,6 +364,8 @@ export interface InvestmentCreateRowInput {
   /** Optional FX rate (security currency -> cash currency) to pin the cash posting. */
   exchangeRate?: number;
   description?: string;
+  /** The bond series of a program-linked security: its code (`EDO1036`) or id. */
+  bondSeriesCode?: string;
 }
 
 /** One edit row for `manage_investment_transactions` (id + optional fields). */
@@ -349,6 +382,8 @@ export interface InvestmentUpdateRowInput {
   /** Optional FX rate (security currency -> cash currency) to pin the cash posting. */
   exchangeRate?: number;
   description?: string;
+  /** The bond series of a program-linked security: its code (`EDO1036`) or id. */
+  bondSeriesCode?: string;
 }
 
 /**
@@ -396,6 +431,40 @@ export interface DeleteInvestmentTransactionPreview {
   description: string | null;
 }
 
+/**
+ * Whether an edit leaves the bond series of a row alone: it names none that
+ * differs from the stored one (a form resends the stored value on every save)
+ * and changes nothing the series depends on -- the security, the action, the
+ * date. Then the stored value is kept as it is, NULL included, and never
+ * inferred or refused (INV-BOND-007).
+ */
+function keepsStoredSeries(
+  stored: {
+    securityId: string | null;
+    action: string;
+    transactionDate: string;
+    bondInstrumentId: string | null;
+  },
+  dto: {
+    securityId?: string | null;
+    action?: string;
+    transactionDate?: string;
+    bondInstrumentId?: string | null;
+  },
+): boolean {
+  const same = (a: string | null | undefined, b: string | null | undefined) =>
+    (a ?? null)?.toLowerCase() === (b ?? null)?.toLowerCase();
+  return (
+    (dto.bondInstrumentId === undefined ||
+      same(dto.bondInstrumentId, stored.bondInstrumentId)) &&
+    (dto.securityId === undefined || same(dto.securityId, stored.securityId)) &&
+    (dto.action === undefined || dto.action === stored.action) &&
+    (dto.transactionDate === undefined ||
+      String(dto.transactionDate).slice(0, 10) ===
+        String(stored.transactionDate).slice(0, 10))
+  );
+}
+
 @Injectable()
 export class InvestmentTransactionsService {
   private readonly logger = new Logger(InvestmentTransactionsService.name);
@@ -418,6 +487,7 @@ export class InvestmentTransactionsService {
     private actionHistoryService: ActionHistoryService,
     private exchangeRateService: ExchangeRateService,
     private currenciesService: CurrenciesService,
+    private bondHoldingsService: BondHoldingsService,
   ) {}
 
   /**
@@ -1063,6 +1133,7 @@ export class InvestmentTransactionsService {
   async create(
     userId: string,
     createDto: CreateInvestmentTransactionDto,
+    options: { deferBondRecompute?: boolean } = {},
   ): Promise<InvestmentTransaction> {
     const account = await this.accountsService.findOne(
       userId,
@@ -1144,10 +1215,29 @@ export class InvestmentTransactionsService {
       // keeps this path in the one order every holdings writer uses.
       await lockHoldingScope(manager, [createDto.accountId]);
 
+      // A removal the account cannot cover (OVER_REMOVAL,
+      // REMOVAL_EXCEEDS_SERIES) is refused after the mutation, in this
+      // transaction, so nothing commits (INV-BOND-007).
+      const bondGuard = await beginBondWriteGuard(manager, userId, [
+        createDto.securityId,
+      ]);
+
+      // The series of a program-linked security (INV-BOND-007): given and
+      // checked, inferred from the date of a BUY or REINVEST, required of the
+      // other acquisitions; refused before anything is written.
+      const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
+        securityId: createDto.securityId,
+        action: createDto.action,
+        transactionDate: createDto.transactionDate,
+        bondInstrumentId: createDto.bondInstrumentId,
+        requested: true,
+      });
+
       const investmentTransaction = manager.create(InvestmentTransaction, {
         userId,
         accountId: createDto.accountId,
         securityId: createDto.securityId,
+        bondInstrumentId,
         fundingAccountId: createDto.fundingAccountId || null,
         action: createDto.action,
         transactionDate: createDto.transactionDate,
@@ -1208,6 +1298,8 @@ export class InvestmentTransactionsService {
         );
       }
 
+      await bondGuard.verify([saved.id]);
+
       return saved.id;
     });
 
@@ -1245,6 +1337,15 @@ export class InvestmentTransactionsService {
             `Failed to update transaction-derived price: ${err.message}`,
           ),
         );
+    }
+
+    // A trade on a bond-linked security changes its lots: the engine's prices
+    // are recomputed now that the write has committed (a bulk caller recomputes
+    // once per security at the end).
+    if (!options.deferBondRecompute && createDto.status !== "VOID") {
+      await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+        createDto.securityId,
+      ]);
     }
 
     const result = await this.findOne(userId, savedId);
@@ -1295,7 +1396,9 @@ export class InvestmentTransactionsService {
     const skipped: BulkCreateSkip[] = [];
     for (let index = 0; index < dtos.length; index++) {
       try {
-        created.push(await this.create(userId, dtos[index]));
+        created.push(
+          await this.create(userId, dtos[index], { deferBondRecompute: true }),
+        );
       } catch (error) {
         skipped.push({ index, reason: bulkSkipReason(error) });
         this.logger.warn(
@@ -1305,7 +1408,138 @@ export class InvestmentTransactionsService {
         );
       }
     }
+    // Once per security, after the whole batch has committed.
+    await this.securitiesService.recomputeBondPricesAfterWrite(
+      userId,
+      created.map((row) => row.securityId),
+    );
     return { created, skipped };
+  }
+
+  /**
+   * The split of a bond redemption applied to what the caller supplied
+   * (`applyRedemptionSplit`), or null when the security is not linked to a bond
+   * program, or the caller stated both price and accrued interest and the split
+   * cannot be worked out (the write guard still refuses what is wrong). With
+   * no series named, the one series the account holds is used and (for a new
+   * row) named on it; none or several are refused, because the split is of one
+   * series' lots. A refused split refuses the preview: no price or interest is
+   * ever guessed.
+   */
+  private async fillBondRedemption(
+    userId: string,
+    row: {
+      accountId: string;
+      securityId: string;
+      transactionDate: string;
+      quantity: number;
+      price: number | null;
+      totalAmount: number | undefined;
+      commission: number;
+      accruedInterest: number;
+      series: { id: string | null; code: string | null };
+      excludeTransactionId?: string;
+      pinSeries: boolean;
+    },
+  ): Promise<{
+    series: { id: string | null; code: string | null };
+    filled: FilledRedemption;
+  } | null> {
+    const linked = await withScopedDb(
+      this.dataSource,
+      async (m) =>
+        (await programOfSecurity(m, userId, row.securityId)) !== null,
+    );
+    if (!linked || !Number.isInteger(row.quantity) || row.quantity <= 0) {
+      return null;
+    }
+    const bothStated =
+      row.accruedInterest > 0 &&
+      (row.price !== null || row.totalAmount !== undefined);
+    const date = String(row.transactionDate).slice(0, 10);
+
+    let series = row.series;
+    let splitSeriesId = series.id;
+    if (splitSeriesId === null) {
+      const { holdings } = await this.bondHoldingsService.seriesHoldings(
+        userId,
+        row.securityId,
+        row.accountId,
+        date,
+        row.excludeTransactionId,
+      );
+      if (holdings.length !== 1) {
+        if (bothStated) return null;
+        throw new BadRequestException({
+          message: tr(
+            "errors.bonds.REDEEM_SERIES_REQUIRED",
+            `Name the bond series being redeemed (bondSeriesCode): the account holds ${holdings.length} series of this security on ${date}, so the price and accrued interest cannot be worked out from the redemption split.`,
+            { count: String(holdings.length), date },
+          ),
+          errorCode: "REDEEM_SERIES_REQUIRED",
+        });
+      }
+      splitSeriesId = holdings[0].instrumentId;
+      if (row.pinSeries) {
+        series = { id: splitSeriesId, code: holdings[0].seriesCode };
+      }
+    }
+
+    let split;
+    try {
+      split = await this.bondHoldingsService.redemptionSplit(
+        userId,
+        row.securityId,
+        row.accountId,
+        splitSeriesId,
+        date,
+        row.quantity,
+        row.excludeTransactionId,
+      );
+    } catch (error) {
+      // A removal the account cannot cover is the write guard's refusal; when
+      // the caller stated both figures the split is only a comparison.
+      if (bothStated && error instanceof HttpException) return null;
+      throw error;
+    }
+    if (
+      split.refusal !== null ||
+      split.payout === null ||
+      split.interest === null ||
+      split.principalReturned === null ||
+      split.principal === null ||
+      split.deduction === null
+    ) {
+      if (bothStated) return null;
+      const code = split.refusal ?? "RATE_UNKNOWN";
+      throw new BadRequestException({
+        message: tr(
+          "errors.bonds.REDEMPTION_SPLIT_REFUSED",
+          `The redemption of series ${series.code ?? ""} on ${date} cannot be split into returned principal and interest (${code}), so no price or accrued interest was filled in. Correct the date or quantity, or enter both the price and the accrued interest yourself.`,
+          { series: series.code ?? "", date, code },
+        ),
+        errorCode: code,
+      });
+    }
+    return {
+      series,
+      filled: applyRedemptionSplit(
+        {
+          principal: Number(split.principal),
+          deduction: Number(split.deduction),
+          interest: Number(split.interest),
+          principalReturned: Number(split.principalReturned),
+          payout: Number(split.payout),
+        },
+        {
+          quantity: row.quantity,
+          price: row.price,
+          totalAmount: row.totalAmount,
+          commission: row.commission,
+          accruedInterest: row.accruedInterest,
+        },
+      ),
+    };
   }
 
   /**
@@ -1335,6 +1569,22 @@ export class InvestmentTransactionsService {
       fundingAccountId?: string;
       exchangeRate?: number;
       description?: string;
+      /** The bond series by code or id; wins over `bondInstrumentId`. */
+      bondSeriesCode?: string;
+      /** A series the row already stores (an edit): kept unless it no longer fits. */
+      bondInstrumentId?: string | null;
+      /**
+       * The row an edit starts from. With no series named, a change of none of
+       * the security, action or date keeps its stored series as it is, NULL
+       * included (what `update()` does, INV-BOND-007).
+       */
+      editing?: {
+        transactionId: string;
+        securityId: string | null;
+        action: string;
+        transactionDate: string;
+        bondInstrumentId: string | null;
+      };
     },
   ): Promise<CreateInvestmentTransactionPreview> {
     const account = await this.accountsService.findOne(userId, input.accountId);
@@ -1426,11 +1676,76 @@ export class InvestmentTransactionsService {
         ? roundToDecimals(Number(input.quantity), 8)
         : null;
     const commission = roundToDecimals(Number(input.commission ?? 0), 4);
-    const accruedInterest = roundToDecimals(
+    const suppliedInterest = roundToDecimals(
       Number(input.accruedInterest ?? 0),
       4,
     );
-    this.assertAccruedInterestAllowed(input.action, accruedInterest, false);
+    this.assertAccruedInterestAllowed(input.action, suppliedInterest, false);
+
+    // The series the commit will store, resolved by the same function and
+    // refused the same way (INV-BOND-007), so the person is not asked to confirm
+    // what cannot be written. An edit that changes none of the security, the
+    // action and the date, and names no series, keeps the stored one as it is.
+    const keepStored =
+      input.editing !== undefined &&
+      !input.bondSeriesCode?.trim() &&
+      keepsStoredSeries(input.editing, {
+        securityId: security?.id ?? null,
+        action: input.action,
+        transactionDate: input.transactionDate,
+        bondInstrumentId: undefined,
+      });
+    let series = await withScopedDb(this.dataSource, async (m) => {
+      const id = await resolveTransactionSeries(m, userId, {
+        keepStored,
+        securityId: security?.id,
+        action: input.action,
+        transactionDate: input.transactionDate,
+        bondInstrumentId: input.bondInstrumentId,
+        bondSeriesReference: input.bondSeriesCode,
+        requested: false,
+      });
+      return { id, code: await seriesCodeOf(m, id) };
+    });
+
+    // A redemption of a bond-linked security: the server works out the split of
+    // what it pays into returned principal and interest, so the interest is not
+    // booked as a capital gain (INV-BOND-009). A preview is the commit's code.
+    let suppliedPrice: number | null =
+      input.price !== undefined && input.price !== null
+        ? roundToDecimals(Number(input.price), INVESTMENT_PRICE_DECIMALS)
+        : null;
+    let suppliedTotal = input.totalAmount;
+    let accruedInterest = suppliedInterest;
+    let redemptionSplit: BondRedemptionSplitPreview | null = null;
+    if (
+      input.action === InvestmentAction.REDEEM &&
+      security &&
+      quantity !== null
+    ) {
+      const redemption = await this.fillBondRedemption(userId, {
+        accountId: input.accountId,
+        securityId: security.id,
+        transactionDate: input.transactionDate,
+        quantity,
+        price: suppliedPrice,
+        totalAmount: suppliedTotal,
+        commission,
+        accruedInterest,
+        series,
+        excludeTransactionId: input.editing?.transactionId,
+        // A new row names the series its split was worked out for; an edit
+        // keeps the stored one as it is (INV-BOND-007).
+        pinSeries: input.editing === undefined,
+      });
+      if (redemption) {
+        series = redemption.series;
+        suppliedPrice = redemption.filled.price;
+        suppliedTotal = redemption.filled.totalAmount;
+        accruedInterest = redemption.filled.accruedInterest;
+        redemptionSplit = redemption.filled.split;
+      }
+    }
 
     // The same door the write goes through, so a preview of a trade entered by
     // its executed total shows the total the commit will store and the price it
@@ -1438,12 +1753,9 @@ export class InvestmentTransactionsService {
     const { totalAmount, price } = resolveInvestmentAmounts({
       action: input.action,
       quantity,
-      price:
-        input.price !== undefined && input.price !== null
-          ? roundToDecimals(Number(input.price), INVESTMENT_PRICE_DECIMALS)
-          : null,
+      price: suppliedPrice,
       commission,
-      totalAmount: input.totalAmount,
+      totalAmount: suppliedTotal,
     });
 
     const exchangeRate = await this.resolveCashExchangeRate(
@@ -1505,6 +1817,9 @@ export class InvestmentTransactionsService {
       cashCurrency,
       cashAmount,
       description: stripHtml(input.description) || null,
+      bondInstrumentId: series.id,
+      bondSeriesCode: series.code,
+      redemptionSplit,
     };
   }
 
@@ -1529,6 +1844,7 @@ export class InvestmentTransactionsService {
       accruedInterest?: number;
       exchangeRate?: number;
       description?: string;
+      bondSeriesCode?: string;
     },
   ): Promise<UpdateInvestmentTransactionPreview> {
     const existing = await this.findOne(userId, transactionId);
@@ -1542,7 +1858,8 @@ export class InvestmentTransactionsService {
       input.commission !== undefined ||
       input.accruedInterest !== undefined ||
       input.exchangeRate !== undefined ||
-      input.description !== undefined;
+      input.description !== undefined ||
+      input.bondSeriesCode !== undefined;
     if (!hasChange) {
       throw new BadRequestException(
         tr(
@@ -1578,6 +1895,18 @@ export class InvestmentTransactionsService {
       // account changed), matching update()'s re-resolution precedence.
       exchangeRate: input.exchangeRate,
       description: input.description ?? existing.description ?? undefined,
+      bondSeriesCode: input.bondSeriesCode,
+      // Kept as stored unless the edit names another (or no longer fits).
+      bondInstrumentId: existing.bondInstrumentId,
+      // With no series named, an edit that changes none of the security, the
+      // action and the date keeps the stored series as it is, NULL included.
+      editing: {
+        transactionId,
+        securityId: existing.securityId,
+        action: existing.action,
+        transactionDate: existing.transactionDate,
+        bondInstrumentId: existing.bondInstrumentId,
+      },
     });
 
     return { ...preview, transactionId };
@@ -1641,6 +1970,9 @@ export class InvestmentTransactionsService {
       cashCurrency: preview.cashCurrency,
       cashAmount: preview.cashAmount,
       description: preview.description,
+      accruedInterest: preview.accruedInterest,
+      bondSeriesCode: preview.bondSeriesCode,
+      bondRedemptionSplit: preview.redemptionSplit,
     };
   }
 
@@ -1718,6 +2050,7 @@ export class InvestmentTransactionsService {
       fundingAccountId,
       exchangeRate: row.exchangeRate,
       description: row.description,
+      bondSeriesCode: row.bondSeriesCode,
     });
   }
 
@@ -1795,6 +2128,7 @@ export class InvestmentTransactionsService {
           fundingAccountId,
           exchangeRate: row.exchangeRate,
           description: row.description,
+          bondSeriesCode: row.bondSeriesCode,
         });
         okPreviews.push(preview);
         okIndex.push(i);
@@ -1839,6 +2173,7 @@ export class InvestmentTransactionsService {
             accruedInterest: row.accruedInterest,
             exchangeRate: row.exchangeRate,
             description: row.description,
+            bondSeriesCode: row.bondSeriesCode,
           },
         );
         okRows.push({
@@ -1854,6 +2189,7 @@ export class InvestmentTransactionsService {
           accruedInterest: preview.accruedInterest,
           exchangeRate: preview.exchangeRate,
           description: preview.description,
+          bondInstrumentId: preview.bondInstrumentId,
         });
         okIndex.push(i);
         previewRows.push(this.toInvestmentPreviewRow(preview));
@@ -2028,10 +2364,28 @@ export class InvestmentTransactionsService {
         // (`common/db/locks.ts`), both accounts, ascending inside the helper.
         await lockHoldingScope(manager, [dto.fromAccountId, dto.toAccountId]);
 
+        // Optional for a transfer (it moves lots, keeping their series); named,
+        // it must belong to the security's program and both legs carry it.
+        const bondGuard = await beginBondWriteGuard(manager, userId, [
+          dto.securityId,
+        ]);
+        const bondInstrumentId = await resolveTransactionSeries(
+          manager,
+          userId,
+          {
+            securityId: dto.securityId,
+            action: InvestmentAction.TRANSFER_OUT,
+            transactionDate: dto.transactionDate,
+            bondInstrumentId: dto.bondInstrumentId,
+            requested: true,
+          },
+        );
+
         const transferOut = manager.create(InvestmentTransaction, {
           userId,
           accountId: dto.fromAccountId,
           securityId: dto.securityId,
+          bondInstrumentId,
           fundingAccountId: null,
           action: InvestmentAction.TRANSFER_OUT,
           transactionDate: dto.transactionDate,
@@ -2055,6 +2409,7 @@ export class InvestmentTransactionsService {
           userId,
           accountId: dto.toAccountId,
           securityId: dto.securityId,
+          bondInstrumentId,
           fundingAccountId: null,
           action: InvestmentAction.TRANSFER_IN,
           transactionDate: dto.transactionDate,
@@ -2105,6 +2460,8 @@ export class InvestmentTransactionsService {
           [dto.securityId],
         );
 
+        await bondGuard.verify([outId, inId]);
+
         return { outId, inId };
       },
     );
@@ -2119,6 +2476,10 @@ export class InvestmentTransactionsService {
           `Failed to update transaction-derived price: ${err.message}`,
         ),
       );
+
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+      dto.securityId,
+    ]);
 
     const [transferOut, transferIn] = await Promise.all([
       this.findOne(userId, outId),
@@ -2270,6 +2631,8 @@ export class InvestmentTransactionsService {
       accruedInterest?: number | null;
       exchangeRate?: number | null;
       description?: string | null;
+      /** The bond series, for a program-linked security (INV-BOND-007). */
+      bondInstrumentId?: string | null;
     },
     /**
      * Cash amount the parent split records for this action, in the CASH
@@ -2284,6 +2647,13 @@ export class InvestmentTransactionsService {
      * holdings, for the same reason its transfer counterparts are created VOID.
      */
     parentStatus?: TransactionStatus,
+    /**
+     * The series the same split's embedded row carried before the parent was
+     * edited (`takeCarriedSeries`), NULL included. Used when `dto` names none:
+     * a parent-only edit rebuilds the embedded rows, and must not ask for a
+     * series the row never needed to be re-inferred for (INV-BOND-007).
+     */
+    carriedSeries?: { readonly bondInstrumentId: string | null } | null,
   ): Promise<InvestmentTransaction> {
     // First database statement this method makes; the rebuild at the end takes
     // the same re-entrant lock. It is *not* the first statement of the caller's
@@ -2394,10 +2764,26 @@ export class InvestmentTransactionsService {
       }
     }
 
+    const bondGuard = await beginBondWriteGuard(manager, userId, [
+      dto.securityId,
+    ]);
+    const carried = !dto.bondInstrumentId ? (carriedSeries ?? null) : null;
+    const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
+      securityId: dto.securityId,
+      action: dto.action,
+      transactionDate: parentTransactionDate,
+      bondInstrumentId: carried
+        ? carried.bondInstrumentId
+        : dto.bondInstrumentId,
+      requested: true,
+      keepStored: carried !== null,
+    });
+
     const investmentTransaction = manager.create(InvestmentTransaction, {
       userId,
       accountId: brokerageAccountId,
       securityId: dto.securityId ?? null,
+      bondInstrumentId,
       fundingAccountId: null,
       transactionId: null,
       transactionSplitId: parentSplitId,
@@ -2439,6 +2825,8 @@ export class InvestmentTransactionsService {
       );
     }
 
+    await bondGuard.verify([saved.id]);
+
     return saved;
   }
 
@@ -2447,12 +2835,29 @@ export class InvestmentTransactionsService {
    * row, and re-derive the position it left behind. The parent split's
    * deletion would cascade-delete this row via the FK, but the holdings
    * projection has to be taken after the row is gone, not before.
+   *
+   * A removal the lots of a bond-linked security cannot spare is refused here,
+   * rolling the caller's whole operation back (`BondWriteGuard`, INV-BOND-007).
+   * A caller that deletes the rows only to recreate them (a split replacement)
+   * passes its own `bondGuard`, tracked before the first deletion and verified
+   * by the caller after the recreation, so a replacement that nets out is not
+   * refused half way. `touchedSecurityIds` collects the security for the
+   * caller's post-commit bond price recompute (INV-BOND-005, INV-CACHE-001).
    */
   async reverseAndRemoveEmbedded(
     manager: EntityManager,
     userId: string,
     investmentTransaction: InvestmentTransaction,
+    options?: {
+      touchedSecurityIds?: Set<string>;
+      bondGuard?: BondWriteGuard;
+    },
   ): Promise<void> {
+    const bondGuard =
+      options?.bondGuard ??
+      (await beginBondWriteGuard(manager, userId, [
+        investmentTransaction.securityId,
+      ]));
     await this.reverseTransactionEffectsInTransaction(
       manager,
       userId,
@@ -2471,7 +2876,24 @@ export class InvestmentTransactionsService {
         ],
         manager,
       );
+      options?.touchedSecurityIds?.add(investmentTransaction.securityId);
     }
+
+    if (!options?.bondGuard) await bondGuard.verify();
+  }
+
+  /**
+   * Recompute the engine prices of the bond-linked securities among these, after
+   * the commit of a split write whose embedded investment rows changed their
+   * lots (INV-BOND-005, INV-CACHE-001: never inside the transaction).
+   */
+  async recomputeBondPricesAfterSplitWrite(
+    userId: string,
+    securityIds: Iterable<string>,
+  ): Promise<void> {
+    const ids = [...securityIds];
+    if (ids.length === 0) return;
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, ids);
   }
 
   /**
@@ -2530,6 +2952,7 @@ export class InvestmentTransactionsService {
     userId: string,
     parentTransactionId: string,
     newStatus: TransactionStatus,
+    touchedSecurityIds?: Set<string>,
   ): Promise<Set<string>> {
     // Re-entrant with the call the split-status paths make before their first
     // balance write (`lockEmbeddedHoldingScopes`): the advisory lock must
@@ -2554,12 +2977,26 @@ export class InvestmentTransactionsService {
     const securityIds = new Set<string>();
     const scopes = new Map<string, HoldingScope>();
 
+    const rowsBySplit: InvestmentTransaction[][] = [];
     for (const splitId of investmentSplitIds) {
-      const rows = await manager.getRepository(InvestmentTransaction).find({
-        // includes VOID rows: records read -- the boundary decision below is
-        // exactly about the rows already on the other side.
-        where: { userId, transactionSplitId: splitId },
-      });
+      rowsBySplit.push(
+        await manager.getRepository(InvestmentTransaction).find({
+          // includes VOID rows: records read -- the boundary decision below is
+          // exactly about the rows already on the other side.
+          where: { userId, transactionSplitId: splitId },
+        }),
+      );
+    }
+
+    // Every security whose lots this can move is tracked before the first row
+    // changes, after the holding lock above (INV-BOND-007): a void that leaves
+    // a later removal uncovered, or an un-void of a row whose price is not a
+    // price per bond, is refused and the parent's whole change rolls back.
+    const bondGuard = createBondWriteGuard(manager, userId);
+    await bondGuard.track(rowsBySplit.flat().map((row) => row.securityId));
+    const changedRowIds: string[] = [];
+
+    for (const rows of rowsBySplit) {
       for (const row of rows) {
         const wasVoid = row.status === TransactionStatus.VOID;
         if (wasVoid === isVoid) continue;
@@ -2587,8 +3024,10 @@ export class InvestmentTransactionsService {
           );
         }
         affectedAccountIds.add(row.accountId);
+        changedRowIds.push(row.id);
         if (row.securityId) {
           securityIds.add(row.securityId);
+          touchedSecurityIds?.add(row.securityId);
           scopes.set(`${row.accountId}:${row.securityId}`, {
             accountId: row.accountId,
             securityId: row.securityId,
@@ -2619,6 +3058,8 @@ export class InvestmentTransactionsService {
         securityIds.size > 0 ? Array.from(securityIds) : undefined,
       );
     }
+
+    await bondGuard.verify(changedRowIds);
 
     return affectedAccountIds;
   }
@@ -3391,6 +3832,32 @@ export class InvestmentTransactionsService {
     }
 
     await withScopedDb(this.dataSource, async (manager) => {
+      const bondGuard = await beginBondWriteGuard(manager, userId, [
+        editedLeg.securityId,
+        updateDto.securityId,
+      ]);
+      // The series both legs carry (INV-BOND-007), refused before the reversal
+      // writes anything; only a value that differs from the stored one is a
+      // request (a form resends it on every save), and an edit that changes
+      // neither the security, the date nor the series keeps the stored value.
+      const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
+        keepStored: keepsStoredSeries(editedLeg, updateDto),
+        securityId:
+          updateDto.securityId !== undefined
+            ? updateDto.securityId
+            : editedLeg.securityId,
+        action: InvestmentAction.TRANSFER_OUT,
+        transactionDate: updateDto.transactionDate ?? editedLeg.transactionDate,
+        bondInstrumentId:
+          updateDto.bondInstrumentId !== undefined
+            ? updateDto.bondInstrumentId
+            : editedLeg.bondInstrumentId,
+        requested:
+          updateDto.bondInstrumentId !== undefined &&
+          updateDto.bondInstrumentId !== null &&
+          updateDto.bondInstrumentId !== editedLeg.bondInstrumentId,
+      });
+
       // Reverse both legs at their original values before reapplying.
       await this.reverseTransactionEffectsInTransaction(
         manager,
@@ -3489,6 +3956,7 @@ export class InvestmentTransactionsService {
 
       // Shared fields applied to both legs.
       const applyShared = (leg: InvestmentTransaction) => {
+        leg.bondInstrumentId = bondInstrumentId;
         if (updateDto.securityId !== undefined) {
           leg.securityId = updateDto.securityId || null;
           leg.security = updateDto.securityId
@@ -3551,6 +4019,8 @@ export class InvestmentTransactionsService {
         Array.from(affectedAccountIds),
         manager,
       );
+
+      await bondGuard.verify([editedLeg.id, linkedLeg.id]);
     });
 
     for (const accId of affectedAccountIds) {
@@ -3648,7 +4118,11 @@ export class InvestmentTransactionsService {
       }
 
       if (locked.status === newStatus) {
-        return { affectedAccountIds: new Set<string>(), splitTouched: false };
+        return {
+          affectedAccountIds: new Set<string>(),
+          splitTouched: false,
+          securityIds: [] as string[],
+        };
       }
 
       // The parent split transaction owns an embedded row's status; see
@@ -3669,7 +4143,11 @@ export class InvestmentTransactionsService {
         // Purely presentational: only crossing the VOID boundary moves money
         // or shares.
         await manager.update(InvestmentTransaction, id, { status: newStatus });
-        return { affectedAccountIds: new Set<string>(), splitTouched: false };
+        return {
+          affectedAccountIds: new Set<string>(),
+          splitTouched: false,
+          securityIds: [] as string[],
+        };
       }
 
       // Crossing. A linked transfer leg is the same movement of shares, so it
@@ -3688,6 +4166,15 @@ export class InvestmentTransactionsService {
           legs.push(linkedLeg);
         }
       }
+
+      // Voiding an acquisition (or restoring a removal) can leave a removal
+      // uncovered: refused after the mutation, in this transaction
+      // (INV-BOND-007).
+      const bondGuard = await beginBondWriteGuard(
+        manager,
+        userId,
+        legs.map((leg) => leg.securityId),
+      );
 
       const affectedAccountIds = new Set<string>();
       const securityIds = new Set<string>();
@@ -3773,7 +4260,13 @@ export class InvestmentTransactionsService {
         securityIds.size > 0 ? Array.from(securityIds) : undefined,
       );
 
-      return { affectedAccountIds, splitTouched };
+      await bondGuard.verify(legs.map((leg) => leg.id));
+
+      return {
+        affectedAccountIds,
+        splitTouched,
+        securityIds: Array.from(securityIds),
+      };
     });
 
     // SPLIT mutations compound on holding state, so a boundary crossing on one
@@ -3791,6 +4284,12 @@ export class InvestmentTransactionsService {
     for (const accountId of outcome.affectedAccountIds) {
       this.triggerRecalcWithCashAccount(accountId, userId);
     }
+
+    // A VOID crossing changes which rows count, hence the lots of a linked bond.
+    await this.securitiesService.recomputeBondPricesAfterWrite(
+      userId,
+      outcome.securityIds,
+    );
 
     return this.findOne(userId, id);
   }
@@ -3827,12 +4326,18 @@ export class InvestmentTransactionsService {
           ),
         );
       }
-      return this.updateLinkedTransfer(
+      const updatedLeg = await this.updateLinkedTransfer(
         userId,
         transaction,
         linkedLeg,
         updateDto,
       );
+      // A pair edit moves the quantity, the date or the accounts of both legs.
+      await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+        transaction.securityId,
+        updatedLeg.securityId,
+      ]);
+      return updatedLeg;
     }
 
     // The companion is materialized from its redemption's accrued interest, so
@@ -3955,6 +4460,37 @@ export class InvestmentTransactionsService {
         [accountId, updateDto.accountId].filter((id): id is string => !!id),
       );
 
+      const bondGuard = await beginBondWriteGuard(manager, userId, [
+        oldSecurityId,
+        updateDto.securityId,
+      ]);
+
+      // The series the row will carry (INV-BOND-007), resolved against the row
+      // as it will be and refused before the reversal writes anything. A form
+      // resends the stored series on every save, so only a value that differs
+      // from the stored one is a request; an edit that changes neither the
+      // series, the security, the action nor the date keeps the stored value
+      // as it is (NULL included); otherwise the stored one is kept, and dropped
+      // when the row can no longer carry it (relinked, unlinked, a cash action).
+      const bondInstrumentId = await resolveTransactionSeries(manager, userId, {
+        keepStored: keepsStoredSeries(transaction, updateDto),
+        securityId:
+          updateDto.securityId !== undefined
+            ? updateDto.securityId
+            : transaction.securityId,
+        action: updateDto.action ?? transaction.action,
+        transactionDate:
+          updateDto.transactionDate ?? transaction.transactionDate,
+        bondInstrumentId:
+          updateDto.bondInstrumentId !== undefined
+            ? updateDto.bondInstrumentId
+            : transaction.bondInstrumentId,
+        requested:
+          updateDto.bondInstrumentId !== undefined &&
+          updateDto.bondInstrumentId !== null &&
+          updateDto.bondInstrumentId !== transaction.bondInstrumentId,
+      });
+
       // Resolved before the reversal, while the row still carries its stored
       // action: an edit may take the action away from REDEEM, and the companion
       // still has to be found so it can be refused or removed.
@@ -4023,6 +4559,7 @@ export class InvestmentTransactionsService {
       }
       if (updateDto.transactionDate !== undefined)
         transaction.transactionDate = updateDto.transactionDate;
+      transaction.bondInstrumentId = bondInstrumentId;
       if (updateDto.securityId !== undefined) {
         transaction.securityId = updateDto.securityId;
         transaction.security = updateDto.securityId
@@ -4252,6 +4789,8 @@ export class InvestmentTransactionsService {
         affectedSecurityIds.length > 0 ? affectedSecurityIds : undefined,
       );
 
+      await bondGuard.verify([saved.id]);
+
       return saved.id;
     });
 
@@ -4308,6 +4847,12 @@ export class InvestmentTransactionsService {
           ),
         );
     }
+
+    // The lots of the old and of the new security both changed.
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+      oldSecurityId,
+      newSecurityId,
+    ]);
 
     const result = await this.findOne(userId, savedId);
 
@@ -4429,6 +4974,15 @@ export class InvestmentTransactionsService {
       // (`common/db/locks.ts`); the reversals below row-lock `accounts`.
       await lockHoldingScope(manager, affectedAccountIds);
 
+      // Deleting an acquisition can leave a later removal uncovered: refused
+      // after the mutation, in this transaction, so nothing commits
+      // (INV-BOND-007).
+      const bondGuard = await beginBondWriteGuard(
+        manager,
+        userId,
+        affectedSecurityIds,
+      );
+
       // Break the mutual link before deleting so neither row's FK points at a
       // row that is about to disappear.
       for (const leg of legsToRemove) {
@@ -4465,6 +5019,8 @@ export class InvestmentTransactionsService {
         affectedAccountIds,
         affectedSecurityIds.length > 0 ? affectedSecurityIds : undefined,
       );
+
+      await bondGuard.verify();
     });
 
     if (transaction.action === InvestmentAction.SPLIT) {
@@ -4503,6 +5059,10 @@ export class InvestmentTransactionsService {
           ),
         );
     }
+
+    await this.securitiesService.recomputeBondPricesAfterWrite(userId, [
+      transaction.securityId,
+    ]);
 
     this.actionHistoryService.record(userId, {
       entityType: "investment_transaction",
@@ -4781,7 +5341,8 @@ export class InvestmentTransactionsService {
     holdingsDeleted: number;
     accountsReset: number;
   }> {
-    return withScopedDb(this.dataSource, async (manager) => {
+    let deletedSecurityIds: Array<string | null> = [];
+    const outcome = await withScopedDb(this.dataSource, async (manager) => {
       // includes VOID rows: records read -- every row is being deleted, and
       // the per-row balance reversal below already reverses only what each
       // cash leg actually contributed.
@@ -4789,6 +5350,7 @@ export class InvestmentTransactionsService {
         where: { userId },
       });
       const transactionsDeleted = transactions.length;
+      deletedSecurityIds = transactions.map((t) => t.securityId);
 
       // Delete linked cash transactions and reverse their balance effects
       const linkedCashTxIds = transactions
@@ -4845,5 +5407,11 @@ export class InvestmentTransactionsService {
         accountsReset,
       };
     });
+    // No lots are left on any linked bond: its engine rows go.
+    await this.securitiesService.recomputeBondPricesAfterWrite(
+      userId,
+      deletedSecurityIds,
+    );
+    return outcome;
   }
 }

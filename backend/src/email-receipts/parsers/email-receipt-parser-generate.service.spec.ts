@@ -9,7 +9,11 @@ import { Category } from "../../categories/entities/category.entity";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
-import { EmailReceiptParserGenerateService } from "./email-receipt-parser-generate.service";
+import { FINANCIAL_TOOLS } from "../../ai/query/tool-definitions";
+import {
+  EmailReceiptParserGenerateService,
+  PARSER_RUN_EXCLUDED_TOOLS,
+} from "./email-receipt-parser-generate.service";
 
 jest.mock("../../common/db/scoped-db", () =>
   jest
@@ -163,6 +167,48 @@ describe("EmailReceiptParserGenerateService.generate", () => {
     expect(prompt).toContain("Order total: 15.00");
     expect(prompt).toContain(T1);
     expect(prompt).toContain("email_receipt_parsers");
+  });
+
+  it("withdraws every network-writing tool from the run: its prompt carries untrusted email content (R2-4)", async () => {
+    const { service, aiQuery } = setup({
+      known: [{ id: P_OLD }],
+      after: [
+        { id: P_NEW, revision: 1 },
+        { id: P_OLD, revision: 3 },
+      ],
+    });
+    await service.generate(USER, dto());
+    const options = aiQuery.executeQuery.mock.calls[0][4];
+    expect(options).toEqual({ excludeTools: PARSER_RUN_EXCLUDED_TOOLS });
+    expect(options.excludeTools).toContain("fetch_bond_series");
+  });
+
+  describe("the tool set of the generator's run", () => {
+    const offered = FINANCIAL_TOOLS.filter(
+      (tool) => !PARSER_RUN_EXCLUDED_TOOLS.includes(tool.name),
+    );
+
+    it("contains no tool that fetches from the network or writes the bond catalog", () => {
+      const names = offered.map((tool) => tool.name);
+      expect(names).not.toContain("fetch_bond_series");
+      expect(names.filter((name) => /fetch|bond_series/i.test(name))).toEqual(
+        [],
+      );
+      // Every tool of that kind the assistant has is on the exclusion list, so
+      // a new one is withdrawn here by being named in one place.
+      const networkWriting = FINANCIAL_TOOLS.filter((tool) =>
+        /fetch|bond_series/i.test(tool.name),
+      ).map((tool) => tool.name);
+      expect([...PARSER_RUN_EXCLUDED_TOOLS].sort()).toEqual(
+        networkWriting.sort(),
+      );
+    });
+
+    it("keeps the tool the run exists for", () => {
+      expect(offered.map((tool) => tool.name)).toContain(
+        "email_receipt_parsers",
+      );
+    });
   });
 
   it("revises the named draft: the prompt carries it and the note, and the answer is its new revision", async () => {

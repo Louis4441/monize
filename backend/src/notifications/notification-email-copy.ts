@@ -7,6 +7,7 @@ import {
   NotificationType,
 } from "../notification-center/entities/notification.entity";
 import { CONSENT_REMINDER_THRESHOLDS } from "../bank-sync/bank-sync-notifications";
+import { composeBondCopy } from "./notification-bond-copy";
 import { NOTIFICATION_EMAIL_MESSAGES } from "./notification-email-messages";
 
 type Copy = Pick<Notification, "title" | "message">;
@@ -354,6 +355,26 @@ export function composeLocalizedNotificationCopy(
         },
       );
     }
+    case NotificationType.BOND_MATURITY_SOON:
+    case NotificationType.BOND_INTEREST_PAYMENT:
+    case NotificationType.BOND_RATE_RESET:
+    case NotificationType.BOND_REDEMPTION_UNBOOKED:
+    case NotificationType.BOND_BENCHMARK_PUBLISHED:
+    case NotificationType.BOND_DATA_MISSING:
+      return composeBondCopy(row.type, data, {
+        text,
+        number,
+        money,
+        percent: (value, decimals = 1) => n.formatPercent(value, decimals),
+        // The catalog key is the whole lookup: a missing one resolves to the id.
+        benchmark: (id) =>
+          t(`emails.notificationCopy.bond.benchmarks.${id}`, id),
+        date: (value) => {
+          const parsed = calendarDate(value);
+          return parsed === null ? null : dateLabel(parsed);
+        },
+        locale,
+      });
     case NotificationType.BILL_DUE: {
       const due = calendarDate(data.dueDate);
       if (

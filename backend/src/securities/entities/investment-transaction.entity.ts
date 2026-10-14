@@ -17,6 +17,7 @@ import { TransactionStatus } from "../../transactions/entities/transaction-statu
 import { TransactionSplit } from "../../transactions/entities/transaction-split.entity";
 import { Security } from "./security.entity";
 import { User } from "../../users/entities/user.entity";
+import { BondInstrument } from "../../bonds/entities/bond-instrument.entity";
 
 const numericTransformer = {
   to: (value: number | null): number | null => value,
@@ -213,6 +214,26 @@ export class InvestmentTransaction {
     default: TransactionStatus.UNRECONCILED,
   })
   status: TransactionStatus;
+
+  @ApiProperty({
+    nullable: true,
+    format: "uuid",
+    description:
+      "The bond series (bond instrument) a share-moving row of a program-linked security acts on. " +
+      "An acquisition's is given or inferred from the date; a removal's is optional. Null otherwise.",
+  })
+  @Column({ type: "uuid", nullable: true, name: "bond_instrument_id" })
+  bondInstrumentId: string | null;
+
+  // Declared so the integration schema, built from the entities, carries the
+  // `fk_investment_transactions_bond_instrument ... ON DELETE RESTRICT` of the
+  // migration. Never loaded; `bondInstrumentId` is what the code reads and writes.
+  @ManyToOne(() => BondInstrument, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({
+    name: "bond_instrument_id",
+    foreignKeyConstraintName: "fk_investment_transactions_bond_instrument",
+  })
+  bondInstrument?: BondInstrument | null;
 
   @ManyToOne(() => Account)
   @JoinColumn({ name: "account_id" })

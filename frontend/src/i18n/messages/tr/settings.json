@@ -384,7 +384,8 @@
         "STRATEGIES": "Strateji sinyalleri",
         "BANK_SYNC": "Banka bağlantıları",
         "BANK_SYNC_ACTIVITY": "Banka senkronizasyonu sonuçları",
-        "EMAIL_RECEIPTS": "E-posta makbuzları"
+        "EMAIL_RECEIPTS": "E-posta makbuzları",
+        "BONDS": "Tahviller"
       },
       "channelNotApplicable": "Bu bildirim türü için geçerli değil",
       "emailToggleLabel": "{category} için rapor e-postası",
@@ -816,7 +817,24 @@
       "totalRecords": "Toplam kayıt",
       "skippedAttachments": "{count, plural, other {# ek geri yüklenmedi}}: yedek bunlar için kullanılabilir bayt içermiyordu — dışa aktarma sırasında eksiktiler veya sağlama toplamından geçemediler, ya da dosya kendi kendine yeten yedeklerden öncesine ait. Ek depolaması düzeldiğinde yeni bir yedek alın.",
       "unusableAiProviderKeys": "{count, plural, other {# AI sağlayıcısı kullanılabilir API anahtarı olmadan geri yüklendi}}: bu yedek, sağlayıcı anahtarları yedeğe eklenmeden önce oluşturulmuştu; bu yüzden kayıtlı anahtar dosyayı üreten sunucuya ait ya da bu sunucuda anahtarı saklayacak bir şifreleme anahtarı tanımlı değil. Ayarlar → AI Sağlayıcıları bölümünü açıp API anahtarını yeniden girin.",
-      "doneButton": "Tamam"
+      "unlinkedBondSecurities": "{count, plural, other {# tahvil menkul kıymeti tahvil enstrümanına bağlanmadan geri yüklendi}}: bu sunucunun tahvil kataloğu seriyi içermiyor (veya başka bir para biriminde içeriyor), bu yüzden tahvil motoru artık bunları fiyatlamıyor ve hesaplanmış fiyatları geri yüklenmedi. Her menkul kıymeti açın ve yeniden bir tahvil enstrümanına bağlayın.",
+      "unlinkedBondSeries": "{count, plural, other {# tahvil işlemi serisini kaybetti}} çünkü seri resmi kaynaktan alınamadı. İşlemler serisiz geri yüklendi; siz seriyi getirene kadar serisiz kalacak.",
+      "unrecoveredBondSeries": "Yedekte adı geçen ve getirilemeyen tahvil serileri: {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "ve {count} tane daha",
+      "unrecoveredBondSeriesAction": "Geri yüklemek için tahvil menkul kıymetini açın, sayfasından seriyi getirin (Yenile) ve serisi olmayan işlemlerde seriyi seçin.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "ihraççı bu seriyi (henüz) yayımlamadı",
+        "source-unavailable": "resmi kaynak yanıt vermedi; daha sonra tekrar deneyin",
+        "no-adapter": "bu sunucuda bu ihraççının ülkesi için kaynak yok",
+        "refused": "resmi kaynağın yanıtı kabul edilmedi",
+        "rate-limited": "resmi kaynak yavaşlamayı istedi; daha sonra tekrar deneyin",
+        "not-attempted": "tek geri yüklemede çok fazla seri var; denenmedi",
+        "other": "bilinmeyen neden"
+      },
+      "doneButton": "Tamam",
+      "unlinkedBondSecuritiesList": "Etkilenen menkul kıymetler: {symbols}.",
+      "unlinkedBondSecuritiesMore": "ve {count} tane daha"
     },
     "storedBackups": {
       "heading": "Otomatik Yedekler",

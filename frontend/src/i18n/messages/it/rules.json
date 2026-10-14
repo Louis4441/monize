@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Nessuna transazione è stata modificata} one {# transazione modificata} other {# transazioni modificate}}. Puoi annullare dalla cronologia azioni.",
-      "aiReviewsQueued": "{count, plural, one {# transazione messa in coda per la revisione IA} other {# transazioni messe in coda per la revisione IA}}."
+      "changedNoUndo": "{count, plural, one {# transazione modificata} other {# transazioni modificate}}.",
+      "aiReviewsQueued": "{count, plural, one {# transazione messa in coda per la revisione IA} other {# transazioni messe in coda per la revisione IA}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transazione aveva già una richiesta di revisione IA aperta, quindi non è stato messo in coda nulla di nuovo} other {# transazioni avevano già una richiesta di revisione IA aperta, quindi non è stato messo in coda nulla di nuovo}}.",
+      "noChanges": "Nessuna transazione è stata modificata."
     },
     "done": {
       "summary": "{count, plural, =0 {Nessuna transazione è stata modificata.} one {È stata modificata # transazione.} other {Sono state modificate # transazioni.}}",

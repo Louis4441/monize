@@ -296,7 +296,30 @@
     "toastSaveFailed": "Lưu giao dịch thất bại",
     "exchangeRateUnresolved": "Không có tỷ giá {from} sang {to}. Nhập tỷ giá, hoặc tổng đã quy đổi, trước khi lưu.",
     "toastExchangeRateRequired": "Nhập tỷ giá trước khi lưu một giao dịch giữa hai loại tiền tệ.",
-    "notAvailable": "Không có sẵn"
+    "notAvailable": "Không có sẵn",
+    "bondSeries": {
+      "label": "Đợt phát hành trái phiếu",
+      "fromDate": "Xác định theo ngày",
+      "oldestFirst": "Cũ nhất trước",
+      "loading": "Đang tải các đợt phát hành...",
+      "loadFailed": "Không thể tải các đợt phát hành.",
+      "retry": "Thử lại",
+      "fromDateCode": "Theo ngày: {code}",
+      "noneOnSale": "Không có series nào được bán vào ngày này",
+      "choose": "Chọn một series",
+      "required": "Chọn series của các chứng khoán này.",
+      "heldOption": "{code} (đang nắm giữ {quantity})",
+      "noLongerHeld": "{code} (không còn nắm giữ vào ngày này)",
+      "noLongerHeldUnknown": "Series đã lưu (không còn nắm giữ vào ngày này)",
+      "storedSeries": "Series đã lưu",
+      "seriesOnSaleMonth": "{code} — mở bán {month}",
+      "seriesOnSaleRange": "{code} — mở bán từ {from} đến {to}"
+    },
+    "bondRedemption": {
+      "summary": "Lãi {interest}, khoản khấu trừ khi hoàn trả sớm {deduction}, số tiền chi trả {payout}",
+      "outsideSaleWindow": "Một lô của đợt phát hành này được mua ngoài thời gian bán, nên không thể tách khoản hoàn trả.",
+      "failed": "Không thể tính phần tách của khoản hoàn trả."
+    }
   },
   "newTransactionButton": {
     "label": "+ Giao dịch mới",

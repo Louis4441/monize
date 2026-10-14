@@ -44,6 +44,21 @@ interface RunRuleDialogProps {
 /** A run is worth confirming when it changes a row or queues a row for AI review. */
 const hasRunWork = (preview: RuleRunPreview): boolean => preview.matched.length > 0 || preview.aiReviewRequests > 0;
 
+/**
+ * The toast after a run. The undo promise belongs only to a run that wrote an
+ * action-history entry (`historyId`); a run that only queued reviews, or found
+ * every review already open, says what happened instead.
+ */
+function runToastMessage(result: RuleRunResult, t: ReturnType<typeof useTranslations>): string {
+  if (result.historyId !== null) return t('toast.done', { count: result.changed });
+  if (result.changed > 0) return t('toast.changedNoUndo', { count: result.changed });
+  if (result.aiReviewsQueued > 0) return t('toast.aiReviewsQueued', { count: result.aiReviewsQueued });
+  if (result.aiReviewsAlreadyQueued > 0) {
+    return t('toast.aiReviewsAlreadyQueued', { count: result.aiReviewsAlreadyQueued });
+  }
+  return t('toast.noChanges');
+}
+
 type PreviewState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -104,11 +119,7 @@ function RunRuleBody({ rule, accountOptions, onClose }: RunRuleDialogProps & { r
     try {
       const result = await transactionRulesApi.run(rule.id, filtersToRequest(sent), preview.preview.fingerprint);
       setRun({ status: 'done', result });
-      toast.success(
-        result.changed === 0 && result.aiReviewsQueued > 0
-          ? t('toast.aiReviewsQueued', { count: result.aiReviewsQueued })
-          : t('toast.done', { count: result.changed }),
-      );
+      toast.success(runToastMessage(result, t));
       // The action history panel and any open list reload on this signal.
       notifyUndoRedo();
     } catch (error) {

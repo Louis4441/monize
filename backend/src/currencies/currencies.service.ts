@@ -237,7 +237,27 @@ export class CurrenciesService implements OnApplicationBootstrap {
    * whole list up front.
    */
   async ensureSystemCurrency(code: string): Promise<void> {
+    await this.insertSystemCurrencyIfMissing(code, true);
+  }
+
+  /**
+   * Ensure the currency a reference catalog row is priced in exists, without
+   * offering it to anyone: a deployment's users did not choose it, so it is
+   * created inactive (`findAll` lists only what a user has activated or what is
+   * active globally) and stays selectable by code through `create`. Used only
+   * by the bond catalog (its seed and a series fetch); an existing row, active or not, is left as is.
+   */
+  async ensureCatalogCurrency(code: string): Promise<void> {
+    await this.insertSystemCurrencyIfMissing(code, false);
+  }
+
+  private async insertSystemCurrencyIfMissing(
+    code: string,
+    active: boolean,
+  ): Promise<void> {
     const upper = code.toUpperCase();
+    // A fixed fragment, never caller text.
+    const isActive = active ? "true" : "false";
     await withScopedDb(this.dataSource, async (manager) => {
       const existing = await manager.getRepository(Currency).findOne({
         where: { code: upper },
@@ -247,7 +267,7 @@ export class CurrenciesService implements OnApplicationBootstrap {
       const meta = resolveCurrencyMetadata(upper);
       await manager.query(
         `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
-       VALUES ($1, $2, $3, $4, true, NULL)
+       VALUES ($1, $2, $3, $4, ${isActive}, NULL)
        ON CONFLICT (code) DO NOTHING`,
         [upper, meta.name, meta.symbol, meta.decimalPlaces],
       );

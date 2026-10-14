@@ -296,7 +296,30 @@
     "toastSaveFailed": "儲存交易失敗",
     "exchangeRateUnresolved": "沒有 {from} 兌 {to} 的匯率。請在儲存前輸入匯率或換算後的總額。",
     "toastExchangeRateRequired": "在儲存跨貨幣交易前請輸入匯率。",
-    "notAvailable": "無法使用"
+    "notAvailable": "無法使用",
+    "bondSeries": {
+      "label": "債券系列",
+      "fromDate": "依日期決定",
+      "oldestFirst": "最早的優先",
+      "loading": "正在載入系列...",
+      "loadFailed": "無法載入系列。",
+      "retry": "重試",
+      "fromDateCode": "依日期:{code}",
+      "noneOnSale": "此日期沒有在售系列",
+      "choose": "選擇系列",
+      "required": "請選擇這些股份的系列。",
+      "heldOption": "{code}(持有 {quantity})",
+      "noLongerHeld": "{code}(在此日期已不再持有)",
+      "noLongerHeldUnknown": "已儲存的系列(在此日期已不再持有)",
+      "storedSeries": "已儲存的系列",
+      "seriesOnSaleMonth": "{code} — {month}發售",
+      "seriesOnSaleRange": "{code} — {from}至{to}發售"
+    },
+    "bondRedemption": {
+      "summary": "利息 {interest}，提前贖回扣減 {deduction}，支付金額 {payout}",
+      "outsideSaleWindow": "此系列的一個批次在其銷售期間之外買入，因此無法拆分贖回。",
+      "failed": "無法計算贖回拆分。"
+    }
   },
   "newTransactionButton": {
     "label": "+ 新增交易",

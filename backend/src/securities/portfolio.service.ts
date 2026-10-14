@@ -33,6 +33,7 @@ import {
 import type { IncompleteDataRanges } from "../net-worth/incomplete-data-ranges.util";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
+import { isPricedByQuoteProvider } from "./provider-priced.util";
 import { roundMoney } from "../common/round.util";
 import { collectTagKeys } from "../tags/tag-key-value.util";
 import {
@@ -1252,7 +1253,11 @@ export class PortfolioService {
         // a transaction-to-transaction delta, not a daily market move. The
         // date-gap check below misses this when two transactions land on
         // adjacent days, so filter on the flag that marks the security itself.
-        h.security?.skipPriceUpdates !== true,
+        h.security?.skipPriceUpdates !== true &&
+        // A bond linked to the engine is valued by accrual, every calendar day:
+        // that is not a market move, and its row dated today would otherwise
+        // decide which session the board shows and push every equity off it.
+        isPricedByQuoteProvider(h.security ?? {}),
     );
     if (activeHoldings.length === 0) return [];
 
@@ -1499,6 +1504,12 @@ export class PortfolioService {
 
     const securityIds = [...new Set(holdings.map((h) => h.securityId))];
     const priceMap = await this.getLatestPrices(securityIds);
+    // A bond-linked holding is worth its own account's lots, never its quantity
+    // times the program-wide blend (bond-program-securities.md 2.4).
+    const bondValues = await this.calculationService.valueBondHoldings(
+      userId,
+      holdings,
+    );
 
     const accountCurrency = new Map<string, string>();
     for (const a of accounts) accountCurrency.set(a.id, a.currencyCode);
@@ -1507,10 +1518,16 @@ export class PortfolioService {
     const result = new Map<string, number>();
     for (const h of holdings) {
       if (Math.abs(Number(h.quantity)) < 0.0001) continue;
-      const price = priceMap.get(h.securityId);
-      if (price == null) continue;
-
-      const marketValue = Number(h.quantity) * price;
+      let marketValue: number;
+      if (h.security.bondProgramId) {
+        const own = bondValues.get(`${h.accountId}:${h.securityId}`);
+        if (!own) continue;
+        marketValue = own.marketValue;
+      } else {
+        const price = priceMap.get(h.securityId);
+        if (price == null) continue;
+        marketValue = Number(h.quantity) * price;
+      }
       const securityCurrency = h.security.currencyCode;
       const acctCurrency = accountCurrency.get(h.accountId) ?? securityCurrency;
 
@@ -2273,6 +2290,9 @@ export class PortfolioService {
         security,
         userDefaultProvider,
       );
+      // A bond-linked security has no quote feed: it is valued at its stored
+      // closes (the bond engine's), like an inactive one (INV-BOND-005).
+      const providerPriced = isPricedByQuoteProvider(security);
       return {
         securityId: security.id,
         symbol: security.symbol,
@@ -2281,7 +2301,7 @@ export class PortfolioService {
         currencyCode: security.currencyCode,
         quantity,
         hasIntraday: typeof primaryProvider.fetchIntradaySeries === "function",
-        fetchIntraday,
+        fetchIntraday: fetchIntraday && providerPriced,
       };
     };
 

@@ -296,7 +296,30 @@
     "toastSaveFailed": "Error al guardar la transacción",
     "exchangeRateUnresolved": "No hay tipo de {from} a {to} disponible. Introduce uno, o el total convertido, antes de guardar.",
     "toastExchangeRateRequired": "Introduce un tipo de cambio antes de guardar una operación entre monedas.",
-    "notAvailable": "No disponible"
+    "notAvailable": "No disponible",
+    "bondSeries": {
+      "label": "Serie de bonos",
+      "fromDate": "Determinada según la fecha",
+      "oldestFirst": "Las más antiguas primero",
+      "loading": "Cargando las series...",
+      "loadFailed": "No se pudieron cargar las series.",
+      "retry": "Reintentar",
+      "fromDateCode": "Según la fecha: {code}",
+      "noneOnSale": "Ninguna serie a la venta en esta fecha",
+      "choose": "Elige una serie",
+      "required": "Elige la serie de estos títulos.",
+      "heldOption": "{code} ({quantity} en cartera)",
+      "noLongerHeld": "{code} (ya no se posee en esta fecha)",
+      "noLongerHeldUnknown": "Serie guardada (ya no se posee en esta fecha)",
+      "storedSeries": "Serie guardada",
+      "seriesOnSaleMonth": "{code} — a la venta en {month}",
+      "seriesOnSaleRange": "{code} — a la venta del {from} al {to}"
+    },
+    "bondRedemption": {
+      "summary": "Intereses {interest}, deducción por amortización anticipada {deduction}, pago {payout}",
+      "outsideSaleWindow": "Un lote de esta serie se compró fuera de su periodo de venta, por lo que no se puede desglosar el reembolso.",
+      "failed": "No se pudo calcular el desglose del reembolso."
+    }
   },
   "newTransactionButton": {
     "label": "+ Nueva Transacción",

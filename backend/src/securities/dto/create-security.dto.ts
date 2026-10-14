@@ -15,7 +15,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from "class-validator";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
 import { IsCurrencyCode } from "../../common/validators/is-currency-code.validator";
 import {
@@ -226,6 +226,36 @@ export class CreateSecurityDto {
   @MaxLength(50)
   @SanitizeHtml()
   msnInstrumentId?: string;
+
+  @ApiProperty({
+    description:
+      "The bond program (GET /bonds/programs) to link this security to; " +
+      "null unlinks. A linked security is priced by the bond engine only, and " +
+      "its currency must equal the program's.",
+    required: false,
+    nullable: true,
+    format: "uuid",
+  })
+  // One canonical spelling (lower case) before anything compares or stores the
+  // id: the same instrument in capitals is not a different link.
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.toLowerCase() : value,
+  )
+  @IsOptional()
+  @ValidateIf((_o, value) => value !== null && value !== undefined)
+  @IsUUID()
+  bondProgramId?: string | null;
+
+  @ApiProperty({
+    description:
+      "Fetch every new series of the linked program automatically (the daily series job). Off by default.",
+    required: false,
+  })
+  // Not nullable: the column is NOT NULL, so null is refused here rather than
+  // reaching the database.
+  @ValidateIf((_o, value) => value !== undefined)
+  @IsBoolean()
+  bondAutoFetch?: boolean;
 
   @ApiProperty({
     description:

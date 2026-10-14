@@ -180,8 +180,18 @@ describe("currency global liveness", () => {
         tablesWithoutUserId([
           ...new Set(references.map((r) => r.table)),
         ]).sort(),
-      ).toEqual(["exchange_rate_coverage", "exchange_rates"]);
-      for (const table of ["exchange_rates", "exchange_rate_coverage"]) {
+      ).toEqual([
+        "bond_instruments",
+        "bond_programs",
+        "exchange_rate_coverage",
+        "exchange_rates",
+      ]);
+      for (const table of [
+        "exchange_rates",
+        "exchange_rate_coverage",
+        "bond_instruments",
+        "bond_programs",
+      ]) {
         expect(perUserDataBody).not.toMatch(
           new RegExp(`FROM\\s+${table}\\b`, "i"),
         );

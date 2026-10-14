@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Nie zmieniono żadnych transakcji} one {Zmieniono # transakcję} few {Zmieniono # transakcje} many {Zmieniono # transakcji} other {Zmieniono # transakcji}}. Możesz to cofnąć w historii akcji.",
-      "aiReviewsQueued": "{count, plural, one {# transakcja dodana do kolejki przeglądu AI} few {# transakcje dodane do kolejki przeglądu AI} many {# transakcji dodanych do kolejki przeglądu AI} other {# transakcji dodanych do kolejki przeglądu AI}}."
+      "changedNoUndo": "{count, plural, one {Zmieniono # transakcję} few {Zmieniono # transakcje} many {Zmieniono # transakcji} other {Zmieniono # transakcji}}.",
+      "aiReviewsQueued": "{count, plural, one {# transakcja dodana do kolejki przeglądu AI} few {# transakcje dodane do kolejki przeglądu AI} many {# transakcji dodanych do kolejki przeglądu AI} other {# transakcji dodanych do kolejki przeglądu AI}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transakcja ma już otwartą prośbę o przegląd AI, więc nic nowego nie dodano do kolejki} few {# transakcje mają już otwartą prośbę o przegląd AI, więc nic nowego nie dodano do kolejki} many {# transakcji ma już otwartą prośbę o przegląd AI, więc nic nowego nie dodano do kolejki} other {# transakcji ma już otwartą prośbę o przegląd AI, więc nic nowego nie dodano do kolejki}}.",
+      "noChanges": "Nie zmieniono żadnej transakcji."
     },
     "done": {
       "summary": "{count, plural, =0 {Nie zmieniono żadnych transakcji.} one {Zmieniono # transakcję.} few {Zmieniono # transakcje.} many {Zmieniono # transakcji.} other {Zmieniono # transakcji.}}",

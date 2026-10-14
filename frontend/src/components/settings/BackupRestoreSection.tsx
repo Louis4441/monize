@@ -51,6 +51,16 @@ interface BackupRestoreSectionProps {
   user: User;
 }
 
+/** The reasons the server names for a bond series the restore could not fetch. */
+const UNRECOVERED_SERIES_REASONS: ReadonlySet<string> = new Set([
+  'not-published',
+  'source-unavailable',
+  'no-adapter',
+  'refused',
+  'rate-limited',
+  'not-attempted',
+]);
+
 export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
   const t = useTranslations('settings.backupRestore');
   const { formatNumber } = useNumberFormat();
@@ -740,6 +750,88 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
                   count: restoreResult.unusableAiProviderKeys,
                 })}
               </p>
+            )}
+
+            {/* The securities came back, but unlinked from their bond
+                instrument: this server's catalog does not carry the series (or
+                carries it in another currency). The bond engine no longer prices
+                them, so say so and what to do. Outside the record total on
+                purpose: the rows were written. */}
+            {!!restoreResult.unlinkedBondSecurities?.count && (
+              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <p>
+                  {t('restoreResult.unlinkedBondSecurities', {
+                    count: restoreResult.unlinkedBondSecurities.count,
+                  })}
+                </p>
+                {restoreResult.unlinkedBondSecurities.symbols.length > 0 && (
+                  <p className="mt-2">
+                    {t('restoreResult.unlinkedBondSecuritiesList', {
+                      symbols:
+                        restoreResult.unlinkedBondSecurities.symbols.join(', '),
+                    })}
+                    {restoreResult.unlinkedBondSecurities.count >
+                      restoreResult.unlinkedBondSecurities.symbols.length && (
+                      <>
+                        {' '}
+                        {t('restoreResult.unlinkedBondSecuritiesMore', {
+                          count:
+                            restoreResult.unlinkedBondSecurities.count -
+                            restoreResult.unlinkedBondSecurities.symbols.length,
+                        })}
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Bond transactions that lost their series: the catalog lacks it. */}
+            {!!restoreResult.unlinkedBondSeries?.count && (
+              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <p>
+                  {t('restoreResult.unlinkedBondSeries', {
+                    count: restoreResult.unlinkedBondSeries.count,
+                  })}
+                </p>
+              </div>
+            )}
+
+            {/* The series the backup names that the restore could not fetch: which, why, and what to do. */}
+            {!!restoreResult.unrecoveredBondSeries?.count && (
+              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <p>
+                  {t('restoreResult.unrecoveredBondSeries', {
+                    count: restoreResult.unrecoveredBondSeries.count,
+                  })}
+                </p>
+                <ul className="mt-2 list-disc pl-5">
+                  {restoreResult.unrecoveredBondSeries.series.map((item) => (
+                    <li key={`${item.issuerCountryCode}-${item.seriesCode}`}>
+                      {t('restoreResult.unrecoveredBondSeriesItem', {
+                        series: item.seriesCode,
+                        country: item.issuerCountryCode,
+                        reason: t(
+                          UNRECOVERED_SERIES_REASONS.has(item.reason)
+                            ? `restoreResult.unrecoveredBondSeriesReason.${item.reason}`
+                            : 'restoreResult.unrecoveredBondSeriesReason.other',
+                        ),
+                      })}
+                    </li>
+                  ))}
+                </ul>
+                {restoreResult.unrecoveredBondSeries.count >
+                  restoreResult.unrecoveredBondSeries.series.length && (
+                  <p className="mt-2">
+                    {t('restoreResult.unrecoveredBondSeriesMore', {
+                      count:
+                        restoreResult.unrecoveredBondSeries.count -
+                        restoreResult.unrecoveredBondSeries.series.length,
+                    })}
+                  </p>
+                )}
+                <p className="mt-2">{t('restoreResult.unrecoveredBondSeriesAction')}</p>
+              </div>
             )}
 
             <div className="mt-6 flex justify-end">

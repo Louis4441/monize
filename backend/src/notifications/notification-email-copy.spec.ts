@@ -13,6 +13,14 @@ import {
 import { NOTIFICATION_EMAIL_MESSAGES } from "./notification-email-messages";
 import { notificationImmediateTemplate } from "./email-templates";
 
+const bondFacts = {
+  securityId: "s1",
+  accountId: "a1",
+  instrumentId: "i1",
+  seriesCode: "SER0000",
+  currency: "EUR",
+};
+
 // Producer-shaped facts, including zero and negative money. PACE_WARNING has
 // no producer or payload contract; its explicit legacy fallback is tested below.
 const examples = {
@@ -147,6 +155,61 @@ const examples = {
     accounts: 2,
   },
   EMAIL_RECEIPTS_ATTENTION: { noParser: 3, parseFailed: 2 },
+  BOND_MATURITY_SOON: {
+    ...bondFacts,
+    maturityDate: "2026-10-25",
+    quantity: 40,
+    payout: "4123.45",
+    interest: "123.45",
+    principalReturned: "4000.00",
+    missing: null,
+  },
+  BOND_INTEREST_PAYMENT: {
+    ...bondFacts,
+    paymentDate: "2026-10-13",
+    amount: "51.00",
+    quantity: 10,
+  },
+  BOND_RATE_RESET: {
+    ...bondFacts,
+    periodStart: "2026-10-13",
+    periodEnd: "2027-10-13",
+    periodIndex: 2,
+    annualRate: "0.069",
+    rateSource: "DERIVED",
+  },
+  BOND_REDEMPTION_UNBOOKED: {
+    ...bondFacts,
+    maturityDate: "2026-10-01",
+    quantity: 5,
+    payout: "500.00",
+    interest: "0.00",
+    principalReturned: "500.00",
+    missing: null,
+  },
+  BOND_BENCHMARK_PUBLISHED: {
+    ...bondFacts,
+    benchmarkId: "BENCH_A",
+    publisher: "Publisher",
+    observation: "2026-09",
+    value: "0.0490000000",
+    unit: "RATE_FRACTION",
+    publishedOn: "2026-10-13",
+    affected: [{ seriesCode: "SER0000", instrumentId: "i1" }],
+    affectedMore: 2,
+  },
+  BOND_DATA_MISSING: {
+    ...bondFacts,
+    causes: [
+      {
+        code: "OBSERVATION_MISSING",
+        benchmarkId: "BENCH_A",
+        observation: "2026-08",
+        publisher: "Publisher",
+      },
+    ],
+    coverage: [],
+  },
 } satisfies Record<
   Exclude<NotificationType, NotificationType.PACE_WARNING>,
   Record<string, unknown>
@@ -207,6 +270,180 @@ describe("notification email copy", () => {
       expect(JSON.stringify(xx)).not.toMatch(/\{\{|undefined|NaN/);
     },
   );
+
+  describe("bond notifications", () => {
+    const english = (type: NotificationType, data: Record<string, unknown>) =>
+      notificationEmailCopy(source(type, data), englishEmailT, "en", { now });
+
+    it("composes each type in English from its data", () => {
+      const copies = Object.fromEntries(
+        (
+          [
+            "BOND_MATURITY_SOON",
+            "BOND_INTEREST_PAYMENT",
+            "BOND_RATE_RESET",
+            "BOND_REDEMPTION_UNBOOKED",
+            "BOND_BENCHMARK_PUBLISHED",
+            "BOND_DATA_MISSING",
+          ] as const
+        ).map((type) => [
+          type,
+          english(NotificationType[type], examples[type]),
+        ]),
+      );
+      expect(copies.BOND_MATURITY_SOON.title).toBe(
+        "SER0000 matures on Oct 25, 2026",
+      );
+      expect(copies.BOND_MATURITY_SOON.message).toContain("40 x SER0000");
+      expect(copies.BOND_MATURITY_SOON.message).toContain("The payout is");
+      expect(copies.BOND_MATURITY_SOON.message).toContain("4,123.45");
+      expect(copies.BOND_INTEREST_PAYMENT.message).toContain("51.00");
+      expect(copies.BOND_RATE_RESET.message).toContain("6.90");
+      expect(copies.BOND_RATE_RESET.message).toContain("period 2");
+      expect(copies.BOND_REDEMPTION_UNBOOKED.message).toContain(
+        "no redemption is booked",
+      );
+      expect(copies.BOND_BENCHMARK_PUBLISHED.title).toBe(
+        "BENCH_A: new observation September 2026",
+      );
+      expect(copies.BOND_BENCHMARK_PUBLISHED.message).toContain(
+        "SER0000 and 2 more",
+      );
+      expect(copies.BOND_BENCHMARK_PUBLISHED.message).toContain("4.90%");
+      expect(copies.BOND_BENCHMARK_PUBLISHED.message).not.toContain("0.049");
+      expect(copies.BOND_DATA_MISSING.message).toContain(
+        "August 2026 observation of BENCH_A (Publisher)",
+      );
+      for (const copy of Object.values(copies)) {
+        expect(JSON.stringify(copy)).not.toMatch(/\{\{|undefined|NaN/);
+      }
+    });
+
+    it("names a benchmark by its catalog label, and by its id when the catalog has none", () => {
+      const labels: Record<string, string> = {
+        "emails.notificationCopy.bond.benchmarks.BENCH_A": "Bench A label",
+      };
+      const t = (key: string, fallback: string) => labels[key] ?? fallback;
+      const named = notificationEmailCopy(
+        source(
+          NotificationType.BOND_BENCHMARK_PUBLISHED,
+          examples.BOND_BENCHMARK_PUBLISHED,
+        ),
+        t,
+        "en",
+        { now },
+      );
+      expect(named.title).toBe("Bench A label: new observation September 2026");
+      const missing = notificationEmailCopy(
+        source(NotificationType.BOND_DATA_MISSING, examples.BOND_DATA_MISSING),
+        t,
+        "en",
+        { now },
+      );
+      expect(missing.message).toContain(
+        "observation of Bench A label (Publisher)",
+      );
+      expect(
+        english(NotificationType.BOND_BENCHMARK_PUBLISHED, {
+          ...examples.BOND_BENCHMARK_PUBLISHED,
+          unit: "INDEX_POINTS",
+          value: "123.5",
+        }).message,
+      ).toContain("123.5");
+    });
+
+    it("says a null payout is not known yet and why, never zero", () => {
+      const copy = english(NotificationType.BOND_MATURITY_SOON, {
+        ...examples.BOND_MATURITY_SOON,
+        payout: null,
+        interest: null,
+        principalReturned: null,
+        missing: "RATE_UNKNOWN",
+      });
+      expect(copy.message).toContain("not known yet");
+      expect(copy.message).toContain(
+        "a rate it depends on is not published yet",
+      );
+      expect(copy.message).not.toMatch(/\b0\.00\b/);
+    });
+
+    it("says a null interest amount is not known yet", () => {
+      const copy = english(NotificationType.BOND_INTEREST_PAYMENT, {
+        ...examples.BOND_INTEREST_PAYMENT,
+        amount: null,
+      });
+      expect(copy.message).toContain("not known yet");
+    });
+
+    it("formats the figures in the recipient's number locale", () => {
+      const copy = notificationEmailCopy(
+        source(NotificationType.BOND_INTEREST_PAYMENT, {
+          ...examples.BOND_INTEREST_PAYMENT,
+          amount: "1234.50",
+        }),
+        englishEmailT,
+        "pl",
+      );
+      expect(copy.message).toContain("1234,50");
+    });
+
+    describe("underivable lots name the refused row and what to do", () => {
+      const lots = (refusalCode: string, extra: Record<string, unknown> = {}) =>
+        english(NotificationType.BOND_DATA_MISSING, {
+          ...bondFacts,
+          causes: [
+            {
+              code: "LOTS_UNDERIVABLE",
+              refusalCode,
+              action: "SELL",
+              date: "2026-01-02",
+              quantity: "5",
+              rowId: "row-1",
+              ...extra,
+            },
+          ],
+          coverage: [],
+        }).message;
+
+      it("asks for the series on a purchase without one", () => {
+        for (const code of ["SERIES_NOT_DETERMINED", "SERIES_REQUIRED"]) {
+          const message = lots(code, { action: "BUY" });
+          expect(message).toContain("the purchase dated Jan 2, 2026");
+          expect(message).toContain("choose the series on that transaction");
+        }
+      });
+
+      it("says a removal exceeds what the account holds of the series", () => {
+        const message = lots("REMOVAL_EXCEEDS_SERIES");
+        expect(message).toContain("the sale dated Jan 2, 2026");
+        expect(message).toContain(
+          "removes more than the account holds of that series",
+        );
+      });
+
+      it("asks to correct the transaction for any other code", () => {
+        expect(lots("OVER_REMOVAL")).toContain("correct the transaction");
+      });
+
+      it("keeps the older line for a row raised before the cause named its transaction", () => {
+        const message = english(NotificationType.BOND_DATA_MISSING, {
+          ...bondFacts,
+          causes: [{ code: "LOTS_UNDERIVABLE", refusalCode: "OVER_REMOVAL" }],
+          coverage: [],
+        }).message;
+        expect(message).toContain("correct the ledger");
+      });
+    });
+
+    it("falls back whole for a row without the facts its copy needs", () => {
+      const { amount, ...older } = examples.BOND_INTEREST_PAYMENT;
+      expect(amount).toBeDefined();
+      expect(english(NotificationType.BOND_INTEREST_PAYMENT, older)).toEqual({
+        title: "Stored title",
+        message: "Stored message",
+      });
+    });
+  });
 
   it("keeps every English fallback and catalog key in agreement", () => {
     const catalog = JSON.parse(

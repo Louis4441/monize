@@ -5,6 +5,7 @@ import {
   positiveIntSchema,
   numberArg,
   booleanArg,
+  bondSeriesCodeSchema,
 } from "../../common/tool-schemas";
 import { isCalendarDate } from "../../common/validators/is-calendar-date.validator";
 import { MAX_BULK_ACTION_ROWS } from "../actions/ai-action.types";
@@ -539,6 +540,7 @@ const manageInvestmentItemSchema = z
     exchangeRate: nonNegativeAmountSchema.optional(),
     description: z.string().max(TRANSACTION_NOTE_MAX_LENGTH).optional(),
     transactionId: z.string().uuid().optional(),
+    bondSeriesCode: bondSeriesCodeSchema.optional(),
   })
   .passthrough();
 
@@ -589,13 +591,14 @@ export const manageInvestmentTransactionsSchema = z
           item.price !== undefined ||
           item.commission !== undefined ||
           item.accruedInterest !== undefined ||
+          item.bondSeriesCode !== undefined ||
           item.description !== undefined;
         if (!hasChange) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: path("transactionId"),
             message:
-              "Provide at least one field to change (action, date, security, quantity, price, commission, accrued interest, or description).",
+              "Provide at least one field to change (action, date, security, quantity, price, commission, accrued interest, bond series, or description).",
           });
         }
       } else {
@@ -1043,6 +1046,22 @@ export const emailReceiptParsersSchema =
     }
   });
 
+/**
+ * `fetch_bond_series`: only a country and a series code. The terms come from the
+ * issuer's official source, never from the model (INV-BOND-006). Shared with the
+ * MCP tool, which is the same two fields.
+ */
+export const fetchBondSeriesSchema = z.object({
+  countryCode: z
+    .string()
+    .regex(/^[A-Za-z]{2}$/)
+    .describe("Issuer country, 2 letters."),
+  seriesCode: z
+    .string()
+    .regex(/^[A-Za-z0-9]{1,16}$/)
+    .describe("Series code."),
+});
+
 export const toolInputSchemas: Record<string, z.ZodSchema> = {
   list_transactions: listTransactionsSchema,
   list_accounts: listAccountsSchema,
@@ -1066,6 +1085,7 @@ export const toolInputSchemas: Record<string, z.ZodSchema> = {
   manage_transaction_rules: manageTransactionRulesSchema,
   ai_review_requests: aiReviewRequestsSchema,
   email_receipt_parsers: emailReceiptParsersSchema,
+  fetch_bond_series: fetchBondSeriesSchema,
 };
 
 /**

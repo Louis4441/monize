@@ -521,6 +521,34 @@ least correct on failure: the provider is called and the response parsed before
 anything is saved, so a failed call leaves no partial rows, and a total provider
 failure throws rather than fabricating a result.
 
+### Bond reference data (NBP, GUS)
+
+`BenchmarkRefreshService` reads the NBP reference rate and the GUS year-on-year
+CPI and writes them to `benchmark_values`; it has no effect at the publisher to
+undo. Each outbound call is gated by the `nbp` or `gus` circuit breaker
+(`ProviderHealthService`) through `SeriesHttp.gated`, limited to the https hosts
+the adapter declares (no other host, no redirect off them), with a 30 s timeout
+and a 5 MB streaming cap, and the whole body is read before the breaker records
+a success. The fetch and parse finish before anything is written, so a failed or
+unparseable document leaves no partial rows, and one series failing does not
+stop the other. The write is one transaction per series: the observations
+(`ON CONFLICT (benchmark_code, observation_date) DO UPDATE ... WHERE value IS
+DISTINCT FROM EXCLUDED.value`, so a revision corrects a row and a repeat
+converges) then `covered_through = GREATEST(...)`, which only moves forward. The
+lease `bond-benchmarks` stops N replicas fetching at once and is not what keeps
+the data correct. `BondCatalogService` seeds the adapters' programs with
+`ON CONFLICT DO NOTHING` and stores a fetched or entered series the same way; a
+stored terms version is never rewritten (INV-BOND-001), so an entry whose
+content differs from the stored one is refused as a conflict, and a correction
+is a new `termsVersion`. The refresh fetches only benchmarks a stored series
+reads, and once after a series is stored for a benchmark never fetched.
+
+A series read from its issuer (`BondSeriesService`, through `SeriesHttp.gated`:
+the `obligacjeskarbowe` breaker, no redirect followed, a 30 s timeout, a 5 MB
+cap) is fetched, cross-checked and parsed before the one write transaction that
+stores it, so a refused or failed read leaves no row, and there is nothing at the
+issuer to undo.
+
 ### Bank sync
 
 A bank sync reads from the provider and writes only to PostgreSQL, so the

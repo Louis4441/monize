@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {No se cambió ninguna transacción} one {# transacción cambiada} other {# transacciones cambiadas}}. Puedes deshacerlo desde el historial de acciones.",
-      "aiReviewsQueued": "{count, plural, one {# transacción en cola para revisión por IA} other {# transacciones en cola para revisión por IA}}."
+      "changedNoUndo": "{count, plural, one {# transacción cambiada} other {# transacciones cambiadas}}.",
+      "aiReviewsQueued": "{count, plural, one {# transacción en cola para revisión por IA} other {# transacciones en cola para revisión por IA}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, one {# transacción ya tenía una solicitud de revisión por IA abierta, así que no se puso nada nuevo en cola} other {# transacciones ya tenían una solicitud de revisión por IA abierta, así que no se puso nada nuevo en cola}}.",
+      "noChanges": "No se cambió ninguna transacción."
     },
     "done": {
       "summary": "{count, plural, =0 {No se cambió ninguna transacción.} one {Se cambió # transacción.} other {Se cambiaron # transacciones.}}",

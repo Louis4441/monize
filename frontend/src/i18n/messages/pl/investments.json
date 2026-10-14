@@ -296,7 +296,30 @@
     "toastSaveFailed": "Nie udało się zapisać transakcji",
     "exchangeRateUnresolved": "Brak kursu z {from} na {to}. Przed zapisaniem wprowadź kurs lub przeliczoną kwotę łączną.",
     "toastExchangeRateRequired": "Wprowadź kurs wymiany przed zapisaniem transakcji między walutami.",
-    "notAvailable": "Niedostępne"
+    "notAvailable": "Niedostępne",
+    "bondSeries": {
+      "label": "Seria obligacji",
+      "fromDate": "Ustalana na podstawie daty",
+      "oldestFirst": "Najstarsze najpierw",
+      "loading": "Wczytywanie serii...",
+      "loadFailed": "Nie udało się wczytać serii.",
+      "retry": "Ponów",
+      "fromDateCode": "Z daty: {code}",
+      "noneOnSale": "Brak serii w sprzedaży w tym dniu",
+      "choose": "Wybierz serię",
+      "required": "Wybierz serię tych papierów.",
+      "heldOption": "{code} (posiadane: {quantity})",
+      "noLongerHeld": "{code} (nie jest już posiadana w tym dniu)",
+      "noLongerHeldUnknown": "Zapisana seria (nie jest już posiadana w tym dniu)",
+      "storedSeries": "Zapisana seria",
+      "seriesOnSaleMonth": "{code} — w sprzedaży {month}",
+      "seriesOnSaleRange": "{code} — w sprzedaży od {from} do {to}"
+    },
+    "bondRedemption": {
+      "summary": "Odsetki {interest}, potrącenie za wykup przedterminowy {deduction}, wypłata {payout}",
+      "outsideSaleWindow": "Partia tej serii została kupiona poza okresem sprzedaży, więc wykupu nie można rozbić.",
+      "failed": "Nie udało się obliczyć podziału wykupu."
+    }
   },
   "newTransactionButton": {
     "label": "+ Nowa transakcja",

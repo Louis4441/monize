@@ -40,6 +40,7 @@ import { AiReviewQueueModule } from "../ai-review/ai-review-queue.module";
 import { AiReviewApprovalController } from "../ai-review/ai-review-approval.controller";
 import { AiReviewApprovalService } from "../ai-review/ai-review-approval.service";
 import { EmailReceiptParsersModule } from "../email-receipts/parsers/email-receipt-parsers.module";
+import { BondsModule } from "../bonds/bonds.module";
 
 @Module({
   imports: [
@@ -80,6 +81,8 @@ import { EmailReceiptParsersModule } from "../email-receipts/parsers/email-recei
     // The `email_receipt_parsers` tool's logic. A forwardRef: the module reaches
     // `PayeesModule`, which reaches back here through the payee lookup.
     forwardRef(() => EmailReceiptParsersModule),
+    // The `fetch_bond_series` tool's logic (BondsModule exports it).
+    forwardRef(() => BondsModule),
   ],
   providers: [
     AiService,

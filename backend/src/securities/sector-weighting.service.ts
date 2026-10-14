@@ -383,6 +383,12 @@ export class SectorWeightingService {
     // 3. Get latest prices
     const uniqueSecurityIds = [...new Set(holdings.map((h) => h.securityId))];
     const priceMap = await this.getLatestPrices(uniqueSecurityIds);
+    // A bond-linked holding is its own account's lots, not quantity x the
+    // program-wide blend (bond-program-securities.md 2.4).
+    const bondValues = await this.portfolioCalculationService.valueBondHoldings(
+      userId,
+      holdings,
+    );
 
     // 4. Ensure sector data is cached
     const securities = holdings.map((h) => h.security);
@@ -406,14 +412,20 @@ export class SectorWeightingService {
     for (const holding of holdings) {
       const quantity = Number(holding.quantity);
       const price = priceMap.get(holding.securityId);
-      if (price == null) continue;
+      const own = holding.security.bondProgramId
+        ? bondValues.get(`${holding.accountId}:${holding.securityId}`)
+        : undefined;
+      // Unpriced is skipped, as for a security with no price; a linked one
+      // never falls back to the blend.
+      if (holding.security.bondProgramId ? !own : price == null) continue;
+      const nativeValue = own ? own.marketValue : quantity * (price as number);
 
       // `null` means no rate exists for the pair. A sector weighting is a share
       // of a total, so counting an unconverted foreign value would misstate
       // this sector's share and every other sector's with it (audit P5-009).
       // Skipping is the honest option; the conversion logs the missing pair.
       const converted = await this.portfolioCalculationService.convertToDefault(
-        quantity * price,
+        nativeValue,
         holding.security.currencyCode,
         defaultCurrency,
         rateCache,
@@ -648,6 +660,12 @@ export class SectorWeightingService {
 
     const uniqueSecurityIds = [...new Set(holdings.map((h) => h.securityId))];
     const priceMap = await this.getLatestPrices(uniqueSecurityIds);
+    // A bond-linked holding is its own account's lots, not quantity x the
+    // program-wide blend (bond-program-securities.md 2.4).
+    const bondValues = await this.portfolioCalculationService.valueBondHoldings(
+      userId,
+      holdings,
+    );
 
     const rateCache: FxRateCache = new Map();
     const defaultCurrency =
@@ -678,12 +696,18 @@ export class SectorWeightingService {
     for (const holding of holdings) {
       const quantity = Number(holding.quantity);
       const price = priceMap.get(holding.securityId);
-      if (price == null) continue;
+      const own = holding.security.bondProgramId
+        ? bondValues.get(`${holding.accountId}:${holding.securityId}`)
+        : undefined;
+      // Unpriced is skipped, as for a security with no price; a linked one
+      // never falls back to the blend.
+      if (holding.security.bondProgramId ? !own : price == null) continue;
+      const nativeValue = own ? own.marketValue : quantity * (price as number);
 
       // See the note above: an unconvertible holding is skipped, not counted
       // at its face value in the wrong currency.
       const converted = await this.portfolioCalculationService.convertToDefault(
-        quantity * price,
+        nativeValue,
         holding.security.currencyCode,
         defaultCurrency,
         rateCache,

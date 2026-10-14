@@ -329,7 +329,30 @@
     "toastSaveFailed": "[XX-Failed to save transaction-XX]",
     "exchangeRateUnresolved": "[XX-No {from} to {to} rate is available. Enter one, or the converted total, before saving.-XX]",
     "toastExchangeRateRequired": "[XX-Enter an exchange rate before saving a cross-currency trade.-XX]",
-    "notAvailable": "[XX-Not available-XX]"
+    "notAvailable": "[XX-Not available-XX]",
+    "bondSeries": {
+      "label": "[XX-Bond series-XX]",
+      "fromDate": "[XX-Determined from the date-XX]",
+      "oldestFirst": "[XX-Oldest first-XX]",
+      "loading": "[XX-Loading the series...-XX]",
+      "loadFailed": "[XX-The series could not be loaded.-XX]",
+      "retry": "[XX-Retry-XX]",
+      "fromDateCode": "[XX-From the date: {code}-XX]",
+      "noneOnSale": "[XX-No series on sale on this date-XX]",
+      "choose": "[XX-Choose a series-XX]",
+      "required": "[XX-Choose the series of these shares.-XX]",
+      "heldOption": "[XX-{code} ({quantity} held)-XX]",
+      "noLongerHeld": "[XX-{code} (no longer held on this date)-XX]",
+      "noLongerHeldUnknown": "[XX-Stored series (no longer held on this date)-XX]",
+      "storedSeries": "[XX-Stored series-XX]",
+      "seriesOnSaleMonth": "[XX-{code} — on sale {month}-XX]",
+      "seriesOnSaleRange": "[XX-{code} — on sale {from} to {to}-XX]"
+    },
+    "bondRedemption": {
+      "summary": "[XX-Interest {interest}, early-redemption deduction {deduction}, payout {payout}-XX]",
+      "outsideSaleWindow": "[XX-A lot of this series was bought outside its sale window, so the redemption cannot be split.-XX]",
+      "failed": "[XX-The redemption split could not be calculated.-XX]"
+    }
   },
   "newTransactionButton": {
     "label": "[XX-+ New Transaction-XX]",

@@ -221,6 +221,26 @@ describe('RunRuleDialog', () => {
     expect(screen.queryByText('You can undo the run from the action history.')).not.toBeInTheDocument();
   });
 
+  it('says nothing new was queued, and promises no undo, when every review was already open', async () => {
+    mocks.rules.previewRun.mockResolvedValue(
+      makePreview({ matched: [], conditionMatchedCount: 3, scanned: 5, aiReviewRequests: 1, fingerprint: FP }),
+    );
+    mocks.rules.run.mockResolvedValue({
+      changed: 0,
+      skipped: [],
+      historyId: null,
+      aiReviewsQueued: 0,
+      aiReviewsAlreadyQueued: 3,
+    });
+    await renderDialog();
+    await preview();
+    await confirm();
+    expect(toast.success).toHaveBeenCalledWith(
+      '3 transactions already had an open AI review request, so nothing new was queued.',
+    );
+    expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining('undo'));
+  });
+
   it('on PREVIEW_CHANGED shows a message and a refreshed preview, and confirms the new fingerprint only after the reader sees it', async () => {
     mocks.rules.run
       .mockRejectedValueOnce(

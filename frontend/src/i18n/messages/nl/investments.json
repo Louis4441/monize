@@ -296,7 +296,30 @@
     "toastSaveFailed": "Opslaan van transactie mislukt",
     "exchangeRateUnresolved": "Geen koers van {from} naar {to} beschikbaar. Voer er een in, of het omgerekende totaal, voordat u opslaat.",
     "toastExchangeRateRequired": "Voer een wisselkoers in voordat u een transactie tussen valuta's opslaat.",
-    "notAvailable": "Niet beschikbaar"
+    "notAvailable": "Niet beschikbaar",
+    "bondSeries": {
+      "label": "Obligatieserie",
+      "fromDate": "Bepaald op basis van de datum",
+      "oldestFirst": "Oudste eerst",
+      "loading": "Series laden...",
+      "loadFailed": "De series konden niet worden geladen.",
+      "retry": "Opnieuw proberen",
+      "fromDateCode": "Op basis van de datum: {code}",
+      "noneOnSale": "Geen serie te koop op deze datum",
+      "choose": "Kies een serie",
+      "required": "Kies de serie van deze stukken.",
+      "heldOption": "{code} ({quantity} aangehouden)",
+      "noLongerHeld": "{code} (op deze datum niet meer aangehouden)",
+      "noLongerHeldUnknown": "Opgeslagen serie (op deze datum niet meer aangehouden)",
+      "storedSeries": "Opgeslagen serie",
+      "seriesOnSaleMonth": "{code} — te koop {month}",
+      "seriesOnSaleRange": "{code} — te koop van {from} tot {to}"
+    },
+    "bondRedemption": {
+      "summary": "Rente {interest}, aftrek bij vervroegde aflossing {deduction}, uitbetaling {payout}",
+      "outsideSaleWindow": "Een lot van deze serie is buiten de verkoopperiode gekocht, dus de aflossing kan niet worden opgesplitst.",
+      "failed": "De opsplitsing van de aflossing kon niet worden berekend."
+    }
   },
   "newTransactionButton": {
     "label": "+ Nieuwe transactie",

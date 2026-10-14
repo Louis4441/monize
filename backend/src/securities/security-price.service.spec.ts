@@ -1,3 +1,4 @@
+import { Not } from "typeorm";
 import { Logger, NotFoundException } from "@nestjs/common";
 import {
   SecurityPriceService,
@@ -632,7 +633,9 @@ describe("SecurityPriceService", () => {
 
       expect(result).toEqual(createdAt);
       expect(securityPriceRepository.findOne).toHaveBeenCalledWith({
-        where: {},
+        // A bond-engine row is written every day by accrual: it is not a quote
+        // provider's write, and counting it would hide a provider outage.
+        where: { source: Not("bond_engine") },
         order: { createdAt: "DESC" },
       });
     });
@@ -3056,6 +3059,8 @@ describe("SecurityPriceService", () => {
           "redeem",
           "transfer_in",
           "transfer_out",
+          // Not "bond_engine": a trade price is one lot's price, not the
+          // holding's value, so it never replaces the engine's row (R3).
         ],
       ]);
     });
@@ -3352,6 +3357,20 @@ describe("SecurityPriceService", () => {
       });
     });
 
+    it("a manual price written over a bond-engine row takes no adjusted close from it (R3)", async () => {
+      await service.createManualPrice(
+        "sec-1",
+        { priceDate: "2025-06-01", closePrice: 101.5 },
+        "user-1",
+      );
+      // The conflict branch sets the adjusted close from the manual entry's own
+      // input (it has none) when the row it replaces is the engine's; any other
+      // row keeps the adjusted close it had.
+      expect(priceUpsertSql()).toMatch(
+        /adjusted_close = CASE WHEN security_prices\.source = 'bond_engine'\s+THEN NULL ELSE security_prices\.adjusted_close END/,
+      );
+    });
+
     // Issue #1242 invalidation: a manual price changes an accepted close, so
     // every account holding the security has a stale monthly snapshot. The
     // create recomputes them through the shared debounced net-worth path.
@@ -3472,6 +3491,34 @@ describe("SecurityPriceService", () => {
           closePrice: 200.0,
           source: "manual",
         }),
+      );
+    });
+
+    it("editing a bond-engine row makes it manual and drops the engine's adjusted close", async () => {
+      securityPriceRepository.findOne.mockResolvedValue({
+        ...mockPriceEntry,
+        source: "bond_engine",
+        adjustedClose: 99.5,
+      });
+      await service.updatePrice("sec-1", 1, { closePrice: 200.0 }, "user-1");
+      expect(securityPriceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "manual",
+          closePrice: 200.0,
+          adjustedClose: null,
+        }),
+      );
+    });
+
+    it("editing a provider row keeps its adjusted close", async () => {
+      securityPriceRepository.findOne.mockResolvedValue({
+        ...mockPriceEntry,
+        source: "yahoo_finance",
+        adjustedClose: 99.5,
+      });
+      await service.updatePrice("sec-1", 1, { closePrice: 200.0 }, "user-1");
+      expect(securityPriceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "manual", adjustedClose: 99.5 }),
       );
     });
 
@@ -4110,6 +4157,93 @@ describe("SecurityPriceService", () => {
       expect(result.failed).toBe(1);
       expect(result.results[0].error).toContain("GBP");
       expect(priceWrites()).toHaveLength(0);
+    });
+  });
+  // INV-BOND-005: the bond engine is a linked security's only automatic price
+  // source. Each path below fetches from a provider for some other security
+  // class; none may fetch for this one. provider-priced.guard.spec.ts holds that
+  // every such path consults the predicate; these hold what it does.
+  describe("a bond-linked security is never priced by a quote provider", () => {
+    const linked = {
+      ...mockSecurity,
+      symbol: "TOS1029",
+      bondProgramId: "11111111-1111-5111-8111-111111111111",
+      // The strongest opt-in a user can give a provider: an explicit override.
+      quoteProvider: "yahoo",
+      skipPriceUpdates: false,
+    } as Security;
+
+    beforeEach(() => {
+      global.fetch = jest.fn() as jest.Mock;
+      securitiesRepository.find.mockResolvedValue([linked]);
+    });
+
+    it("is skipped by the scheduled quote refresh", async () => {
+      const result = await service.refreshAllPrices();
+      expect(result.totalSecurities).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(msnFinanceService.fetchQuote).not.toHaveBeenCalled();
+    });
+
+    it("is skipped by the refresh of selected securities", async () => {
+      const result = await service.refreshPricesForSecurities(["sec-1"]);
+      expect(result.totalSecurities).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("is skipped by the daily settlement", async () => {
+      const result = await service.settleDailyBars();
+      expect(result.totalSecurities).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("is skipped by the scheduled historical backfill", async () => {
+      dataSourceMock.query.mockResolvedValueOnce([]);
+      const result = await service.backfillHistoricalPrices();
+      expect(result.totalSecurities).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("is skipped by the on-demand fill behind a report", async () => {
+      const loaded = await service.ensurePricesForDate(["sec-1"], "2026-10-01");
+      expect(loaded).toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("is skipped by the one-year backfill a new security gets, forced or not", async () => {
+      await service.backfillSecurity(linked);
+      await expect(
+        service.backfillSecurityRange(linked, "max", { force: true }),
+      ).resolves.toBe(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("answers an explicit holding-period backfill with the reason, fetching nothing", async () => {
+      securitiesRepository.findOne.mockResolvedValue(linked);
+
+      for (const range of [undefined, "5y" as const]) {
+        const result = await service.backfillSecurityHoldingPeriod(
+          TEST_USER_ID,
+          "sec-1",
+          range,
+        );
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/priced by the bond engine/);
+      }
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("leaves an unlinked security with the same override eligible", async () => {
+      securitiesRepository.find.mockResolvedValue([
+        { ...mockSecurity, bondProgramId: null, quoteProvider: "yahoo" },
+      ]);
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(
+          createMockFetchResponse(makeYahooChartResponse()),
+        ) as jest.Mock;
+      const result = await service.refreshPricesForSecurities(["sec-1"]);
+      expect(result.totalSecurities).toBe(1);
     });
   });
 });

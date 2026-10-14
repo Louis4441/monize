@@ -101,6 +101,21 @@ implied.
 | INV-LOAN-009 | An annuity installment's payment is the one stated for its own due date | enforced |
 | INV-LOAN-010 | A loan's interest category and its managed payment template's interest line change together | enforced |
 | INV-LOAN-HISTORY-001 | Historical loan interest counted as paid is ledger-backed | partial |
+| INV-BOND-001 | A bond's published terms, period rates, instruments and programs are immutable | enforced |
+| INV-BOND-002 | A missing bond rate is unknown, never substituted | enforced |
+| INV-BOND-003 | Bond money is exact until the issue document rounds it | enforced |
+| INV-BOND-004 | Known and projected bond values never mix | enforced |
+| INV-BOND-005 | A linked security's automatic price comes only from the bond engine; the engine replaces every non-manual row and never a manual one | enforced |
+| INV-BOND-006 | Bond terms enter the catalog only from an adapter's fetch of its official source or an administrator's manual entry on the adapter's template; a person who is not an administrator supplies only a country and a series code | enforced |
+| INV-BOND-007 | A program-linked security's acquisitions with a date of their own are inferred, TRANSFER_IN and ADD_SHARES name their series, a removal the account cannot cover is refused at write time, and an import may store NULL which the lots name | enforced |
+| INV-BOND-008 | No country's bond data (series, terms version, benchmark observation) is fetched or stored without a person's action | enforced |
+| INV-BOND-009 | A bond redemption's cash splits into returned principal and interest, never into a capital gain | enforced |
+| INV-BOND-010 | A bond-linked holding's current value is its own account's lots' value, never quantity times the security's blended price | partial |
+| INV-BONDNOTIFY-001 | The bond notification producer reads stored terms, observations and the ledger, fetches nothing and writes nothing but notification rows | enforced |
+| INV-BONDNOTIFY-002 | Each bond notification event has one row per person: a re-run, a second replica or a restart raises nothing new, and a state-keyed event is raised once while its state lasts | enforced |
+| INV-BONDNOTIFY-003 | Every amount, rate and date in a bond notification is the engine's | enforced |
+| INV-BONDNOTIFY-004 | A bond amount the engine cannot work out is null in a notification and its copy says it is not known and why, never zero | enforced |
+| INV-BONDNOTIFY-005 | The bond notification producer names no country, program, publisher or benchmark | enforced |
 | INV-OCCURRENCE-001 | One scheduled occurrence has at most one financial effect | enforced |
 | INV-OCCURRENCE-002 | A stored override price survives reopening | enforced |
 | INV-OCCURRENCE-003 | Every surface reports the effective occurrence: its current amount and currency, its direction, on the date it falls | enforced |
@@ -3170,6 +3185,806 @@ to the stored contractual payment, and where the rate timeline records the
 payment in effect that value is authoritative even when it does not amortize
 (`INV-LOAN-HISTORY-001` covers the interest; the payment's authority ordering is
 documented in `docs/frontend/financial-figures.md`).
+
+## Sovereign bonds
+
+The bond engine is country-agnostic (`docs/specs/polish-retail-bonds.md`
+section 2.0); these invariants hold for every adapter.
+
+### INV-BOND-001 -- published terms, period rates, instruments and programs are immutable
+
+```text
+Statement           A stored bond terms version, a stored announced period
+                    rate, a stored bond instrument (series) and a stored bond
+                    program are never updated or deleted; a correction is a
+                    new terms version.
+Source of truth     bond_terms_versions, bond_period_rates, bond_instruments,
+                    bond_programs
+Enforcement         bond_reject_mutation(), a row-level BEFORE UPDATE OR DELETE
+                    trigger on all four tables (the first two: migration
+                    20261010170817_bond_reference_tables.sql; bond_instruments
+                    and bond_programs: migration
+                    20261011090000_bond_instruments_immutable.sql paired with database/schema.sql);
+                    ON DELETE RESTRICT from the first two to bond_instruments,
+                    from bond_instruments to bond_programs, from
+                    securities.bond_program_id to bond_programs and from
+                    investment_transactions.bond_instrument_id to
+                    bond_instruments. TRUNCATE is not
+                    covered: no application path issues it, and the
+                    integration test reset relies on it.
+                    The catalog's writers (BondCatalogService: the boot seed
+                    of the programs, and storeEntry for a series) are not
+                    refused by the trigger, they never reach it: they insert
+                    with INSERT ... ON CONFLICT (bond_instrument_id, version)
+                    DO NOTHING (and the equivalent on the instrument and
+                    program keys), so the trigger, which fires only on UPDATE
+                    and DELETE, never sees a second writer.
+                    A series is stored in its own transaction
+                    (BondSeriesService.store) and the seed stores each program
+                    in its own, so one failing statement rolls back that one
+                    only.
+Concurrency scope   global (per instrument)
+Retry semantics     A retried or concurrent insert of the same (instrument,
+                    version) or (instrument, period) inserts nothing and
+                    raises nothing (ON CONFLICT DO NOTHING on the primary key
+                    makes the second writer a no-op; it never overwrites).
+                    storeEntry then compares the stored content_hash with the
+                    entry's: the same hash is unchanged, a differing one is a
+                    conflict (SERIES_TERMS_CONFLICT) and nothing is written:
+                    changed terms are not applied until they are a new version.
+Crash semantics     Single-row inserts; nothing partial to recover. A failure
+                    of one series' or program's transaction loses that one
+                    only.
+Failure response    refuse an UPDATE or DELETE (the statement raises); an entry
+                    whose content differs from the stored version is refused
+                    as a conflict and logged
+Required tests      bond-reference-tables.integration.spec.ts: update and delete
+                    of all four tables raise and leave the row unchanged;
+                    bond-catalog.service.spec.ts: a version stored again with
+                    differing content is a conflict and inserts no second one;
+                    one failing program does not roll back the others.
+Status              enforced
+```
+
+### INV-BOND-002 -- a missing rate is unknown, never substituted
+
+```text
+Statement           A period that has started and whose rate is neither in the
+                    terms, announced, nor derivable from the stored observation
+                    for its own month or day has no rate. Nothing substitutes
+                    another month's observation, the latest value, 0 or the
+                    first-period rate. A period that has not started is
+                    PROJECTED from a named assumption (supplied, else the
+                    newest stored observation), labelled as such, never KNOWN.
+Source of truth     benchmark_values, benchmark_series.covered_through,
+                    bond_period_rates
+Enforcement         resolvePeriodRates (backend/src/bonds/engine/rate-resolution.ts):
+                    a started period without a rate yields null values, a
+                    `missing` entry naming the benchmark, the observation and
+                    its publisher, and referenceDataComplete = false (every
+                    such null also makes valuationComplete false); a future
+                    period is PROJECTED from a named assumption, structured as
+                    { benchmarkId, value, basis, observation }.
+Concurrency scope   --
+Retry semantics     -- (computed on read)
+Crash semantics     -- (nothing stored)
+Failure response    null with the missing observation named; a future cash
+                    flow whose amount is unknown is emitted with status UNKNOWN
+                    and amount null, never dropped; a benchmark with neither an
+                    observation nor an assumption is listed in
+                    projectionMissing { benchmarkId, publisher | null }. A
+                    STEP benchmark (NBP) whose archive cannot prove that no
+                    decision is missing is covered only up to the archive's
+                    newest date (coveredThrough); a later day is unknown, not
+                    derived from an older rate. Each benchmark's coveredThrough
+                    and lastFetchedAt are returned as benchmarkCoverage.
+Required tests      bond-engine.spec.ts truth-table rows (spec section 4), the
+                    STEP coverage rule, the UNKNOWN cash flow and
+                    projectionMissing cases, and the NBP coverage cases.
+Status              enforced (engine, read by bond-valuation.service.ts and by
+                    the bond_engine price sync in bond-price.service.ts, which
+                    writes no price for a day whose lots lack a gross value)
+```
+
+### INV-BOND-003 -- money is exact until the issue document rounds it
+
+```text
+Statement           Bond amounts and rates are computed in exact rational
+                    arithmetic and rounded only where the issue document
+                    rounds, per bond, then multiplied by the quantity.
+Source of truth     the terms document (rounding, capitalization.baseRounding)
+Enforcement         ExactDecimal (backend/src/bonds/domain/exact-decimal.ts)
+                    parses only decimal strings; the engine's formulas take
+                    and return ExactDecimal. Golden tests E1 to E16 pin the
+                    rounding points. country-agnostic.guard.spec.ts fails
+                    parseFloat, Number( or Math. in domain/ or engine/ outside
+                    the calendar-date module.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    --
+Required tests      unit (golden fixtures) and the source scan above.
+Status              enforced
+```
+
+### INV-BOND-004 -- known and projected never mix
+
+```text
+Statement           A bond cash flow or maturity value is KNOWN only when every
+                    rate it depends on comes from the terms, an announcement or
+                    a stored observation; otherwise it is PROJECTED and the
+                    valuation lists the assumption.
+Source of truth     the resolved period rates of one valuation
+Enforcement         valueBondLot (backend/src/bonds/engine/bond-engine.ts):
+                    maturityValueKnown is null while any rate it needs is
+                    projected; each cash flow carries its status (KNOWN,
+                    PROJECTED, or UNKNOWN with amount null).
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    the figure moves to the projected fields
+Required tests      bond-engine.spec.ts known/projected cases.
+Status              enforced
+```
+
+### INV-BOND-005 -- a linked security's automatic price is the bond engine's; it replaces every non-manual row and never a manual one
+
+```text
+Statement           A security linked to a bond program
+                    (securities.bond_program_id, allowed only on a security
+                    of type BOND) is priced automatically by the bond engine
+                    and by no quote provider; the engine's unit price is
+                    blended over the lots of every series the security holds,
+                    each lot valued by its own series' terms
+                    (docs/specs/bond-program-securities.md section 2.4). For a linked security the engine
+                    row replaces every non-manual row on its days (provider
+                    rows and transaction-derived rows: a transaction price is
+                    one lot's trade price, not the holding's value); a
+                    transaction-derived price never replaces a bond_engine
+                    row; a manual price always wins and the engine never
+                    replaces it. An engine row stores adjusted_close NULL
+                    (coupons are recorded as INTEREST income, the close is the
+                    value), and a manual price written over an engine row does
+                    not inherit the engine's adjusted_close. An unchanged day
+                    is not rewritten.
+Source of truth     securities.bond_program_id; security_prices.source
+Enforcement         Three mechanisms.
+                    1. One predicate, isPricedByQuoteProvider
+                       (backend/src/securities/provider-priced.util.ts), read by
+                       every path that asks a provider about a security:
+                       isRefreshEligible (the quote refresh, the selected
+                       refresh, the settlement, the historical backfill and the
+                       on-demand fill), fetchAndStoreRange (every backfill, even
+                       a forced one), backfillSecurityHoldingPeriod and the
+                       intraday chart. provider-priced.guard.spec.ts fails when
+                       a method that reaches a provider stops consulting it. The
+                       "refresh price" of a linked security first fetches its
+                       program's current offer and a bounded piece of its
+                       history (INV-BOND-008), then recomputes the engine
+                       prices instead of reporting 0 updated.
+                    2. BondPriceService.upsertPrices
+                       (backend/src/bonds/bond-price.service.ts): one
+                       INSERT ... ON CONFLICT (security_id, price_date) DO UPDATE
+                       whose WHERE admits every source except 'manual' AND a
+                       close or source that differs, and writes
+                       adjusted_close NULL; the same constant
+                       BOND_ENGINE_PRICE_SOURCE is bound by the delete of days
+                       that no longer get a price (it deletes only
+                       bond_engine rows). The transaction-price upsert's
+                       replaceable-source list (TRANSACTION_SOURCES)
+                       does not contain bond_engine for a linked security, and
+                       the manual-price write sets adjusted_close from its own
+                       input, never from the row it replaces.
+                    3. The link and its edits, all in the write's own
+                       transaction (SecuritiesService assertBondLink, shared
+                       by update, the AI/MCP update_security preview and the
+                       undo of a security edit): the program must exist, be
+                       priced in the security's currency (INV-PRICE-001) and
+                       the security's type must be BOND (code
+                       LINK_REQUIRES_BOND_TYPE; changing the type of a linked
+                       security away from BOND is refused unless the same
+                       request unlinks it); the link is refused (code
+                       LINK_QUANTITY_NOT_BONDS) when the link is being set
+                       and the security has priced acquisitions (BUY,
+                       REINVEST and its variants, not void) whose price is
+                       not within [0.5, 2] x the face value of the row's own
+                       series
+                       (its stored series, or the one on sale on its date)
+                       per bond, because the quantity is then not a number of
+                       bonds. The same band is the rule of every WRITE of a
+                       linked security, not only of the link:
+                       BondWriteGuard.verify (backend/src/bonds/
+                       bond-write-guard.ts), in the transaction of every
+                       write path (create, update, updateLinkedTransfer,
+                       transferSecurity, an embedded split row, remove, void,
+                       undo, redo and once per file in the imports), reads the
+                       stored price and series of the rows just written
+                       (findQuantitiesNotBonds, backend/src/securities/
+                       bond-link.util.ts) and refuses a BUY or REINVEST*
+                       priced outside the band with errorCode
+                       QUANTITY_NOT_BONDS before anything commits. Only
+                       acquisitions are read: a SELL or REDEEM of a long-held
+                       bond may be worth more than twice its face value, and a
+                       removal counted in currency units is refused by the lot
+                       derivation. The face value is the row's series' (newest
+                       terms version, instrument.faceValue) and, for a row with
+                       no series of the program, the program's product
+                       template's (BondProgramDefinition.faceValue,
+                       templateFaceValueOf, backend/src/bonds/
+                       bond-adapters.ts): an empty catalog is never a way past
+                       the band. A row already outside the band when the guard
+                       began does not block an unrelated write or a delete.
+                       After the commit of a split parent's create, edit, void
+                       or delete, the embedded rows' securities are repriced
+                       (recomputeBondPricesAfterWrite via
+                       TransactionSplitService, never inside the transaction;
+                       INV-CACHE-001) on every route: TransactionsService
+                       create/update/remove, updateSplits/removeSplit, the
+                       reconciliation status endpoints and the bulk status
+                       update; bondProgramId is canonicalized to lowercase
+                       before comparing and storing; a link that changes
+                       (unlink, another program) also clears, in the same
+                       transaction, the series its transactions name outside
+                       the new program (INV-BOND-007);
+                       linkChanged is decided inside the update transaction from
+                       the row locked FOR UPDATE. Undo and redo snapshots carry
+                       bond_program_id and are applied through the same
+                       validation and the same engine-price cleanup and
+                       post-commit recompute; a restored state that fails them
+                       is refused (code UNDO_LINK_INVALID).
+                       fk_securities_bond_program is ON DELETE RESTRICT.
+Concurrency scope   per security; recomputes and unlink cleanups of one security
+                    are serialized by a transaction-scoped advisory lock
+                    (LockScope.BondPriceRecompute in common/db/locks.ts, keyed
+                    on the security id; first statement of the transaction,
+                    before the account locks of lockAccountsForBalanceWrite),
+                    and the recompute reads the link after taking it. Unlinking
+                    deletes that security's bond_engine rows in the same
+                    transaction. A manual price wins over a bond_engine row
+                    whatever the write order: the engine upsert's WHERE never
+                    admits source = 'manual', and the manual write replaces the
+                    engine row. A provider write inserts only WHERE the
+                    security has no bond link at write time, so an in-flight
+                    refresh cannot price a just-linked security.
+                    Every creation, edit, void or delete of an investment
+                    transaction of a linked security (UI service, bulk, AI
+                    action, MCP, import) dispatches that security's recompute
+                    after the commit, as does a restore (every linked security
+                    of the restoring user). The request recompute and the cron
+                    use one definition of "today", the user's financial today.
+                    A series of days is valued from one resolution of each
+                    lot's schedule and period rates (the engine's series API,
+                    exact because a period that has started on a day has the
+                    same rate or the same "missing" whether resolved then or
+                    now), so a recompute costs O(days + lots x periods).
+Lots                Lots are derived per account and per series (spec section
+                    12.2 and bond-program-securities.md 2.3): an acquisition's
+                    lot carries the series its row names; a removal that names
+                    a series takes first-in first-out from that series' lots of
+                    the row's own account (REMOVAL_EXCEEDS_SERIES when it holds
+                    less), one that names none takes first-in first-out across
+                    the account's series; a paired TRANSFER_OUT/TRANSFER_IN
+                    moves the quantity FIFO from the source account's lots to
+                    the destination account keeping purchase dates and series;
+                    an unpaired leg is a removal / a new dated lot as before. A
+                    row without a stored series (written before the link) is
+                    read as a write would resolve it, from its date, and when
+                    that is not determined the lots are unknown
+                    (SERIES_NOT_DETERMINED). The security's price is the blend
+                    over all accounts and all series. A lot whose purchase
+                    date is outside terms.saleWindow gets no valuation:
+                    status REFUSED, refusal PURCHASE_OUTSIDE_SALE_WINDOW, every
+                    figure null, valuationComplete false (a null saleWindow is
+                    no restriction), and its day gets no price row.
+Retry semantics     A retried recompute writes nothing it already wrote
+                    (written = 0, deleted = 0).
+Crash semantics     Reads, the upsert, the delete and the account updated_at
+                    marker share one transaction; the portfolio memo and the
+                    net-worth recompute are dispatched after the commit
+                    (INV-CACHE-001), and a lost debounce is recovered from the
+                    marker by sweepStaleSnapshots.
+Failure response    refuse a link the instrument cannot honour (400, nothing
+                    written); a day whose lots have no gross value gets no row
+                    (INV-BOND-002); lots that cannot be derived (a split, a
+                    fractional or over-removed quantity) price nothing and the
+                    valuation names why. A valuation or scenarios request with
+                    asOf after today is refused (code AS_OF_IN_FUTURE; a future
+                    projection is the scenarios' job, with assumptions).
+                    A support backup stores bond_program_id and the
+                    transactions' bond_instrument_id as NULL. A user restore
+                    whose catalog lacks the program restores the link as NULL
+                    and reports unlinkedBondSecurities { count, symbols }
+                    (symbols capped at 50); a transaction whose series the
+                    catalog lacks is restored without it and counted in
+                    unlinkedBondSeries { count }.
+                    Surfaces that rank or date market moves (Top Movers and the
+                    daily-change boards, the global "last price update" marker)
+                    exclude bond-linked securities and bond_engine rows; the
+                    price source bond_engine is shown by a translated label.
+Required tests      bond-prices.integration.spec.ts (real PostgreSQL: a manual
+                    price survives; a provider and a transaction-derived price
+                    on a linked security's day are replaced by the engine row
+                    and a transaction price never replaces an engine row; an
+                    engine row has adjusted_close NULL and a manual write over
+                    one does not inherit it; an unchanged day is not rewritten;
+                    stale rows are deleted; every refresh path skips a linked
+                    security with an explicit provider override; another user's
+                    security answers 404; a transaction write, a bulk, AI, MCP
+                    and import write each dispatch the recompute);
+                    bond-price.service.spec.ts (including the 10-year EDO lot
+                    series bound and the blend over two series),
+                    bond-lots.spec.ts (per-account and per-series FIFO and the
+                    paired transfer), securities.service.spec.ts (link
+                    refusals: type, quantity, currency, uppercase UUID, undo),
+                    action-history undo spec, provider-priced.guard.spec.ts,
+                    backup specs (support backup drops the link; restore
+                    names and recomputes).
+Status              enforced
+```
+
+### INV-BOND-006 -- terms enter the catalog from the official source or an administrator, never from a user's numbers
+
+```text
+Statement           A bond terms version is stored only from one of two
+                    origins: the adapter's fetch of its official source, or an
+                    administrator's manual entry built on the adapter's product
+                    template (an adapter ships no series of its own,
+                    INV-BOND-008). A request from a
+                    person who is not an administrator carries only a country
+                    and a series code, never a rate, a margin, a fee or a date.
+                    Every stored version names its origin in source.provider
+                    (the official host the fetch read, or manual). Terms are
+                    inserted once and never changed (INV-BOND-001): a series already stored is
+                    returned and nothing is fetched or written, and a read
+                    whose content differs from the stored version 1 is refused
+                    and logged, never stored over it. A refused fetch leaves no
+                    row.
+Source of truth     bond_terms_versions.terms ->> 'source' (provider, url,
+                    document) and bond_terms_versions.source_url; the series
+                    code and country on bond_instruments
+Enforcement         Three mechanisms.
+                    1. The entry points take no terms from a person.
+                       FetchBondSeriesDto (backend/src/bonds/dto/) has exactly
+                       two bounded fields under whitelist and
+                       forbidNonWhitelisted, so POST /bonds/instruments/fetch
+                       (throttled to 10 a minute per user), the Refresh of a
+                       linked security (no input but the security; it fetches
+                       the codes the adapter's own listing and series-code
+                       grammar name, bounded per program), the fetch_bond_series
+                       AI and MCP tool (the same two fields in
+                       fetchBondSeriesSchema) and the daily cron
+                       (BondSeriesService.scheduledCurrentOffer, which takes the
+                       codes from the adapter's own listing of the offer, only
+                       for the programs a security has switched auto-fetch on
+                       for) cannot
+                       carry a value. Values enter only through POST
+                       /bonds/instruments/manual behind RolesGuard with
+                       Roles("admin"), and the MCP tool
+                       enter_bond_series_manually, which refuses a caller that
+                       BondSeriesService.isAdministrator does not find with the
+                       admin role, validates the values before asking, and
+                       confirms with the user before it stores. Both build the
+                       entry through the adapter's manualSeries: the same
+                       template, bounds and strict parseBondTerms as a fetch.
+                    2. Every check runs before the write. The adapter reads its
+                       host only (getFromIssuer refuses another host, a final
+                       url elsewhere, a status other than 200 and an oversized
+                       body), SeriesHttp makes the request with
+                       redirect: "manual", a 30 s timeout and a 5 MB streaming
+                       cap behind the obligacjeskarbowe circuit breaker (the
+                       NBP and GUS benchmark fetches use the same door, limited
+                       to the https hosts their adapter declares), and the
+                       series page and the issue letter are cross-checked field
+                       by field before the template is filled and parsed. A
+                       refusal is a SeriesFetchError thrown before
+                       BondSeriesService opens the write transaction.
+                    3. One store path. BondSeriesService.store runs
+                       BondCatalogService.storeEntry
+                       in one withScopedDb transaction whose first statement is
+                       pg_advisory_xact_lock(LockScope.BondSeriesFetch, 8,
+                       keyed on the deterministic instrument id). storeEntry
+                       reads inside the lock: the instrument row and version 1
+                       are inserted ON CONFLICT DO NOTHING, and a stored
+                       version is compared by content_hash. A differing hash,
+                       or an instrument row that disagrees, throws
+                       SERIES_TERMS_CONFLICT inside the transaction, which rolls
+                       back. The immutability trigger of INV-BOND-001 is the
+                       last backstop.
+                    Not enforced: the content of an adapter's product template
+                    beyond the strict parser (it is reviewed code), and the truth of an
+                    administrator's manual values within the adapter's bounds
+                    (the role is the control; the card says the terms were
+                    entered by hand).
+Concurrency scope   per instrument (the advisory lock); the network read is
+                    outside it
+Retry semantics     A repeat of a stored series answers created: false and
+                    fetches nothing. Two concurrent first fetches of one series
+                    queue on the lock: the first inserts, the second finds the
+                    same content hash and writes nothing. A differing repeat is
+                    a conflict, retried never.
+Crash semantics     One transaction; a crash leaves no instrument or version
+                    row. The cron's lease (fetch_sync job bond-series) is a
+                    cost control: the store is idempotent however many replicas
+                    run.
+Failure response    SeriesFetchError codes, each with errors.bonds.<code> in
+                    every locale: SERIES_CODE_INVALID and
+                    SERIES_FETCH_UNSUPPORTED 400, SERIES_NOT_PUBLISHED 404,
+                    SOURCE_UNAVAILABLE 503, SOURCE_FORMAT_CHANGED 502 (422 for
+                    a manual entry), SOURCE_INCONSISTENT and
+                    TEMPLATE_NOT_VALIDATED 422, SERIES_TERMS_CONFLICT 409.
+Required tests      bond-series-fetch.integration.spec.ts (real PostgreSQL, a
+                    fake BondFetch over the saved fixtures, never the network: a
+                    fetch inserts one instrument and version 1; a repeat writes
+                    nothing; a differing repeat is SERIES_TERMS_CONFLICT; a
+                    refused fetch leaves no row; two concurrent fetches insert
+                    once; a manual entry is stored with provider manual and an
+                    out-of-bounds one leaves no row);
+                    bond-series.service.spec.ts, series-http.spec.ts,
+                    bonds.controller.spec.ts (DTO bounds, throttle, admin
+                    guard, error mapping), the fetch_bond_series and
+                    enter_bond_series_manually tool specs,
+                    provider-call.guard.spec.ts (the fetch goes through the
+                    breaker) and country-agnostic.guard.spec.ts (the service
+                    names no country).
+Status              enforced
+```
+
+### INV-BOND-008 -- no country's bond data is fetched or stored without a person's action
+
+```text
+Statement           No series, terms version or benchmark observation of any
+                    country is fetched or stored unless a person asked for it:
+                    a series fetch or manual entry, the current-offer fetch, a
+                    program switched to auto-fetch (bond_auto_fetch), a
+                    restore of the person's own backup (only the series that
+                    backup's rows reference), or a stored series that reads
+                    the benchmark. An adapter ships
+                    product templates and programs only; the boot seed stores
+                    programs and makes no network call.
+Why                 A deployment follows the bonds its people chose (Polish
+                    bonds for a person in Poland, Canadian ones for a person in
+                    Canada); default fetching would send every deployment's
+                    traffic to every country's issuer and statistics office and
+                    fill its catalog with data nobody holds.
+Mechanism           The BondAdapter type carries no series catalog; the boot
+                    seed stores programs only; the series cron and backfill
+                    read the auto-fetch programs first; the benchmark refresh
+                    reads the benchmarks of stored series first.
+Enforcement         backend/src/bonds/no-automatic-bonds.guard.spec.ts (every
+                    installed adapter: boot, crons, templates, type) and
+                    backend/test/integration/no-automatic-bonds.integration.spec.ts
+                    (real database, a fetch that throws if called).
+Status              enforced
+```
+
+### INV-BOND-007 -- a program-linked security's rows name a series of its program, or the ledger says which does not
+
+```text
+Statement           A security linked to a bond program
+                    (securities.bond_program_id) holds the program's series
+                    (the product, e.g. one security for all of EDO). Every
+                    share-moving row of such a security stores the series it
+                    acts on in investment_transactions.bond_instrument_id, and
+                    that series belongs to the security's program.
+                    - A BUY or REINVEST has a purchase date of its own: its
+                      series is the one named or, when none is, the program's
+                      series whose newest terms version's saleWindow contains
+                      the transaction date; the server resolves and stores it,
+                      and a series a client names is checked against the
+                      program, never trusted.
+                    - ADD_SHARES and an unpaired TRANSFER_IN have no purchase
+                      date of their own (the date is the transfer's or the
+                      grant's): they name the series explicitly
+                      (SERIES_REQUIRED), never inferred. A paired transfer
+                      moves the source's lots with their series.
+                    - A removal (SELL, REDEEM, REMOVE_SHARES, an unpaired
+                      TRANSFER_OUT) may name a series (absent: first-in
+                      first-out across series). It is checked at write time:
+                      a write after which the account does not hold enough
+                      (of the named series, REMOVAL_EXCEEDS_SERIES; at all,
+                      OVER_REMOVAL) is refused and nothing commits.
+                    - A file import (QIF/OFX, Money) names no series: a BUY or
+                      REINVEST takes the series on sale on its date, any other
+                      acquisition, or one with none on sale, is stored with
+                      NULL and counted (bondRowsWithoutSeries); the lots then
+                      refuse with SERIES_NOT_DETERMINED, naming the row,
+                      instead of the import dropping it.
+                    A security that is not program-linked never has the column
+                    set. The series-naming refusals (SERIES_NOT_IN_PROGRAM,
+                    SERIES_NOT_DETERMINED, SERIES_REQUIRED,
+                    SERIES_NOT_ALLOWED) run in the write's own transaction
+                    before anything is written.
+Source of truth     investment_transactions.bond_instrument_id;
+                    bond_instruments.bond_program_id;
+                    securities.bond_program_id
+Enforcement         One resolver, resolveTransactionSeries
+                    (backend/src/bonds/bond-series-resolver.ts), called by
+                    every path that writes the column, inside its transaction
+                    and before the first write: InvestmentTransactionsService
+                    create (also reached by bulk, the AI action executor, the
+                    MCP tools and the scheduled-transaction post), update,
+                    updateLinkedTransfer, transferSecurity and
+                    createEmbeddedForSplit; and the AI and MCP previews through
+                    previewCreateInvestmentTransaction, so a card never shows
+                    what the commit would refuse. The file imports use
+                    resolveImportedSeries (the program looked up once per
+                    security per run); undo and redo use restoredSeries, which
+                    puts the snapshot's series back exactly, never inferred (a
+                    series outside the security's current program is stored as
+                    NULL). A form resends the stored series on every save, so on
+                    update only a series that differs from the stored one is a
+                    request, and an edit that changes neither the series, the
+                    security, the action nor the date keeps the stored value,
+                    NULL included (keepStored). A split parent's edit recreates
+                    its embedded rows: a recreated row that names no series
+                    keeps its predecessor's (readEmbeddedSeriesCarry,
+                    takeCarriedSeries; matched on security, action, quantity and
+                    date, since a split stores no position). The write guard
+                    (BondWriteGuard, bond-write-guard.ts) runs in the same
+                    transaction, after the mutation, in create, update,
+                    updateLinkedTransfer, transferSecurity,
+                    createEmbeddedForSplit, remove (so bulk, AI and MCP
+                    deletes), updateStatus (void), reverseAndRemoveEmbedded and
+                    applyParentStatusToEmbeddedRows (a split parent's delete,
+                    void, and, through deleteSplitSideEffects, replacement),
+                    undo and redo, and once per file in the imports. A split
+                    parent's delete is guarded once over all its embedded rows,
+                    so a parent holding a BUY and the SELL it covers is not
+                    refused half way; a replacement of the splits tracks one
+                    guard before the teardown and verifies it after the
+                    successors are written. The guard derives the lots over the
+                    security's whole
+                    ledger (bondLotsFromTransactions over loadBondLedger, the
+                    derivation the valuation reads) and throws when OVER_REMOVAL
+                    or REMOVAL_EXCEEDS_SERIES refuses it now and it was
+                    derivable before the write, or the refusal names a written
+                    row; a refusal that already existed about another row does
+                    not block an unrelated edit. GET
+                    /bonds/securities/:id/series-on-sale and /series-holdings
+                    answer the form with the same code (seriesOnSaleSql, the
+                    lot derivation). The link follows the rows:
+                    clearForeignSeries (securities update and the undo of a link
+                    change) clears the series outside the new program in the
+                    link's transaction, hasQuantitiesThatAreNotBonds reads a
+                    row of another program as the series it will be read as
+                    under the new one, and clearForeignSeriesOfUser does the
+                    same after a restore, whatever the file said. A BUY or
+                    REINVEST written before the link, or by a path that
+                    predates the column, is read by loadBondLedger as a write
+                    would resolve it (the same seriesOnSaleSql), never guessed
+                    when two series were on sale; an ADD_SHARES or unpaired
+                    TRANSFER_IN without a series is never inferred. Not enforced
+                    by the database: a CHECK cannot compare a row's series
+                    program with its security's program across tables; the ON
+                    DELETE RESTRICT foreign keys keep the named series and
+                    program in the catalog.
+Concurrency scope   per row; the security's link is read without a lock, so a
+                    link changed concurrently with a trade is repaired by
+                    clearForeignSeries at the link's commit and by the lots'
+                    inference of a row without a series
+Retry semantics     The resolution is a function of the row, the program and
+                    the stored terms: repeating a write resolves the same
+                    series.
+Crash semantics     The series is a column of the row; nothing partial to
+                    recover. A series stored after a row was written (a fetch,
+                    the offer, the cron, the backfill) changes how a BUY or
+                    REINVEST without one is read: the engine prices of the
+                    program's securities are recomputed after that commit
+                    (BondPriceService.recomputeLinkedSecuritiesOfSeries,
+                    INV-CACHE-001).
+Failure response    400 with errors.bonds.SERIES_NOT_IN_PROGRAM (names the
+                    series and the program), SERIES_NOT_DETERMINED (names the
+                    date and the program, says to fetch the series),
+                    SERIES_REQUIRED, SERIES_NOT_ALLOWED, REMOVAL_EXCEEDS_SERIES
+                    or OVER_REMOVAL (errorCode is the code, the message names
+                    the removal's date and quantity), in every locale; nothing
+                    written. A bulk row that is refused is skipped with the same
+                    message; an import is refused as a whole before anything is
+                    kept when a removal is not covered. A read of lots that
+                    cannot be derived (series-holdings) is 422 with the
+                    refusal code as errorCode.
+Required tests      bond-series-resolver.spec.ts (every branch: inferred,
+                    named, foreign program, none on sale, two on sale, a code
+                    reference, removal, unlinked, cash action, stored series
+                    kept or dropped, keepStored, SERIES_REQUIRED, restored
+                    series, imported series, clearing);
+                    bond-write-guard.spec.ts; investment-transactions
+                    .service.spec.ts ("the bond series of a share-moving row":
+                    create, update, transferSecurity, an embedded split and
+                    the preview, each refusing before a write);
+                    embedded-series-carry.spec.ts;
+                    import-investment-processor.service.spec.ts,
+                    write-investments.spec.ts, action-history.service.spec.ts
+                    (undo and redo), the AI and MCP tool specs (the series
+                    reaches the descriptor and the commit), bond-lots.spec.ts
+                    (per-series lots), bond-holdings.service.spec.ts,
+                    bond-valuation.service.spec.ts (two series),
+                    bond-series-write.integration.spec.ts,
+                    bond-prices.integration.spec.ts and
+                    bond-valuation.integration.spec.ts (real PostgreSQL),
+                    backup-restore.integration.spec.ts (the series follow the
+                    program).
+Status              enforced
+```
+
+### INV-BOND-009 -- a redemption's cash is returned principal plus interest
+
+```text
+Statement           The split of a bond-linked redemption satisfies
+                    payout = principalReturned + interest exactly, interest >= 0
+                    and principalReturned <= principal; at maturity the
+                    deduction is 0. What a bond pays above the principal it was
+                    bought at is interest (a discount instrument's discount
+                    included), net of an early-redemption deduction taken from
+                    it, never a capital gain.
+Source of truth     the lot's terms, rates and redemption date, through the same
+                    schedule, rate, penalty, floor and rounding code as the
+                    valuation (spec docs/specs/bond-redemption-interest.md
+                    sections 2 and 3)
+Enforcement         redemptionSplit (backend/src/bonds/engine/bond-engine.ts,
+                    redemption-split.ts): every figure is rounded per bond by
+                    the terms and then multiplied by the quantity, so the three
+                    sums hold to the last digit; interest is
+                    max(0, grossInterest - deduction) and principalReturned is
+                    payout - interest. A refused day or an unknown rate gives a
+                    refusal and null figures, never 0.
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    a refusal (NOT_REDEEMABLE, TOO_EARLY, TOO_LATE, RECORD_DAY,
+                    TERMS_INCOMPLETE, RATE_UNKNOWN, PURCHASE_OUTSIDE_SALE_WINDOW)
+                    and null figures
+Required tests      backend/src/bonds/engine/redemption-split.spec.ts (the
+                    table of the spec, a day-by-day sweep of the identity for a
+                    compounding bond, a coupon bond and a discount bill, refusals,
+                    unknown rates, per-bond rounding) and
+                    backend/src/bonds/adapters/pl/redemption-split.golden.spec.ts
+                    (the maturity value of EDO0423 stated by the Ministry, early
+                    redemptions of EDO and COI worked by hand from the letters).
+                    The endpoint (GET /bonds/securities/:id/redemption-split,
+                    BondHoldingsService.redemptionSplit), which splits the lots
+                    the write guard's own derivation removes, is covered by
+                    bond-holdings.service.spec.ts, bonds.controller.spec.ts and
+                    bond-series-write.integration.spec.ts (first in first out
+                    across two purchase dates, a quantity above the series held
+                    refused, the row being edited not counted, another user's
+                    security 404); the form that fills the price and the accrued
+                    interest from it by
+                    InvestmentTransactionForm.bondRedemption.test.tsx.
+Status              enforced
+```
+
+### INV-BOND-010 -- a bond holding's current value is its own account's lots
+
+```text
+Statement           The current market value of a bond-linked holding (one
+                    account, one security) is the sum of the engine's grossValue
+                    of that account's open and matured lots on the person's
+                    financial today, never quantity x the security's daily
+                    bond_engine price, which blends the lots of every account.
+                    An unknown lot makes the holding unpriced (marketValue null,
+                    pricesComplete false), never the blend.
+Source of truth     the account's lots (bondLotsAsOf over the ledger) valued by
+                    the engine (BondValuationService.valueByAccount)
+Enforcement         PortfolioCalculationService.valueBondHoldings, used by
+                    calculateHoldingsWithValues and getAccountMarketValues; the
+                    account balances report (valuePositions), sector weightings
+                    and GEM positions call valueByAccount once per linked
+                    security. Not enforced for historical per-account series
+                    (net worth by account, an account's value chart): they
+                    still read the daily blend, so their per-account split is
+                    approximate for a security held in several accounts while
+                    their total is exact (spec
+                    docs/specs/bond-program-securities.md 2.4).
+Concurrency scope   --
+Retry semantics     --
+Crash semantics     --
+Failure response    the holding is unpriced and named in unpricedSecurityIds
+Required tests      backend/src/securities/portfolio-calculation.service.spec.ts
+                    (two accounts holding different series of one program, an
+                    unknown lot, a valuation that throws);
+                    backend/test/integration/bond-holding-value.integration.spec.ts
+Status              partial (historical per-account series)
+```
+
+### INV-BONDNOTIFY-001 -- the bond notification producer fetches nothing
+
+```text
+Statement           BondNotificationService (backend/src/bonds/) reads stored
+                    terms, observations and the ledger through
+                    BondValuationService and BondHoldingsService, and writes
+                    nothing but notification rows, through
+                    NotificationDispatchService.notify after every read has
+                    committed. It never fetches a series, a benchmark or an
+                    offer.
+Why                 A notification cron that fetched would send every
+                    deployment's traffic to every issuer daily (INV-BOND-008),
+                    and a push or email fan-out inside a read transaction holds
+                    a connection across an external call.
+Mechanism           The service injects no fetching collaborator; dispatch runs
+                    after the reads, outside any transaction.
+Enforcement         backend/src/bonds/no-automatic-bonds.guard.spec.ts (the
+                    producer's source names none of BondSeriesService,
+                    BenchmarkRefreshService, SeriesHttp, BondOfferService and
+                    makes no request) and bond-notification.service.spec.ts
+                    (dispatch outside the transaction).
+Status              enforced
+```
+
+### INV-BONDNOTIFY-002 -- one row per event, and a state-keyed event once
+
+```text
+Statement           Each event has a dedupe key (docs/specs/bond-notifications.md
+                    section 4) and NotificationService.create refuses a second
+                    row with the same key per user. The two state-keyed events
+                    (bond:unbooked:*, item 4, and bond:missing:*, item 6) are
+                    raised once while their state lasts: the nightly purge
+                    keeps their rows, read or dismissed, and forgets one only
+                    when it was dismissed more than 365 days ago. Items 2 and 3
+                    look back 3 days with date-scoped keys, so a skipped day is
+                    caught up without a duplicate.
+Why                 The dedupe row is the only memory that an event was
+                    raised; purging it at 30 days raised the same state again
+                    every month.
+Mechanism           INSERT ... ON CONFLICT DO NOTHING against the unique
+                    idx_notifications_dedupe; STATE_KEYED_DEDUPE_PREFIXES
+                    (backend/src/notification-center/notification-bounds.ts)
+                    excluded from both DELETEs of NotificationService.purgeOld
+                    by a parameterized LIKE ANY.
+Enforcement         notification.service.spec.ts (the purge SQL),
+                    bond-notification-events.spec.ts (dedupe keys, window
+                    edges), backend/test/integration/bond-notifications.integration.spec.ts
+                    (real database: a row dismissed 31 days ago survives the
+                    purge and the next run raises nothing; one dismissed 366
+                    days ago is forgotten).
+Status              enforced
+```
+
+### INV-BONDNOTIFY-003 -- the engine's figures
+
+```text
+Statement           Every amount, rate and date in a bond notification is
+                    BondValuationService.valueSecurity's (lot figures) or
+                    BondHoldingsService.redemptionSplit's (a payout), so the
+                    notification and the security page cannot disagree.
+Mechanism           The event rules (bond-notification-events.ts) are pure over
+                    the valuation; nothing is recomputed. An affected series of
+                    item 5 carries its rate source, and a projected rate is
+                    worded as projected.
+Enforcement         bond-notification-events.spec.ts,
+                    bond-notification.service.spec.ts,
+                    frontend/src/hooks/useNotificationCopy.test.ts
+Status              partial: the copy of both layers is held by unit tests,
+                    there is no guard scanning the rules for a recomputed figure
+```
+
+### INV-BONDNOTIFY-004 -- unknown is said, never zero
+
+```text
+Statement           A figure the engine cannot work out (a payout, a coupon
+                    whose rate is not published) is null in the row's data, and
+                    both copies say it is not known and why; a refused ledger
+                    names the row (action, date) and what to do.
+Mechanism           payoutOf / unknownPayout, sumExact (null when any flow is
+                    unknown), missingDataNotification (causes carry the
+                    refusal's action, date and row id; the dedupe hash covers
+                    the code, row and date, never a translated text).
+Enforcement         bond-notification-events.spec.ts,
+                    notification-email-copy.spec.ts,
+                    frontend/src/hooks/useNotificationCopy.test.ts
+Status              enforced
+```
+
+### INV-BONDNOTIFY-005 -- country-agnostic
+
+```text
+Statement           The producer holds no country, program, publisher or
+                    benchmark literal.
+Mechanism           Every such value arrives in the valuation or the stored
+                    benchmark row.
+Enforcement         backend/src/bonds/country-agnostic.guard.spec.ts
+Status              enforced
+```
 
 ## Scheduled occurrences
 

@@ -224,16 +224,19 @@ export const ZERO_MATCH_ADVICE =
 
 /**
  * The condition matched but no row would change: not an error, so it carries
- * no advice to rewrite the rule.
+ * no advice to rewrite the rule. Silent when the run still queues AI reviews:
+ * that run has work, only not a field change.
  */
 export function noChangeNote(test: {
   matchedCount: number;
   conditionMatchedCount?: number;
+  aiReviewRequests?: number;
   scanned: number;
   scanOrder?: RuleRunScanOrder;
 }): string | null {
   const matched = test.conditionMatchedCount ?? 0;
   if (matched === 0 || test.matchedCount !== 0) return null;
+  if ((test.aiReviewRequests ?? 0) > 0) return null;
   return `The condition matches ${matched} of the ${test.scanned} ${scannedRowsWord(test)} transactions, but nothing would change (for example they already have the value and only-if-empty is on, or they are locked or reconciled). This is not an error.`;
 }
 
@@ -241,6 +244,7 @@ export function noChangeNote(test: {
 export function zeroMatchNote(test: {
   matchedCount: number;
   conditionMatchedCount?: number;
+  aiReviewRequests?: number;
   scanned: number;
   scanOrder?: RuleRunScanOrder;
 }): string {

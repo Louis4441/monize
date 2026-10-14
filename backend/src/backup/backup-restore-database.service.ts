@@ -3,7 +3,17 @@ import { EntityManager } from "typeorm";
 import { resolveCurrencyMetadata } from "../currencies/currency-metadata";
 import { tr } from "../i18n/translate";
 import { boundRestoredNotification } from "./notification-restore-bounds";
-import { BackupData, backupTables } from "./backup-format";
+import {
+  BackupData,
+  backupTables,
+  SeveredCatalogLinks,
+  SeveredRow,
+} from "./backup-format";
+import {
+  CATALOG_CURRENCY_MATCHED_COLUMNS,
+  CATALOG_ON_SEVERED,
+  CATALOG_REFERENCE_COLUMNS,
+} from "./restore-references";
 import {
   CONFLICT_ARBITER_COLUMNS,
   DEFERRED_FK_COLUMNS,
@@ -501,6 +511,139 @@ export class BackupRestoreDatabaseService {
         `Auto-created missing currency ${code} during backup restore`,
       );
     }
+  }
+
+  /**
+   * Write NULL over every reference to catalog data the target deployment cannot
+   * honour, for each entry of `CATALOG_REFERENCE_COLUMNS` (so a column added
+   * there is checked here, not just declared).
+   *
+   * A catalog table (`bond_programs`, `bond_instruments`) is reference data
+   * held per deployment and not part of a backup, so a reference survives a
+   * restore only where the same row exists here (a catalog id is derived from
+   * its codes, so it is the same id on every deployment). The series a backup
+   * references are fetched before this runs (`BackupBondSeriesRecoveryService`),
+   * so what is severed here is what this deployment could not obtain.
+   * What else a severed link costs the row is `CATALOG_ON_SEVERED`. A reference to a row this
+   * catalog lacks -- a series a newer release seeds, an adapter this build does
+   * not install -- is restored as NULL rather than failing the restore on the
+   * foreign key. A column in `CATALOG_CURRENCY_MATCHED_COLUMNS` is also dropped
+   * when the referenced row is in another currency than the referencing row: that
+   * pair would price the row in the wrong currency (INV-PRICE-001), and a crafted
+   * file is the only way to produce one.
+   *
+   * A security whose bond link was dropped keeps none of the engine's price rows
+   * from the file: they were computed from an instrument it is no longer linked
+   * to, nothing would ever recompute or remove them, and a security priced by a
+   * stale engine looks like a valid price (INV-BOND-005).
+   *
+   * Replaces `data[table]` with new rows. Returns how many references were
+   * dropped per `table.column`, each also in the log, and which rows lost one;
+   * the caller tells the user (a quietly unpriced bond is a surprise).
+   */
+  async severUnavailableCatalogLinks(
+    manager: EntityManager,
+    data: BackupData,
+    columns: Readonly<
+      Record<string, Readonly<Record<string, string>>>
+    > = CATALOG_REFERENCE_COLUMNS,
+  ): Promise<SeveredCatalogLinks> {
+    const counts: Record<string, number> = {};
+    const severed: Record<string, SeveredRow[]> = {};
+    for (const [table, references] of Object.entries(columns)) {
+      for (const [column, referenced] of Object.entries(references)) {
+        if (!/^[a-z_]+$/.test(referenced)) {
+          // The names come from a constant, never from the file; refuse a typo
+          // loudly rather than interpolate it.
+          throw new Error(`Invalid catalog table name "${referenced}"`);
+        }
+        const key = `${table}.${column}`;
+        const rows = (data as unknown as Record<string, unknown>)[table] as
+          Array<Record<string, unknown>> | undefined;
+        if (!rows) continue;
+        const { count: dropped, rows: severedRows } =
+          await this.severOneCatalogColumn(
+            manager,
+            data,
+            table,
+            column,
+            referenced,
+            rows,
+            CATALOG_CURRENCY_MATCHED_COLUMNS.has(key),
+          );
+        if (dropped > 0) {
+          counts[key] = dropped;
+          severed[key] = severedRows;
+        }
+      }
+    }
+    return { counts, severed };
+  }
+
+  private async severOneCatalogColumn(
+    manager: EntityManager,
+    data: BackupData,
+    table: string,
+    column: string,
+    referenced: string,
+    rows: Array<Record<string, unknown>>,
+    mustMatchCurrency: boolean,
+  ): Promise<{ count: number; rows: SeveredRow[] }> {
+    const wanted = [
+      ...new Set(
+        rows
+          .map((row) => row[column])
+          .filter((id): id is string => typeof id === "string"),
+      ),
+    ];
+    if (wanted.length === 0) return { count: 0, rows: [] };
+
+    const found: Array<{ id: string; currency_code?: string }> =
+      await manager.query(
+        `SELECT id${mustMatchCurrency ? ", currency_code" : ""} FROM ${referenced} WHERE id = ANY($1::uuid[])`,
+        [wanted],
+      );
+    const present = new Map(found.map((r) => [r.id, r.currency_code]));
+
+    let absent = 0;
+    let foreignCurrency = 0;
+    const severedRows: SeveredRow[] = [];
+    const next = rows.map((row) => {
+      const id = row[column];
+      if (typeof id !== "string") return row;
+      if (!present.has(id)) {
+        absent += 1;
+      } else if (!mustMatchCurrency || present.get(id) === row.currency_code) {
+        return row;
+      } else {
+        foreignCurrency += 1;
+      }
+      if (typeof row.id === "string") {
+        const symbol = typeof row.symbol === "string" ? row.symbol : null;
+        severedRows.push({ id: row.id, symbol });
+      }
+      return { ...row, [column]: null };
+    });
+    (data as unknown as Record<string, unknown>)[table] = next;
+
+    if (absent > 0) {
+      this.logger.warn(
+        `Backup restore: ${absent} ${table}.${column} reference(s) to ${referenced} this ` +
+          "deployment's catalog does not carry were restored as NULL.",
+      );
+    }
+    if (foreignCurrency > 0) {
+      this.logger.warn(
+        `Backup restore: ${foreignCurrency} ${table}.${column} reference(s) to ${referenced} ` +
+          "in another currency than the row were restored as NULL.",
+      );
+    }
+
+    CATALOG_ON_SEVERED.get(`${table}.${column}`)?.(
+      data,
+      new Set(severedRows.map((row) => row.id)),
+    );
+    return { count: absent + foreignCurrency, rows: severedRows };
   }
 
   async insertRows(

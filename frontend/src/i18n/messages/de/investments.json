@@ -296,7 +296,30 @@
     "toastSaveFailed": "Buchung konnte nicht gespeichert werden",
     "exchangeRateUnresolved": "Kein Kurs für {from} zu {to} verfügbar. Geben Sie vor dem Speichern einen Kurs oder den umgerechneten Gesamtbetrag ein.",
     "toastExchangeRateRequired": "Geben Sie einen Wechselkurs ein, bevor Sie einen währungsübergreifenden Handel speichern.",
-    "notAvailable": "Nicht verfügbar"
+    "notAvailable": "Nicht verfügbar",
+    "bondSeries": {
+      "label": "Anleiheserie",
+      "fromDate": "Aus dem Datum ermittelt",
+      "oldestFirst": "Älteste zuerst",
+      "loading": "Serien werden geladen...",
+      "loadFailed": "Die Serien konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "fromDateCode": "Aus dem Datum: {code}",
+      "noneOnSale": "Keine Serie an diesem Datum im Verkauf",
+      "choose": "Serie wählen",
+      "required": "Wähle die Serie dieser Anteile.",
+      "heldOption": "{code} ({quantity} gehalten)",
+      "noLongerHeld": "{code} (an diesem Datum nicht mehr gehalten)",
+      "noLongerHeldUnknown": "Gespeicherte Serie (an diesem Datum nicht mehr gehalten)",
+      "storedSeries": "Gespeicherte Serie",
+      "seriesOnSaleMonth": "{code} — im Verkauf {month}",
+      "seriesOnSaleRange": "{code} — im Verkauf von {from} bis {to}"
+    },
+    "bondRedemption": {
+      "summary": "Zinsen {interest}, Abzug für vorzeitige Rückzahlung {deduction}, Auszahlung {payout}",
+      "outsideSaleWindow": "Ein Los dieser Serie wurde außerhalb ihres Verkaufszeitraums gekauft, daher lässt sich die Rückzahlung nicht aufteilen.",
+      "failed": "Die Aufteilung der Rückzahlung konnte nicht berechnet werden."
+    }
   },
   "newTransactionButton": {
     "label": "+ Neue Buchung",

@@ -20,11 +20,11 @@ import { TransactionsService } from "../../transactions/transactions.service";
 import { EmailReceiptMailbox } from "../entities/email-receipt-mailbox.entity";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import { describeFailure } from "../pipeline/email-receipt-pipeline.service";
 import {
-  describeFailure,
   RECEIPT_AUTOMATIC_AI_INSTRUCTION,
   RECEIPT_CHAT_INSTRUCTION,
-} from "../pipeline/email-receipt-pipeline.service";
+} from "../pipeline/receipt-instructions";
 import { loadLinkableTransaction } from "../pipeline/linkable-transaction";
 import {
   closeReceiptRequests,

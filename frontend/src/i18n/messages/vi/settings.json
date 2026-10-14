@@ -384,7 +384,8 @@
         "STRATEGIES": "Tín hiệu chiến lược",
         "BANK_SYNC": "Kết nối ngân hàng",
         "BANK_SYNC_ACTIVITY": "Kết quả đồng bộ ngân hàng",
-        "EMAIL_RECEIPTS": "Biên lai email"
+        "EMAIL_RECEIPTS": "Biên lai email",
+        "BONDS": "Trái phiếu"
       },
       "channelNotApplicable": "Không áp dụng cho loại thông báo này",
       "emailToggleLabel": "Email báo cáo cho {category}",
@@ -816,7 +817,24 @@
       "totalRecords": "Tổng số bản ghi",
       "skippedAttachments": "{count, plural, other {# tệp đính kèm không được phục hồi}}: bản sao lưu không mang theo byte dùng được cho chúng — khi xuất, chúng bị thiếu hoặc không qua được kiểm tra tổng, hoặc tệp có trước các bản sao lưu tự chứa. Hãy xuất bản sao lưu mới khi bộ lưu trữ tệp đính kèm đã ổn.",
       "unusableAiProviderKeys": "{count, plural, other {# nhà cung cấp AI đã được khôi phục mà không có khóa API dùng được}}: bản sao lưu này được tạo trước khi khóa của nhà cung cấp đi kèm trong đó, nên khóa đã lưu thuộc về máy chủ tạo ra tệp, hoặc máy chủ này chưa cấu hình khóa mã hóa để lưu khóa đó. Hãy mở Cài đặt → Nhà cung cấp AI và nhập lại khóa API.",
-      "doneButton": "Xong"
+      "unlinkedBondSecurities": "{count, plural, other {# chứng khoán trái phiếu đã được khôi phục mà không liên kết với công cụ trái phiếu của nó}}: danh mục trái phiếu của máy chủ này không có chuỗi này (hoặc có nhưng bằng đơn vị tiền tệ khác), nên công cụ tính trái phiếu không còn định giá chúng và giá đã tính của chúng không được khôi phục. Hãy mở từng chứng khoán và liên kết lại với một công cụ trái phiếu.",
+      "unlinkedBondSeries": "{count, plural, other {# giao dịch trái phiếu đã mất series}} vì không thể lấy series từ nguồn chính thức. Các giao dịch được khôi phục không có series và sẽ giữ nguyên như vậy cho đến khi bạn tải series.",
+      "unrecoveredBondSeries": "Các series trái phiếu nêu trong bản sao lưu nhưng không thể tải: {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "và {count} mục nữa",
+      "unrecoveredBondSeriesAction": "Để khôi phục, hãy mở chứng khoán trái phiếu, tải series trên trang của nó (Làm mới) và chọn series trong các giao dịch chưa có.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "tổ chức phát hành chưa công bố series này",
+        "source-unavailable": "nguồn chính thức không trả lời; hãy thử lại sau",
+        "no-adapter": "máy chủ này không có nguồn cho quốc gia của tổ chức phát hành này",
+        "refused": "câu trả lời của nguồn chính thức không được chấp nhận",
+        "rate-limited": "nguồn chính thức yêu cầu chậm lại; hãy thử lại sau",
+        "not-attempted": "quá nhiều series trong một lần khôi phục; không thử",
+        "other": "lý do không xác định"
+      },
+      "doneButton": "Xong",
+      "unlinkedBondSecuritiesList": "Chứng khoán bị ảnh hưởng: {symbols}.",
+      "unlinkedBondSecuritiesMore": "và {count} mã nữa"
     },
     "storedBackups": {
       "heading": "Sao lưu tự động",

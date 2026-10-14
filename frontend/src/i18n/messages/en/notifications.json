@@ -68,6 +68,58 @@
     "riskOn": "risk-on",
     "riskOff": "risk-off"
   },
+  "bond": {
+    "maturitySoonTitle": "{series} matures on {date}",
+    "maturitySoonMessage": "{quantity} x {series} mature on {date}. {payout}",
+    "interestTitle": "{series}: interest payment on {date}",
+    "interestMessage": "{quantity} x {series} pay {amount} of interest on {date}. Book it on the security page if it is not in your account yet.",
+    "interestMessageUnknown": "{quantity} x {series} pay interest on {date}. The amount is not known yet: a rate it depends on is not published.",
+    "rateResetTitle": "{series}: new interest period",
+    "rateResetMessage": "{series} entered period {period} on {date} at {rate} a year.",
+    "unbookedTitle": "{series}: matured, redemption not booked",
+    "unbookedMessage": "{quantity} x {series} matured on {date} and no redemption is booked. {payout} Book the redemption on the security page.",
+    "payoutKnown": "The payout is {payout}.",
+    "payoutUnknown": "The payout is not known yet: {reason}.",
+    "reason": {
+      "RATE_UNKNOWN": "a rate it depends on is not published yet",
+      "TERMS_INCOMPLETE": "the terms of the series are incomplete",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "a purchase date is outside the sale window of the series",
+      "other": "it cannot be worked out from the data stored"
+    },
+    "benchmarkTitle": "{benchmark}: new observation {observation}",
+    "benchmarkIntro": "{publisher} published {benchmark} for {observation}: {value}.",
+    "benchmarkSeries": "{series}: period from {date} at {rate} a year.",
+    "benchmarkSeriesProjected": "{series}: period from {date}, projected at {rate} a year.",
+    "benchmarkSeriesUnknown": "{series}: period from {date}, the rate is not known yet.",
+    "benchmarkMore": "And {more} more.",
+    "missingTitle": "Bond figures are not known yet",
+    "missingMessage": "Some bond figures cannot be worked out. {causes}",
+    "cause": {
+      "observation": "The {observation} observation of {benchmark} ({publisher}) is not stored: it is not published yet, or the feed has not been fetched since. Refresh on the bond page.",
+      "observationNoPublisher": "The {observation} observation of {benchmark} is not stored: it is not published yet, or the feed has not been fetched since. Refresh on the bond page.",
+      "terms": "The terms of {series} are incomplete. Refresh the series on the bond page.",
+      "purchase": "A purchase of {series} on {date} is outside its sale window ({from} to {to}). Correct the purchase date.",
+      "lots": "The lots cannot be derived from the ledger ({code}). Correct the ledger.",
+      "lotsRow": "{action} on {date} makes the lots impossible to derive ({code}). Correct the transaction.",
+      "lotsRowSeries": "{action} on {date} is not placed in a series ({code}). Choose the series on that transaction.",
+      "lotsRowRemoval": "{action} on {date} removes more than the account holds of that series ({code}). Correct the transaction."
+    },
+    "action": {
+      "BUY": "Purchase",
+      "SELL": "Sale",
+      "REINVEST": "Reinvestment",
+      "ADD_SHARES": "Share addition",
+      "REMOVE_SHARES": "Share removal",
+      "SPLIT": "Split",
+      "TRANSFER_IN": "Incoming transfer",
+      "TRANSFER_OUT": "Outgoing transfer",
+      "other": "Transaction"
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "CPI, 12 months (GUS)",
+      "PL_NBP_REFERENCE": "NBP reference rate"
+    }
+  },
   "emailReceiptsAttention": {
     "title": "Email receipts need attention",
     "message": "Your receipts inbox holds {noParser} without a profile and {parseFailed} that their profile did not recognize. Open to review."

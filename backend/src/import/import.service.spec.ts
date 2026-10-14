@@ -27,6 +27,7 @@ import {
 import { Holding } from "../securities/entities/holding.entity";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityPriceService } from "../securities/security-price.service";
+import { SecuritiesService } from "../securities/securities.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { HoldingsService } from "../securities/holdings.service";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
@@ -328,6 +329,14 @@ describe("ImportService", () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: NetWorthService, useValue: mockNetWorthService },
         { provide: SecurityPriceService, useValue: mockSecurityPriceService },
+        {
+          provide: SecuritiesService,
+          useValue: {
+            recomputeBondPricesOfAccounts: jest
+              .fn()
+              .mockResolvedValue(undefined),
+          },
+        },
         { provide: ExchangeRateService, useValue: mockExchangeRateService },
         { provide: HoldingsService, useValue: mockHoldingsService },
         ImportPostProcessingService,
@@ -1058,6 +1067,51 @@ describe("ImportService", () => {
         const sqls = mockQueryRunner.query.mock.calls.map((call) => call[0]);
         expect(sqls).toContain("ROLLBACK TO SAVEPOINT tx_import_1");
         expect(sqls).toContain("RELEASE SAVEPOINT tx_import_2");
+      });
+
+      it("refuses the file as a whole, before the holdings are rebuilt, when the run's bond guard finds a removal the lots do not cover (INV-BOND-007)", async () => {
+        mockedParseQif.mockReturnValue({
+          accountType: "INVESTMENT",
+          accountName: "",
+          transactions: [
+            makeQifTransaction({ action: "Sell", security: "EDO" }),
+          ],
+          categories: [],
+          transferAccounts: [],
+          securities: [],
+          detectedDateFormat: "MM/DD/YYYY",
+          sampleDates: [],
+          openingBalance: null,
+          openingBalanceDate: null,
+        });
+        accountsRepository.findOne.mockResolvedValue(mockBrokerageAccount);
+        mockHoldingsService.rebuildAccountsFromTransactions.mockClear();
+        const verify = jest
+          .fn()
+          .mockRejectedValue(new BadRequestException("OVER_REMOVAL"));
+        const processed = jest
+          .spyOn(
+            ImportInvestmentProcessorService.prototype,
+            "processTransaction",
+          )
+          .mockImplementation(async (ctx) => {
+            ctx.bond = {
+              programCache: new Map(),
+              seriesMemo: new Map(),
+              guard: { verify } as never,
+            };
+          });
+        try {
+          await expect(
+            service.importQifFile(userId, makeBaseDto()),
+          ).rejects.toThrow(/OVER_REMOVAL/);
+          expect(verify).toHaveBeenCalledTimes(1);
+          expect(
+            mockHoldingsService.rebuildAccountsFromTransactions,
+          ).not.toHaveBeenCalled();
+        } finally {
+          processed.mockRestore();
+        }
       });
 
       it("does not load rules for an investment file", async () => {

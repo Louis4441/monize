@@ -78,7 +78,11 @@ export class TransactionReconciliationService {
     /** Accounts a counterpart or split propagation moved besides the row's own. */
     counterpartAccountIds: string[];
   }> {
-    return withScopedDb(this.dataSource, async (m) => {
+    // Securities of embedded investment rows that crossed the VOID boundary
+    // with a split parent, repriced by the bond engine after the commit
+    // (INV-BOND-005, INV-CACHE-001).
+    const touchedSecurityIds = new Set<string>();
+    const result = await withScopedDb(this.dataSource, async (m) => {
       // First lock of the transaction: advisory before row locks
       // (`common/db/locks.ts`). If this row is a split parent whose legs carry
       // embedded investment rows, those rows are rebuilt under the holdings
@@ -191,6 +195,7 @@ export class TransactionReconciliationService {
             transactionId,
             userId,
             status,
+            touchedSecurityIds,
           )) {
             counterpartAccountIds.push(affected);
           }
@@ -213,6 +218,11 @@ export class TransactionReconciliationService {
         counterpartAccountIds,
       };
     });
+    await this.splitService.recomputeBondPricesAfterWrite(
+      userId,
+      touchedSecurityIds,
+    );
+    return result;
   }
 
   async updateStatus(

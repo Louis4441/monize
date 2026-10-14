@@ -170,6 +170,27 @@ describe('RuleConfirmationCard: create', () => {
     expect(screen.queryByText(/matches none of the transactions examined/)).not.toBeInTheDocument();
   });
 
+  it('drops the nothing-would-change note when the run only queues AI reviews', () => {
+    renderCard(
+      makeRuleAction(
+        'create_transaction_rule',
+        makeRule({
+          test: makeTest({
+            matchedCount: 0,
+            conditionMatchedCount: 9,
+            rows: [],
+            skipped: [],
+            skippedCount: 0,
+            aiReviewRequests: 4,
+          }),
+        }),
+      ),
+    );
+    expect(screen.queryByText(/nothing would change/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/This is not an error/)).not.toBeInTheDocument();
+    expect(screen.getByText(/4/, { selector: 'p' })).toBeInTheDocument();
+  });
+
   it('does not warn when the rule matches something or nothing was examined', () => {
     renderCard(action);
     expect(screen.queryByText(/matches none of the transactions examined/)).not.toBeInTheDocument();

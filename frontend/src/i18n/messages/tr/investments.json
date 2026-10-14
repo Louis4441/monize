@@ -296,7 +296,30 @@
     "toastSaveFailed": "İşlem kaydedilemedi",
     "exchangeRateUnresolved": "{from} → {to} kuru yok. Kaydetmeden önce bir kur veya çevrilmiş toplamı girin.",
     "toastExchangeRateRequired": "Para birimleri arası bir işlemi kaydetmeden önce bir döviz kuru girin.",
-    "notAvailable": "Mevcut değil"
+    "notAvailable": "Mevcut değil",
+    "bondSeries": {
+      "label": "Tahvil serisi",
+      "fromDate": "Tarihe göre belirlenir",
+      "oldestFirst": "Önce en eskiler",
+      "loading": "Seriler yükleniyor...",
+      "loadFailed": "Seriler yüklenemedi.",
+      "retry": "Yeniden dene",
+      "fromDateCode": "Tarihten: {code}",
+      "noneOnSale": "Bu tarihte satışta seri yok",
+      "choose": "Bir seri seçin",
+      "required": "Bu payların serisini seçin.",
+      "heldOption": "{code} ({quantity} eldeki)",
+      "noLongerHeld": "{code} (bu tarihte artık elde değil)",
+      "noLongerHeldUnknown": "Kayıtlı seri (bu tarihte artık elde değil)",
+      "storedSeries": "Kayıtlı seri",
+      "seriesOnSaleMonth": "{code} — satışta {month}",
+      "seriesOnSaleRange": "{code} — satışta {from} - {to}"
+    },
+    "bondRedemption": {
+      "summary": "Faiz {interest}, erken itfa kesintisi {deduction}, ödeme {payout}",
+      "outsideSaleWindow": "Bu serinin bir lotu satış döneminin dışında alındığından itfa bölünemiyor.",
+      "failed": "İtfa dökümü hesaplanamadı."
+    }
   },
   "newTransactionButton": {
     "label": "+ Yeni İşlem",

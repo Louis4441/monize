@@ -384,7 +384,8 @@
         "STRATEGIES": "策略訊號",
         "BANK_SYNC": "銀行連線",
         "BANK_SYNC_ACTIVITY": "銀行同步結果",
-        "EMAIL_RECEIPTS": "電子郵件收據"
+        "EMAIL_RECEIPTS": "電子郵件收據",
+        "BONDS": "債券"
       },
       "channelNotApplicable": "不適用於此通知類型",
       "emailToggleLabel": "{category} 的報告郵件",
@@ -816,7 +817,24 @@
       "totalRecords": "總記錄數",
       "skippedAttachments": "{count, plural, other {# 個附件未被還原}}：備份中沒有可用的位元組——匯出時它們缺失或未通過總和檢查，或該檔案早於自包含備份。請在附件儲存恢復正常後重新匯出備份。",
       "unusableAiProviderKeys": "{count, plural, other {# 個 AI 提供者在還原後沒有可用的 API 金鑰}}：此備份建立於提供者金鑰隨備份一同保存之前，因此儲存的金鑰屬於產生該檔案的伺服器，或者本伺服器沒有設定用來保存金鑰的加密金鑰。請開啟「設定 → AI 提供者」並重新輸入 API 金鑰。",
-      "doneButton": "完成"
+      "unlinkedBondSecurities": "{count, plural, other {# 個債券證券在還原後未連結其債券商品}}：此伺服器的債券目錄不包含該系列（或其幣別不同），因此債券引擎不再為它們定價，其計算出的價格也未被還原。請開啟每個證券，重新將其連結到債券商品。",
+      "unlinkedBondSeries": "{count, plural, other {# 筆債券交易遺失了系列}}，因為無法從官方來源取得該系列。這些交易已在沒有系列的情況下還原，在你取得系列之前將維持無系列。",
+      "unrecoveredBondSeries": "備份中提到但無法取得的債券系列：{count} 個。",
+      "unrecoveredBondSeriesItem": "{series}（{country}）：{reason}",
+      "unrecoveredBondSeriesMore": "另有 {count} 個",
+      "unrecoveredBondSeriesAction": "要還原它們，請開啟債券證券，在其頁面取得該系列（重新整理），然後在缺少系列的交易中選擇系列。",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "發行方尚未公布該系列",
+        "source-unavailable": "官方來源未回應；請稍後再試",
+        "no-adapter": "此伺服器沒有該發行方所在國家的來源",
+        "refused": "官方來源的回應未被接受",
+        "rate-limited": "官方來源要求放慢請求；請稍後再試",
+        "not-attempted": "一次還原中的系列過多；未嘗試",
+        "other": "原因不明"
+      },
+      "doneButton": "完成",
+      "unlinkedBondSecuritiesList": "受影響的證券:{symbols}。",
+      "unlinkedBondSecuritiesMore": "以及另外 {count} 個"
     },
     "storedBackups": {
       "heading": "自動備份",

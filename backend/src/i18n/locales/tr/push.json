@@ -39,6 +39,10 @@
     "email_receipts": {
       "title": "E-posta makbuzları ilgilenilmesi gerekiyor",
       "body": "Makbuz gelen kutunuzdaki bazı e-postalar bir profil veya düzeltme gerektirir. Detaylar için Monize'i açın."
+    },
+    "bonds": {
+      "title": "Tahvil bildirimi",
+      "body": "Tahvillerinizden biriyle ilgili yeni bir gelişme var. Ayrıntılar için Monize uygulamasını açın."
     }
   },
   "actions": {

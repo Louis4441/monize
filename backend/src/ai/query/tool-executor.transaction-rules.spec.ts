@@ -23,6 +23,7 @@ import { RelayAttachmentStore } from "../relay/relay-attachment.store";
 import { ExchangeRateService } from "../../currencies/exchange-rate.service";
 import { AiReviewWorkService } from "../../ai-review/ai-review-work.service";
 import { EmailReceiptParserToolsService } from "../../email-receipts/parsers/email-receipt-parser-tools.service";
+import { BondSeriesService } from "../../bonds/bond-series.service";
 import { TransactionRuleToolPrepService } from "../../transaction-rules/rule-tool-prep.service";
 
 const USER = "user-1";
@@ -140,6 +141,7 @@ describe("ToolExecutorService transaction rule tools", () => {
         { provide: AiActionSigningService, useValue: signing },
         { provide: AiReviewWorkService, useValue: {} },
         { provide: EmailReceiptParserToolsService, useValue: {} },
+        { provide: BondSeriesService, useValue: {} },
         { provide: TransactionRuleToolPrepService, useValue: prep },
         ...unused,
       ],

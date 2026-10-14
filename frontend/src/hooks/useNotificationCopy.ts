@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { benchmarkLabel } from '@/components/securities/detail/bond-labels';
 
 /** Shared display copy for bell rows and reminder templates, including legacy fallback. */
 type Notification = {
@@ -106,7 +107,7 @@ function joinList(items: string[], locale: string): string {
 export function useNotificationCopy() {
   const t = useTranslations('notifications');
   const locale = useLocale();
-  const { formatCurrency, formatNumber } = useNumberFormat();
+  const { formatCurrency, formatNumber, formatPercent } = useNumberFormat();
   const { formatDate } = useDateFormat();
   /**
    * A bill-due notification's headline, in the reader's language. `null` for anything
@@ -518,6 +519,210 @@ export function useNotificationCopy() {
       : null;
   };
 
+  /**
+   * The six bond rows (`docs/specs/bond-notifications.md`), composed from `data`
+   * alone. Amounts arrive as decimal strings and rates as fractions; a null
+   * amount says it is not known yet and why, never a zero. A row missing the
+   * facts its copy needs returns null and shows its stored English.
+   */
+  const bondCopy = (notification: Notification, part: 'title' | 'message'): string | null => {
+    if (!notification.type.startsWith('BOND_')) return null;
+    const data = notification.data ?? {};
+    const text = (value: unknown): string | null =>
+      typeof value === 'string' && value !== '' ? value : null;
+    const decimal = (value: unknown): number | null => {
+      const raw = text(value);
+      if (raw === null) return null;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const whole = (value: unknown): number | null =>
+      typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+    const day = (value: unknown): string | null => {
+      const raw = text(value);
+      return raw !== null && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? formatDate(raw) : null;
+    };
+    const observation = (value: string): string => {
+      const match = /^(\d{4})-(\d{2})$/.exec(value);
+      if (!match) return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDate(value) : value;
+      return new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'long',
+        timeZone: 'UTC',
+      }).format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)));
+    };
+    const rate = (fraction: unknown): string | null => {
+      const value = decimal(fraction);
+      return value === null ? null : formatPercent(value * 100, 2);
+    };
+    const series = text(data.seriesCode);
+    const currency = text(data.currency);
+    const quantity = whole(data.quantity);
+
+    const payoutSentence = (): string | null => {
+      if (!currency) return null;
+      const payout = decimal(data.payout);
+      if (data.payout !== null && payout === null) return null;
+      if (payout !== null) {
+        return t('bond.payoutKnown', { payout: formatCurrency(payout, currency) });
+      }
+      const code = typeof data.missing === 'string' ? data.missing : '';
+      const known = ['RATE_UNKNOWN', 'TERMS_INCOMPLETE', 'PURCHASE_OUTSIDE_SALE_WINDOW'];
+      return t('bond.payoutUnknown', {
+        reason: t(known.includes(code) ? `bond.reason.${code}` : 'bond.reason.other'),
+      });
+    };
+
+    const causeLine = (cause: unknown): string | null => {
+      if (typeof cause !== 'object' || cause === null) return null;
+      const c = cause as Record<string, unknown>;
+      switch (c.code) {
+        case 'OBSERVATION_MISSING': {
+          const benchmark = text(c.benchmarkId);
+          const label = text(c.observation);
+          if (!benchmark || !label) return null;
+          const publisher = text(c.publisher);
+          return publisher
+            ? t('bond.cause.observation', {
+                observation: observation(label),
+                benchmark: benchmarkLabel(t, benchmark),
+                publisher,
+              })
+            : t('bond.cause.observationNoPublisher', {
+                observation: observation(label),
+                benchmark: benchmarkLabel(t, benchmark),
+              });
+        }
+        case 'TERMS_INCOMPLETE': {
+          const code = text(c.seriesCode);
+          return code ? t('bond.cause.terms', { series: code }) : null;
+        }
+        case 'PURCHASE_OUTSIDE_SALE_WINDOW': {
+          const code = text(c.seriesCode);
+          const date = day(c.purchaseDate);
+          const from = day(c.from);
+          const to = day(c.to);
+          return code && date && from && to
+            ? t('bond.cause.purchase', { series: code, date, from, to })
+            : null;
+        }
+        case 'LOTS_UNDERIVABLE': {
+          const code = text(c.refusalCode);
+          if (!code) return null;
+          const rowAction = text(c.action);
+          const rowDate = day(c.date);
+          // A row raised before the cause named its transaction keeps the older line.
+          if (!rowAction || !rowDate) return t('bond.cause.lots', { code });
+          // The bell's own labels (`bond.action.*`): the `investments` namespace
+          // is not in the public client catalog the bell loads.
+          const args = {
+            action: t(t.has(`bond.action.${rowAction}`) ? `bond.action.${rowAction}` : 'bond.action.other'),
+            date: rowDate,
+            code,
+          };
+          if (code === 'SERIES_NOT_DETERMINED' || code === 'SERIES_REQUIRED') {
+            return t('bond.cause.lotsRowSeries', args);
+          }
+          return t(
+            code === 'REMOVAL_EXCEEDS_SERIES' ? 'bond.cause.lotsRowRemoval' : 'bond.cause.lotsRow',
+            args,
+          );
+        }
+        default:
+          return null;
+      }
+    };
+
+    switch (notification.type) {
+      case 'BOND_MATURITY_SOON':
+      case 'BOND_REDEMPTION_UNBOOKED': {
+        const date = day(data.maturityDate);
+        const payout = payoutSentence();
+        if (!series || quantity === null || !date || payout === null) return null;
+        const args = { series, date, quantity: formatNumber(quantity, 0), payout };
+        const key =
+          notification.type === 'BOND_MATURITY_SOON' ? 'bond.maturitySoon' : 'bond.unbooked';
+        return t(`${key}${part === 'title' ? 'Title' : 'Message'}`, args);
+      }
+      case 'BOND_INTEREST_PAYMENT': {
+        const date = day(data.paymentDate);
+        if (!series || !currency || quantity === null || !date) return null;
+        // A null amount is a valid producer state (a rate not published yet); a
+        // missing key is an older row and proves nothing.
+        if (!('amount' in data)) return null;
+        const amount = decimal(data.amount);
+        if (data.amount !== null && amount === null) return null;
+        const args = { series, date, quantity: formatNumber(quantity, 0) };
+        if (part === 'title') return t('bond.interestTitle', args);
+        return amount === null
+          ? t('bond.interestMessageUnknown', args)
+          : t('bond.interestMessage', { ...args, amount: formatCurrency(amount, currency) });
+      }
+      case 'BOND_RATE_RESET': {
+        const date = day(data.periodStart);
+        const annual = rate(data.annualRate);
+        const period = whole(data.periodIndex);
+        if (!series || !date || annual === null || period === null) return null;
+        if (part === 'title') return t('bond.rateResetTitle', { series });
+        return t('bond.rateResetMessage', {
+          series,
+          date,
+          period: formatNumber(period, 0),
+          rate: annual,
+        });
+      }
+      case 'BOND_BENCHMARK_PUBLISHED': {
+        const benchmark = text(data.benchmarkId);
+        const publisher = text(data.publisher);
+        const label = text(data.observation);
+        const value = text(data.value);
+        const more = whole(data.affectedMore);
+        if (!benchmark || !publisher || !label || !value || more === null) return null;
+        if (!Array.isArray(data.affected)) return null;
+        const lines: string[] = [];
+        for (const entry of data.affected as unknown[]) {
+          if (typeof entry !== 'object' || entry === null) return null;
+          const e = entry as Record<string, unknown>;
+          const code = text(e.seriesCode);
+          const date = day(e.periodStart);
+          if (!code || !date) return null;
+          const annual = e.annualRate === null ? null : rate(e.annualRate);
+          if (e.annualRate !== null && annual === null) return null;
+          // A projected rate is an assumption, never shown as a known one.
+          const line =
+            annual === null
+              ? 'bond.benchmarkSeriesUnknown'
+              : e.rateSource === 'PROJECTED'
+                ? 'bond.benchmarkSeriesProjected'
+                : 'bond.benchmarkSeries';
+          lines.push(t(line, { series: code, date, rate: annual ?? '' }));
+        }
+        if (lines.length === 0) return null;
+        const figure = decimal(value);
+        if (figure === null) return null;
+        const args = {
+          benchmark: benchmarkLabel(t, benchmark),
+          publisher,
+          observation: observation(label),
+          // A rate series stores a fraction; any other unit is shown as a plain number.
+          value: data.unit === 'RATE_FRACTION' ? formatPercent(figure * 100, 2) : formatNumber(figure, 4),
+        };
+        if (part === 'title') return t('bond.benchmarkTitle', args);
+        const tail = more > 0 ? [t('bond.benchmarkMore', { more: formatNumber(more, 0) })] : [];
+        return [t('bond.benchmarkIntro', args), ...lines, ...tail].join(' ');
+      }
+      case 'BOND_DATA_MISSING': {
+        if (!Array.isArray(data.causes) || data.causes.length === 0) return null;
+        if (part === 'title') return t('bond.missingTitle');
+        const lines = (data.causes as unknown[]).map(causeLine);
+        if (lines.some((line) => line === null)) return null;
+        return t('bond.missingMessage', { causes: lines.join(' ') });
+      }
+      default:
+        return null;
+    }
+  };
+
   return (notification: Notification) => ({
     title:
       priceCopy(notification, 'title') ??
@@ -528,6 +733,7 @@ export function useNotificationCopy() {
       balanceThresholdTitle(notification) ??
       bankSyncCopy(notification, 'title') ??
       emailReceiptsAttentionTitle(notification) ??
+      bondCopy(notification, 'title') ??
       notification.title,
     message:
       priceCopy(notification, 'message') ??
@@ -538,6 +744,7 @@ export function useNotificationCopy() {
       balanceThresholdMessage(notification) ??
       bankSyncCopy(notification, 'message') ??
       emailReceiptsAttentionMessage(notification) ??
+      bondCopy(notification, 'message') ??
       notification.message,
   });
 }

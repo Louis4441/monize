@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, HttpException } from "@nestjs/common";
 import { ToolExecutorService } from "./tool-executor.service";
 import { AccountsService } from "../../accounts/accounts.service";
 import { CategoriesService } from "../../categories/categories.service";
@@ -26,6 +26,8 @@ import { RelayAttachmentStore } from "../relay/relay-attachment.store";
 import { AttachmentDto } from "./dto/ai-query.dto";
 import { AiReviewWorkService } from "../../ai-review/ai-review-work.service";
 import { EmailReceiptParserToolsService } from "../../email-receipts/parsers/email-receipt-parser-tools.service";
+import { SeriesFetchError } from "../../bonds/bond-adapter";
+import { BondSeriesService } from "../../bonds/bond-series.service";
 import { TransactionRuleToolPrepService } from "../../transaction-rules/rule-tool-prep.service";
 
 describe("ToolExecutorService", () => {
@@ -46,6 +48,7 @@ describe("ToolExecutorService", () => {
   let splitService: Record<string, jest.Mock>;
   let builtInReports: Record<string, jest.Mock>;
   let exchangeRates: { convertOnDate: jest.Mock };
+  let bondSeries: { fetchSeries: jest.Mock };
   let attachmentPrep: Record<string, jest.Mock>;
   let attachmentStore: Record<string, jest.Mock>;
 
@@ -604,6 +607,14 @@ describe("ToolExecutorService", () => {
       }),
     };
 
+    bondSeries = {
+      fetchSeries: jest.fn().mockResolvedValue({
+        id: "i1",
+        seriesCode: "EDO1036",
+        termsProvider: "obligacjeskarbowe.pl",
+        created: true,
+      }),
+    };
     exchangeRates = {
       convertOnDate: jest.fn().mockResolvedValue({
         amount: 1500,
@@ -684,6 +695,7 @@ describe("ToolExecutorService", () => {
         // Exercised in tool-executor.transaction-rules.spec.ts.
         { provide: AiReviewWorkService, useValue: {} },
         { provide: EmailReceiptParserToolsService, useValue: {} },
+        { provide: BondSeriesService, useValue: bondSeries },
         { provide: TransactionRuleToolPrepService, useValue: {} },
         // Real prep + builder wrapping the mocked services, so the executor's
         // name resolution, preview building, and pending-action construction
@@ -2749,6 +2761,96 @@ describe("ToolExecutorService", () => {
         search: "x",
       });
       expect(result.isError).toBe(true);
+    });
+  });
+
+  describe("fetch_bond_series (reference data, no card)", () => {
+    it("fetches through the service for the country and series code, with no pending action", async () => {
+      const result = await service.execute(userId, "fetch_bond_series", {
+        countryCode: "PL",
+        seriesCode: "EDO1036",
+      });
+
+      expect(bondSeries.fetchSeries).toHaveBeenCalledWith(
+        userId,
+        "PL",
+        "EDO1036",
+      );
+      expect(result.pendingAction).toBeUndefined();
+      expect(result.isError).toBeFalsy();
+      expect(result.data).toMatchObject({ created: true });
+      expect(result.summary).toMatch(/Stored bond series EDO1036/);
+      expect(result.sources[0].type).toBe("bond_series");
+    });
+
+    it("says nothing was fetched for a series that was already stored", async () => {
+      bondSeries.fetchSeries.mockResolvedValueOnce({
+        id: "i1",
+        seriesCode: "EDO1036",
+        termsProvider: "PL_MF",
+        created: false,
+      });
+      const result = await service.execute(userId, "fetch_bond_series", {
+        countryCode: "PL",
+        seriesCode: "EDO1036",
+      });
+      expect(result.summary).toMatch(/already in the catalog/);
+    });
+
+    it("refuses a value the model was never to supply, before any fetch", async () => {
+      const result = await service.execute(userId, "fetch_bond_series", {
+        countryCode: "PL",
+        seriesCode: "EDO1036/../x",
+      });
+      expect(result.isError).toBe(true);
+      expect(bondSeries.fetchSeries).not.toHaveBeenCalled();
+    });
+
+    it("relays a refusal in its translated words, as a tool error", async () => {
+      bondSeries.fetchSeries.mockRejectedValueOnce(
+        new SeriesFetchError("SOURCE_UNAVAILABLE", {
+          series: "EDO1036",
+          country: "PL",
+        }),
+      );
+      const result = await service.execute(userId, "fetch_bond_series", {
+        countryCode: "PL",
+        seriesCode: "EDO1036",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.summary).toBe(
+        "The official source for series EDO1036 could not be read right now; try again later",
+      );
+    });
+
+    it("relays the per-user rate limit (429) in its translated words", async () => {
+      bondSeries.fetchSeries.mockRejectedValueOnce(
+        new HttpException(
+          {
+            message: "At most 10 bond series can be fetched per minute.",
+            errorCode: "SERIES_FETCH_RATE_LIMITED",
+          },
+          429,
+        ),
+      );
+      const result = await service.execute(userId, "fetch_bond_series", {
+        countryCode: "PL",
+        seriesCode: "EDO1036",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.summary).toBe(
+        "At most 10 bond series can be fetched per minute.",
+      );
+    });
+
+    it("gives a generic error for anything that is not a refusal", async () => {
+      bondSeries.fetchSeries.mockRejectedValueOnce(new Error("db down"));
+      const result = await service.execute(userId, "fetch_bond_series", {
+        countryCode: "PL",
+        seriesCode: "EDO1036",
+      });
+      expect(result.isError).toBe(true);
+      expect(result.summary).toBe("Could not fetch the bond series.");
     });
   });
 

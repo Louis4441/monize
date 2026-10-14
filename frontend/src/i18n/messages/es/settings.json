@@ -384,7 +384,8 @@
         "STRATEGIES": "Señales de estrategia",
         "BANK_SYNC": "Conexiones bancarias",
         "BANK_SYNC_ACTIVITY": "Resultados de la sincronización bancaria",
-        "EMAIL_RECEIPTS": "Recibos de correo"
+        "EMAIL_RECEIPTS": "Recibos de correo",
+        "BONDS": "Bonos"
       },
       "channelNotApplicable": "No aplicable a este tipo de notificación",
       "emailToggleLabel": "Correo (informe) para {category}",
@@ -816,7 +817,24 @@
       "totalRecords": "Total de registros",
       "skippedAttachments": "{count, plural, one {# archivo adjunto no se restauró} other {# archivos adjuntos no se restauraron}}: la copia no contenía bytes utilizables para ellos — faltaban o no pasaron su suma de comprobación al exportarla, o el fichero es anterior a las copias autocontenidas. Exporte una copia nueva cuando el almacenamiento de adjuntos esté correcto.",
       "unusableAiProviderKeys": "{count, plural, one {Se restauró # proveedor de IA sin una clave de API utilizable} other {Se restauraron # proveedores de IA sin claves de API utilizables}}: la copia de seguridad se creó antes de que las claves de proveedor viajaran en ella, así que la clave guardada pertenece al servidor que generó el archivo, o este servidor no tiene configurada ninguna clave de cifrado con la que almacenarla. Abre Ajustes → Proveedores de IA e introduce de nuevo la clave de API.",
-      "doneButton": "Listo"
+      "unlinkedBondSecurities": "{count, plural, one {Se restauró # valor de bono sin vínculo con su instrumento de bono} other {Se restauraron # valores de bono sin vínculo con sus instrumentos de bono}}: el catálogo de bonos de este servidor no incluye la serie (o la incluye en otra moneda), por lo que el motor de bonos ya no los valora y sus precios calculados no se restauraron. Abra cada valor y vuélvalo a vincular a un instrumento de bono.",
+      "unlinkedBondSeries": "{count, plural, one {# transacción de bonos perdió su serie} other {# transacciones de bonos perdieron su serie}} porque no se pudo obtener la serie de la fuente oficial. Se restauraron sin serie y seguirán sin ella hasta que la obtengas.",
+      "unrecoveredBondSeries": "Series de bonos de la copia de seguridad que no se pudieron obtener: {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "y {count} más",
+      "unrecoveredBondSeriesAction": "Para restaurarlas, abre el valor del bono, obtén la serie en su página (Actualizar) y elige la serie en las transacciones que no la tengan.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "el emisor aún no ha publicado esta serie",
+        "source-unavailable": "la fuente oficial no respondió; inténtalo de nuevo más tarde",
+        "no-adapter": "este servidor no tiene fuente para el país de este emisor",
+        "refused": "no se aceptó la respuesta de la fuente oficial",
+        "rate-limited": "la fuente oficial pidió reducir el ritmo; inténtalo de nuevo más tarde",
+        "not-attempted": "demasiadas series en una restauración; no se intentó",
+        "other": "motivo desconocido"
+      },
+      "doneButton": "Listo",
+      "unlinkedBondSecuritiesList": "Valores afectados: {symbols}.",
+      "unlinkedBondSecuritiesMore": "y {count} más"
     },
     "storedBackups": {
       "heading": "Copias de seguridad automáticas",

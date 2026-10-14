@@ -296,7 +296,30 @@
     "toastSaveFailed": "लेनदेन सहेजने में विफल",
     "exchangeRateUnresolved": "{from} से {to} की कोई दर उपलब्ध नहीं है। सहेजने से पहले एक दर, या परिवर्तित कुल, दर्ज करें।",
     "toastExchangeRateRequired": "मुद्राओं के बीच का सौदा सहेजने से पहले विनिमय दर दर्ज करें।",
-    "notAvailable": "उपलब्ध नहीं"
+    "notAvailable": "उपलब्ध नहीं",
+    "bondSeries": {
+      "label": "बॉन्ड सीरीज़",
+      "fromDate": "तारीख़ से निर्धारित",
+      "oldestFirst": "सबसे पुरानी पहले",
+      "loading": "सीरीज़ लोड हो रही हैं...",
+      "loadFailed": "सीरीज़ लोड नहीं हो सकीं।",
+      "retry": "पुनः प्रयास करें",
+      "fromDateCode": "तारीख से: {code}",
+      "noneOnSale": "इस तारीख पर बिक्री के लिए कोई सीरीज़ नहीं है",
+      "choose": "सीरीज़ चुनें",
+      "required": "इन शेयरों की सीरीज़ चुनें।",
+      "heldOption": "{code} ({quantity} धारित)",
+      "noLongerHeld": "{code} (इस तारीख पर अब धारित नहीं)",
+      "noLongerHeldUnknown": "सहेजी गई सीरीज़ (इस तारीख पर अब धारित नहीं)",
+      "storedSeries": "सहेजी गई सीरीज़",
+      "seriesOnSaleMonth": "{code} — {month} में बिक्री पर",
+      "seriesOnSaleRange": "{code} — {from} से {to} तक बिक्री पर"
+    },
+    "bondRedemption": {
+      "summary": "ब्याज {interest}, समय-पूर्व मोचन कटौती {deduction}, भुगतान {payout}",
+      "outsideSaleWindow": "इस सीरीज़ का एक लॉट उसकी बिक्री अवधि के बाहर खरीदा गया था, इसलिए मोचन को विभाजित नहीं किया जा सकता।",
+      "failed": "मोचन का विभाजन परिकलित नहीं किया जा सका।"
+    }
   },
   "newTransactionButton": {
     "label": "+ नया लेनदेन",

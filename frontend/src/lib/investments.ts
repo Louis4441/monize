@@ -38,6 +38,22 @@ import {
   PortfolioTagSummary,
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
+import type {
+  BondInstrumentSummary,
+  BondProgramSummary,
+  BondRedemptionSplit,
+  BondSeriesHoldings,
+  BondExpectedSeries,
+  BondSeriesOnSale,
+  FetchBondSeriesResult,
+  BondAssumption,
+  BondHistory,
+  BondOffer,
+  BondPriceRecompute,
+  BondRefreshProgress,
+  SecurityBondScenarios,
+  SecurityBondValuation,
+} from '@/types/bond';
 import {
   clearAllCache,
   dedupe,
@@ -627,6 +643,8 @@ export const investmentsApi = {
   // Create security
   createSecurity: async (data: CreateSecurityData): Promise<Security> => {
     const response = await apiClient.post<Security>('/securities', data);
+    // A link to a bond program makes the server write engine prices.
+    if (data.bondProgramId !== undefined) invalidateCache('investments:');
     return response.data;
   },
 
@@ -645,6 +663,9 @@ export const investmentsApi = {
     // an un-invalidated branch here later. One semantic helper shared with the
     // account-update and rate-refresh paths.
     invalidateScheduledFxReadModel();
+    // Linking or unlinking a bond program writes or deletes the engine's
+    // prices on the server, so every cached price read is stale.
+    if (data.bondProgramId !== undefined) invalidateCache('investments:');
     return response.data;
   },
 
@@ -944,6 +965,194 @@ export const investmentsApi = {
         },
       },
     );
+    return response.data;
+  },
+
+  // The catalog's programs, for the security form's program picker. Reference
+  // data, identical for every user, so it is not cached per user here.
+  listBondPrograms: async (): Promise<BondProgramSummary[]> => {
+    const response = await apiClient.get<BondProgramSummary[]>('/bonds/programs');
+    return response.data;
+  },
+
+  // The bond catalog's series, for the transaction form's series picker.
+  // Reference data, identical for every user, so it is not cached per user here.
+  listBondInstruments: async (): Promise<BondInstrumentSummary[]> => {
+    const response = await apiClient.get<BondInstrumentSummary[]>('/bonds/instruments');
+    return response.data;
+  },
+
+  // Reads a series from the official source into the catalog (or finds it
+  // already stored). Reference data, so no per-user cache to invalidate.
+  fetchBondSeries: async (
+    countryCode: string,
+    seriesCode: string,
+  ): Promise<FetchBondSeriesResult> => {
+    const response = await apiClient.post<FetchBondSeriesResult>(
+      '/bonds/instruments/fetch',
+      { countryCode, seriesCode },
+    );
+    return response.data;
+  },
+
+  // The series on sale today with what 100 of face value is worth at maturity.
+  // Reference data plus the engine, identical for every user. `assume` replaces
+  // the latest observation of a benchmark for every period that has not started
+  // (`<benchmarkId>:<fraction>`), so it is part of the request, not a cache key.
+  getBondOffer: async (
+    countryCode: string,
+    assume?: BondAssumption[],
+  ): Promise<BondOffer> => {
+    const params: Record<string, string> = { countryCode };
+    if (assume && assume.length > 0) {
+      params.assume = assume.map((a) => `${a.benchmarkId}:${a.value}`).join(',');
+    }
+    const response = await apiClient.get<BondOffer>('/bonds/offer', { params });
+    return response.data;
+  },
+
+  // How the terms of a program (or of every program) changed from one sale
+  // month to the next, with the months the catalog does not hold.
+  getBondHistory: async (
+    countryCode: string,
+    programCode?: string,
+  ): Promise<BondHistory> => {
+    const params: Record<string, string> = { countryCode };
+    if (programCode) params.programCode = programCode;
+    const response = await apiClient.get<BondHistory>('/bonds/history', { params });
+    return response.data;
+  },
+
+  // The open lots of a bond-linked security valued on `asOf` (the server's
+  // today when omitted). Uncached: a trade or a price write changes it.
+  // `assume` projects every period that has not started at that benchmark value.
+  getSecurityBondValuation: async (
+    securityId: string,
+    asOf?: string,
+    assume?: BondAssumption,
+  ): Promise<SecurityBondValuation> => {
+    const params: Record<string, string> = {};
+    if (asOf) params.asOf = asOf;
+    if (assume) params.assume = `${assume.benchmarkId}:${assume.value}`;
+    const response = await apiClient.get<SecurityBondValuation>(
+      `/bonds/securities/${securityId}/valuation`,
+      { params: Object.keys(params).length > 0 ? params : undefined },
+    );
+    return response.data;
+  },
+
+  // The series the server would infer for a BUY/REINVEST of the security on
+  // `date`; null when no stored series was on sale. Uncached: a fetch changes it.
+  getBondSeriesOnSale: async (
+    securityId: string,
+    date: string,
+  ): Promise<BondSeriesOnSale | null> => {
+    const response = await apiClient.get<BondSeriesOnSale | null>(
+      `/bonds/securities/${securityId}/series-on-sale`,
+      { params: { date } },
+    );
+    return response.data ?? null;
+  },
+
+  // The series code a purchase on `date` would carry, by the grammar of the
+  // security's program's country; nothing is fetched or stored.
+  getExpectedBondSeries: async (
+    securityId: string,
+    date: string,
+  ): Promise<BondExpectedSeries> => {
+    const response = await apiClient.get<BondExpectedSeries>(
+      `/bonds/securities/${securityId}/expected-series`,
+      { params: { date } },
+    );
+    return response.data;
+  },
+
+  // What redeeming `quantity` bonds of a series out of an account on `date` pays,
+  // split into returned principal and interest (the lots the removal takes, the
+  // engine's figures). `excludeTransactionId` leaves the row being edited out. A
+  // 400 carries the removal refusal as `errorCode`. Uncached: a trade changes it.
+  getBondRedemptionSplit: async (
+    securityId: string,
+    params: {
+      accountId: string;
+      bondInstrumentId: string;
+      date: string;
+      quantity: number;
+      excludeTransactionId?: string;
+    },
+  ): Promise<BondRedemptionSplit> => {
+    const { excludeTransactionId, ...rest } = params;
+    const response = await apiClient.get<BondRedemptionSplit>(
+      `/bonds/securities/${securityId}/redemption-split`,
+      { params: { ...rest, ...(excludeTransactionId ? { excludeTransactionId } : {}) } },
+    );
+    return response.data;
+  },
+
+  // The series (and quantities) the account holds of the security on `date`,
+  // for a removal's series picker. `excludeTransactionId` leaves the row being
+  // edited out. A 422 carries the lots refusal code. Uncached: a trade changes it.
+  getBondSeriesHoldings: async (
+    securityId: string,
+    accountId: string,
+    date: string,
+    excludeTransactionId?: string,
+  ): Promise<BondSeriesHoldings> => {
+    const response = await apiClient.get<BondSeriesHoldings>(
+      `/bonds/securities/${securityId}/series-holdings`,
+      {
+        params: {
+          accountId,
+          date,
+          ...(excludeTransactionId ? { excludeTransactionId } : {}),
+        },
+      },
+    );
+    return response.data;
+  },
+
+  // The lots valued on `asOf` (the server's today when omitted) under each assumed value (fractions, 1 to 6) of the
+  // benchmark, in one request. Uncached for the same reason as the valuation.
+  getSecurityBondScenarios: async (
+    securityId: string,
+    benchmarkId: string,
+    values: readonly string[],
+    asOf?: string,
+  ): Promise<SecurityBondScenarios> => {
+    const response = await apiClient.get<SecurityBondScenarios>(
+      `/bonds/securities/${securityId}/scenarios`,
+      {
+        params: {
+          benchmarkId,
+          values: values.join(','),
+          ...(asOf ? { asOf } : {}),
+        },
+      },
+    );
+    return response.data;
+  },
+
+  // How far the server's synchronous fetch for a bond program has got. Polled
+  // while a Refresh runs, so it is never cached.
+  getBondRefreshProgress: async (programId: string): Promise<BondRefreshProgress> => {
+    const response = await apiClient.get<BondRefreshProgress>(
+      `/bonds/programs/${programId}/refresh-progress`,
+    );
+    return response.data;
+  },
+
+  // Write the bond engine's daily prices for a linked security. Drops the
+  // cached investments answers only when a row was actually written or removed:
+  // a recompute that agreed with what is stored changed nothing to re-read.
+  recomputeSecurityBondPrices: async (
+    securityId: string,
+  ): Promise<BondPriceRecompute> => {
+    const response = await apiClient.post<BondPriceRecompute>(
+      `/bonds/securities/${securityId}/recompute`,
+    );
+    if (response.data?.written > 0 || response.data?.deleted > 0) {
+      invalidateCache('investments:');
+    }
     return response.data;
   },
 

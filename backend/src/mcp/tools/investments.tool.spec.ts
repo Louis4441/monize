@@ -21,6 +21,7 @@ describe("McpInvestmentsTools", () => {
   let actionBuilderRef: Record<string, jest.Mock>;
   let ctx: McpTestContext;
   const handlers: Record<string, (...args: any[]) => any> = {};
+  const configs: Record<string, any> = {};
 
   beforeEach(() => {
     portfolioService = {
@@ -143,8 +144,9 @@ describe("McpInvestmentsTools", () => {
 
     elicitInput = jest.fn();
     server = {
-      registerTool: jest.fn((name, _opts, handler) => {
+      registerTool: jest.fn((name, opts, handler) => {
         handlers[name] = handler;
+        configs[name] = opts;
       }),
       // confirmWrite() reads the client's advertised capabilities from the
       // session's server and sends the dialog through the request (ctx). The
@@ -1152,6 +1154,57 @@ describe("McpInvestmentsTools", () => {
       expect(parsed.count).toBe(1);
     });
 
+    it("forwards the series code to the prep and the resolved series to the write (INV-BOND-007)", async () => {
+      ctx.setUser({ userId: "u1", scopes: "write" });
+      investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
+        {
+          ...createPreview,
+          bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+          bondSeriesCode: "EDO1036",
+        },
+      );
+      investmentTransactionsService.create.mockResolvedValue({
+        id: "inv-1",
+        transactionDate: "2026-01-15",
+      });
+
+      await handlers["manage_investment_transactions"](
+        {
+          operation: "create",
+          items: [{ ...createArgs.items[0], bondSeriesCode: "EDO1036" }],
+        },
+        ctx,
+      );
+
+      expect(
+        investmentTransactionsService.prepareCreateInvestmentSingle,
+      ).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({ bondSeriesCode: "EDO1036" }),
+      );
+      expect(investmentTransactionsService.create).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          bondInstrumentId: "11111111-1111-5111-8111-111111111111",
+        }),
+      );
+    });
+
+    it("sends no series for a row that is not a bond", async () => {
+      ctx.setUser({ userId: "u1", scopes: "write" });
+      investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
+        createPreview,
+      );
+      investmentTransactionsService.create.mockResolvedValue({
+        id: "inv-1",
+        transactionDate: "2026-01-15",
+      });
+      await handlers["manage_investment_transactions"](createArgs, ctx);
+      expect(
+        investmentTransactionsService.create.mock.calls[0][1].bondInstrumentId,
+      ).toBeUndefined();
+    });
+
     it("forwards an explicit exchangeRate to the create prep (issue #744)", async () => {
       ctx.setUser({ userId: "u1", scopes: "write" });
       investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
@@ -1377,6 +1430,184 @@ describe("McpInvestmentsTools", () => {
       expect(relayService.emitPendingAction).toHaveBeenCalledTimes(2);
       const parsed = result.structuredContent as any;
       expect(parsed.status).toBe("preview_shown");
+    });
+
+    describe("a bond REDEEM (R2-1, R2-3, R2-6)", () => {
+      const SERIES = "11111111-1111-5111-8111-111111111111";
+      const split = {
+        principal: 1000,
+        interest: 470.5,
+        deduction: 0,
+        payout: 1470.5,
+        outcome: "filled" as const,
+      };
+      const redeemPreview = {
+        ...createPreview,
+        action: "REDEEM",
+        transactionDate: "2023-04-01",
+        symbol: "EDO",
+        securityName: "EDO bonds",
+        securityCurrency: "PLN",
+        quantity: 10,
+        price: 100,
+        totalAmount: 1000,
+        cashAmount: 1470.5,
+        accruedInterest: 47.05,
+        bondInstrumentId: SERIES,
+        bondSeriesCode: "EDO0423",
+        redemptionSplit: split,
+      };
+      const redeemArgs = {
+        operation: "create",
+        items: [
+          {
+            accountName: "Brokerage",
+            action: "REDEEM",
+            date: "2023-04-01",
+            security: "EDO",
+            quantity: 10,
+          },
+        ],
+      };
+
+      it("rejects an empty or blank series code, as the assistant's schema does, and trims a padded one", () => {
+        const schema = configs["manage_investment_transactions"].inputSchema;
+        const withCode = (bondSeriesCode: string) =>
+          schema.safeParse({
+            operation: "create",
+            items: [{ ...redeemArgs.items[0], bondSeriesCode }],
+          });
+        expect(withCode("").success).toBe(false);
+        expect(withCode("   ").success).toBe(false);
+        expect(withCode("x".repeat(41)).success).toBe(false);
+        const padded = withCode("  EDO0423 ");
+        expect(padded.success).toBe(true);
+        expect(padded.data.items[0].bondSeriesCode).toBe("EDO0423");
+      });
+
+      it("writes the accrued interest the card showed (single create)", async () => {
+        ctx.setUser({ userId: "u1", scopes: "write" });
+        investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
+          redeemPreview,
+        );
+        investmentTransactionsService.create.mockResolvedValue({
+          id: "inv-1",
+          transactionDate: "2023-04-01",
+        });
+        await handlers["manage_investment_transactions"](redeemArgs, ctx);
+        expect(investmentTransactionsService.create).toHaveBeenCalledWith(
+          "u1",
+          expect.objectContaining({
+            action: "REDEEM",
+            price: 100,
+            accruedInterest: 47.05,
+          }),
+        );
+      });
+
+      it("writes the accrued interest of every row (bulk create)", async () => {
+        ctx.setUser({ userId: "u1", scopes: "write" });
+        investmentTransactionsService.prepareCreateInvestmentBulk.mockResolvedValue(
+          {
+            okPreviews: Array(6).fill(redeemPreview),
+            okIndex: [0, 1, 2, 3, 4, 5],
+            previewRows: Array(6).fill({ status: "ok" }),
+            skipped: [],
+          },
+        );
+        investmentTransactionsService.createBulk.mockResolvedValue({
+          created: Array(6).fill({ id: "i1" }),
+          skipped: [],
+        });
+        await handlers["manage_investment_transactions"](
+          {
+            operation: "create",
+            items: Array(6).fill(redeemArgs.items[0]),
+          },
+          ctx,
+        );
+        expect(investmentTransactionsService.createBulk).toHaveBeenCalledWith(
+          "u1",
+          Array(6).fill(
+            expect.objectContaining({ price: 100, accruedInterest: 47.05 }),
+          ),
+        );
+      });
+
+      it("writes the accrued interest of an edit (single and bulk update)", async () => {
+        ctx.setUser({ userId: "u1", scopes: "write" });
+        investmentTransactionsService.previewUpdateInvestmentTransaction.mockResolvedValue(
+          { ...redeemPreview, transactionId: "it1" },
+        );
+        investmentTransactionsService.update.mockResolvedValue({ id: "it1" });
+        await handlers["manage_investment_transactions"](
+          {
+            operation: "update",
+            items: [{ transactionId: "it1", accruedInterest: 47.05 }],
+          },
+          ctx,
+        );
+        expect(investmentTransactionsService.update).toHaveBeenLastCalledWith(
+          "u1",
+          "it1",
+          expect.objectContaining({ accruedInterest: 47.05 }),
+        );
+
+        investmentTransactionsService.prepareUpdateInvestmentBulk.mockResolvedValue(
+          {
+            okRows: ["it1", "it2", "it3", "it4", "it5", "it6"].map((id) => ({
+              ...redeemPreview,
+              transactionId: id,
+            })),
+            okIndex: [0, 1, 2, 3, 4, 5],
+            previewRows: [],
+            skipped: [],
+          },
+        );
+        await handlers["manage_investment_transactions"](
+          {
+            operation: "update",
+            items: ["it1", "it2", "it3", "it4", "it5", "it6"].map(
+              (transactionId) => ({ transactionId, accruedInterest: 47.05 }),
+            ),
+          },
+          ctx,
+        );
+        expect(investmentTransactionsService.update).toHaveBeenLastCalledWith(
+          "u1",
+          "it6",
+          expect.objectContaining({ accruedInterest: 47.05 }),
+        );
+      });
+
+      it("shows the series, the interest and the split in the confirmation text, and warns when the figures differ", async () => {
+        ctx.setUser({ userId: "u1", scopes: "write" });
+        server.server.getClientCapabilities.mockReturnValue({
+          elicitation: { form: {} },
+        });
+        elicitInput.mockResolvedValue({ action: "decline" });
+        investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
+          {
+            ...redeemPreview,
+            redemptionSplit: { ...split, outcome: "differs" },
+          },
+        );
+        await handlers["manage_investment_transactions"](redeemArgs, ctx);
+        const message = elicitInput.mock.calls[0][0].message as string;
+        expect(message).toContain("Series: EDO0423");
+        expect(message).toContain("Accrued interest: 47.05");
+        expect(message).toContain(
+          "Redemption split: principal 1000, interest 470.5, deduction 0, payout 1470.5",
+        );
+        expect(message).toContain("Warning");
+      });
+
+      it("describes how the server fills a bond REDEEM in the schema", () => {
+        const shape =
+          configs["manage_investment_transactions"].inputSchema.shape.items
+            .element.shape;
+        expect(shape.accruedInterest.description).toMatch(/redemption split/);
+      });
     });
 
     it("updates a single investment transaction", async () => {

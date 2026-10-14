@@ -216,6 +216,8 @@ describe("TransactionBulkUpdateService", () => {
       // Takes the holdings advisory lock for the parents' embedded investment
       // rows; the real method resolves to nothing.
       lockEmbeddedInvestmentScopes: jest.fn().mockResolvedValue(undefined),
+      // The post-commit bond price recompute (INV-BOND-005).
+      recomputeBondPricesAfterWrite: jest.fn().mockResolvedValue(undefined),
     };
 
     tagsService = {
@@ -1089,6 +1091,19 @@ describe("TransactionBulkUpdateService", () => {
       });
       mockManagerCreateQueryBuilder.mockReturnValue(updateQb);
 
+      splitService.applyParentStatusToTransferCounterparts.mockImplementationOnce(
+        async (
+          _m: unknown,
+          _id: string,
+          _u: string,
+          _s: unknown,
+          touched: Set<string>,
+        ) => {
+          touched.add("sec-1");
+          return new Set<string>();
+        },
+      );
+
       await service.bulkUpdate(userId, {
         mode: "ids",
         transactionIds: ["parent-tx"],
@@ -1104,6 +1119,13 @@ describe("TransactionBulkUpdateService", () => {
         "parent-tx",
         userId,
         TransactionStatus.VOID,
+        expect.any(Set),
+      );
+      // After the commit, the securities of the embedded rows that crossed the
+      // boundary are repriced (INV-BOND-005, INV-CACHE-001).
+      expect(splitService.recomputeBondPricesAfterWrite).toHaveBeenCalledWith(
+        userId,
+        new Set(["sec-1"]),
       );
     });
 

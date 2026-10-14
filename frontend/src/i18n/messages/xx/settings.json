@@ -384,7 +384,8 @@
         "STRATEGIES": "[XX-Strategy signals-XX]",
         "BANK_SYNC": "[XX-Bank connections-XX]",
         "BANK_SYNC_ACTIVITY": "[XX-Bank sync results-XX]",
-        "EMAIL_RECEIPTS": "[XX-Email receipts-XX]"
+        "EMAIL_RECEIPTS": "[XX-Email receipts-XX]",
+        "BONDS": "[XX-Bonds-XX]"
       },
       "channelNotApplicable": "[XX-Not applicable for this notification type-XX]",
       "emailToggleLabel": "[XX-Report email for {category}-XX]",
@@ -816,7 +817,24 @@
       "totalRecords": "[XX-Total records-XX]",
       "skippedAttachments": "[XX-{count, plural, one {# attachment was not restored} other {# attachments were not restored}}: the backup did not carry usable bytes for them — they were missing or failed their checksum when it was exported, or the file predates self-contained backups. Export a fresh backup once attachment storage is healthy to capture them.-XX]",
       "unusableAiProviderKeys": "[XX-{count, plural, one {# AI provider was restored without a usable API key} other {# AI providers were restored without usable API keys}}: the backup was written before provider keys were included in it, so the stored key belongs to the server that made the file, or this server has no encryption key configured to store one. Open Settings → AI Providers and enter the API key again.-XX]",
-      "doneButton": "[XX-Done-XX]"
+      "unlinkedBondSecurities": "[XX-{count, plural, one {# bond security was restored unlinked from its bond instrument} other {# bond securities were restored unlinked from their bond instruments}}: this server's bond catalog does not carry the series (or carries it in another currency), so the bond engine no longer prices them and their calculated prices were not restored. Open each security and link it to a bond instrument again.-XX]",
+      "unlinkedBondSeries": "[XX-{count, plural, one {# bond transaction lost its series} other {# bond transactions lost their series}} because their series could not be obtained from the official source. They were restored without a series and keep none until you fetch it.-XX]",
+      "unrecoveredBondSeries": "[XX-{count} bond series named in the backup could not be fetched.-XX]",
+      "unrecoveredBondSeriesItem": "[XX-{series} ({country}): {reason}-XX]",
+      "unrecoveredBondSeriesMore": "[XX-and {count} more-XX]",
+      "unrecoveredBondSeriesAction": "[XX-To restore them, open the bond security, fetch the series on its page (Refresh) and choose the series on the transactions that lack it.-XX]",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "[XX-the issuer has not published this series (yet)-XX]",
+        "source-unavailable": "[XX-the official source did not answer; try again later-XX]",
+        "no-adapter": "[XX-this server has no source for this issuer's country-XX]",
+        "refused": "[XX-the official source's answer was not accepted-XX]",
+        "rate-limited": "[XX-the official source asked to slow down; try again later-XX]",
+        "not-attempted": "[XX-too many series in one restore; not attempted-XX]",
+        "other": "[XX-unknown reason-XX]"
+      },
+      "doneButton": "[XX-Done-XX]",
+      "unlinkedBondSecuritiesList": "[XX-Affected securities: {symbols}.-XX]",
+      "unlinkedBondSecuritiesMore": "[XX-and {count} more-XX]"
     },
     "storedBackups": {
       "heading": "[XX-Automatic Backups-XX]",

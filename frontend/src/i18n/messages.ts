@@ -28,6 +28,7 @@ const NAMESPACES = [
   "ai",
   "aiReview",
   "bills",
+  "bonds",
   "budgets",
   "calendar",
   "categories",

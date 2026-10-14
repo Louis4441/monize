@@ -37,6 +37,10 @@ const GUARDED_DIRS = [
   "payees/lookup/google-places",
   "bank-sync/providers/enable-banking",
   "currencies",
+  // Every bond request (NBP, GUS and the series fetch of obligacjeskarbowe.pl)
+  // is made in `SeriesHttp.gated` (`bonds/series-http.ts`); the benchmark refresh
+  // and the adapters receive that gated function and never call the network.
+  "bonds",
 ];
 
 /** A bare global `fetch(` or a raw `https.get(` -- an outbound request. */
@@ -75,6 +79,7 @@ describe("outbound provider calls are answerable to the breaker", () => {
     );
     expect(callers.map((file) => file.path).sort()).toEqual([
       "bank-sync/providers/enable-banking/enable-banking.client.ts",
+      "bonds/series-http.ts",
       "currencies/providers/frankfurter-fx.provider.ts",
       "payees/lookup/google-places/google-places.client.ts",
       "securities/deutsche-boerse-finance.service.ts",
@@ -158,6 +163,9 @@ describe("a response is recorded in one place per client", () => {
     // Frankfurter: two, the same split again. Every call funnels through one
     // `request` method, so the rule lives there once.
     ["currencies/providers/frankfurter-fx.provider.ts", 2],
+    // Bond fetches (series, and the NBP and GUS benchmarks): one, in
+    // `SeriesHttp.gated`, the door every bond request goes through.
+    ["bonds/series-http.ts", 1],
   ])("%s records an arrived response in at most %i places", (file, allowed) => {
     const source = readFileSync(join(SRC_ROOT, file), "utf8");
     const occurrences = source.split("recordSuccess(").length - 1;

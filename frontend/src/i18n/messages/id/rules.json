@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Tidak ada transaksi yang diubah} other {# transaksi diubah}}. Anda dapat membatalkannya dari riwayat tindakan.",
-      "aiReviewsQueued": "{count, plural, other {# transaksi dimasukkan ke antrean tinjauan AI}}."
+      "changedNoUndo": "{count, plural, other {# transaksi diubah}}.",
+      "aiReviewsQueued": "{count, plural, other {# transaksi dimasukkan ke antrean tinjauan AI}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# transaksi sudah memiliki permintaan tinjauan AI yang terbuka, sehingga tidak ada yang baru dimasukkan ke antrean}}.",
+      "noChanges": "Tidak ada transaksi yang diubah."
     },
     "done": {
       "summary": "{count, plural, =0 {Tidak ada transaksi yang diubah.} other {# transaksi diubah.}}",

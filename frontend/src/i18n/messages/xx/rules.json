@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "[XX-{count, plural, =0 {No transactions were changed} one {# transaction changed} other {# transactions changed}}. You can undo this from the action history.-XX]",
-      "aiReviewsQueued": "[XX-{count, plural, one {# transaction queued for AI review} other {# transactions queued for AI review}}.-XX]"
+      "changedNoUndo": "[XX-{count, plural, one {# transaction changed} other {# transactions changed}}.-XX]",
+      "aiReviewsQueued": "[XX-{count, plural, one {# transaction queued for AI review} other {# transactions queued for AI review}}.-XX]",
+      "aiReviewsAlreadyQueued": "[XX-{count, plural, one {# transaction already had an open AI review request, so nothing new was queued} other {# transactions already had an open AI review request, so nothing new was queued}}.-XX]",
+      "noChanges": "[XX-No transactions were changed.-XX]"
     },
     "done": {
       "summary": "[XX-{count, plural, =0 {No transactions were changed.} one {# transaction was changed.} other {# transactions were changed.}}-XX]",

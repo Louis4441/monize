@@ -48,6 +48,7 @@ describe("InvestmentTransactionsService", () => {
   let netWorthService: Record<string, jest.Mock>;
   let exchangeRateService: Record<string, jest.Mock>;
   let currenciesService: Record<string, jest.Mock>;
+  let bondHoldingsService: Record<string, jest.Mock>;
   let dataSource: DataSourceMock;
   let mockQueryRunner: Record<string, any>;
   let mockActionHistoryService: Record<string, jest.Mock>;
@@ -122,6 +123,7 @@ describe("InvestmentTransactionsService", () => {
     fundingAccount: null,
     transactionSplitId: null,
     transactionSplit: null,
+    bondInstrumentId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -149,6 +151,7 @@ describe("InvestmentTransactionsService", () => {
     fundingAccount: null,
     transactionSplitId: null,
     transactionSplit: null,
+    bondInstrumentId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -176,6 +179,7 @@ describe("InvestmentTransactionsService", () => {
     fundingAccount: null,
     transactionSplitId: null,
     transactionSplit: null,
+    bondInstrumentId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -264,6 +268,7 @@ describe("InvestmentTransactionsService", () => {
     };
 
     securitiesService = {
+      recomputeBondPricesAfterWrite: jest.fn().mockResolvedValue(undefined),
       findOne: jest.fn().mockResolvedValue(mockSecurity),
       resolveBySymbolOrName: jest
         .fn()
@@ -397,6 +402,13 @@ describe("InvestmentTransactionsService", () => {
     });
     mockQueryRunner = { manager: mocks.manager };
 
+    // A bond redemption's split and the series an account holds; a spec that
+    // exercises them sets the answers.
+    bondHoldingsService = {
+      seriesHoldings: jest.fn().mockResolvedValue({ holdings: [] }),
+      redemptionSplit: jest.fn(),
+    };
+
     service = new InvestmentTransactionsService(
       dataSource as never,
       accountsService as never,
@@ -409,6 +421,7 @@ describe("InvestmentTransactionsService", () => {
       mockActionHistoryService as never,
       exchangeRateService as never,
       currenciesService as never,
+      bondHoldingsService as never,
     );
   });
 
@@ -463,6 +476,31 @@ describe("InvestmentTransactionsService", () => {
       );
       expect(investmentTransactionsRepository.save).toHaveBeenCalled();
       expect(result).toEqual(mockBuyTransaction);
+    });
+
+    it("recomputes the bond-engine prices of its security after the commit (R7)", async () => {
+      await service.create(userId, createBuyDto);
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+      // After the write: the holdings were rebuilt first.
+      expect(
+        holdingsService.rebuildScopesFromTransactions.mock
+          .invocationCallOrder[0],
+      ).toBeLessThan(
+        securitiesService.recomputeBondPricesAfterWrite.mock
+          .invocationCallOrder[0],
+      );
+    });
+
+    it("does not recompute for a VOID row, which recorded nothing", async () => {
+      await service.create(userId, {
+        ...createBuyDto,
+        status: TransactionStatus.VOID,
+      });
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).not.toHaveBeenCalled();
     });
 
     it("updates holdings for a BUY transaction at the commission-inclusive unit cost", async () => {
@@ -1951,6 +1989,27 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
+    it("recomputes the bond-engine prices of the old and the new security after the edit (R7)", async () => {
+      const existingTx = { ...mockBuyTransaction };
+      investmentTransactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(createMockQueryBuilder(existingTx))
+        .mockReturnValueOnce(
+          createMockQueryBuilder({ ...existingTx, quantity: 20 }),
+        );
+      transactionRepository.findOne.mockResolvedValue({
+        id: cashTransactionId,
+        userId,
+        accountId: cashAccountId,
+        amount: -1509.99,
+      });
+
+      await service.update(userId, transactionId, { quantity: 20 });
+
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId, securityId]);
+    });
+
     it("updates transaction fields and re-applies effects", async () => {
       // findOne returns existing BUY transaction
       const existingTx = { ...mockBuyTransaction };
@@ -2609,6 +2668,20 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
+    it("recomputes the bond-engine prices of its security after the delete (R7)", async () => {
+      const mockQB = createMockQueryBuilder({ ...mockBuyTransaction });
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        mockQB,
+      );
+      transactionRepository.findOne.mockResolvedValue(null);
+
+      await service.remove(userId, transactionId);
+
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+    });
+
     it("reverses effects and deletes the transaction", async () => {
       const tx = { ...mockBuyTransaction, transactionId: cashTransactionId };
       const mockQB = createMockQueryBuilder(tx);
@@ -3095,6 +3168,16 @@ describe("InvestmentTransactionsService", () => {
      * from create/update/remove, so two concurrent writers of one account
      * deadlock (40P01).
      */
+    it("recomputes the bond-engine prices of the security whose row crossed the VOID boundary (R7)", async () => {
+      stageLocks([invLockRow()], [cashLockRow()]);
+
+      await service.updateStatus(userId, transactionId, TransactionStatus.VOID);
+
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+    });
+
     it("takes the holdings advisory lock before its first row lock", async () => {
       stageLocks([invLockRow()], [cashLockRow()]);
 
@@ -4215,6 +4298,13 @@ describe("InvestmentTransactionsService", () => {
         holdingsDeleted: 5,
         accountsReset: 2,
       });
+      // No lots are left on any linked bond: its engine rows go (R7).
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [
+        mockBuyTransaction.securityId,
+        mockSellTransaction.securityId,
+      ]);
     });
 
     it("handles zero transactions gracefully", async () => {
@@ -6468,6 +6558,13 @@ describe("InvestmentTransactionsService", () => {
       expect(result).toHaveProperty("transferIn");
     });
 
+    it("recomputes the bond-engine prices of the security after the transfer (R7)", async () => {
+      await service.transferSecurity(userId, transferDto);
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, [securityId]);
+    });
+
     it("does not create any cash transaction", async () => {
       await service.transferSecurity(userId, transferDto);
       expect(transactionRepository.create).not.toHaveBeenCalled();
@@ -6713,6 +6810,51 @@ describe("InvestmentTransactionsService", () => {
       // Edit propagated to the linked leg too.
       expect(inLeg.quantity).toBe(50);
       expect(dataSource.transaction).toHaveBeenCalled();
+    });
+
+    it("update keeps the stored series of both legs when the edit changes neither it, the security nor the date (INV-BOND-007)", async () => {
+      const STORED = "22222222-2222-5222-8222-222222222222";
+      const original = mockQueryRunner.manager.query.getMockImplementation();
+      mockQueryRunner.manager.query.mockImplementation(
+        async (sql: string, params?: unknown[]) => {
+          const text = String(sql);
+          if (text.includes("s.bond_program_id AS id")) {
+            return [{ id: "prog-1", program_code: "EDO" }];
+          }
+          if (text.includes("bond_auto_fetch")) {
+            return [
+              {
+                id: securityId,
+                user_id: userId,
+                symbol: "EDO",
+                currency_code: "PLN",
+                bond_program_id: "prog-1",
+                bond_auto_fetch: false,
+              },
+            ];
+          }
+          if (text.includes("counterpart_account_id")) return [];
+          // The program holds no such series any more: only the rule that
+          // keeps an unchanged stored value lets it through.
+          if (text.includes("id = $1::uuid AND bond_program_id")) return [];
+          return original ? original(sql, params) : [];
+        },
+      );
+      const { outLeg, inLeg } = makeLegs();
+      outLeg.bondInstrumentId = STORED;
+      inLeg.bondInstrumentId = STORED;
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await service.update(userId, "leg-out", {
+        quantity: 50,
+        bondInstrumentId: STORED,
+      });
+
+      expect(outLeg.bondInstrumentId).toBe(STORED);
+      expect(inLeg.bondInstrumentId).toBe(STORED);
     });
 
     it("update rejects changing the transfer direction", async () => {
@@ -7680,6 +7822,26 @@ describe("InvestmentTransactionsService", () => {
       expect(result.skipped).toEqual([]);
     });
 
+    it("recomputes the bond-engine prices once per security after the whole batch, not once per row (R7)", async () => {
+      const createSpy = jest
+        .spyOn(service, "create")
+        .mockResolvedValueOnce({ id: "inv-1", securityId: "s1" } as never)
+        .mockResolvedValueOnce({ id: "inv-2", securityId: "s1" } as never)
+        .mockResolvedValueOnce({ id: "inv-3", securityId: "s2" } as never);
+
+      await service.createBulk(userId, [dto(), dto(), dto()]);
+
+      for (const call of createSpy.mock.calls) {
+        expect(call[2]).toEqual({ deferBondRecompute: true });
+      }
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        securitiesService.recomputeBondPricesAfterWrite,
+      ).toHaveBeenCalledWith(userId, ["s1", "s1", "s2"]);
+    });
+
     it("isolates a failing row into skipped without aborting the rest", async () => {
       jest
         .spyOn(service, "create")
@@ -8084,6 +8246,1326 @@ describe("InvestmentTransactionsService", () => {
           cashAccountId,
           -10062.5,
         );
+      });
+    });
+  });
+
+  /**
+   * INV-BOND-007: every share-moving row of a program-linked security names a
+   * series of that program, resolved by `resolveTransactionSeries` inside the
+   * write's own transaction and before anything is written.
+   * Canonical adversarial input: a rejected command reintroduced through a
+   * second entry point -- so each write path of the service is driven.
+   * Minimal mutation: delete the `resolveTransactionSeries` call of one path.
+   */
+  describe("the bond series of a share-moving row (INV-BOND-007)", () => {
+    const PROGRAM = "prog-1";
+    const SERIES_ON_SALE = "11111111-1111-5111-8111-111111111111";
+    const OTHER_SERIES = "22222222-2222-5222-8222-222222222222";
+    const buyDto = {
+      accountId,
+      securityId,
+      action: InvestmentAction.BUY,
+      transactionDate: "2026-10-15",
+      quantity: 10,
+      price: 100,
+      commission: 0,
+    };
+
+    /** Answers the resolver's statements; everything else as the harness does. */
+    /** A row of the bond ledger query (`loadBondLedger`). */
+    const ledgerRow = (
+      over: Partial<{
+        id: string;
+        action: string;
+        tx_date: string;
+        quantity: string;
+        account_id: string;
+        bond_instrument_id: string | null;
+      }>,
+    ) => ({
+      id: "row-x",
+      action: "BUY",
+      status: "UNRECONCILED",
+      tx_date: "2026-01-10",
+      quantity: "10",
+      account_id: accountId,
+      bond_instrument_id: SERIES_ON_SALE,
+      counterpart_account_id: null,
+      ...over,
+    });
+
+    /**
+     * Answers the resolver's statements and the write guard's ledger reads;
+     * everything else as the harness does. `ledgers` are the answers of
+     * successive ledger reads (the guard reads it before the mutation and again
+     * after it); the last repeats.
+     */
+    const bondDatabase = (opts: {
+      linked?: boolean;
+      inProgram?: string[];
+      onSale?: string[];
+      ledgers?: Array<Array<ReturnType<typeof ledgerRow>>>;
+      /**
+       * The answers of successive reads of the price band
+       * (`findQuantitiesNotBonds`: the rows outside it); the last repeats,
+       * none at all means no row is out of band.
+       */
+      band?: Array<Array<{ id: string; price: string; face: string }>>;
+    }) => {
+      const original = mockQueryRunner.manager.query.getMockImplementation();
+      let ledgerReads = 0;
+      let bandReads = 0;
+      mockQueryRunner.manager.query.mockImplementation(
+        async (sql: string, params?: unknown[]) => {
+          const text = String(sql);
+          if (text.includes("bond_auto_fetch")) {
+            return [
+              {
+                id: securityId,
+                user_id: userId,
+                symbol: "EDO",
+                currency_code: "PLN",
+                bond_program_id: opts.linked === false ? null : PROGRAM,
+                bond_auto_fetch: false,
+              },
+            ];
+          }
+          if (text.includes("t.price IS NOT NULL")) {
+            const all = opts.band ?? [[]];
+            const rows = all[Math.min(bandReads, all.length - 1)];
+            bandReads += 1;
+            return rows;
+          }
+          if (text.includes("FROM bond_programs WHERE id")) {
+            return [
+              {
+                issuer_country_code: "PL",
+                issuer_code: "PL_MF",
+                program_code: "EDO",
+              },
+            ];
+          }
+          if (text.includes("counterpart_account_id")) {
+            const all = opts.ledgers ?? [[]];
+            const rows = all[Math.min(ledgerReads, all.length - 1)];
+            ledgerReads += 1;
+            return rows;
+          }
+          if (text.includes("s.bond_program_id AS id")) {
+            return [
+              opts.linked === false
+                ? { id: null, program_code: null }
+                : { id: PROGRAM, program_code: "EDO" },
+            ];
+          }
+          if (text.includes("id = $1::uuid AND bond_program_id")) {
+            return (opts.inProgram ?? []).includes(String(params?.[0]))
+              ? [{ "?column?": 1 }]
+              : [];
+          }
+          if (text.includes("saleWindow")) {
+            return (opts.onSale ?? []).map((id) => ({ id }));
+          }
+          if (text.includes("SELECT series_code")) {
+            return [{ series_code: "EDO1036" }];
+          }
+          return original ? original(sql, params) : [];
+        },
+      );
+    };
+    const created = () =>
+      mockQueryRunner.manager.create.mock.calls
+        .filter(([entity]: any[]) => entity === InvestmentTransaction)
+        .map(([, data]: any[]) => data);
+
+    beforeEach(() => {
+      accountsService.findOne.mockImplementation((_u: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === cashAccountId) return Promise.resolve(mockCashAccount);
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(mockBuyTransaction),
+      );
+    });
+
+    describe("create (also bulk, AI and MCP, which commit through it)", () => {
+      it("infers the series on sale on the date and stores it", async () => {
+        bondDatabase({ onSale: [SERIES_ON_SALE] });
+        await service.create(userId, buyDto);
+        expect(created()[0]).toMatchObject({
+          bondInstrumentId: SERIES_ON_SALE,
+        });
+      });
+
+      it("stores a series of the program that is named, whatever is on sale", async () => {
+        bondDatabase({ inProgram: [OTHER_SERIES], onSale: [SERIES_ON_SALE] });
+        await service.create(userId, {
+          ...buyDto,
+          bondInstrumentId: OTHER_SERIES,
+        });
+        expect(created()[0]).toMatchObject({ bondInstrumentId: OTHER_SERIES });
+      });
+
+      it("refuses a series of another program before anything is written", async () => {
+        bondDatabase({ inProgram: [], onSale: [SERIES_ON_SALE] });
+        await expect(
+          service.create(userId, { ...buyDto, bondInstrumentId: OTHER_SERIES }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(created()).toEqual([]);
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+        expect(
+          holdingsService.rebuildScopesFromTransactions,
+        ).not.toHaveBeenCalled();
+        expect(
+          securitiesService.recomputeBondPricesAfterWrite,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("refuses an acquisition no stored series covers (SERIES_NOT_DETERMINED), naming the date, before anything is written", async () => {
+        bondDatabase({ onSale: [] });
+        await expect(service.create(userId, buyDto)).rejects.toThrow(
+          /2026-10-15/,
+        );
+        expect(created()).toEqual([]);
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+      });
+
+      it("does not guess when two stored series were on sale", async () => {
+        bondDatabase({ onSale: [SERIES_ON_SALE, OTHER_SERIES] });
+        await expect(service.create(userId, buyDto)).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+        expect(created()).toEqual([]);
+      });
+
+      it("leaves a removal without a series when none is named, and checks one that is", async () => {
+        bondDatabase({ inProgram: [SERIES_ON_SALE], onSale: [] });
+        await service.create(userId, {
+          ...buyDto,
+          action: InvestmentAction.SELL,
+        });
+        expect(created()[0]).toMatchObject({ bondInstrumentId: null });
+
+        mockQueryRunner.manager.create.mockClear();
+        await service.create(userId, {
+          ...buyDto,
+          action: InvestmentAction.SELL,
+          bondInstrumentId: SERIES_ON_SALE,
+        });
+        expect(created()[0]).toMatchObject({
+          bondInstrumentId: SERIES_ON_SALE,
+        });
+
+        await expect(
+          service.create(userId, {
+            ...buyDto,
+            action: InvestmentAction.SELL,
+            bondInstrumentId: OTHER_SERIES,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it("never sets a series on a security that is not linked to a program, and refuses one that is named", async () => {
+        bondDatabase({ linked: false, onSale: [SERIES_ON_SALE] });
+        await service.create(userId, buyDto);
+        expect(created()[0]).toMatchObject({ bondInstrumentId: null });
+
+        mockQueryRunner.manager.create.mockClear();
+        await expect(
+          service.create(userId, { ...buyDto, bondInstrumentId: OTHER_SERIES }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(created()).toEqual([]);
+      });
+
+      it("refuses a SELL naming a series the account does not hold enough of (REMOVAL_EXCEEDS_SERIES), after the mutation, so nothing commits", async () => {
+        const buy = ledgerRow({ id: "b1", quantity: "5" });
+        const sell = ledgerRow({
+          id: "written-1",
+          action: "SELL",
+          tx_date: "2026-10-15",
+          quantity: "10",
+        });
+        bondDatabase({
+          inProgram: [SERIES_ON_SALE],
+          ledgers: [[buy], [buy, sell]],
+        });
+        mockQueryRunner.manager.save.mockImplementationOnce(
+          async (data: object) => ({ ...data, id: "written-1" }),
+        );
+        const attempt = service.create(userId, {
+          ...buyDto,
+          action: InvestmentAction.SELL,
+          bondInstrumentId: SERIES_ON_SALE,
+        });
+        await expect(attempt).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        // The check ran inside the write's transaction, after the mutation;
+        // the throw rolls the scoped transaction back, so nothing after it ran.
+        expect(mockQueryRunner.manager.save).toHaveBeenCalled();
+        expect(
+          securitiesService.recomputeBondPricesAfterWrite,
+        ).not.toHaveBeenCalled();
+        expect(mockActionHistoryService.record).not.toHaveBeenCalled();
+      });
+
+      it("refuses a SELL that names no series when it removes more bonds than the account holds (OVER_REMOVAL)", async () => {
+        const buy = ledgerRow({ id: "b1", quantity: "5" });
+        const sell = ledgerRow({
+          id: "written-1",
+          action: "SELL",
+          tx_date: "2026-10-15",
+          quantity: "10",
+          bond_instrument_id: null,
+        });
+        bondDatabase({ ledgers: [[buy], [buy, sell]] });
+        await expect(
+          service.create(userId, { ...buyDto, action: InvestmentAction.SELL }),
+        ).rejects.toMatchObject({ response: { errorCode: "OVER_REMOVAL" } });
+      });
+
+      it("is not blocked by a removal problem that already existed about another row, but is when the refusal names the written row", async () => {
+        const buy = ledgerRow({ id: "b1", quantity: "5" });
+        const oldSell = ledgerRow({
+          id: "old",
+          action: "SELL",
+          tx_date: "2026-03-01",
+          quantity: "9",
+          bond_instrument_id: null,
+        });
+        bondDatabase({
+          onSale: [SERIES_ON_SALE],
+          ledgers: [
+            [buy, oldSell],
+            [buy, oldSell],
+          ],
+        });
+        await expect(service.create(userId, buyDto)).resolves.toBeDefined();
+
+        // The same old refusal, but now the written row is the one refused.
+        const written = ledgerRow({
+          id: "written-1",
+          action: "SELL",
+          tx_date: "2026-02-01",
+          quantity: "9",
+          bond_instrument_id: null,
+        });
+        bondDatabase({
+          onSale: [SERIES_ON_SALE],
+          ledgers: [
+            [buy, oldSell],
+            [buy, written, oldSell],
+          ],
+        });
+        mockQueryRunner.manager.save.mockImplementationOnce(
+          async (data: object) => ({ ...data, id: "written-1" }),
+        );
+        await expect(service.create(userId, buyDto)).rejects.toMatchObject({
+          response: { errorCode: "OVER_REMOVAL" },
+        });
+      });
+
+      it("refuses an ADD_SHARES or an unpaired TRANSFER_IN that names no series (SERIES_REQUIRED), never inferring one from the date", async () => {
+        bondDatabase({ onSale: [SERIES_ON_SALE] });
+        for (const action of [
+          InvestmentAction.ADD_SHARES,
+          InvestmentAction.TRANSFER_IN,
+        ]) {
+          await expect(
+            service.create(userId, { ...buyDto, action, price: undefined }),
+          ).rejects.toMatchObject({
+            response: { errorCode: "SERIES_REQUIRED" },
+          });
+        }
+        expect(created()).toEqual([]);
+
+        // Named, they are accepted.
+        bondDatabase({ inProgram: [OTHER_SERIES], onSale: [SERIES_ON_SALE] });
+        await service.create(userId, {
+          ...buyDto,
+          action: InvestmentAction.ADD_SHARES,
+          price: undefined,
+          bondInstrumentId: OTHER_SERIES,
+        });
+        expect(created()[0]).toMatchObject({ bondInstrumentId: OTHER_SERIES });
+      });
+
+      it("refuses a series on a cash action", async () => {
+        bondDatabase({ inProgram: [SERIES_ON_SALE] });
+        await expect(
+          service.create(userId, {
+            accountId,
+            securityId,
+            action: InvestmentAction.DIVIDEND,
+            transactionDate: "2026-10-15",
+            price: 5,
+            bondInstrumentId: SERIES_ON_SALE,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+    });
+
+    describe("update", () => {
+      it("refuses a series of another program before the reversal writes anything", async () => {
+        bondDatabase({ inProgram: [] });
+        await expect(
+          service.update(userId, transactionId, {
+            bondInstrumentId: OTHER_SERIES,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+        expect(accountsService.updateBalance).not.toHaveBeenCalled();
+      });
+
+      it("keeps the stored series as it is when the edit changes neither it, the security, the action nor the date, even if the program no longer holds it", async () => {
+        bondDatabase({ inProgram: [], onSale: [SERIES_ON_SALE] });
+        investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+          createMockQueryBuilder({
+            ...mockBuyTransaction,
+            bondInstrumentId: OTHER_SERIES,
+          }),
+        );
+        await service.update(userId, transactionId, {
+          description: "renamed",
+          bondInstrumentId: OTHER_SERIES,
+        });
+        // Not a request (the value is unchanged), so it is neither refused nor
+        // re-resolved: the stored value stays as it is.
+        expect(mockQueryRunner.manager.save).toHaveBeenCalledWith(
+          expect.objectContaining({ bondInstrumentId: OTHER_SERIES }),
+        );
+      });
+
+      it("keeps a NULL series of a legacy row on an unrelated edit instead of asking for a series (a BUY with none on sale, an ADD_SHARES)", async () => {
+        bondDatabase({ onSale: [] });
+        for (const action of [
+          InvestmentAction.BUY,
+          InvestmentAction.ADD_SHARES,
+        ]) {
+          mockQueryRunner.manager.save.mockClear();
+          investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+            createMockQueryBuilder({
+              ...mockBuyTransaction,
+              action,
+              bondInstrumentId: null,
+            }),
+          );
+          await service.update(userId, transactionId, {
+            description: "renamed",
+            action,
+            transactionDate: mockBuyTransaction.transactionDate,
+          });
+          expect(mockQueryRunner.manager.save).toHaveBeenCalledWith(
+            expect.objectContaining({ bondInstrumentId: null }),
+          );
+        }
+      });
+
+      it("resolves the series again when the date changes (a BUY with none on the new date is refused before any write)", async () => {
+        bondDatabase({ onSale: [] });
+        await expect(
+          service.update(userId, transactionId, {
+            transactionDate: "2025-02-20",
+          }),
+        ).rejects.toThrow(/2025-02-20/);
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+      });
+
+      it("asks for the series when an edit turns the row into an ADD_SHARES that has none (SERIES_REQUIRED)", async () => {
+        bondDatabase({ onSale: [SERIES_ON_SALE] });
+        await expect(
+          service.update(userId, transactionId, {
+            action: InvestmentAction.ADD_SHARES,
+          }),
+        ).rejects.toMatchObject({
+          response: { errorCode: "SERIES_REQUIRED" },
+        });
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+      });
+
+      it("refuses an edit after which a removal naming a series is not covered (REMOVAL_EXCEEDS_SERIES), and an unrelated edit is not blocked by an old refusal", async () => {
+        const buy = ledgerRow({ id: "b1", quantity: "10" });
+        const sell = ledgerRow({
+          id: transactionId,
+          action: "SELL",
+          tx_date: "2026-02-01",
+          quantity: "8",
+        });
+        // Derivable before; after the edit the BUY holds fewer than the SELL.
+        bondDatabase({
+          ledgers: [
+            [buy, sell],
+            [{ ...buy, quantity: "5" }, sell],
+          ],
+        });
+        await expect(
+          service.update(userId, transactionId, { quantity: 5 }),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+
+        // A refusal that already existed about another row blocks nothing.
+        const oldSell = ledgerRow({
+          id: "old",
+          action: "SELL",
+          tx_date: "2026-03-01",
+          quantity: "99",
+        });
+        bondDatabase({ ledgers: [[buy, oldSell]] });
+        await expect(
+          service.update(userId, transactionId, { description: "renamed" }),
+        ).resolves.toBeDefined();
+      });
+
+      it("stores a newly named series of the program", async () => {
+        bondDatabase({ inProgram: [OTHER_SERIES] });
+        await service.update(userId, transactionId, {
+          bondInstrumentId: OTHER_SERIES,
+        });
+        expect(mockQueryRunner.manager.save).toHaveBeenCalledWith(
+          expect.objectContaining({ bondInstrumentId: OTHER_SERIES }),
+        );
+      });
+    });
+
+    describe("remove and void (an acquisition leaving a later removal uncovered)", () => {
+      const buy = () => ledgerRow({ id: transactionId, quantity: "10" });
+      const sell = (series: string | null) =>
+        ledgerRow({
+          id: "s1",
+          action: "SELL",
+          tx_date: "2026-02-01",
+          quantity: "8",
+          bond_instrument_id: series,
+        });
+
+      it("refuses deleting a purchase a later SELL of its series depends on (REMOVAL_EXCEEDS_SERIES), after the mutation, so the delete rolls back", async () => {
+        bondDatabase({
+          ledgers: [[buy(), sell(SERIES_ON_SALE)], [sell(SERIES_ON_SALE)]],
+        });
+        await expect(
+          service.remove(userId, transactionId),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+        expect(mockQueryRunner.manager.remove).toHaveBeenCalled();
+        expect(mockActionHistoryService.record).not.toHaveBeenCalled();
+        expect(
+          securitiesService.recomputeBondPricesAfterWrite,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("refuses it as OVER_REMOVAL when the SELL names no series, and allows a delete nothing depends on", async () => {
+        bondDatabase({ ledgers: [[buy(), sell(null)], [sell(null)]] });
+        await expect(
+          service.remove(userId, transactionId),
+        ).rejects.toMatchObject({
+          response: { errorCode: "OVER_REMOVAL" },
+        });
+        bondDatabase({ ledgers: [[buy()], []] });
+        await expect(
+          service.remove(userId, transactionId),
+        ).resolves.toBeUndefined();
+      });
+
+      it("is not blocked by an older removal problem that was already there", async () => {
+        const old = [sell(null)];
+        bondDatabase({ ledgers: [old, old] });
+        await expect(
+          service.remove(userId, transactionId),
+        ).resolves.toBeUndefined();
+      });
+
+      it("refuses voiding such a purchase (updateStatus) under the same rule", async () => {
+        bondDatabase({
+          ledgers: [[buy(), sell(SERIES_ON_SALE)], [sell(SERIES_ON_SALE)]],
+        });
+        const bondQuery =
+          mockQueryRunner.manager.query.getMockImplementation()!;
+        mockQueryRunner.manager.query.mockImplementation(
+          async (sql: string, params?: unknown[]) =>
+            /FOR UPDATE/i.test(String(sql)) &&
+            /investment_transactions/i.test(String(sql))
+              ? [
+                  {
+                    id: transactionId,
+                    account_id: accountId,
+                    security_id: securityId,
+                    funding_account_id: null,
+                    transaction_id: null,
+                    transaction_split_id: null,
+                    linked_transaction_id: null,
+                    action: InvestmentAction.BUY,
+                    transaction_date: "2026-01-10",
+                    quantity: "10",
+                    price: "100",
+                    commission: "0",
+                    total_amount: "1000",
+                    exchange_rate: "1",
+                    status: TransactionStatus.CLEARED,
+                  },
+                ]
+              : bondQuery(sql, params),
+        );
+        await expect(
+          service.updateStatus(userId, transactionId, TransactionStatus.VOID),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+      });
+    });
+
+    describe("transferSecurity", () => {
+      const toAccountId = "account-2";
+      beforeEach(() => {
+        accountsService.findOne.mockImplementation((_u: string, aid: string) =>
+          Promise.resolve(
+            aid === toAccountId
+              ? {
+                  id: toAccountId,
+                  userId,
+                  accountType: "INVESTMENT",
+                  accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+                  currencyCode: "USD",
+                  name: "B",
+                }
+              : mockInvestmentAccount,
+          ),
+        );
+      });
+      const transferDto = {
+        fromAccountId: accountId,
+        toAccountId,
+        securityId,
+        transactionDate: "2026-11-01",
+        quantity: 5,
+        costPerShare: 100,
+      };
+
+      it("stores a named series on both legs, and none when none is named (FIFO across series)", async () => {
+        bondDatabase({ inProgram: [OTHER_SERIES] });
+        await service.transferSecurity(userId, {
+          ...transferDto,
+          bondInstrumentId: OTHER_SERIES,
+        });
+        expect(created().map((leg: any) => leg.bondInstrumentId)).toEqual([
+          OTHER_SERIES,
+          OTHER_SERIES,
+        ]);
+
+        mockQueryRunner.manager.create.mockClear();
+        await service.transferSecurity(userId, transferDto);
+        expect(created().map((leg: any) => leg.bondInstrumentId)).toEqual([
+          null,
+          null,
+        ]);
+      });
+
+      it("refuses a transfer after which the source does not hold enough of the series (REMOVAL_EXCEEDS_SERIES)", async () => {
+        const buy = ledgerRow({ id: "b1", quantity: "3" });
+        const out = ledgerRow({
+          id: "out-1",
+          action: "TRANSFER_OUT",
+          tx_date: "2026-11-01",
+          quantity: "5",
+          counterpart_account_id: toAccountId,
+        } as never);
+        bondDatabase({
+          inProgram: [SERIES_ON_SALE],
+          ledgers: [[buy], [buy, out]],
+        });
+        await expect(
+          service.transferSecurity(userId, {
+            ...transferDto,
+            bondInstrumentId: SERIES_ON_SALE,
+          }),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+      });
+
+      it("refuses a series of another program before either leg is written", async () => {
+        bondDatabase({ inProgram: [] });
+        await expect(
+          service.transferSecurity(userId, {
+            ...transferDto,
+            bondInstrumentId: OTHER_SERIES,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(created()).toEqual([]);
+      });
+    });
+
+    describe("a transaction embedded in a split", () => {
+      it("infers the series from the parent's date", async () => {
+        bondDatabase({ onSale: [SERIES_ON_SALE] });
+        accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+        await service.createEmbeddedForSplit(
+          mockQueryRunner.manager as never,
+          userId,
+          "2026-10-15",
+          "split-1",
+          accountId,
+          cashAccountId,
+          {
+            action: InvestmentAction.BUY,
+            securityId,
+            quantity: 10,
+            price: 100,
+            commission: 0,
+          },
+        );
+        expect(created().at(-1)).toMatchObject({
+          bondInstrumentId: SERIES_ON_SALE,
+        });
+      });
+
+      it("keeps the series its predecessor carried, NULL included, when the incoming split names none and none is on sale (a parent-only edit)", async () => {
+        bondDatabase({ onSale: [] });
+        accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+        const dto = {
+          action: InvestmentAction.BUY,
+          securityId,
+          quantity: 10,
+          price: 100,
+          commission: 0,
+        };
+        for (const carried of [null, OTHER_SERIES]) {
+          await service.createEmbeddedForSplit(
+            mockQueryRunner.manager as never,
+            userId,
+            "2026-10-15",
+            "split-1",
+            accountId,
+            cashAccountId,
+            dto,
+            undefined,
+            undefined,
+            { bondInstrumentId: carried },
+          );
+          expect(created().at(-1)).toMatchObject({ bondInstrumentId: carried });
+        }
+      });
+
+      it("takes a series the incoming split names over the carried one", async () => {
+        bondDatabase({ inProgram: [SERIES_ON_SALE], onSale: [] });
+        accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+        await service.createEmbeddedForSplit(
+          mockQueryRunner.manager as never,
+          userId,
+          "2026-10-15",
+          "split-1",
+          accountId,
+          cashAccountId,
+          {
+            action: InvestmentAction.BUY,
+            securityId,
+            quantity: 10,
+            price: 100,
+            commission: 0,
+            bondInstrumentId: SERIES_ON_SALE,
+          },
+          undefined,
+          undefined,
+          { bondInstrumentId: null },
+        );
+        expect(created().at(-1)).toMatchObject({
+          bondInstrumentId: SERIES_ON_SALE,
+        });
+      });
+
+      it("refuses before the row is written when no series covers the date", async () => {
+        bondDatabase({ onSale: [] });
+        accountsService.findOne.mockResolvedValue(mockInvestmentAccount);
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+        await expect(
+          service.createEmbeddedForSplit(
+            mockQueryRunner.manager as never,
+            userId,
+            "2026-10-15",
+            "split-1",
+            accountId,
+            cashAccountId,
+            {
+              action: InvestmentAction.BUY,
+              securityId,
+              quantity: 10,
+              price: 100,
+              commission: 0,
+            },
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("the preview of the AI assistant and MCP", () => {
+      beforeEach(() => {
+        securitiesService.resolveBySymbolOrName.mockResolvedValue({
+          match: mockSecurity,
+          candidates: [],
+        });
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+      });
+      const previewInput = {
+        accountId,
+        action: InvestmentAction.BUY,
+        transactionDate: "2026-10-15",
+        securityQuery: "AAPL",
+        quantity: 10,
+        price: 100,
+      };
+
+      it("shows the series the commit will store, inferred from the date", async () => {
+        bondDatabase({ onSale: [SERIES_ON_SALE] });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, previewInput),
+        ).resolves.toMatchObject({
+          bondInstrumentId: SERIES_ON_SALE,
+          bondSeriesCode: "EDO1036",
+        });
+      });
+
+      it("resolves a series code within the program, and refuses one it does not hold", async () => {
+        bondDatabase({ inProgram: [SERIES_ON_SALE] });
+        const original = mockQueryRunner.manager.query.getMockImplementation()!;
+        mockQueryRunner.manager.query.mockImplementation(
+          async (sql: string, params?: unknown[]) =>
+            String(sql).includes("UPPER(series_code) = UPPER($2)")
+              ? params?.[1] === "EDO1036"
+                ? [{ id: SERIES_ON_SALE }]
+                : []
+              : original(sql, params),
+        );
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, {
+            ...previewInput,
+            bondSeriesCode: "EDO9999",
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, {
+            ...previewInput,
+            bondSeriesCode: "EDO1036",
+          }),
+        ).resolves.toMatchObject({ bondInstrumentId: SERIES_ON_SALE });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, {
+            ...previewInput,
+            bondSeriesCode: "COI1030",
+          }),
+        ).rejects.toThrow(/COI1030/);
+      });
+
+      it("refuses what the commit would refuse: no series covers the date", async () => {
+        bondDatabase({ onSale: [] });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, previewInput),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it("shows no series for a security that is not linked", async () => {
+        bondDatabase({ linked: false });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, previewInput),
+        ).resolves.toMatchObject({
+          bondInstrumentId: null,
+          bondSeriesCode: null,
+        });
+      });
+    });
+
+    describe("the preview of an edit of a legacy row with no stored series (L4)", () => {
+      beforeEach(() => {
+        securitiesService.resolveBySymbolOrName.mockResolvedValue({
+          match: mockSecurity,
+          candidates: [],
+        });
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+      });
+      const legacy = (action: InvestmentAction) =>
+        investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+          createMockQueryBuilder({
+            ...mockBuyTransaction,
+            action,
+            bondInstrumentId: null,
+          }),
+        );
+
+      it.each([InvestmentAction.ADD_SHARES, InvestmentAction.BUY])(
+        "keeps the NULL series of a %s on a description-only edit instead of refusing it, as update() does",
+        async (action) => {
+          bondDatabase({ onSale: [] });
+          legacy(action);
+          await expect(
+            service.previewUpdateInvestmentTransaction(userId, transactionId, {
+              description: "renamed",
+            }),
+          ).resolves.toMatchObject({
+            bondInstrumentId: null,
+            bondSeriesCode: null,
+            description: "renamed",
+          });
+        },
+      );
+
+      it("still resolves the series when the edit changes the date, the action or names a series", async () => {
+        bondDatabase({ onSale: [] });
+        legacy(InvestmentAction.BUY);
+        await expect(
+          service.previewUpdateInvestmentTransaction(userId, transactionId, {
+            transactionDate: "2025-02-20",
+          }),
+        ).rejects.toMatchObject({
+          response: { errorCode: "SERIES_NOT_DETERMINED" },
+        });
+        legacy(InvestmentAction.BUY);
+        await expect(
+          service.previewUpdateInvestmentTransaction(userId, transactionId, {
+            action: InvestmentAction.ADD_SHARES,
+          }),
+        ).rejects.toMatchObject({
+          response: { errorCode: "SERIES_REQUIRED" },
+        });
+      });
+    });
+
+    /**
+     * INV-BOND-009: a bond-linked REDEEM through the assistant or MCP is split
+     * into returned principal and interest by the server, never left to the
+     * caller to book as a capital gain.
+     */
+    describe("the redemption split of a bond REDEEM in the preview (INV-BOND-009)", () => {
+      const EDO0423 = "33333333-3333-5333-8333-333333333333";
+      // 10 x EDO0423 redeemed at maturity: 147.05 per bond, i.e. 100.00 of
+      // principal and 47.05 of interest each.
+      const AT_MATURITY = {
+        date: "2023-04-01",
+        quantity: 10,
+        principal: "1000.00",
+        grossInterest: "470.50",
+        deduction: "0.00",
+        interest: "470.50",
+        principalReturned: "1000.00",
+        payout: "1470.50",
+        refusal: null,
+      };
+      const redeem = {
+        accountId,
+        action: InvestmentAction.REDEEM,
+        transactionDate: "2023-04-01",
+        securityQuery: "AAPL",
+        quantity: 10,
+      };
+
+      beforeEach(() => {
+        securitiesService.resolveBySymbolOrName.mockResolvedValue({
+          match: mockSecurity,
+          candidates: [],
+        });
+        securitiesService.findOne.mockResolvedValue(mockSecurity);
+        bondDatabase({});
+        bondHoldingsService.seriesHoldings.mockResolvedValue({
+          holdings: [
+            { instrumentId: EDO0423, seriesCode: "EDO0423", quantity: 10 },
+          ],
+        });
+        bondHoldingsService.redemptionSplit.mockResolvedValue(AT_MATURITY);
+      });
+
+      it("fills price 100.00 and accrued interest 470.50 when the caller gave neither, and names the series the split was worked out for", async () => {
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          redeem,
+        );
+        expect(bondHoldingsService.redemptionSplit).toHaveBeenCalledWith(
+          userId,
+          securityId,
+          accountId,
+          EDO0423,
+          "2023-04-01",
+          10,
+          undefined,
+        );
+        expect(preview).toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          totalAmount: 1000,
+          // The one cash row is the payout.
+          cashAmount: 1470.5,
+          bondInstrumentId: EDO0423,
+          bondSeriesCode: "EDO0423",
+          redemptionSplit: {
+            principal: 1000,
+            interest: 470.5,
+            deduction: 0,
+            payout: 1470.5,
+            outcome: "filled",
+          },
+        });
+      });
+
+      it("splits a price that is the whole payout per bond (147.05) instead of booking its interest as a gain", async () => {
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 147.05 },
+        );
+        expect(preview).toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          totalAmount: 1000,
+          cashAmount: 1470.5,
+        });
+        expect(preview.redemptionSplit?.outcome).toBe("filled");
+
+        // The same payout stated as an executed total.
+        const byTotal = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, totalAmount: 1470.5 },
+        );
+        expect(byTotal).toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          totalAmount: 1000,
+        });
+      });
+
+      it("fills only the price when the caller gave the interest", async () => {
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, accruedInterest: 470.5 },
+        );
+        expect(preview).toMatchObject({ price: 100, accruedInterest: 470.5 });
+        expect(preview.redemptionSplit?.outcome).toBe("filled");
+      });
+
+      it("keeps both figures the caller gave and flags a difference from the split instead of overriding", async () => {
+        const matching = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100, accruedInterest: 470.5 },
+        );
+        expect(matching.redemptionSplit?.outcome).toBe("matches");
+
+        const differing = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100, accruedInterest: 400 },
+        );
+        expect(differing).toMatchObject({
+          price: 100,
+          accruedInterest: 400,
+          cashAmount: 1400,
+          redemptionSplit: {
+            interest: 470.5,
+            payout: 1470.5,
+            outcome: "differs",
+          },
+        });
+
+        // A price that is not the payout, with no interest: kept, flagged.
+        const principalOnly = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100 },
+        );
+        expect(principalOnly).toMatchObject({
+          price: 100,
+          accruedInterest: 0,
+          redemptionSplit: { outcome: "differs" },
+        });
+      });
+
+      it("refuses the preview when the split cannot be worked out, guessing nothing", async () => {
+        bondHoldingsService.redemptionSplit.mockResolvedValue({
+          ...AT_MATURITY,
+          interest: null,
+          grossInterest: null,
+          principalReturned: null,
+          payout: null,
+          refusal: "RATE_UNKNOWN",
+        });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, redeem),
+        ).rejects.toMatchObject({
+          response: { errorCode: "RATE_UNKNOWN" },
+        });
+        // Both figures stated: the split is only a comparison, so no refusal.
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, {
+            ...redeem,
+            price: 100,
+            accruedInterest: 470.5,
+          }),
+        ).resolves.toMatchObject({
+          price: 100,
+          accruedInterest: 470.5,
+          redemptionSplit: null,
+        });
+      });
+
+      it("asks for the series when the account holds none or several, unless both figures were given", async () => {
+        bondHoldingsService.seriesHoldings.mockResolvedValue({
+          holdings: [
+            { instrumentId: EDO0423, seriesCode: "EDO0423", quantity: 5 },
+            { instrumentId: OTHER_SERIES, seriesCode: "EDO0523", quantity: 5 },
+          ],
+        });
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, redeem),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REDEEM_SERIES_REQUIRED" },
+        });
+        expect(bondHoldingsService.redemptionSplit).not.toHaveBeenCalled();
+        await expect(
+          service.previewCreateInvestmentTransaction(userId, {
+            ...redeem,
+            price: 100,
+            accruedInterest: 470.5,
+          }),
+        ).resolves.toMatchObject({ redemptionSplit: null });
+      });
+
+      it("takes the split of the series the caller named, whatever else the account holds", async () => {
+        bondDatabase({ inProgram: [EDO0423] });
+        const original = mockQueryRunner.manager.query.getMockImplementation()!;
+        mockQueryRunner.manager.query.mockImplementation(
+          async (sql: string, params?: unknown[]) =>
+            String(sql).includes("UPPER(series_code) = UPPER($2)")
+              ? [{ id: EDO0423 }]
+              : original(sql, params),
+        );
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, bondSeriesCode: "EDO0423" },
+        );
+        expect(bondHoldingsService.seriesHoldings).not.toHaveBeenCalled();
+        expect(bondHoldingsService.redemptionSplit).toHaveBeenCalledWith(
+          userId,
+          securityId,
+          accountId,
+          EDO0423,
+          "2023-04-01",
+          10,
+          undefined,
+        );
+        expect(preview).toMatchObject({ price: 100, accruedInterest: 470.5 });
+      });
+
+      it("leaves a security that is not linked to a bond program alone", async () => {
+        bondDatabase({ linked: false });
+        const preview = await service.previewCreateInvestmentTransaction(
+          userId,
+          { ...redeem, price: 100 },
+        );
+        expect(bondHoldingsService.redemptionSplit).not.toHaveBeenCalled();
+        expect(preview).toMatchObject({
+          price: 100,
+          accruedInterest: 0,
+          redemptionSplit: null,
+        });
+      });
+
+      it("works the split of an edit without the row being edited, keeps its stored series and pins none", async () => {
+        investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+          createMockQueryBuilder({
+            ...mockBuyTransaction,
+            action: InvestmentAction.REDEEM,
+            quantity: 10,
+            price: 100,
+            transactionDate: "2023-04-01",
+            bondInstrumentId: null,
+          }),
+        );
+        const preview = await service.previewUpdateInvestmentTransaction(
+          userId,
+          transactionId,
+          { description: "renamed" },
+        );
+        expect(bondHoldingsService.redemptionSplit).toHaveBeenCalledWith(
+          userId,
+          securityId,
+          accountId,
+          EDO0423,
+          "2023-04-01",
+          10,
+          transactionId,
+        );
+        // The stored row books the interest as a gain: the card says so.
+        expect(preview).toMatchObject({
+          bondInstrumentId: null,
+          price: 100,
+          accruedInterest: 0,
+          redemptionSplit: { interest: 470.5, outcome: "differs" },
+        });
+      });
+    });
+
+    /**
+     * INV-BOND-007 (M1): a split parent's deletion, void and replacement reach
+     * the lots through the embedded rows. The guard runs there too, so the whole
+     * parent operation rolls back; a replacement verifies once after the
+     * recreation.
+     */
+    describe("split-embedded rows (M1)", () => {
+      const embedded: any = {
+        id: "emb-1",
+        userId,
+        accountId,
+        securityId,
+        action: InvestmentAction.BUY,
+        quantity: 10,
+        price: 100,
+        commission: 0,
+        totalAmount: 1000,
+        exchangeRate: 1,
+        transactionDate: "2026-01-10",
+        transactionId: null,
+        transactionSplitId: "split-1",
+      };
+      const buyRow = ledgerRow({ id: "emb-1" });
+      const laterSell = ledgerRow({
+        id: "sell-1",
+        action: "SELL",
+        tx_date: "2026-02-01",
+        bond_instrument_id: SERIES_ON_SALE,
+      });
+
+      it("reverseAndRemoveEmbedded refuses removing a purchase a later SELL of its series depends on (REMOVAL_EXCEEDS_SERIES), after the removal, so the parent operation rolls back", async () => {
+        bondDatabase({
+          ledgers: [[buyRow, laterSell], [laterSell]],
+        });
+        const touched = new Set<string>();
+        await expect(
+          service.reverseAndRemoveEmbedded(
+            mockQueryRunner.manager as any,
+            userId,
+            embedded,
+            { touchedSecurityIds: touched },
+          ),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+        expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(embedded);
+        expect(
+          holdingsService.rebuildScopesFromTransactions,
+        ).toHaveBeenCalled();
+      });
+
+      it("reverseAndRemoveEmbedded removes what nothing depends on and reports the security for the post-commit recompute", async () => {
+        bondDatabase({ ledgers: [[buyRow], []] });
+        const touched = new Set<string>();
+        await service.reverseAndRemoveEmbedded(
+          mockQueryRunner.manager as any,
+          userId,
+          embedded,
+          { touchedSecurityIds: touched },
+        );
+        expect([...touched]).toEqual([securityId]);
+      });
+
+      it("reverseAndRemoveEmbedded leaves the verdict to a caller's own guard (a replacement recreates the row first)", async () => {
+        bondDatabase({ ledgers: [[buyRow, laterSell], [laterSell]] });
+        const callerGuard = {
+          track: jest.fn(),
+          verify: jest.fn(),
+        };
+        await service.reverseAndRemoveEmbedded(
+          mockQueryRunner.manager as any,
+          userId,
+          embedded,
+          { bondGuard: callerGuard },
+        );
+        expect(callerGuard.verify).not.toHaveBeenCalled();
+      });
+
+      it("applyParentStatusToEmbeddedRows refuses voiding an embedded purchase a later SELL depends on (REMOVAL_EXCEEDS_SERIES)", async () => {
+        transactionSplitRepository.find.mockResolvedValue([
+          { id: "split-1", kind: "investment" },
+        ]);
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, status: TransactionStatus.UNRECONCILED },
+        ]);
+        bondDatabase({ ledgers: [[buyRow, laterSell], [laterSell]] });
+        await expect(
+          service.applyParentStatusToEmbeddedRows(
+            mockQueryRunner.manager as any,
+            userId,
+            "parent-1",
+            TransactionStatus.VOID,
+          ),
+        ).rejects.toMatchObject({
+          response: { errorCode: "REMOVAL_EXCEEDS_SERIES" },
+        });
+      });
+
+      it("applyParentStatusToEmbeddedRows reports the security of a row that crossed the boundary, and says nothing of one that did not", async () => {
+        transactionSplitRepository.find.mockResolvedValue([
+          { id: "split-1", kind: "investment" },
+        ]);
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, status: TransactionStatus.UNRECONCILED },
+        ]);
+        bondDatabase({ ledgers: [[buyRow], []] });
+        const touched = new Set<string>();
+        await service.applyParentStatusToEmbeddedRows(
+          mockQueryRunner.manager as any,
+          userId,
+          "parent-1",
+          TransactionStatus.VOID,
+          touched,
+        );
+        expect([...touched]).toEqual([securityId]);
+
+        const idle = new Set<string>();
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, status: TransactionStatus.VOID },
+        ]);
+        await service.applyParentStatusToEmbeddedRows(
+          mockQueryRunner.manager as any,
+          userId,
+          "parent-1",
+          TransactionStatus.VOID,
+          idle,
+        );
+        expect(idle.size).toBe(0);
+      });
+
+      it("applyParentStatusToEmbeddedRows refuses un-voiding a row whose price is not a price per bond (QUANTITY_NOT_BONDS)", async () => {
+        transactionSplitRepository.find.mockResolvedValue([
+          { id: "split-1", kind: "investment" },
+        ]);
+        investmentTransactionsRepository.find.mockResolvedValue([
+          { ...embedded, price: 1, status: TransactionStatus.VOID },
+        ]);
+        bondDatabase({
+          band: [[], [{ id: "emb-1", price: "1.0000", face: "100.00" }]],
+        });
+        await expect(
+          service.applyParentStatusToEmbeddedRows(
+            mockQueryRunner.manager as any,
+            userId,
+            "parent-1",
+            TransactionStatus.UNRECONCILED,
+          ),
+        ).rejects.toMatchObject({
+          response: { errorCode: "QUANTITY_NOT_BONDS" },
+        });
+      });
+
+      it("recomputeBondPricesAfterSplitWrite dispatches the engine recompute for the ids, and nothing for none", async () => {
+        await service.recomputeBondPricesAfterSplitWrite(userId, []);
+        expect(
+          securitiesService.recomputeBondPricesAfterWrite,
+        ).not.toHaveBeenCalled();
+        await service.recomputeBondPricesAfterSplitWrite(userId, [securityId]);
+        expect(
+          securitiesService.recomputeBondPricesAfterWrite,
+        ).toHaveBeenCalledWith(userId, [securityId]);
       });
     });
   });

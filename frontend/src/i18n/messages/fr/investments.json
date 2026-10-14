@@ -296,7 +296,30 @@
     "toastSaveFailed": "Échec de l'enregistrement de la transaction",
     "exchangeRateUnresolved": "Aucun taux de {from} vers {to} n'est disponible. Saisissez-en un, ou le total converti, avant d'enregistrer.",
     "toastExchangeRateRequired": "Saisissez un taux de change avant d'enregistrer une opération entre devises.",
-    "notAvailable": "Non disponible"
+    "notAvailable": "Non disponible",
+    "bondSeries": {
+      "label": "Série d'obligations",
+      "fromDate": "Déterminée d'après la date",
+      "oldestFirst": "Les plus anciennes d'abord",
+      "loading": "Chargement des séries...",
+      "loadFailed": "Les séries n'ont pas pu être chargées.",
+      "retry": "Réessayer",
+      "fromDateCode": "D'après la date : {code}",
+      "noneOnSale": "Aucune série en vente à cette date",
+      "choose": "Choisir une série",
+      "required": "Choisissez la série de ces titres.",
+      "heldOption": "{code} ({quantity} détenus)",
+      "noLongerHeld": "{code} (n'est plus détenue à cette date)",
+      "noLongerHeldUnknown": "Série enregistrée (n'est plus détenue à cette date)",
+      "storedSeries": "Série enregistrée",
+      "seriesOnSaleMonth": "{code} — en vente {month}",
+      "seriesOnSaleRange": "{code} — en vente du {from} au {to}"
+    },
+    "bondRedemption": {
+      "summary": "Intérêts {interest}, retenue de remboursement anticipé {deduction}, versement {payout}",
+      "outsideSaleWindow": "Un lot de cette série a été acheté en dehors de sa période de vente ; le remboursement ne peut pas être ventilé.",
+      "failed": "La ventilation du remboursement n'a pas pu être calculée."
+    }
   },
   "newTransactionButton": {
     "label": "+ Nouvelle transaction",

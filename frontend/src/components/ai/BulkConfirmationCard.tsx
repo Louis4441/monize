@@ -148,7 +148,13 @@ export function BulkConfirmationCard({
           )
         : '';
       const symbol = row.symbol ?? '';
-      const primary = [date, [actionLabel, symbol].filter(Boolean).join(' ')]
+      const series = row.bondSeriesCode
+        ? `${t('confirmAction.bondSeries')} ${row.bondSeriesCode}`
+        : '';
+      const primary = [
+        date,
+        [actionLabel, symbol, series].filter(Boolean).join(' '),
+      ]
         .filter(Boolean)
         .join(' · ');
       const parts: string[] = [];
@@ -163,6 +169,17 @@ export function BulkConfirmationCard({
         parts.push(
           formatCurrency(row.totalAmount, row.securityCurrency ?? undefined),
         );
+      }
+      if (row.accruedInterest) {
+        parts.push(
+          `${t('confirmAction.accruedInterest')} ${formatCurrency(
+            row.accruedInterest,
+            row.securityCurrency ?? undefined,
+          )}`,
+        );
+      }
+      if (row.bondRedemptionSplit?.outcome === 'differs') {
+        parts.push(t('confirmAction.redemptionSplitDiffers'));
       }
       return { primary, secondary: parts.join(' · ') };
     }

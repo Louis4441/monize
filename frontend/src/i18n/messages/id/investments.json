@@ -296,7 +296,30 @@
     "toastSaveFailed": "Gagal menyimpan transaksi",
     "exchangeRateUnresolved": "Tidak ada kurs {from} ke {to}. Masukkan satu, atau total terkonversi, sebelum menyimpan.",
     "toastExchangeRateRequired": "Masukkan nilai tukar sebelum menyimpan perdagangan lintas mata uang.",
-    "notAvailable": "Tidak tersedia"
+    "notAvailable": "Tidak tersedia",
+    "bondSeries": {
+      "label": "Seri obligasi",
+      "fromDate": "Ditentukan dari tanggal",
+      "oldestFirst": "Yang terlama lebih dulu",
+      "loading": "Memuat seri...",
+      "loadFailed": "Seri tidak dapat dimuat.",
+      "retry": "Coba lagi",
+      "fromDateCode": "Dari tanggal: {code}",
+      "noneOnSale": "Tidak ada seri yang dijual pada tanggal ini",
+      "choose": "Pilih seri",
+      "required": "Pilih seri dari saham ini.",
+      "heldOption": "{code} ({quantity} dimiliki)",
+      "noLongerHeld": "{code} (tidak lagi dimiliki pada tanggal ini)",
+      "noLongerHeldUnknown": "Seri tersimpan (tidak lagi dimiliki pada tanggal ini)",
+      "storedSeries": "Seri tersimpan",
+      "seriesOnSaleMonth": "{code} — dijual {month}",
+      "seriesOnSaleRange": "{code} — dijual {from} sampai {to}"
+    },
+    "bondRedemption": {
+      "summary": "Bunga {interest}, potongan pelunasan dipercepat {deduction}, pembayaran {payout}",
+      "outsideSaleWindow": "Satu lot seri ini dibeli di luar periode penjualannya, sehingga pelunasan tidak dapat dirinci.",
+      "failed": "Rincian pelunasan tidak dapat dihitung."
+    }
   },
   "newTransactionButton": {
     "label": "+ Transaksi Baru",

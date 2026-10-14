@@ -16,6 +16,10 @@ import {
   claimLoanOccurrence,
 } from "../loan-installments/claim-loan-occurrence";
 import { AiReviewRequestsService } from "../ai-review/ai-review-requests.service";
+import {
+  AiReviewRequest,
+  OPEN_AI_REVIEW_STATUSES,
+} from "../ai-review/ai-review-request.entity";
 import { TagsService } from "../tags/tags.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import {
@@ -824,6 +828,35 @@ export class TransactionRulesApplierService {
             effects: recordAiReviewAlreadyQueued(row.effects, skipped),
           };
     });
+  }
+
+  /**
+   * The transactions among `transactionIds` that already hold an open request
+   * from `ruleId`: the rows `queueAiReviews` would skip (the enqueue's dedupe
+   * covers exactly `OPEN_AI_REVIEW_STATUSES`), so a preview counts only the
+   * requests a run would really add.
+   */
+  async openAiReviewTransactionIds(
+    m: EntityManager,
+    userId: string,
+    ruleId: string,
+    transactionIds: readonly string[],
+  ): Promise<Set<string>> {
+    if (transactionIds.length === 0) return new Set();
+    const open = await m.getRepository(AiReviewRequest).find({
+      select: { transactionId: true },
+      where: {
+        userId,
+        ruleId,
+        transactionId: In([...transactionIds]),
+        status: In([...OPEN_AI_REVIEW_STATUSES]),
+      },
+    });
+    return new Set(
+      open
+        .map((r) => r.transactionId)
+        .filter((id): id is string => id !== null),
+    );
   }
 
   planWithChains(

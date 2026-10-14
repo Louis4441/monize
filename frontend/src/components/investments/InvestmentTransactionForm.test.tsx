@@ -77,6 +77,7 @@ vi.mock('react-hot-toast', () => ({
 
 vi.mock('@/lib/errors', () => ({
   getErrorMessage: (_e: any, fallback: string) => fallback,
+  getErrorCode: () => undefined,
 }));
 
 vi.mock('@/components/securities/SecurityForm', () => ({

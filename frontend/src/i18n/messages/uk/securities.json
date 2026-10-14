@@ -146,7 +146,8 @@
       "yahoo": "Yahoo",
       "msn": "MSN",
       "lse": "LSE",
-      "deutsche_boerse": "Deutsche Börse"
+      "deutsche_boerse": "Deutsche Börse",
+      "bond_engine": "Модуль облігацій"
     },
     "types": {
       "select": "Оберіть тип...",
@@ -196,7 +197,23 @@
       "deleteConfirm": "Видалити",
       "deleteSuccess": "Клас активів «{name}» видалено",
       "deleteFailed": "Не вдалося видалити клас активів «{name}»"
-    }
+    },
+    "bondFetchAction": "Отримати {code} з офіційного джерела",
+    "bondFetching": "Отримання {code} від емітента та його референсних ставок. Це може тривати до хвилини.",
+    "bondFetchFailed": "Не вдалося отримати серію.",
+    "bondCurrencyLocked": "Цей цінний папір пов'язано з видом облігацій у валюті {linkedCurrency}. Поверніть валюту {linkedCurrency} або спершу від'єднайте вид облігацій (від'єднання видаляє розрахункові ціни).",
+    "bondProgramLabel": "Вид облігацій",
+    "bondProgramNone": "Не прив'язана",
+    "bondProgramCurrent": "Прив'язаний вид облігацій",
+    "bondProgramLoading": "Завантаження видів облігацій...",
+    "bondProgramLoadFailed": "Не вдалося завантажити види облігацій, тому вид облігацій поки що не можна прив’язати.",
+    "bondProgramRetry": "Повторити",
+    "bondNoPrograms": "У каталозі облігацій поки що немає жодного виду облігацій.",
+    "bondAutoFetchLabel": "Автоматично отримувати нові серії цього виду облігацій",
+    "bondAutoFetchHelp": "Якщо ввімкнено, Monize щодня зчитує нові серії цього виду облігацій з офіційного джерела, тож покупку можна записати, не отримуючи серію заздалегідь.",
+    "bondCountryLabel": "Країна",
+    "bondCountryOther": "Інша",
+    "bondCountryOtherInfo": "Підтримку облігацій інших країн можна запросити на <link>GitHub проєкту</link>."
   },
   "priceForm": {
     "dateLabel": "Дата",
@@ -342,6 +359,7 @@
     "nameRequired": "Назва обов'язкова",
     "nameMax": "Назва має бути не більше 255 символів",
     "currencyRequired": "Валюта обов'язкова",
+    "bondProgramRequired": "Вид облігацій обов'язковий",
     "descriptionMax": "Опис не може перевищувати 5000 символів"
   },
   "priceValidation": {

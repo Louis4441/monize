@@ -92,8 +92,10 @@ describe("AiActionSigningService", () => {
       quantity: 10,
       price: 100,
       commission: 0,
+      accruedInterest: 0,
       exchangeRate: 1,
       description: null,
+      bondInstrumentId: null,
     });
     const bulk: CreateInvestmentTransactionsDescriptor = {
       type: "create_investment_transactions",
@@ -113,6 +115,15 @@ describe("AiActionSigningService", () => {
       const tampered: CreateInvestmentTransactionsDescriptor = {
         ...bulk,
         rows: [row("s1"), { ...row("s2"), quantity: 9999 }],
+      };
+      expect(service.verify(tampered, sig)).toBe(false);
+    });
+
+    it("rejects tampering with a row's accrued interest (the card's interest is signed)", () => {
+      const sig = service.sign(bulk);
+      const tampered: CreateInvestmentTransactionsDescriptor = {
+        ...bulk,
+        rows: [row("s1"), { ...row("s2"), accruedInterest: 470.5 }],
       };
       expect(service.verify(tampered, sig)).toBe(false);
     });

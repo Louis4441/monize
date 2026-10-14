@@ -159,6 +159,20 @@ describe('NotificationPreferencesMatrix', () => {
     );
   });
 
+  it('renders the BONDS row with all four channels', async () => {
+    list.mockResolvedValue([
+      { category: 'BONDS', email: true, emailNotification: true, push: true, unifiedpush: false, throttleMinutes: 0, supportedChannels: allChannels },
+    ]);
+    await renderMatrix();
+    expect(screen.getByText('Bonds')).toBeInTheDocument();
+    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.queryByText('Not applicable for this notification type')).toBeNull();
+    await act(async () => fireEvent.click(screen.getAllByRole('switch')[2]));
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith('BONDS', { push: false }),
+    );
+  });
+
   it('enables the UnifiedPush column only when a UnifiedPush device is live', async () => {
     listDevices.mockResolvedValue([liveDevice, liveUnifiedDevice]);
     await renderMatrix();

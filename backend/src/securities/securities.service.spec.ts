@@ -1,3 +1,4 @@
+import { SeriesFetchError } from "../bonds/bond-adapter";
 import {
   BadRequestException,
   ConflictException,
@@ -17,6 +18,16 @@ jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
+/**
+ * The row `update()` locks (`SELECT ... FOR UPDATE`) mirrors the security the
+ * test had `findOne` return, as the database would return the same row.
+ */
+let lockedRowOf: () => Promise<unknown[]> = async () => [];
+const queryWith =
+  (other: (sql: string, params: unknown[]) => unknown) =>
+  async (sql: string, params: unknown[]) =>
+    /FOR UPDATE/.test(sql) ? lockedRowOf() : other(sql, params);
+
 describe("SecuritiesService", () => {
   let service: SecuritiesService;
   let securitiesRepository: Record<string, any>;
@@ -27,6 +38,8 @@ describe("SecuritiesService", () => {
   let mockSecurityPriceService: Record<string, jest.Mock>;
   let mockActionHistoryService: Record<string, jest.Mock>;
   let mockYahooFinanceService: Record<string, jest.Mock>;
+  let mockBondPriceService: Record<string, jest.Mock>;
+  let mockBondSeriesService: { fetchProgramOffer: jest.Mock };
   let queryRunnerManager: Record<string, jest.Mock>;
   let scopedRepository: Record<string, any>;
   let scopedManager: Record<string, jest.Mock>;
@@ -109,6 +122,25 @@ describe("SecuritiesService", () => {
       record: jest.fn().mockResolvedValue(null),
     };
 
+    mockBondPriceService = {
+      recomputeSecurity: jest
+        .fn()
+        .mockResolvedValue({ written: 0, deleted: 0 }),
+      clearEnginePrices: jest
+        .fn()
+        .mockResolvedValue({ deleted: 0, accountIds: [] }),
+      publishClearedPrices: jest.fn(),
+    };
+
+    mockBondSeriesService = {
+      fetchProgramOffer: jest.fn().mockResolvedValue({
+        listed: 1,
+        stored: 1,
+        alreadyStored: 0,
+        failed: 0,
+      }),
+    };
+
     mockYahooFinanceService = {
       fetchSecurityProfileDescription: jest.fn(),
       fetchSecurityProfile: jest.fn().mockResolvedValue(null),
@@ -155,8 +187,21 @@ describe("SecuritiesService", () => {
     for (const [name, impl] of Object.entries(queryRunnerManager)) {
       manager[name].mockImplementation(impl.getMockImplementation()!);
     }
+    lockedRowOf = async () => {
+      const first = securitiesRepository.findOne.mock.results[0];
+      const security = first ? await first.value : null;
+      return security
+        ? [
+            {
+              bond_program_id: security.bondProgramId ?? null,
+              security_type: security.securityType ?? null,
+              currency_code: security.currencyCode,
+            },
+          ]
+        : [];
+    };
     queryRunnerManager = manager;
-    manager.query.mockResolvedValue([]);
+    manager.query.mockImplementation(queryWith(() => []));
     mockDataSource = dataSource;
 
     service = new SecuritiesService(
@@ -164,6 +209,8 @@ describe("SecuritiesService", () => {
       mockYahooFinanceService as never,
       mockActionHistoryService as never,
       dataSource as never,
+      mockBondPriceService as never,
+      mockBondSeriesService as never,
     );
   });
 
@@ -430,6 +477,92 @@ describe("SecuritiesService", () => {
   });
 
   describe("create", () => {
+    describe("bond link (spec 12.1)", () => {
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
+      const bond = {
+        symbol: "TOS1029",
+        name: "TOS 3y",
+        securityType: "BOND",
+        currencyCode: "PLN",
+        bondProgramId: PROGRAM,
+      };
+
+      it("checks the instrument in the write's transaction, before the save, then recomputes after it", async () => {
+        queryRunnerManager.findOne.mockResolvedValue(null);
+        queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);
+        const order: string[] = [];
+        queryRunnerManager.query.mockImplementation(async () => {
+          order.push("check");
+          return [{ currency_code: "PLN" }];
+        });
+        queryRunnerManager.save.mockImplementation(async (a, b) => {
+          order.push("save");
+          return b ?? a;
+        });
+        mockBondPriceService.recomputeSecurity.mockImplementation(async () => {
+          order.push("recompute");
+          return { written: 0, deleted: 0 };
+        });
+
+        await service.create("user-1", bond);
+
+        expect(queryRunnerManager.query).toHaveBeenCalledWith(
+          expect.stringContaining("FROM bond_programs"),
+          [PROGRAM],
+        );
+        expect(order).toEqual(["check", "save", "recompute"]);
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledWith(
+          "user-1",
+          "new-sec",
+        );
+      });
+
+      it("refuses an instrument that does not exist, writing nothing and recomputing nothing", async () => {
+        queryRunnerManager.findOne.mockResolvedValue(null);
+        queryRunnerManager.query.mockResolvedValue([]);
+
+        await expect(service.create("user-1", bond)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(queryRunnerManager.save).not.toHaveBeenCalled();
+        expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("refuses a security whose currency differs from the instrument's (INV-PRICE-001)", async () => {
+        queryRunnerManager.findOne.mockResolvedValue(null);
+        queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);
+
+        await expect(
+          service.create("user-1", { ...bond, currencyCode: "USD" }),
+        ).rejects.toThrow(/recorded in USD.*priced in PLN/);
+        expect(queryRunnerManager.save).not.toHaveBeenCalled();
+      });
+
+      it("does not look at the catalog for an unlinked security", async () => {
+        queryRunnerManager.findOne.mockResolvedValue(null);
+        await service.create("user-1", {
+          symbol: "MSFT",
+          name: "Microsoft",
+          currencyCode: "USD",
+        });
+        expect(queryRunnerManager.query).not.toHaveBeenCalledWith(
+          expect.stringContaining("bond_programs"),
+          expect.anything(),
+        );
+        expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("keeps the security when the recompute fails: it is saved, the daily job repairs it", async () => {
+        queryRunnerManager.findOne.mockResolvedValue(null);
+        queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);
+        mockBondPriceService.recomputeSecurity.mockRejectedValue(
+          new Error("catalog empty"),
+        );
+        await expect(service.create("user-1", bond)).resolves.toMatchObject({
+          bondProgramId: PROGRAM,
+        });
+      });
+    });
     it("creates a new security", async () => {
       queryRunnerManager.findOne.mockResolvedValue(null);
 
@@ -639,6 +772,509 @@ describe("SecuritiesService", () => {
   });
 
   describe("update", () => {
+    describe("bond link (spec 12.1)", () => {
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
+      const OTHER = "22222222-2222-5222-8222-222222222222";
+      const pln = {
+        ...mockSecurity,
+        currencyCode: "PLN",
+        securityType: "BOND",
+      };
+      /**
+       * The security as the database holds it: `findOne` returns a copy (the
+       * service mutates what it is given) and the row the write locks is the
+       * snapshot taken now.
+       */
+      const serve = (security: Record<string, unknown>) => {
+        securitiesRepository.findOne.mockResolvedValue({ ...security });
+        const snapshot = {
+          bond_program_id: security.bondProgramId ?? null,
+          bond_auto_fetch: security.bondAutoFetch ?? false,
+          security_type: security.securityType ?? null,
+          currency_code: security.currencyCode,
+        };
+        lockedRowOf = async () => [snapshot];
+      };
+      /** The catalog and the ledger as the write's transaction sees them. */
+      const world = (
+        opts: {
+          instrumentCurrency?: string | null;
+          notBonds?: boolean;
+          onQuery?: (sql: string) => void;
+        } = {},
+      ) =>
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async (sql: string) => {
+            opts.onQuery?.(sql);
+            if (/FROM bond_programs/.test(sql))
+              return opts.instrumentCurrency === null
+                ? []
+                : [{ currency_code: opts.instrumentCurrency ?? "PLN" }];
+            if (/FROM investment_transactions/.test(sql))
+              return opts.notBonds ? [{ "?column?": 1 }] : [];
+            return [];
+          }),
+        );
+
+      it("links a security, checking inside the write transaction before the save, and recomputes after", async () => {
+        serve({ ...pln });
+        const order: string[] = [];
+        world({
+          onQuery: (sql) =>
+            /bond_programs/.test(sql) &&
+            !order.includes("check") &&
+            order.push("check"),
+        });
+        queryRunnerManager.save.mockImplementation(async (a, b) => {
+          order.push("save");
+          return b ?? a;
+        });
+        mockBondPriceService.recomputeSecurity.mockImplementation(async () => {
+          order.push("recompute");
+          return { written: 0, deleted: 0 };
+        });
+
+        await service.update("user-1", "sec-1", {
+          bondProgramId: PROGRAM,
+        });
+
+        expect(order).toEqual(["check", "save", "recompute"]);
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledWith(
+          "user-1",
+          "sec-1",
+        );
+      });
+
+      it("refuses a link to a missing instrument or one in another currency, writing nothing", async () => {
+        serve({ ...pln });
+        world({ instrumentCurrency: null });
+        await expect(
+          service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
+        ).rejects.toThrow(BadRequestException);
+
+        // A fresh row per request, as the database would return one.
+        serve({ ...pln });
+        world({ instrumentCurrency: "EUR" });
+        await expect(
+          service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
+        ).rejects.toThrow(/recorded in PLN.*priced in EUR/);
+
+        expect(queryRunnerManager.save).not.toHaveBeenCalled();
+        expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("refuses a currency change of a security that stays linked", async () => {
+        serve({
+          ...pln,
+          bondProgramId: PROGRAM,
+        });
+        world();
+
+        await expect(
+          service.update("user-1", "sec-1", { currencyCode: "USD" }),
+        ).rejects.toThrow(/stays in the instrument's currency \(PLN\)/);
+        expect(queryRunnerManager.save).not.toHaveBeenCalled();
+      });
+
+      it("allows a currency change together with unlinking, and checks nothing", async () => {
+        serve({
+          ...pln,
+          bondProgramId: PROGRAM,
+        });
+
+        const result = await service.update("user-1", "sec-1", {
+          currencyCode: "USD",
+          bondProgramId: null,
+        });
+
+        expect(result.bondProgramId).toBeNull();
+        expect(queryRunnerManager.query).not.toHaveBeenCalledWith(
+          expect.stringContaining("bond_programs"),
+          expect.anything(),
+        );
+        expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("deletes the engine's rows in the write's transaction on unlinking, then refreshes derived state after the commit", async () => {
+        serve({
+          ...pln,
+          bondProgramId: PROGRAM,
+        });
+        const order: string[] = [];
+        mockBondPriceService.clearEnginePrices.mockImplementation(
+          async (m: unknown) => {
+            expect(m).toBe(queryRunnerManager);
+            order.push("clear");
+            return { deleted: 3, accountIds: ["acc-1"] };
+          },
+        );
+        queryRunnerManager.save.mockImplementation(async (a, b) => {
+          order.push("save");
+          return b ?? a;
+        });
+        mockBondPriceService.publishClearedPrices.mockImplementation(() => {
+          order.push("publish");
+        });
+
+        await service.update("user-1", "sec-1", { bondProgramId: null });
+
+        expect(order).toEqual(["clear", "save", "publish"]);
+        expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledWith(
+          queryRunnerManager,
+          "user-1",
+          "sec-1",
+        );
+        expect(mockBondPriceService.publishClearedPrices).toHaveBeenCalledWith(
+          "user-1",
+          ["acc-1"],
+        );
+        expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("clears the old instrument's engine rows when the link moves, and prices the new one after the commit", async () => {
+        serve({
+          ...pln,
+          bondProgramId: PROGRAM,
+        });
+        world();
+        await service.update("user-1", "sec-1", { bondProgramId: OTHER });
+        expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledTimes(1);
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledWith(
+          "user-1",
+          "sec-1",
+        );
+      });
+
+      it("clears nothing when the link is unchanged", async () => {
+        serve({
+          ...pln,
+          bondProgramId: PROGRAM,
+        });
+        await service.update("user-1", "sec-1", { name: "Renamed" });
+        expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
+        expect(
+          mockBondPriceService.publishClearedPrices,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("does not check or recompute when an edit leaves the link, the currency and the type alone", async () => {
+        serve({
+          ...pln,
+          bondProgramId: PROGRAM,
+        });
+        await service.update("user-1", "sec-1", { name: "Renamed" });
+        expect(queryRunnerManager.query).not.toHaveBeenCalledWith(
+          expect.stringContaining("bond_programs"),
+          expect.anything(),
+        );
+        expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+      });
+
+      it("recomputes when the link moves to another instrument", async () => {
+        serve({
+          ...pln,
+          bondProgramId: PROGRAM,
+        });
+        world();
+        await service.update("user-1", "sec-1", { bondProgramId: OTHER });
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledTimes(1);
+      });
+
+      describe("the series of the rows follow the link (INV-BOND-007)", () => {
+        const clears = () =>
+          queryRunnerManager.query.mock.calls.filter(([q]) =>
+            /UPDATE investment_transactions/.test(String(q)),
+          );
+
+        it("clears the series outside the new program in the link's own transaction, before the save", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          const order: string[] = [];
+          queryRunnerManager.query.mockImplementation(
+            queryWith(async (sql: string) => {
+              if (/UPDATE investment_transactions/.test(sql))
+                order.push("clear");
+              if (/FROM bond_programs/.test(sql))
+                return [{ currency_code: "PLN" }];
+              return [];
+            }),
+          );
+          queryRunnerManager.save.mockImplementation(async (a, b) => {
+            order.push("save");
+            return b ?? a;
+          });
+          await service.update("user-1", "sec-1", { bondProgramId: OTHER });
+          expect(order).toEqual(["clear", "save"]);
+          expect(clears()[0][1]).toEqual(["sec-1", "user-1", OTHER]);
+        });
+
+        it("clears every series of a security that is unlinked", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          await service.update("user-1", "sec-1", { bondProgramId: null });
+          expect(clears()).toHaveLength(1);
+          expect(clears()[0][1]).toEqual(["sec-1", "user-1", null]);
+        });
+
+        it("clears nothing while the link is unchanged", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          await service.update("user-1", "sec-1", { name: "Renamed" });
+          expect(clears()).toHaveLength(0);
+        });
+
+        it("does not touch the rows when the link is refused", async () => {
+          serve({ ...pln });
+          world({ instrumentCurrency: "EUR" });
+          await expect(
+            service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
+          ).rejects.toThrow(BadRequestException);
+          expect(clears()).toHaveLength(0);
+        });
+      });
+
+      describe("auto-fetch of the program's new series (spec 2.5)", () => {
+        it("is saved with the update and kept when the request does not mention it", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM });
+          world();
+          await service.update("user-1", "sec-1", { bondAutoFetch: true });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            true,
+          );
+
+          queryRunnerManager.save.mockClear();
+          serve({ ...pln, bondProgramId: PROGRAM, bondAutoFetch: true });
+          await service.update("user-1", "sec-1", { name: "Renamed" });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            true,
+          );
+        });
+
+        it("is switched off by an unlink and cannot be on for an unlinked security", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM, bondAutoFetch: true });
+          world();
+          await service.update("user-1", "sec-1", { bondProgramId: null });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            false,
+          );
+
+          queryRunnerManager.save.mockClear();
+          serve({ ...pln });
+          await service.update("user-1", "sec-1", { bondAutoFetch: true });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondAutoFetch).toBe(
+            false,
+          );
+        });
+
+        it("is recorded in the snapshot an undo restores", async () => {
+          serve({ ...pln, bondProgramId: PROGRAM, bondAutoFetch: true });
+          world();
+          await service.update("user-1", "sec-1", { bondAutoFetch: false });
+          expect(mockActionHistoryService.record).toHaveBeenCalledWith(
+            "user-1",
+            expect.objectContaining({
+              beforeData: expect.objectContaining({ bondAutoFetch: true }),
+            }),
+          );
+        });
+      });
+
+      describe("only a BOND is linked (R8)", () => {
+        it("refuses a link on a security of another type", async () => {
+          serve({
+            ...pln,
+            securityType: "ETF",
+          });
+          world();
+          await expect(
+            service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
+          ).rejects.toThrow(/Only a security of type Bond/);
+          expect(queryRunnerManager.save).not.toHaveBeenCalled();
+        });
+
+        it("accepts a link and a change to BOND in the same request", async () => {
+          serve({
+            ...pln,
+            securityType: "ETF",
+          });
+          world();
+          await service.update("user-1", "sec-1", {
+            securityType: "BOND",
+            bondProgramId: PROGRAM,
+          });
+          expect(queryRunnerManager.save).toHaveBeenCalled();
+        });
+
+        it("refuses changing the type of a linked security away from BOND", async () => {
+          serve({
+            ...pln,
+            bondProgramId: PROGRAM,
+          });
+          world();
+          await expect(
+            service.update("user-1", "sec-1", { securityType: "ETF" }),
+          ).rejects.toThrow(/Only a security of type Bond/);
+          expect(queryRunnerManager.save).not.toHaveBeenCalled();
+          expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
+        });
+
+        it("allows changing the type away from BOND when the same request unlinks", async () => {
+          serve({
+            ...pln,
+            bondProgramId: PROGRAM,
+          });
+          await service.update("user-1", "sec-1", {
+            securityType: "ETF",
+            bondProgramId: null,
+          });
+          expect(queryRunnerManager.save).toHaveBeenCalled();
+          expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalled();
+        });
+      });
+
+      describe("legacy unit quantities (R15)", () => {
+        it("refuses a link when a trade's price is far from the face value per bond, writing nothing", async () => {
+          serve({ ...pln });
+          world({ notBonds: true });
+          await expect(
+            service.update("user-1", "sec-1", { bondProgramId: PROGRAM }),
+          ).rejects.toThrow(/not numbers of bonds/);
+          expect(queryRunnerManager.save).not.toHaveBeenCalled();
+          expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+        });
+
+        it("reads the band [0.5, 2] x the newest terms' face value, over trades that carry a price", async () => {
+          serve({ ...pln });
+          let sql = "";
+          world({
+            onQuery: (q) => {
+              if (/FROM investment_transactions/.test(q)) sql = q;
+            },
+          });
+          await service.update("user-1", "sec-1", {
+            bondProgramId: PROGRAM,
+          });
+          expect(sql).toMatch(/faceValue/);
+          expect(sql).toMatch(/ORDER BY version DESC/);
+          expect(sql).toMatch(
+            /t\.price < COALESCE\(f\.face, \$4::numeric\) \* 0\.5/,
+          );
+          expect(sql).toMatch(
+            /t\.price > COALESCE\(f\.face, \$4::numeric\) \* 2/,
+          );
+          expect(sql).toMatch(/t\.status != 'VOID'/);
+          expect(sql).toMatch(/t\.price IS NOT NULL/);
+        });
+
+        it("is not read when the link is unchanged (a rename of a linked bond)", async () => {
+          serve({
+            ...pln,
+            bondProgramId: PROGRAM,
+          });
+          world({ notBonds: true });
+          await service.update("user-1", "sec-1", { name: "Renamed" });
+          expect(queryRunnerManager.save).toHaveBeenCalled();
+        });
+      });
+
+      describe("the same instrument in another spelling (R16)", () => {
+        it("is no change: nothing is cleared, nothing recomputed, the stored id stays canonical", async () => {
+          serve({
+            ...pln,
+            bondProgramId: PROGRAM,
+          });
+          world();
+          await service.update("user-1", "sec-1", {
+            bondProgramId: PROGRAM.toUpperCase(),
+          });
+          expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
+          expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+          expect(queryRunnerManager.save.mock.calls[0][1].bondProgramId).toBe(
+            PROGRAM,
+          );
+        });
+
+        it("a new link in capitals is stored in lower case", async () => {
+          serve({ ...pln });
+          world();
+          await service.update("user-1", "sec-1", {
+            bondProgramId: PROGRAM.toUpperCase(),
+          });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondProgramId).toBe(
+            PROGRAM,
+          );
+        });
+      });
+
+      describe("the link is decided on the locked row (R32)", () => {
+        it("takes the recompute lock, then locks the row FOR UPDATE for its owner, inside the write", async () => {
+          serve({ ...pln });
+          const sqls: string[] = [];
+          world({ onQuery: (q) => sqls.push(q) });
+          await service.update("user-1", "sec-1", {
+            bondProgramId: PROGRAM,
+          });
+          const lock = queryRunnerManager.query.mock.calls.find(([q]) =>
+            /FOR UPDATE/.test(q),
+          )!;
+          expect(lock[0]).toMatch(/FROM securities/);
+          expect(lock[1]).toEqual(["sec-1", "user-1"]);
+          // The recompute lock (advisory) comes before the row lock.
+          const texts = queryRunnerManager.query.mock.calls.map(([q]) =>
+            String(q),
+          );
+          expect(
+            texts.findIndex((q) => /pg_advisory_xact_lock/.test(q)),
+          ).toBeLessThan(texts.findIndex((q) => /FOR UPDATE/.test(q)));
+          expect(
+            texts.findIndex((q) => /pg_advisory_xact_lock/.test(q)),
+          ).toBeGreaterThanOrEqual(0);
+        });
+
+        it("a link committed by a concurrent request after this one's read is the baseline: no stale link is put back, and a rename clears nothing", async () => {
+          // The read before the transaction saw an unlinked security; by the
+          // time the lock is granted another request has linked it.
+          serve({ ...pln });
+          lockedRowOf = async () => [
+            {
+              bond_program_id: PROGRAM,
+              security_type: "BOND",
+              currency_code: "PLN",
+            },
+          ];
+          await service.update("user-1", "sec-1", { name: "Renamed" });
+          expect(queryRunnerManager.save.mock.calls[0][1].bondProgramId).toBe(
+            PROGRAM,
+          );
+          expect(mockBondPriceService.clearEnginePrices).not.toHaveBeenCalled();
+          expect(mockBondPriceService.recomputeSecurity).not.toHaveBeenCalled();
+        });
+
+        it("an unlink decided on a stale read that showed no link still clears the engine's rows", async () => {
+          serve({ ...pln });
+          lockedRowOf = async () => [
+            {
+              bond_program_id: PROGRAM,
+              security_type: "BOND",
+              currency_code: "PLN",
+            },
+          ];
+          await service.update("user-1", "sec-1", { bondProgramId: null });
+          expect(mockBondPriceService.clearEnginePrices).toHaveBeenCalledTimes(
+            1,
+          );
+        });
+
+        it("a security that vanished before the lock is a 404", async () => {
+          serve({ ...pln });
+          lockedRowOf = async () => [];
+          await expect(
+            service.update("user-1", "sec-1", { name: "x" }),
+          ).rejects.toThrow(NotFoundException);
+          expect(queryRunnerManager.save).not.toHaveBeenCalled();
+        });
+      });
+    });
     it("updates security fields", async () => {
       securitiesRepository.findOne.mockResolvedValue({ ...mockSecurity });
 
@@ -1107,10 +1743,20 @@ describe("SecuritiesService", () => {
         getCount,
       });
 
+      securitiesRepository.findOneOrFail = jest
+        .fn()
+        .mockResolvedValue({ ...mockSecurity, isActive: false });
+
       const result = await service.deactivate("user-1", "sec-1");
 
       expect(result.isActive).toBe(false);
-      expect(securitiesRepository.save).toHaveBeenCalled();
+      // Only the flag is written: a save of the stale read could write back a
+      // bond link changed in between.
+      expect(securitiesRepository.update).toHaveBeenCalledWith(
+        { id: mockSecurity.id, userId: "user-1" },
+        { isActive: false },
+      );
+      expect(securitiesRepository.save).not.toHaveBeenCalled();
       expect(getCount).toHaveBeenCalled();
     });
 
@@ -1143,10 +1789,17 @@ describe("SecuritiesService", () => {
         getCount,
       });
 
+      securitiesRepository.findOneOrFail = jest
+        .fn()
+        .mockResolvedValue({ ...mockSecurity, isActive: false });
+
       const result = await service.deactivate("user-1", "sec-1");
 
       expect(result.isActive).toBe(false);
-      expect(securitiesRepository.save).toHaveBeenCalled();
+      expect(securitiesRepository.update).toHaveBeenCalledWith(
+        { id: mockSecurity.id, userId: "user-1" },
+        { isActive: false },
+      );
     });
   });
 
@@ -1157,10 +1810,18 @@ describe("SecuritiesService", () => {
         isActive: false,
       });
 
+      securitiesRepository.findOneOrFail = jest
+        .fn()
+        .mockResolvedValue({ ...mockSecurity, isActive: true });
+
       const result = await service.activate("user-1", "sec-1");
 
       expect(result.isActive).toBe(true);
-      expect(securitiesRepository.save).toHaveBeenCalled();
+      expect(securitiesRepository.update).toHaveBeenCalledWith(
+        { id: mockSecurity.id, userId: "user-1" },
+        { isActive: true },
+      );
+      expect(securitiesRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -1801,6 +2462,76 @@ describe("SecuritiesService", () => {
       });
     });
 
+    describe("previewUpdateSecurity of a bond-linked security (R18)", () => {
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
+      const linked = {
+        ...sec,
+        securityType: "BOND",
+        currencyCode: "PLN",
+        bondProgramId: PROGRAM,
+      };
+      const catalog = (currency: string | null) =>
+        queryRunnerManager.query.mockImplementation(async (sql: string) =>
+          /FROM bond_programs/.test(sql)
+            ? currency === null
+              ? []
+              : [{ currency_code: currency }]
+            : [],
+        );
+
+      it("refuses a currency change the commit would refuse, with the same message, before any confirmation", async () => {
+        securitiesRepository.createQueryBuilder.mockReturnValueOnce(
+          qb({ getOne: linked }),
+        );
+        catalog("PLN");
+        await expect(
+          service.previewUpdateSecurity("user-1", {
+            query: "AAPL",
+            currencyCode: "EUR",
+          }),
+        ).rejects.toThrow(/stays in the instrument's currency \(PLN\)/);
+      });
+
+      it("refuses a change of the type away from BOND", async () => {
+        securitiesRepository.createQueryBuilder.mockReturnValueOnce(
+          qb({ getOne: linked }),
+        );
+        catalog("PLN");
+        await expect(
+          service.previewUpdateSecurity("user-1", {
+            query: "AAPL",
+            securityType: "ETF",
+          }),
+        ).rejects.toThrow(/Only a security of type Bond/);
+      });
+
+      it("accepts an edit that leaves the currency and the type alone, without reading the catalog", async () => {
+        securitiesRepository.createQueryBuilder.mockReturnValueOnce(
+          qb({ getOne: linked }),
+        );
+        queryRunnerManager.query.mockClear();
+        const preview = await service.previewUpdateSecurity("user-1", {
+          query: "AAPL",
+          isFavourite: true,
+          currencyCode: "PLN",
+          securityType: "BOND",
+        });
+        expect(preview.currencyCode).toBe("PLN");
+        expect(queryRunnerManager.query).not.toHaveBeenCalled();
+      });
+
+      it("leaves an unlinked security alone", async () => {
+        securitiesRepository.createQueryBuilder.mockReturnValueOnce(
+          qb({ getOne: sec }),
+        );
+        const preview = await service.previewUpdateSecurity("user-1", {
+          query: "AAPL",
+          currencyCode: "EUR",
+        });
+        expect(preview.currencyCode).toBe("EUR");
+      });
+    });
+
     it("previewUpdateSecurity normalizes supplied country weightings to decimals", async () => {
       securitiesRepository.createQueryBuilder.mockReturnValueOnce(
         qb({ getOne: sec }),
@@ -2133,6 +2864,280 @@ describe("SecuritiesService", () => {
       expect(queryRunnerManager.save).toHaveBeenCalledWith(SecurityTag, [
         expect.objectContaining({ securityId: "sec-1", tagId: "tag-1" }),
       ]);
+    });
+  });
+
+  describe("bond price recompute entry points", () => {
+    it("recomputeBondPricesAfterWrite hands the ids to the price service, which ignores the ones that are not linked", async () => {
+      mockBondPriceService.recomputeLinkedSecurities = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      await service.recomputeBondPricesAfterWrite("user-1", ["a", null, "b"]);
+      expect(
+        mockBondPriceService.recomputeLinkedSecurities,
+      ).toHaveBeenCalledWith("user-1", ["a", null, "b"]);
+    });
+
+    it("recomputeBondPricesOfAccounts finds the linked securities traded in the accounts, owner-scoped", async () => {
+      mockBondPriceService.recomputeLinkedSecurities = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      queryRunnerManager.query.mockResolvedValue([{ id: "s1" }, { id: "s2" }]);
+      await service.recomputeBondPricesOfAccounts("user-1", ["acc-1"]);
+      const [sql, params] = queryRunnerManager.query.mock.calls[0];
+      expect(sql).toMatch(/s\.bond_program_id IS NOT NULL/);
+      expect(sql).toMatch(/s\.user_id = \$1/);
+      expect(params).toEqual(["user-1", ["acc-1"]]);
+      expect(
+        mockBondPriceService.recomputeLinkedSecurities,
+      ).toHaveBeenCalledWith("user-1", ["s1", "s2"]);
+    });
+
+    it("recomputeBondPricesOfAccounts does nothing for no accounts", async () => {
+      mockBondPriceService.recomputeLinkedSecurities = jest.fn();
+      await service.recomputeBondPricesOfAccounts("user-1", []);
+      expect(queryRunnerManager.query).not.toHaveBeenCalled();
+    });
+
+    it("recomputeLinkedPrices recomputes each selected linked security and reports a failure as a failed row", async () => {
+      mockBondPriceService.recomputeSecurity
+        .mockResolvedValueOnce({ written: 1, deleted: 0 })
+        .mockRejectedValueOnce(new Error("no rates"));
+      const result = await service.recomputeLinkedPrices("user-1", [
+        { id: "s1", symbol: "EDO1036" },
+        { id: "s2", symbol: "TOS1029" },
+      ]);
+      expect(result).toEqual({
+        updated: 1,
+        failed: 1,
+        results: [
+          { symbol: "EDO1036", success: true },
+          { symbol: "TOS1029", success: false, error: "no rates" },
+        ],
+      });
+    });
+
+    describe("recomputeLinkedPrices fetches the program's offer first", () => {
+      const selection = [
+        { id: "s1", symbol: "EDO1036" },
+        { id: "s2", symbol: "EDO1035" },
+      ];
+      const programRows = (country = "PL") => [
+        { id: "s1", issuer_country_code: country, program_code: "EDO" },
+        { id: "s2", issuer_country_code: country, program_code: "EDO" },
+      ];
+
+      it("fetches once per program, before the recompute", async () => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => programRows()),
+        );
+        const order: string[] = [];
+        mockBondSeriesService.fetchProgramOffer.mockImplementation(async () => {
+          order.push("fetch");
+          return { listed: 1, stored: 1, alreadyStored: 0, failed: 0 };
+        });
+        mockBondPriceService.recomputeSecurity.mockImplementation(async () => {
+          order.push("recompute");
+          return { written: 1, deleted: 0 };
+        });
+        const result = await service.recomputeLinkedPrices("user-1", selection);
+        expect(mockBondSeriesService.fetchProgramOffer).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(mockBondSeriesService.fetchProgramOffer).toHaveBeenCalledWith(
+          "PL",
+          "EDO",
+        );
+        expect(order).toEqual(["fetch", "recompute", "recompute"]);
+        expect(result.updated).toBe(2);
+        expect(result.failed).toBe(0);
+      });
+
+      it("a failed fetch still recomputes and is reported on the row", async () => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => programRows()),
+        );
+        mockBondSeriesService.fetchProgramOffer.mockRejectedValue(
+          new Error("source down"),
+        );
+        const result = await service.recomputeLinkedPrices("user-1", selection);
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalledTimes(2);
+        expect(result.updated).toBe(0);
+        expect(result.failed).toBe(2);
+        expect(result.results[0]).toMatchObject({
+          symbol: "EDO1036",
+          success: false,
+          error: expect.stringContaining("source down"),
+        });
+      });
+
+      it("an offer where everything failed is reported, a country with no fetch is not", async () => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => programRows()),
+        );
+        mockBondSeriesService.fetchProgramOffer.mockResolvedValue({
+          listed: 2,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 2,
+        });
+        const failedRun = await service.recomputeLinkedPrices(
+          "user-1",
+          selection,
+        );
+        expect(failedRun.failed).toBe(2);
+
+        mockBondSeriesService.fetchProgramOffer.mockRejectedValue(
+          new SeriesFetchError("SERIES_FETCH_UNSUPPORTED", { country: "DE" }),
+        );
+        const skipped = await service.recomputeLinkedPrices(
+          "user-1",
+          selection,
+        );
+        expect(skipped).toMatchObject({ updated: 2, failed: 0 });
+        expect(mockBondPriceService.recomputeSecurity).toHaveBeenCalled();
+      });
+    });
+
+    describe("recomputeLinkedPrices judges the whole refresh pass", () => {
+      const selection = [{ id: "s1", symbol: "EDO1036" }];
+      const history = (stored: number, failed: number) => ({
+        candidates: 8,
+        alreadyStored: 0,
+        stored,
+        notPublished: 0,
+        failed,
+        stoppedEarly: false,
+        remaining: 0,
+      });
+      const run = async (offer: object) => {
+        queryRunnerManager.query.mockImplementation(
+          queryWith(async () => [
+            { id: "s1", issuer_country_code: "PL", program_code: "EDO" },
+          ]),
+        );
+        mockBondSeriesService.fetchProgramOffer.mockResolvedValue(offer);
+        return service.recomputeLinkedPrices("user-1", selection);
+      };
+
+      it("is a success when the listing failed but the history stored series", async () => {
+        const result = await run({
+          listed: 0,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 1,
+          history: history(3, 0),
+        });
+        expect(result).toMatchObject({ updated: 1, failed: 0 });
+      });
+
+      it("is a success when the offer stored some and another series failed", async () => {
+        const result = await run({
+          listed: 2,
+          stored: 1,
+          alreadyStored: 0,
+          failed: 1,
+          history: history(0, 0),
+        });
+        expect(result).toMatchObject({ updated: 1, failed: 0 });
+      });
+
+      it("is a failure only when nothing of the pass succeeded and something failed", async () => {
+        const result = await run({
+          listed: 0,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 1,
+          history: history(0, 2),
+        });
+        expect(result).toMatchObject({ updated: 0, failed: 1 });
+        expect(result.results[0]).toMatchObject({
+          success: false,
+          error: "The current EDO offer could not be fetched",
+        });
+      });
+
+      it("is a success when nothing failed, even if nothing was stored", async () => {
+        const result = await run({
+          listed: 0,
+          stored: 0,
+          alreadyStored: 0,
+          failed: 0,
+          history: history(0, 0),
+        });
+        expect(result).toMatchObject({ updated: 1, failed: 0 });
+      });
+    });
+
+    it("create refuses a link on a security that is not of type BOND", async () => {
+      queryRunnerManager.findOne.mockResolvedValue(null);
+      queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);
+      await expect(
+        service.create("user-1", {
+          symbol: "X",
+          name: "X",
+          securityType: "ETF",
+          currencyCode: "PLN",
+          bondProgramId: "11111111-1111-5111-8111-111111111111",
+        }),
+      ).rejects.toThrow(/Only a security of type Bond/);
+      expect(queryRunnerManager.save).not.toHaveBeenCalled();
+    });
+
+    describe("create links to a program and takes the auto-fetch switch", () => {
+      const PROGRAM = "11111111-1111-5111-8111-111111111111";
+      const bond = {
+        symbol: "EDO",
+        name: "EDO",
+        securityType: "BOND",
+        currencyCode: "PLN",
+      };
+      beforeEach(() => {
+        queryRunnerManager.findOne.mockResolvedValue(null);
+        queryRunnerManager.query.mockResolvedValue([{ currency_code: "PLN" }]);
+        queryRunnerManager.save.mockImplementation(async (a, b) => b ?? a);
+      });
+
+      it("stores the program id lower-cased, with auto-fetch as asked, after the program check", async () => {
+        await service.create("user-1", {
+          ...bond,
+          bondProgramId: PROGRAM.toUpperCase(),
+          bondAutoFetch: true,
+        });
+        expect(queryRunnerManager.create.mock.calls[0][1]).toMatchObject({
+          bondProgramId: PROGRAM,
+          bondAutoFetch: true,
+        });
+        expect(queryRunnerManager.query).toHaveBeenCalledWith(
+          expect.stringContaining("FROM bond_programs"),
+          [PROGRAM],
+        );
+      });
+
+      it("refuses a program that does not exist, writing nothing", async () => {
+        queryRunnerManager.query.mockResolvedValue([]);
+        await expect(
+          service.create("user-1", { ...bond, bondProgramId: PROGRAM }),
+        ).rejects.toThrow(/does not exist/);
+        expect(queryRunnerManager.save).not.toHaveBeenCalled();
+      });
+
+      it("refuses a program in another currency", async () => {
+        await expect(
+          service.create("user-1", {
+            ...bond,
+            currencyCode: "EUR",
+            bondProgramId: PROGRAM,
+          }),
+        ).rejects.toThrow(/recorded in EUR.*priced in PLN/);
+      });
+
+      it("keeps auto-fetch off for a security that is not linked, whatever was sent", async () => {
+        await service.create("user-1", { ...bond, bondAutoFetch: true });
+        expect(queryRunnerManager.create.mock.calls[0][1]).toMatchObject({
+          bondAutoFetch: false,
+        });
+      });
     });
   });
 });

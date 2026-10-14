@@ -22,6 +22,7 @@ import { CARD_CLASS } from '@/components/ui/Card';
 import { SecurityList, type SecurityHoldings, type SecurityTransactions, type SecuritySortField, type SortDirection } from '@/components/securities/SecurityList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { usePriceRefresh } from '@/hooks/usePriceRefresh';
+import { BondRefreshProgress } from '@/components/securities/BondRefreshProgress';
 import { RefreshPricesButton } from '@/components/investments/RefreshPricesButton';
 import { securityPositionValue, compareSecurityValues } from '@/lib/security-value';
 import { createLogger } from '@/lib/logger';
@@ -66,6 +67,8 @@ function SecuritiesContent() {
   const [sortField, setSortField] = useLocalStorage<SecuritySortField>('monize-securities-sort-field', 'symbol');
   const [sortDirection, setSortDirection] = useLocalStorage<SortDirection>('monize-securities-sort-dir', 'asc');
   const [lastPriceUpdate, setLastPriceUpdate] = useState<string | null>(null);
+  // The program whose post-save refresh is running; null hides the progress bar.
+  const [bondRefreshProgramId, setBondRefreshProgramId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -178,15 +181,40 @@ function SecuritiesContent() {
 
   const handleFormSubmit = async (data: CreateSecurityData) => {
     try {
+      // A linked bond with auto-fetch on gets its data through the list's own
+      // Refresh: the server fetches the program's current offer, then recomputes.
+      let refreshId: string | null = null;
+      let refreshProgramId: string | null = null;
       if (editingSecurity) {
         await investmentsApi.updateSecurity(editingSecurity.id, data);
         toast.success(t('page.toasts.updated'));
+        // The form omits link fields that did not change, so an absent field
+        // keeps the stored value; only a present, different program is a change.
+        const programId = data.bondProgramId !== undefined ? data.bondProgramId : editingSecurity.bondProgramId;
+        const autoFetch = data.bondAutoFetch !== undefined ? data.bondAutoFetch : editingSecurity.bondAutoFetch;
+        const wasOn = !!editingSecurity.bondProgramId && editingSecurity.bondAutoFetch === true;
+        const isOn = !!programId && autoFetch === true;
+        const programChanged = data.bondProgramId !== undefined && data.bondProgramId !== editingSecurity.bondProgramId;
+        if (isOn && (!wasOn || programChanged)) {
+          refreshId = editingSecurity.id;
+          refreshProgramId = programId ?? null;
+        }
       } else {
-        await investmentsApi.createSecurity(data);
+        const created = await investmentsApi.createSecurity(data);
         toast.success(t('page.toasts.created'));
+        if (data.bondProgramId && data.bondAutoFetch === true) {
+          refreshId = created.id;
+          refreshProgramId = data.bondProgramId;
+        }
       }
       close();
       loadData();
+      if (refreshId && refreshProgramId) {
+        setBondRefreshProgramId(refreshProgramId);
+        void triggerManualRefresh([refreshId]).finally(() => setBondRefreshProgramId(null));
+      } else if (refreshId) {
+        void triggerManualRefresh([refreshId]);
+      }
     } catch (error) {
       toast.error(getErrorMessage(error, editingSecurity ? t('page.toasts.updateFailed') : t('page.toasts.createFailed')));
       throw error;
@@ -350,6 +378,10 @@ function SecuritiesContent() {
           subtitle={t('page.subtitle')}
           helpUrl="https://github.com/kenlasko/monize/wiki/Investments"
           actions={<Button onClick={handleCreateNew}>{t('page.newSecurity')}</Button>}
+        />
+        <BondRefreshProgress
+          programId={bondRefreshProgramId}
+          active={bondRefreshProgramId !== null}
         />
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">

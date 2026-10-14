@@ -221,6 +221,22 @@ const WITH_CONTEXT_ALLOWLIST = [
   // it: the rows it writes are global reference data with no owner, exactly like
   // the exchange-rate refresh above.
   "src/securities/market-index.service.ts",
+  // The bond catalog seed and the benchmark refresh write global reference data
+  // with no owner (bond instruments, terms versions, NBP and GUS series), the
+  // same as the market-index refresh above; neither has a request behind it.
+  "src/bonds/bond-catalog.service.ts",
+  "src/bonds/benchmark-refresh.service.ts",
+  // The daily bond price recompute: a cron with no request behind it, so a
+  // system context for the lease and the cross-user listing of linked
+  // securities, then each user's own withUserContext for the writes (one user's
+  // failure does not stop the others; docs/specs/polish-retail-bonds.md 12.4).
+  "src/bonds/bond-price.service.ts",
+  // The daily check of the issuer's current offer: a cron with no request
+  // behind it, so a system context around the whole lease call. It stores
+  // global reference data with no owner (bond instruments and terms versions),
+  // like the catalog seed above; the user-facing fetch reaches the same store
+  // under the caller's own identity (docs/specs/bond-series-fetch.md 5.1).
+  "src/bonds/bond-series.service.ts",
   "src/securities/securities.controller.ts",
   "src/securities/security-price.service.ts",
   // GEM recommendation-change cron: a deployment-wide fan-out (system context
@@ -228,6 +244,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   // that reuses the report materializer and dispatches a notification. No
   // request behind it (docs/specs/gem-signal-change-notifications.md).
   "src/strategies/gem-signal-change-alert.service.ts",
+  // Bond notification cron: a deployment-wide fan-out (system context to list
+  // the owners of bond-linked securities) then a per-user body (withUserContext)
+  // that reads the engine valuation and dispatches notifications. No request
+  // behind it (docs/specs/bond-notifications.md).
+  "src/bonds/bond-notification.service.ts",
   // System alerts: every caller is a cron catch, a post-claim hook or a
   // bootstrap hook with no request behind it, so the service seeds its own
   // context -- system for the admin fan-out, user for a per-user alert

@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {変更された取引はありません} other {# 件の取引を変更しました}}。操作履歴から元に戻せます。",
-      "aiReviewsQueued": "{count, plural, other {# 件の取引を AI レビューのキューに追加しました}}。"
+      "changedNoUndo": "{count, plural, other {# 件の取引を変更しました}}。",
+      "aiReviewsQueued": "{count, plural, other {# 件の取引を AI レビューのキューに追加しました}}。",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# 件の取引にはすでに未処理の AI レビュー依頼があるため、新たにキューへ追加されたものはありません}}。",
+      "noChanges": "変更された取引はありません。"
     },
     "done": {
       "summary": "{count, plural, =0 {変更された取引はありません。} other {# 件の取引を変更しました。}}",

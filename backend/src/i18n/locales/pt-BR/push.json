@@ -39,6 +39,10 @@
     "email_receipts": {
       "title": "Recibos de e-mail precisam de atenção",
       "body": "Alguns e-mails na sua caixa de entrada de recibos precisam de um perfil ou uma correção. Abra o Monize para obter os detalhes."
+    },
+    "bonds": {
+      "title": "Aviso de obrigações",
+      "body": "Uma das suas obrigações tem novidades. Abra o Monize para ver os detalhes."
     }
   },
   "actions": {

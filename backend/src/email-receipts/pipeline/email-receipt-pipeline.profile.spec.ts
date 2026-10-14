@@ -16,10 +16,12 @@ import type { ParsedReceipt } from "../parsing/receipt-parser.types";
 import {
   applyCategoryHints,
   EmailReceiptPipelineService,
-  RECEIPT_AUTOMATIC_AI_INSTRUCTION,
-  RECEIPT_CATEGORIZE_INSTRUCTION,
   type ProcessReceiptOptions,
 } from "./email-receipt-pipeline.service";
+import {
+  RECEIPT_AUTOMATIC_AI_INSTRUCTION,
+  RECEIPT_CATEGORIZE_INSTRUCTION,
+} from "./receipt-instructions";
 
 /**
  * What a profile configures beyond reading the email (design 5.5 and 5.6): the

@@ -384,7 +384,8 @@
         "STRATEGIES": "Strategiesignale",
         "BANK_SYNC": "Bankverbindungen",
         "BANK_SYNC_ACTIVITY": "Ergebnisse der Bank-Synchronisierung",
-        "EMAIL_RECEIPTS": "E-Mail-Belege"
+        "EMAIL_RECEIPTS": "E-Mail-Belege",
+        "BONDS": "Anleihen"
       },
       "channelNotApplicable": "Für diese Benachrichtigungsart nicht zutreffend",
       "emailToggleLabel": "Bericht-E-Mail für {category}",
@@ -816,7 +817,24 @@
       "totalRecords": "Datensätze gesamt",
       "skippedAttachments": "{count, plural, one {# Anhang wurde nicht wiederhergestellt} other {# Anhänge wurden nicht wiederhergestellt}}: Das Backup enthielt keine verwendbaren Bytes dafür — sie fehlten beim Export oder scheiterten an ihrer Prüfsumme, oder die Datei stammt aus der Zeit vor eigenständigen Backups. Erstelle ein neues Backup, sobald der Anhangsspeicher in Ordnung ist.",
       "unusableAiProviderKeys": "{count, plural, one {# KI-Anbieter wurde ohne nutzbaren API-Schlüssel wiederhergestellt} other {# KI-Anbieter wurden ohne nutzbare API-Schlüssel wiederhergestellt}}: Die Sicherung entstand, bevor Anbieterschlüssel mitgeführt wurden — der gespeicherte Schlüssel gehört also zu dem Server, der die Datei erstellt hat, oder auf diesem Server ist kein Verschlüsselungsschlüssel eingerichtet, unter dem einer abgelegt werden könnte. Öffnen Sie Einstellungen → KI-Anbieter und geben Sie den API-Schlüssel erneut ein.",
-      "doneButton": "Fertig"
+      "unlinkedBondSecurities": "{count, plural, one {# Anleihe-Wertpapier wurde ohne Verknüpfung mit ihrem Anleiheinstrument wiederhergestellt} other {# Anleihe-Wertpapiere wurden ohne Verknüpfung mit ihren Anleiheinstrumenten wiederhergestellt}}: Der Anleihekatalog dieses Servers enthält die Serie nicht (oder in einer anderen Währung), daher bewertet die Anleihe-Engine sie nicht mehr und ihre berechneten Kurse wurden nicht wiederhergestellt. Öffnen Sie jedes Wertpapier und verknüpfen Sie es erneut mit einem Anleiheinstrument.",
+      "unlinkedBondSeries": "{count, plural, one {# Anleihetransaktion hat} other {# Anleihetransaktionen haben}} ihre Serie verloren, weil sich die Serie nicht aus der offiziellen Quelle beziehen ließ. Sie wurden ohne Serie wiederhergestellt und behalten keine, bis du sie abrufst.",
+      "unrecoveredBondSeries": "Anleiheserien aus dem Backup, die nicht abgerufen werden konnten: {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "und {count} weitere",
+      "unrecoveredBondSeriesAction": "Zum Wiederherstellen öffne das Anleihewertpapier, rufe die Serie auf seiner Seite ab (Aktualisieren) und wähle die Serie in den Buchungen, denen sie fehlt.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "der Emittent hat diese Serie (noch) nicht veröffentlicht",
+        "source-unavailable": "die offizielle Quelle hat nicht geantwortet; versuche es später erneut",
+        "no-adapter": "dieser Server hat keine Quelle für das Land dieses Emittenten",
+        "refused": "die Antwort der offiziellen Quelle wurde nicht akzeptiert",
+        "rate-limited": "die offizielle Quelle hat um Verlangsamung gebeten; versuche es später erneut",
+        "not-attempted": "zu viele Serien in einer Wiederherstellung; nicht versucht",
+        "other": "unbekannter Grund"
+      },
+      "doneButton": "Fertig",
+      "unlinkedBondSecuritiesList": "Betroffene Wertpapiere: {symbols}.",
+      "unlinkedBondSecuritiesMore": "und {count} weitere"
     },
     "storedBackups": {
       "heading": "Automatische Sicherungen",

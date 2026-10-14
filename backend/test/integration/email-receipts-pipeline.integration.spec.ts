@@ -22,7 +22,7 @@ import {
   type FetchSinceResult,
 } from "@/email-receipts/imap/imap-mailbox-client";
 import { EmailReceiptAiService } from "@/email-receipts/ai/email-receipt-ai.service";
-import { RECEIPT_AUTOMATIC_AI_INSTRUCTION } from "@/email-receipts/pipeline/email-receipt-pipeline.service";
+import { RECEIPT_AUTOMATIC_AI_INSTRUCTION } from "@/email-receipts/pipeline/receipt-instructions";
 import { EmailReceiptParserToolsService } from "@/email-receipts/parsers/email-receipt-parser-tools.service";
 import { EmailReceiptParsersService } from "@/email-receipts/parsers/email-receipt-parsers.service";
 import { EmailReceiptPollService } from "@/email-receipts/poll/email-receipt-poll.service";

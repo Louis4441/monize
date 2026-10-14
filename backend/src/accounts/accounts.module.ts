@@ -24,6 +24,7 @@ import { CategoriesModule } from "../categories/categories.module";
 import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
 import { NetWorthModule } from "../net-worth/net-worth.module";
 import { SecuritiesModule } from "../securities/securities.module";
+import { BondsModule } from "../bonds/bonds.module";
 import { ActionHistoryModule } from "../action-history/action-history.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { DelegationModule } from "../delegation/delegation.module";
@@ -48,6 +49,9 @@ import { TransactionRulesModule } from "../transaction-rules/transaction-rules.m
     forwardRef(() => ScheduledTransactionsModule),
     forwardRef(() => NetWorthModule),
     forwardRef(() => SecuritiesModule),
+    // The account-balances report values a bond-linked holding from its own
+    // lots; BondsModule reaches this module back through NetWorthModule.
+    forwardRef(() => BondsModule),
     ActionHistoryModule,
     // forwardRef: NotificationsModule now reaches back here through
     // ScheduledTransactionsModule (issue #1247), so this edge closes a

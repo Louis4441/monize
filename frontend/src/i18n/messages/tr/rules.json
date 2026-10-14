@@ -526,7 +526,10 @@
     },
     "toast": {
       "done": "{count, plural, =0 {Hiçbir işlem değiştirilmedi} other {# işlem değiştirildi}}. Bunu işlem geçmişinden geri alabilirsiniz.",
-      "aiReviewsQueued": "{count, plural, other {# işlem yapay zeka incelemesi için sıraya alındı}}."
+      "changedNoUndo": "{count, plural, other {# işlem değiştirildi}}.",
+      "aiReviewsQueued": "{count, plural, other {# işlem yapay zeka incelemesi için sıraya alındı}}.",
+      "aiReviewsAlreadyQueued": "{count, plural, other {# işlemin zaten açık bir yapay zeka inceleme isteği vardı, bu yüzden sıraya yeni bir şey eklenmedi}}.",
+      "noChanges": "Hiçbir işlem değiştirilmedi."
     },
     "done": {
       "summary": "{count, plural, =0 {Hiçbir işlem değiştirilmedi.} other {# işlem değiştirildi.}}",

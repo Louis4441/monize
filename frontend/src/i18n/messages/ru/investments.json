@@ -296,7 +296,30 @@
     "toastSaveFailed": "Не удалось сохранить проводку",
     "exchangeRateUnresolved": "Нет курса {from} к {to}. Перед сохранением введите курс или конвертированную итоговую сумму.",
     "toastExchangeRateRequired": "Введите курс обмена перед сохранением сделки между валютами.",
-    "notAvailable": "Недоступно"
+    "notAvailable": "Недоступно",
+    "bondSeries": {
+      "label": "Серия облигаций",
+      "fromDate": "Определяется по дате",
+      "oldestFirst": "Сначала самые старые",
+      "loading": "Загрузка серий...",
+      "loadFailed": "Не удалось загрузить серии.",
+      "retry": "Повторить",
+      "fromDateCode": "По дате: {code}",
+      "noneOnSale": "На эту дату нет серии в продаже",
+      "choose": "Выберите серию",
+      "required": "Выберите серию этих бумаг.",
+      "heldOption": "{code} (в наличии: {quantity})",
+      "noLongerHeld": "{code} (на эту дату уже не числится)",
+      "noLongerHeldUnknown": "Сохранённая серия (на эту дату уже не числится)",
+      "storedSeries": "Сохранённая серия",
+      "seriesOnSaleMonth": "{code} — в продаже {month}",
+      "seriesOnSaleRange": "{code} — в продаже с {from} по {to}"
+    },
+    "bondRedemption": {
+      "summary": "Проценты {interest}, удержание за досрочное погашение {deduction}, выплата {payout}",
+      "outsideSaleWindow": "Лот этой серии куплен вне периода её продажи, поэтому погашение нельзя разделить.",
+      "failed": "Не удалось рассчитать разбивку погашения."
+    }
   },
   "newTransactionButton": {
     "label": "+ Новая проводка",

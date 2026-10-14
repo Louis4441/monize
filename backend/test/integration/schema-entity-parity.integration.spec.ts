@@ -128,7 +128,9 @@ describe("entity/schema FK delete-rule drift (integration)", () => {
           ? "CASCADE"
           : /ON DELETE SET NULL/i.test(trailing)
             ? "SET NULL"
-            : "NO ACTION";
+            : /ON DELETE RESTRICT/i.test(trailing)
+              ? "RESTRICT"
+              : "NO ACTION";
         rules.set(`${table}.${fk[1]}`, rule);
       }
     }

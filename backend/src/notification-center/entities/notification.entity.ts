@@ -72,6 +72,16 @@ export enum NotificationType {
   // not recognise them (`parse_failed`). One row per (count of the first, count of
   // the second) via the dedupe key, raised only when a count grows.
   EMAIL_RECEIPTS_ATTENTION = "EMAIL_RECEIPTS_ATTENTION",
+  // What is about to happen to, or has happened to, the money in a person's
+  // engine-priced bonds (BONDS category). Each carries a dedupe_key (`bond:...`)
+  // so a re-run or a second replica raises nothing new. See
+  // `docs/specs/bond-notifications.md`.
+  BOND_MATURITY_SOON = "BOND_MATURITY_SOON",
+  BOND_INTEREST_PAYMENT = "BOND_INTEREST_PAYMENT",
+  BOND_RATE_RESET = "BOND_RATE_RESET",
+  BOND_REDEMPTION_UNBOOKED = "BOND_REDEMPTION_UNBOOKED",
+  BOND_BENCHMARK_PUBLISHED = "BOND_BENCHMARK_PUBLISHED",
+  BOND_DATA_MISSING = "BOND_DATA_MISSING",
 }
 
 /**
@@ -134,6 +144,7 @@ export enum NotificationCategory {
   BANK_SYNC = "BANK_SYNC",
   BANK_SYNC_ACTIVITY = "BANK_SYNC_ACTIVITY",
   EMAIL_RECEIPTS = "EMAIL_RECEIPTS",
+  BONDS = "BONDS",
 }
 
 /**
@@ -163,6 +174,14 @@ export const BANK_SYNC_ACTIVITY_NOTIFICATION_TYPES: readonly NotificationType[] 
   [NotificationType.BANK_SYNC_IMPORTED];
 export const EMAIL_RECEIPT_NOTIFICATION_TYPES: readonly NotificationType[] = [
   NotificationType.EMAIL_RECEIPTS_ATTENTION,
+];
+export const BOND_NOTIFICATION_TYPES: readonly NotificationType[] = [
+  NotificationType.BOND_MATURITY_SOON,
+  NotificationType.BOND_INTEREST_PAYMENT,
+  NotificationType.BOND_RATE_RESET,
+  NotificationType.BOND_REDEMPTION_UNBOOKED,
+  NotificationType.BOND_BENCHMARK_PUBLISHED,
+  NotificationType.BOND_DATA_MISSING,
 ];
 
 /**
@@ -210,6 +229,9 @@ export function notificationCategoryOf(
   }
   if (EMAIL_RECEIPT_NOTIFICATION_TYPES.includes(type)) {
     return NotificationCategory.EMAIL_RECEIPTS;
+  }
+  if (BOND_NOTIFICATION_TYPES.includes(type)) {
+    return NotificationCategory.BONDS;
   }
   return NotificationCategory.BUDGETS;
 }

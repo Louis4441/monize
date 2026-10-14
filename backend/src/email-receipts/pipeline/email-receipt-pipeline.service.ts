@@ -67,12 +67,6 @@ import {
   lockReceiptTransaction,
 } from "./receipt-requests.util";
 
-export {
-  RECEIPT_AUTOMATIC_AI_INSTRUCTION,
-  RECEIPT_CATEGORIZE_INSTRUCTION,
-  RECEIPT_CHAT_INSTRUCTION,
-  RECEIPT_PARSED_INSTRUCTION,
-} from "./receipt-instructions";
 import {
   RECEIPT_AUTOMATIC_AI_INSTRUCTION,
   RECEIPT_CATEGORIZE_INSTRUCTION,

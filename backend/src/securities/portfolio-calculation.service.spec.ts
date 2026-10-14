@@ -10,6 +10,7 @@ import {
 } from "./entities/investment-transaction.entity";
 import { Account, AccountSubType } from "../accounts/entities/account.entity";
 import { HoldingWithMarketValue } from "./portfolio.service";
+import { SecurityValueByAccount } from "../bonds/bond-valuation.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -25,6 +26,7 @@ function buildService(
   repos: Array<[unknown, Record<string, jest.Mock>]>,
   exchangeRateService: unknown,
   rawQuery?: jest.Mock,
+  bondValuation: unknown = { valueByAccount: jest.fn() },
 ): PortfolioCalculationService {
   const { manager, dataSource } = createScopedDbMocks(repos as never);
   manager.query.mockImplementation((sql: string, params?: unknown[]) =>
@@ -33,6 +35,7 @@ function buildService(
   return new PortfolioCalculationService(
     dataSource as never,
     exchangeRateService as never,
+    bondValuation as never,
   );
 }
 
@@ -3209,5 +3212,198 @@ describe("PortfolioCalculationService.calculateHoldingsWithValues", () => {
     expect(holding.costBasisAccountCurrency).toBe(305);
     // Gain follows the native costBasis: 10 x 50 market - 300.
     expect(holding.gainLoss).toBe(200);
+  });
+});
+
+/**
+ * Invariant: a bond-linked holding is worth its own account's lots, never
+ * quantity x the program-wide blend (bond-program-securities.md 2.4, audit H2).
+ * Minimal mutation: price a linked holding as `quantity x priceMap.get(...)`.
+ * Test that fails under it: the two-account case (1177.40 each instead of
+ * 1354.00 and 1000.80).
+ */
+describe("PortfolioCalculationService.calculateHoldingsWithValues (bond-linked)", () => {
+  const userId = "user-1";
+  const BLEND = 117.74;
+
+  const holdingOf = (
+    id: string,
+    accountId: string,
+    securityId: string,
+    over: { quantity?: number; linked?: boolean } = {},
+  ) => ({
+    id,
+    accountId,
+    securityId,
+    quantity: over.quantity ?? 10,
+    averageCost: 100,
+    security: {
+      id: securityId,
+      symbol: securityId.toUpperCase(),
+      name: securityId,
+      securityType: "BOND",
+      currencyCode: "PLN",
+      bondProgramId: over.linked === false ? null : "prog-1",
+    },
+    account: { id: accountId, currencyCode: "PLN" },
+  });
+
+  const byAccount = (
+    entries: Array<[string, number, string | null]>,
+  ): SecurityValueByAccount => ({
+    asOf: "2026-10-13",
+    accounts: new Map(
+      entries.map(([accountId, quantity, grossValue]) => [
+        accountId,
+        { quantity, grossValue },
+      ]),
+    ),
+  });
+
+  const run = async (
+    holdings: ReturnType<typeof holdingOf>[],
+    valueByAccount: jest.Mock,
+    prices: Array<[string, number]> = holdings.map(
+      (h) => [h.securityId, BLEND] as [string, number],
+    ),
+  ) => {
+    const service = buildService(
+      [
+        [Holding, { find: jest.fn().mockResolvedValue(holdings) }],
+        [InvestmentTransaction, { find: jest.fn().mockResolvedValue([]) }],
+        [Account, { find: jest.fn().mockResolvedValue([]) }],
+      ],
+      { resolveStoredRate: storedRateDouble() },
+      undefined,
+      { valueByAccount },
+    );
+    jest
+      .spyOn(service, "calculateCostBasisLotsInAccountCurrency")
+      .mockResolvedValue(new Map());
+    return service.calculateHoldingsWithValues(
+      userId,
+      ["ike", "reg"],
+      "PLN",
+      new Map(),
+      async () => new Map(prices),
+    );
+  };
+
+  it("values each account by its own lots, not by the blend", async () => {
+    const valueByAccount = jest.fn().mockResolvedValue(
+      byAccount([
+        ["ike", 10, "1354.00"],
+        ["reg", 10, "1000.80"],
+      ]),
+    );
+
+    const result = await run(
+      [holdingOf("h-1", "ike", "edo"), holdingOf("h-2", "reg", "edo")],
+      valueByAccount,
+    );
+
+    const [ike, reg] = result.holdingsWithValues;
+    expect(ike.marketValue).toBe(1354);
+    expect(ike.currentPrice).toBe(135.4);
+    expect(ike.gainLoss).toBe(354);
+    expect(reg.marketValue).toBe(1000.8);
+    expect(reg.currentPrice).toBe(100.08);
+    expect(reg.gainLoss).toBeCloseTo(0.8, 10);
+    expect(result.totalHoldingsValue).toBeCloseTo(2354.8, 10);
+    expect(result.pricesComplete).toBe(true);
+    // One valuation for the security, not one per holding.
+    expect(valueByAccount).toHaveBeenCalledTimes(1);
+    expect(valueByAccount).toHaveBeenCalledWith(userId, "edo", undefined);
+  });
+
+  it("leaves an account with an unknown lot unpriced and the total a subtotal", async () => {
+    const result = await run(
+      [holdingOf("h-1", "ike", "edo"), holdingOf("h-2", "reg", "edo")],
+      jest.fn().mockResolvedValue(
+        byAccount([
+          ["ike", 10, null],
+          ["reg", 10, "1000.80"],
+        ]),
+      ),
+    );
+
+    const [ike, reg] = result.holdingsWithValues;
+    expect(ike.marketValue).toBeNull();
+    expect(ike.currentPrice).toBeNull();
+    expect(ike.gainLoss).toBeNull();
+    expect(reg.marketValue).toBe(1000.8);
+    expect(result.pricesComplete).toBe(false);
+    expect(result.unpricedSecurityIds).toEqual(["edo"]);
+    expect(result.totalHoldingsValue).toBe(1000.8);
+  });
+
+  it("leaves every holding unpriced when the lots are unknowable", async () => {
+    const result = await run(
+      [holdingOf("h-1", "ike", "edo")],
+      jest.fn().mockResolvedValue({ asOf: "2026-10-13", accounts: null }),
+    );
+
+    expect(result.holdingsWithValues[0].marketValue).toBeNull();
+    expect(result.pricesComplete).toBe(false);
+  });
+
+  it("never prices a different quantity than the holding's", async () => {
+    const result = await run(
+      [holdingOf("h-1", "ike", "edo", { quantity: 10 })],
+      jest.fn().mockResolvedValue(byAccount([["ike", 8, "1083.20"]])),
+    );
+
+    expect(result.holdingsWithValues[0].marketValue).toBeNull();
+    expect(result.unpricedSecurityIds).toEqual(["edo"]);
+  });
+
+  it("leaves a holding with no lots in its account unpriced", async () => {
+    const result = await run(
+      [holdingOf("h-1", "ike", "edo")],
+      jest.fn().mockResolvedValue(byAccount([["reg", 10, "1000.80"]])),
+    );
+
+    expect(result.holdingsWithValues[0].marketValue).toBeNull();
+  });
+
+  it("prices the other holdings when one security's valuation throws", async () => {
+    const valueByAccount = jest.fn().mockImplementation(async (_u, id) => {
+      if (id === "edo") throw new Error("boom");
+      return byAccount([["ike", 10, "1000.00"]]);
+    });
+
+    const result = await run(
+      [
+        holdingOf("h-1", "ike", "edo"),
+        holdingOf("h-2", "ike", "tos"),
+        holdingOf("h-3", "ike", "stock", { linked: false }),
+      ],
+      valueByAccount,
+      [
+        ["edo", BLEND],
+        ["tos", BLEND],
+        ["stock", 50],
+      ],
+    );
+
+    const [edo, tos, stock] = result.holdingsWithValues;
+    expect(edo.marketValue).toBeNull();
+    expect(tos.marketValue).toBe(1000);
+    expect(stock.marketValue).toBe(500);
+    expect(result.unpricedSecurityIds).toEqual(["edo"]);
+    expect(result.pricesComplete).toBe(false);
+  });
+
+  it("leaves a non-bond security on quantity x price and never values it as a bond", async () => {
+    const valueByAccount = jest.fn();
+
+    const result = await run(
+      [holdingOf("h-1", "ike", "stock", { linked: false })],
+      valueByAccount,
+      [["stock", 50]],
+    );
+
+    expect(result.holdingsWithValues[0].marketValue).toBe(500);
+    expect(valueByAccount).not.toHaveBeenCalled();
   });
 });

@@ -68,6 +68,58 @@
     "riskOn": "risk-on",
     "riskOff": "risk-off"
   },
+  "bond": {
+    "maturitySoonTitle": "{series}: погашение {date}",
+    "maturitySoonMessage": "{quantity} × {series} будут погашены {date}. {payout}",
+    "interestTitle": "{series}: выплата процентов {date}",
+    "interestMessage": "{quantity} × {series}: {date} выплата процентов в размере {amount}. Если их ещё нет на вашем счёте, проведите их на странице ценной бумаги.",
+    "interestMessageUnknown": "{quantity} × {series}: {date} выплата процентов. Сумма пока неизвестна: ставка, от которой она зависит, не опубликована.",
+    "rateResetTitle": "{series}: новый процентный период",
+    "rateResetMessage": "{series}: с {date} идёт период {period} со ставкой {rate} годовых.",
+    "unbookedTitle": "{series}: погашена, погашение не проведено",
+    "unbookedMessage": "{quantity} × {series} погашены {date}, но погашение не проведено. {payout} Проведите погашение на странице ценной бумаги.",
+    "payoutKnown": "Сумма выплаты: {payout}.",
+    "payoutUnknown": "Сумма выплаты пока неизвестна: {reason}.",
+    "reason": {
+      "RATE_UNKNOWN": "ставка, от которой она зависит, ещё не опубликована",
+      "TERMS_INCOMPLETE": "условия серии неполные",
+      "PURCHASE_OUTSIDE_SALE_WINDOW": "дата покупки выходит за период продажи серии",
+      "other": "её нельзя рассчитать по сохранённым данным"
+    },
+    "benchmarkTitle": "{benchmark}: новое значение за {observation}",
+    "benchmarkIntro": "Опубликовано {benchmark} за {observation}: {value} (источник: {publisher}).",
+    "benchmarkSeries": "{series}: период с {date} со ставкой {rate} годовых.",
+    "benchmarkSeriesProjected": "{series}: период с {date} с прогнозной ставкой {rate} годовых.",
+    "benchmarkSeriesUnknown": "{series}: период с {date}, ставка пока неизвестна.",
+    "benchmarkMore": "И ещё {more}.",
+    "missingTitle": "Показатели по облигациям пока неизвестны",
+    "missingMessage": "Некоторые показатели по облигациям не удаётся рассчитать. {causes}",
+    "cause": {
+      "observation": "Значение {benchmark} за {observation} ({publisher}) не сохранено: оно ещё не опубликовано или поток данных не загружался с тех пор. Обновите данные на странице облигации.",
+      "observationNoPublisher": "Значение {benchmark} за {observation} не сохранено: оно ещё не опубликовано или поток данных не загружался с тех пор. Обновите данные на странице облигации.",
+      "terms": "Условия {series} неполные. Обновите серию на странице облигации.",
+      "purchase": "Покупка {series} от {date} выходит за период продажи ({from} – {to}). Исправьте дату покупки.",
+      "lots": "Партии не удаётся определить по журналу операций ({code}). Исправьте журнал.",
+      "lotsRow": "{action} от {date}: партии не удаётся определить ({code}). Исправьте операцию.",
+      "lotsRowSeries": "{action} от {date}: серия не указана ({code}). Выберите серию в этой операции.",
+      "lotsRowRemoval": "{action} от {date}: количество превышает остаток этой серии на счёте ({code}). Исправьте операцию."
+    },
+    "action": {
+      "BUY": "Покупка",
+      "SELL": "Продажа",
+      "REINVEST": "Реинвестирование",
+      "ADD_SHARES": "Зачисление бумаг",
+      "REMOVE_SHARES": "Списание бумаг",
+      "SPLIT": "Сплит",
+      "TRANSFER_IN": "Входящий перевод",
+      "TRANSFER_OUT": "Исходящий перевод",
+      "other": "Операция"
+    },
+    "benchmarks": {
+      "PL_CPI_GUS_YOY": "Инфляция ИПЦ, 12 месяцев (GUS)",
+      "PL_NBP_REFERENCE": "Ориентировочная ставка NBP"
+    }
+  },
   "portfolioMovement": {
     "titleUp": "Инвестиции выросли на {percent}%",
     "titleDown": "Инвестиции упали на {percent}%",

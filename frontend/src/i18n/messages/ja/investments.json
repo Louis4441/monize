@@ -296,7 +296,30 @@
     "toastSaveFailed": "取引の保存に失敗しました",
     "exchangeRateUnresolved": "{from} から {to} へのレートがありません。保存する前にレートか換算後の合計を入力してください。",
     "toastExchangeRateRequired": "通貨をまたぐ取引を保存する前に為替レートを入力してください。",
-    "notAvailable": "利用不可"
+    "notAvailable": "利用不可",
+    "bondSeries": {
+      "label": "債券シリーズ",
+      "fromDate": "日付から自動判定",
+      "oldestFirst": "古いものから",
+      "loading": "シリーズを読み込み中...",
+      "loadFailed": "シリーズを読み込めませんでした。",
+      "retry": "再試行",
+      "fromDateCode": "日付から: {code}",
+      "noneOnSale": "この日付に販売中のシリーズはありません",
+      "choose": "シリーズを選択",
+      "required": "これらの株数のシリーズを選択してください。",
+      "heldOption": "{code}(保有 {quantity})",
+      "noLongerHeld": "{code}(この日付ではすでに保有していません)",
+      "noLongerHeldUnknown": "保存済みのシリーズ(この日付ではすでに保有していません)",
+      "storedSeries": "保存済みのシリーズ",
+      "seriesOnSaleMonth": "{code} — {month}に販売",
+      "seriesOnSaleRange": "{code} — {from}から{to}まで販売"
+    },
+    "bondRedemption": {
+      "summary": "利息 {interest}、期限前償還の控除 {deduction}、支払額 {payout}",
+      "outsideSaleWindow": "この銘柄のロットは販売期間外に購入されたため、償還を分割できません。",
+      "failed": "償還の内訳を計算できませんでした。"
+    }
   },
   "newTransactionButton": {
     "label": "+ 新規取引",

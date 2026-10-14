@@ -410,6 +410,30 @@ describe("McpRulesTools", () => {
       expect(message).not.toContain("usually wrong");
     });
 
+    it("drops the no-change note when the run still queues AI reviews", async () => {
+      server.server.getClientCapabilities.mockReturnValue({
+        elicitation: { form: {} },
+      });
+      prep.prepareCreate.mockResolvedValue({
+        ok: true,
+        preview: {
+          rule: ruleState,
+          labels: {},
+          test: {
+            ...test,
+            matchedCount: 0,
+            conditionMatchedCount: 12,
+            aiReviewRequests: 3,
+          },
+        },
+      });
+      await call(createArgs);
+      const message = elicitInput.mock.calls[0][0].message as string;
+      expect(message).toContain("It would queue 3 transactions for AI review.");
+      expect(message).not.toContain("nothing would change");
+      expect(message).not.toContain("not an error");
+    });
+
     it("does not warn when the rule matches something", async () => {
       server.server.getClientCapabilities.mockReturnValue({
         elicitation: { form: {} },

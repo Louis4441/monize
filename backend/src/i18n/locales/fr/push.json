@@ -39,6 +39,10 @@
     "email_receipts": {
       "title": "Les reçus par courrier nécessitent attention",
       "body": "Certains courriels dans votre boîte de réception des reçus nécessitent un profil ou une correction. Ouvrez Monize pour plus de détails."
+    },
+    "bonds": {
+      "title": "Avis sur les obligations",
+      "body": "L'une de vos obligations a du nouveau. Ouvrez Monize pour les détails."
     }
   },
   "actions": {

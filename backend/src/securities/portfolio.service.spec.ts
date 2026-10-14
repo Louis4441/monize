@@ -36,6 +36,7 @@ jest.mock("../common/db/scoped-db", () =>
 
 describe("PortfolioService", () => {
   let service: PortfolioService;
+  let bondValuation: { valueByAccount: jest.Mock };
   let holdingsRepository: Record<string, jest.Mock>;
   let securityPriceRepository: Record<string, jest.Mock>;
   let securityRepository: Record<string, jest.Mock>;
@@ -336,9 +337,11 @@ describe("PortfolioService", () => {
         : accountsRepository.query(sql, params),
     );
 
+    bondValuation = { valueByAccount: jest.fn() };
     const calculationService = new PortfolioCalculationService(
       dataSource as never,
       exchangeRateService as never,
+      bondValuation as never,
     );
     // Default: a portfolio with no investment transaction at all, which is the
     // empty decision rather than a zero return.
@@ -2276,6 +2279,63 @@ describe("PortfolioService", () => {
       });
     });
 
+    describe("a bond linked to the engine is not a market mover (R13)", () => {
+      it("is left off the board, so its daily accrual row does not push every equity off the newest session", async () => {
+        accountsRepository.find.mockResolvedValue([
+          mockBrokerageAccount,
+          mockCashAccount,
+        ]);
+        const bondHolding = {
+          ...mockHoldingVFV,
+          securityId: "sec-bond",
+          security: {
+            ...mockSecurityVFV,
+            id: "sec-bond",
+            symbol: "EDO1036",
+            bondProgramId: "11111111-1111-5111-8111-111111111111",
+          },
+        };
+        holdingsRepository.find.mockResolvedValue([
+          mockHoldingAAPL,
+          bondHolding,
+        ]);
+        securityPriceRepository.query.mockResolvedValue([
+          // AAPL's newest close is Friday's session; the engine wrote Monday.
+          {
+            security_id: "sec-1",
+            close_price: "180",
+            price_date: "2026-02-06",
+            rn: "1",
+          },
+          {
+            security_id: "sec-1",
+            close_price: "175",
+            price_date: "2026-02-05",
+            rn: "2",
+          },
+          {
+            security_id: "sec-bond",
+            close_price: "100.05",
+            price_date: "2026-02-09",
+            rn: "1",
+          },
+          {
+            security_id: "sec-bond",
+            close_price: "100.04",
+            price_date: "2026-02-08",
+            rn: "2",
+          },
+        ]);
+
+        const board = await service.getTopMovers(userId);
+
+        expect(board.map((m) => m.symbol)).not.toContain("EDO1036");
+        // The bond's rows are not even asked for.
+        const asked = securityPriceRepository.query.mock.calls[0][1][0];
+        expect(asked).toEqual(["sec-1"]);
+      });
+    });
+
     describe("when a security has only one price point", () => {
       it("skips securities without two price points", async () => {
         accountsRepository.find.mockResolvedValue([
@@ -3707,6 +3767,74 @@ describe("PortfolioService", () => {
       const result = await service.getAccountMarketValues(userId);
       expect(result.get("acct-brokerage-1")).toBe(2000);
     });
+
+    describe("a bond-linked holding", () => {
+      const bondSecurity = {
+        ...mockSecurityXIC,
+        id: "sec-bond",
+        securityType: "BOND",
+        bondProgramId: "prog-1",
+      };
+      const heldIn = (accountId: string) =>
+        ({
+          ...mockHoldingVFV,
+          id: `hold-${accountId}`,
+          accountId,
+          securityId: "sec-bond",
+          security: bondSecurity,
+          quantity: "10",
+        }) as any;
+
+      beforeEach(() => {
+        accountsRepository.find.mockResolvedValue([
+          mockBrokerageAccount,
+          { ...mockBrokerageAccount, id: "acct-brokerage-2" },
+        ]);
+        holdingsRepository.find.mockResolvedValue([
+          heldIn("acct-brokerage-1"),
+          heldIn("acct-brokerage-2"),
+        ]);
+        // The blend (117.74) a quantity x price reading would use.
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-bond",
+            close_price: "117.74",
+            price_date: "2026-02-01",
+          },
+        ]);
+      });
+
+      it("values each account by its own lots, not quantity x the blend", async () => {
+        bondValuation.valueByAccount.mockResolvedValue({
+          asOf: "2026-02-01",
+          accounts: new Map([
+            ["acct-brokerage-1", { quantity: 10, grossValue: "1354.00" }],
+            ["acct-brokerage-2", { quantity: 10, grossValue: "1000.80" }],
+          ]),
+        });
+
+        const result = await service.getAccountMarketValues(userId);
+
+        expect(result.get("acct-brokerage-1")).toBe(1354);
+        expect(result.get("acct-brokerage-2")).toBe(1000.8);
+        expect(bondValuation.valueByAccount).toHaveBeenCalledTimes(1);
+      });
+
+      it("leaves out an account whose lots have an unknown value", async () => {
+        bondValuation.valueByAccount.mockResolvedValue({
+          asOf: "2026-02-01",
+          accounts: new Map([
+            ["acct-brokerage-1", { quantity: 10, grossValue: null }],
+            ["acct-brokerage-2", { quantity: 10, grossValue: "1000.80" }],
+          ]),
+        });
+
+        const result = await service.getAccountMarketValues(userId);
+
+        expect(result.has("acct-brokerage-1")).toBe(false);
+        expect(result.get("acct-brokerage-2")).toBe(1000.8);
+      });
+    });
   });
 
   describe("getIntradayValueSeries", () => {
@@ -3883,6 +4011,34 @@ describe("PortfolioService", () => {
       // ts1: AAPL at open=99 (first bar), VFV backfilled at its own open=79.
       // = 10 * 99 * 1.4 + 50 * 79 + 5000 = 1386 + 3950 + 5000 = 10336
       expect(result.points[0].value).toBeCloseTo(10336, 4);
+    });
+
+    it("never asks a quote provider for a bond-linked holding's intraday bars (INV-BOND-005)", async () => {
+      accountsRepository.find.mockResolvedValue([mockBrokerageAccount]);
+      holdingsRepository.find.mockResolvedValue([
+        mockHoldingAAPL,
+        {
+          ...mockHoldingVFV,
+          security: {
+            ...mockSecurityVFV,
+            bondProgramId: "11111111-1111-5111-8111-111111111111",
+          } as any,
+        },
+      ]);
+      yahooFinanceService.fetchIntradaySeries.mockResolvedValue([
+        { timestamp: new Date("2026-05-06T13:30:00.000Z"), close: 100 },
+      ]);
+      exchangeRateService.getLatestRate.mockResolvedValue(1.4);
+
+      await service.getIntradayValueSeries(userId, { range: "1d" });
+
+      const asked = yahooFinanceService.fetchIntradaySeries.mock.calls.map(
+        ([symbol]: [string]) => symbol,
+      );
+      expect(asked).toEqual([mockSecurityAAPL.symbol]);
+      // This is the legacy (holdings-table) branch, reached because the default
+      // ledger mock is empty; production values a linked holding on the ledger
+      // path, which the next test pins (its stored close, per day).
     });
 
     it("caches results for 60 seconds keyed by user/range/accounts/currency", async () => {
@@ -5053,6 +5209,70 @@ describe("PortfolioService", () => {
       expect(result.points[4].value).toBe(111541.4543);
       expect(result.points[4].securitiesValue).toBe(111541.4543);
       expect(result.points[1].value).toBe(111396.8957);
+    });
+
+    it("values a bond-linked holding at its stored close on the ledger path and never asks a provider for it (INV-BOND-005)", async () => {
+      const bond = {
+        id: "sec-bond",
+        symbol: "TOS1029",
+        name: "TOS1029",
+        securityType: "BOND",
+        exchange: null,
+        currencyCode: "CAD",
+        isActive: true,
+        bondProgramId: "11111111-1111-5111-8111-111111111111",
+      } as unknown as Security;
+      netWorthService.getDailyInvestmentPositions.mockResolvedValue(
+        ledgerOf(
+          [
+            {
+              date: "2026-09-01",
+              quantities: { [xgro.id]: 10, [bond.id]: 100 },
+              closes: { [xgro.id]: 100, [bond.id]: 100 },
+              // The bond's close is the engine's stored price, per day.
+              closeValues: { [xgro.id]: 1000, [bond.id]: 10000 },
+              value: 11000,
+              securitiesValue: 11000,
+            },
+            {
+              date: "2026-09-02",
+              quantities: { [xgro.id]: 10, [bond.id]: 100 },
+              closes: { [xgro.id]: 101, [bond.id]: 100.1 },
+              closeValues: { [xgro.id]: 1010, [bond.id]: 10010 },
+              value: 11020,
+              securitiesValue: 11020,
+            },
+          ],
+          [xgro, bond],
+        ),
+      );
+      seriesBySymbol({
+        "XGRO.TO": [
+          bar("2026-09-01T19:45:00.000Z", 100),
+          bar("2026-09-02T19:45:00.000Z", 102),
+        ],
+      });
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1m",
+      });
+
+      const asked = yahooFinanceService.fetchIntradaySeries.mock.calls.map(
+        ([symbol]: [string]) => symbol,
+      );
+      expect(asked).not.toContain("TOS1029");
+      // Mid-session the bond contributes its stored close beside the live bar:
+      // 10 x 102 + 10010. Dropping a holding that is not fetched would leave 1020.
+      const midSession = result.points.find(
+        (p) => p.timestamp === "2026-09-02T19:45:00.000Z",
+      )!;
+      expect(midSession.value).toBeCloseTo(1020 + 10010, 4);
+      // The session's last point is the daily series' figure, bond included.
+      const close = result.points.find(
+        (p) => p.timestamp === "2026-09-02T20:00:00.000Z",
+      )!;
+      expect(close.value).toBe(11020);
+      expect(close.securitiesValue).toBe(11020);
     });
 
     it("values each day at that day's share count and cash, not today's (a deposit, then a buy)", async () => {

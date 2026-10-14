@@ -296,7 +296,30 @@
     "toastSaveFailed": "Falha ao guardar a transação",
     "exchangeRateUnresolved": "Não há taxa de {from} para {to} disponível. Introduza uma, ou o total convertido, antes de guardar.",
     "toastExchangeRateRequired": "Introduza uma taxa de câmbio antes de guardar uma operação entre moedas.",
-    "notAvailable": "Não disponível"
+    "notAvailable": "Não disponível",
+    "bondSeries": {
+      "label": "Série de obrigações",
+      "fromDate": "Determinada a partir da data",
+      "oldestFirst": "As mais antigas primeiro",
+      "loading": "A carregar as séries...",
+      "loadFailed": "Não foi possível carregar as séries.",
+      "retry": "Tentar novamente",
+      "fromDateCode": "Da data: {code}",
+      "noneOnSale": "Nenhuma série à venda nesta data",
+      "choose": "Escolha uma série",
+      "required": "Escolha a série destes títulos.",
+      "heldOption": "{code} ({quantity} detidos)",
+      "noLongerHeld": "{code} (já não detida nesta data)",
+      "noLongerHeldUnknown": "Série guardada (já não detida nesta data)",
+      "storedSeries": "Série guardada",
+      "seriesOnSaleMonth": "{code} — à venda em {month}",
+      "seriesOnSaleRange": "{code} — à venda de {from} a {to}"
+    },
+    "bondRedemption": {
+      "summary": "Juros {interest}, dedução por resgate antecipado {deduction}, pagamento {payout}",
+      "outsideSaleWindow": "Um lote desta série foi comprado fora do seu período de venda, por isso o resgate não pode ser dividido.",
+      "failed": "Não foi possível calcular a divisão do resgate."
+    }
   },
   "newTransactionButton": {
     "label": "+ Nova Transação",

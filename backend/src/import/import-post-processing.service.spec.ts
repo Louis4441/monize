@@ -4,6 +4,7 @@ import { Logger } from "@nestjs/common";
 import { ImportPostProcessingService } from "./import-post-processing.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityPriceService } from "../securities/security-price.service";
+import { SecuritiesService } from "../securities/securities.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { lockAccountsForBalanceWrite } from "../common/db/locks";
@@ -45,6 +46,7 @@ describe("ImportPostProcessingService", () => {
     backfillTransactionPrices: jest.Mock;
   };
   let rates: { backfillHistoricalRates: jest.Mock };
+  let securities: { recomputeBondPricesOfAccounts: jest.Mock };
   let errorSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
 
@@ -61,6 +63,9 @@ describe("ImportPostProcessingService", () => {
       backfillTransactionPrices: jest.fn().mockResolvedValue(undefined),
     };
     rates = { backfillHistoricalRates: jest.fn().mockResolvedValue(undefined) };
+    securities = {
+      recomputeBondPricesOfAccounts: jest.fn().mockResolvedValue(undefined),
+    };
 
     errorSpy = jest.spyOn(Logger.prototype, "error").mockImplementation();
     warnSpy = jest.spyOn(Logger.prototype, "warn").mockImplementation();
@@ -73,6 +78,7 @@ describe("ImportPostProcessingService", () => {
         { provide: NetWorthService, useValue: netWorth },
         { provide: SecurityPriceService, useValue: prices },
         { provide: ExchangeRateService, useValue: rates },
+        { provide: SecuritiesService, useValue: securities },
       ],
     }).compile();
 
@@ -209,6 +215,36 @@ describe("ImportPostProcessingService", () => {
       await service.run(userId, true, new Set([accountA]));
       expect(prices.backfillHistoricalPrices).toHaveBeenCalled();
       expect(prices.backfillTransactionPrices).toHaveBeenCalled();
+    });
+
+    it("recomputes the bond-engine prices of the imported accounts' linked securities, after the price backfills, for an investment import only", async () => {
+      await service.run(userId, false, new Set([accountA]));
+      expect(securities.recomputeBondPricesOfAccounts).not.toHaveBeenCalled();
+
+      await service.run(userId, true, new Set([accountA]));
+      expect(securities.recomputeBondPricesOfAccounts).toHaveBeenCalledWith(
+        userId,
+        [accountA],
+      );
+      expect(
+        prices.backfillTransactionPrices.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        securities.recomputeBondPricesOfAccounts.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("a failing bond recompute is a warning, never a failed import", async () => {
+      securities.recomputeBondPricesOfAccounts.mockRejectedValue(
+        new Error("boom"),
+      );
+      await expect(
+        service.run(userId, true, new Set([accountA])),
+      ).resolves.toBeUndefined();
+      expect(
+        warnSpy.mock.calls.some((c) =>
+          String(c[0]).includes("bond price recompute failed"),
+        ),
+      ).toBe(true);
     });
 
     it("warns rather than errors when a provider is down", async () => {

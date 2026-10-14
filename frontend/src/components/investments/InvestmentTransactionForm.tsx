@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, MutableRefObject } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, MutableRefObject } from 'react';
 import { useTranslations } from 'next-intl';
 import { useForm, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
@@ -14,6 +14,18 @@ import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { SecurityForm } from '@/components/securities/SecurityForm';
+import {
+  BOND_SERIES_ERROR_CODES,
+  BondSeriesSelect,
+  bondSeriesKind,
+  useBondSeriesOptions,
+} from './BondSeriesSelect';
+import { BondRedemptionInfo } from './BondRedemptionInfo';
+import {
+  redemptionRequestKey,
+  useBondRedemptionSplit,
+  type RedemptionSplitRequest,
+} from './useBondRedemptionSplit';
 import { investmentsApi } from '@/lib/investments';
 import {
   LAST_INVESTMENT_TRANSACTION_DATE_KEY,
@@ -35,7 +47,7 @@ import {
   roundFxRate,
   FX_RATE_DISPLAY_DECIMALS,
 } from '@/lib/format';
-import { getErrorMessage } from '@/lib/errors';
+import { getErrorCode, getErrorMessage } from '@/lib/errors';
 import {
   baseInvestmentAction,
   redemptionTotalWithInterest,
@@ -74,6 +86,10 @@ export const buildInvestmentTransactionSchema = (t: (key: string) => string) => 
   ]),
   transactionDate: z.string().min(1, t('validation.dateRequired')),
   securityId: z.string().optional(),
+  // The bond series of a share-moving row of a program-linked security.
+  // Undefined is "not chosen" (an acquisition is prefilled from the date); ''
+  // is the reader's "determine it" / "oldest first".
+  bondInstrumentId: z.string().optional(),
   fundingAccountId: z.string().optional(),
   // Destination account for a TRANSFER (the source is `accountId`).
   destinationAccountId: z.string().optional(),
@@ -258,6 +274,8 @@ function InvestmentTransactionFormFields({
   const [securities, setSecurities] = useState<Security[]>([]);
   const [securitiesLoaded, setSecuritiesLoaded] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
+  // The server's refusal about the bond series, said under the series select.
+  const [bondSeriesError, setBondSeriesError] = useState<string | null>(null);
   // Holding state replayed up to the SPLIT's transaction date, used for the
   // "Before" line in the holding preview. Null means "no holding history at
   // that date" (don't render the preview).
@@ -324,6 +342,7 @@ function InvestmentTransactionFormFields({
           action: transaction.action,
           transactionDate: transaction.transactionDate,
           securityId: transaction.securityId || transaction.security?.id || '',
+          bondInstrumentId: transaction.bondInstrumentId ?? '',
           fundingAccountId: transaction.fundingAccountId || '',
           // The destination account for a transfer leg is resolved from the
           // paired (linked) leg once it loads; start empty so the field is
@@ -386,14 +405,23 @@ function InvestmentTransactionFormFields({
   const isTransfer = (watchedAction as string) === 'TRANSFER';
   // Editing an existing transfer leg (the action is one of the real
   // TRANSFER_IN/OUT values, not the UI-only 'TRANSFER').
+  // An imported TRANSFER_IN with no paired leg is one row, not a pair: it is
+  // edited and saved like any single transaction, so it can be given a series.
+  const isUnpairedTransferIn =
+    !!transaction &&
+    transaction.action === 'TRANSFER_IN' &&
+    !transaction.linkedTransactionId &&
+    (watchedAction as string) === 'TRANSFER_IN';
   const isTransferEditing =
     !!transaction &&
+    !isUnpairedTransferIn &&
     ((watchedAction as string) === 'TRANSFER_IN' ||
       (watchedAction as string) === 'TRANSFER_OUT');
   // Source-account holdings are relevant both when creating a transfer and when
   // editing one (to validate the available quantity).
   const transferActive = isTransfer || isTransferEditing;
   const watchedSecurityId = watch('securityId');
+  const watchedBondInstrumentId = watch('bondInstrumentId');
   const watchedDestinationAccountId = watch('destinationAccountId');
   const watchedFundingAccountId = watch('fundingAccountId');
   const watchedQuantity = Number(watch('quantity')) || 0;
@@ -453,6 +481,98 @@ function InvestmentTransactionFormFields({
     }
     return accountCurrency;
   }, [watchedSecurityId, securities, accountCurrency]);
+  const originalSecurityId = transaction?.securityId || transaction?.security?.id;
+  const bondKindNow = bondSeriesKind(watchedAction);
+  const storedBondKind = transaction ? bondSeriesKind(transaction.action) : null;
+  // The edited row's own series counts only while the form is still on the row's
+  // security and the kind of action it was saved as.
+  const storedBondInstrumentId =
+    transaction && watchedSecurityId === originalSecurityId && bondKindNow === storedBondKind
+      ? (transaction.bondInstrumentId ?? null)
+      : null;
+  // A program-linked security's share-moving row names the series it acts on.
+  const bondSeries = useBondSeriesOptions(
+    securities.find((s) => s.id === watchedSecurityId),
+    bondKindNow,
+    {
+      date: watchedTransactionDate,
+      accountId: watchedAccountId,
+      excludeTransactionId: transaction?.id,
+      storedInstrumentId: storedBondInstrumentId,
+    },
+  );
+  // The reader's pick; '' is the default of the kind: the series the server
+  // infers from the date (an acquisition) or the oldest lots (a removal).
+  const bondSeriesValue = watchedBondInstrumentId ?? '';
+  // A series belongs to one security and one direction: another security, or a
+  // switch between acquiring, removing and transferring in, starts the choice
+  // again -- even when editing, where only the row's own kind restores its value.
+  useEffect(() => {
+    setValue(
+      'bondInstrumentId',
+      transaction && watchedSecurityId === originalSecurityId && bondKindNow === storedBondKind
+        ? (transaction.bondInstrumentId ?? '')
+        : undefined,
+      { shouldDirty: false },
+    );
+  }, [watchedSecurityId, bondKindNow, storedBondKind, originalSecurityId, transaction, setValue]);
+  // A redemption of a program-linked bond: once series, date and quantity are
+  // set, the server splits what it pays into returned principal and interest and
+  // the form suggests both. A person's own edit of either field stands.
+  const priceEditedByPerson = useRef(false);
+  const interestEditedByPerson = useRef(false);
+  const redemptionRequest: RedemptionSplitRequest | null =
+    (watchedAction as string) === 'REDEEM' &&
+    bondSeries?.kind === 'remove' &&
+    watchedSecurityId &&
+    watchedAccountId &&
+    bondSeriesValue &&
+    /^\d{4}-\d{2}-\d{2}$/.test(watchedTransactionDate) &&
+    Number.isInteger(watchedQuantity) &&
+    watchedQuantity > 0
+      ? {
+          securityId: watchedSecurityId,
+          accountId: watchedAccountId,
+          bondInstrumentId: bondSeriesValue,
+          date: watchedTransactionDate,
+          quantity: watchedQuantity,
+          excludeTransactionId: transaction?.id,
+        }
+      : null;
+  const redemption = useBondRedemptionSplit(redemptionRequest);
+  // An existing redemption opens with the values it stored; only a change of
+  // series, date, account or quantity suggests new ones.
+  const openRedemptionKey =
+    transaction && transaction.action === 'REDEEM' && transaction.bondInstrumentId
+      ? redemptionRequestKey({
+          securityId: originalSecurityId ?? '',
+          accountId: transaction.accountId,
+          bondInstrumentId: transaction.bondInstrumentId,
+          date: transaction.transactionDate,
+          quantity: Number(transaction.quantity),
+          excludeTransactionId: transaction.id,
+        })
+      : null;
+  // The opened row's own answer is suppressed once (it seeds the ref); every
+  // later answer, including a return to the opened quantity, fills.
+  const lastFilledKey = useRef<string | null>(openRedemptionKey);
+  useEffect(() => {
+    const { key, split } = redemption;
+    if (key === null || split === null) return;
+    if (key === lastFilledKey.current) return;
+    lastFilledKey.current = key;
+    if (split.refusal !== null || split.principalReturned === null || split.interest === null) return;
+    const quantity = split.quantity;
+    if (!priceEditedByPerson.current) {
+      setValue('price', roundToDecimals(Number(split.principalReturned) / quantity, 10), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+    if (!interestEditedByPerson.current) {
+      setValue('accruedInterest', Number(split.interest), { shouldDirty: true, shouldValidate: true });
+    }
+  }, [redemption, setValue]);
   const currencySymbol = getCurrencySymbol(transactionCurrency);
   const cashCurrencySymbol = getCurrencySymbol(cashCurrency);
 
@@ -597,6 +717,7 @@ function InvestmentTransactionFormFields({
         ? proceeds - watchedCommission
         : proceeds + watchedCommission;
     if (!(gross > 0)) return;
+    priceEditedByPerson.current = true;
     setValue('price', roundToDecimals(gross / watchedQuantity, 10), {
       shouldDirty: true,
       shouldValidate: true,
@@ -850,6 +971,7 @@ function InvestmentTransactionFormFields({
 
   const onSubmit = async (data: InvestmentTransactionFormData) => {
     setIsLoading(true);
+    setBondSeriesError(null);
     try {
       if (data.action === 'TRANSFER') {
         const quantity = Number(data.quantity) || 0;
@@ -904,6 +1026,7 @@ function InvestmentTransactionFormFields({
       // Editing an existing transfer: update the pair via the source (OUT) leg.
       if (
         transaction &&
+        !isUnpairedTransferIn &&
         (data.action === 'TRANSFER_IN' || data.action === 'TRANSFER_OUT')
       ) {
         const quantity = Number(data.quantity) || 0;
@@ -977,6 +1100,13 @@ function InvestmentTransactionFormFields({
       }
 
       const action = data.action as InvestmentAction;
+      // A transfer in or an added holding names its series: the server has no
+      // date to infer it from, so the form does not send it without one.
+      if (bondSeries?.kind === 'select' && !bondSeriesValue) {
+        setBondSeriesError(t('transactionForm.bondSeries.required'));
+        setIsLoading(false);
+        return;
+      }
       const postsCash = actionIn(action, cashPostingActions);
       const isSplit = action === 'SPLIT';
       // For splits the new/old-shares inputs are the source of truth; the
@@ -1005,7 +1135,7 @@ function InvestmentTransactionFormFields({
         accountId: data.accountId,
         action,
         transactionDate: data.transactionDate,
-        securityId: actionIn(action, securityRequiredActions)
+        securityId: actionIn(action, securityRequiredActions) || isUnpairedTransferIn
           ? data.securityId
           : undefined,
         fundingAccountId:
@@ -1045,6 +1175,10 @@ function InvestmentTransactionFormFields({
           postsCash && data.exchangeRate && data.exchangeRate > 0
             ? data.exchangeRate
             : undefined,
+        // Null lets the server infer the series from the date (an acquisition)
+        // or take the oldest lots first (a removal); only a program-linked
+        // security has one. A pick is sent as the series id it is.
+        bondInstrumentId: bondSeries ? bondSeriesValue || null : undefined,
         description: data.description,
         status: data.status,
       };
@@ -1063,7 +1197,12 @@ function InvestmentTransactionFormFields({
         finishAfterCreate(data.accountId);
       }
     } catch (error) {
-      toast.error(getErrorMessage(error, t('transactionForm.toastSaveFailed')));
+      const message = getErrorMessage(error, t('transactionForm.toastSaveFailed'));
+      const code = getErrorCode(error);
+      if (bondSeries && code && (BOND_SERIES_ERROR_CODES as readonly string[]).includes(code)) {
+        setBondSeriesError(message);
+      }
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -1083,7 +1222,7 @@ function InvestmentTransactionFormFields({
     watchedAction === 'TRANSFER_IN' || watchedAction === 'TRANSFER_OUT';
   // Either creating a transfer (combined action) or editing an existing leg.
   // Both render the From/To + security + quantity + cost-per-share UI.
-  const transferMode = isTransfer || isTransferLeg;
+  const transferMode = isTransfer || (isTransferLeg && !isUnpairedTransferIn);
   const canHaveFundingAccount = actionIn(watchedAction, fundingAccountActions);
   const canHaveCashDestination = actionIn(watchedAction, cashDestinationActions);
 
@@ -1217,7 +1356,7 @@ function InvestmentTransactionFormFields({
       )}
 
       {/* Security Selection - only for actions that need it */}
-      {(needsSecurity || transferMode) && (
+      {(needsSecurity || transferMode || isUnpairedTransferIn) && (
         <div className="space-y-2">
           <Select
             label={t('transactionForm.security')}
@@ -1256,6 +1395,19 @@ function InvestmentTransactionFormFields({
         </div>
       )}
 
+      {/* The series a share-moving row of a bond program acts on */}
+      {bondSeries && !transferMode && (
+        <BondSeriesSelect
+          series={bondSeries}
+          value={bondSeriesValue}
+          onChange={(id) => {
+            setBondSeriesError(null);
+            setValue('bondInstrumentId', id, { shouldDirty: true });
+          }}
+          error={bondSeriesError ?? undefined}
+        />
+      )}
+
       {/* Quantity and Price - for buy/sell/reinvest */}
       {needsQuantityPrice && (
         <div className={`grid gap-4 ${needsConversion ? 'grid-cols-3' : 'grid-cols-2'}`}>
@@ -1271,7 +1423,10 @@ function InvestmentTransactionFormFields({
             label={t('transactionForm.pricePerShare', { currency: transactionCurrency })}
             prefix={currencySymbol}
             value={watchedPrice || undefined}
-            onChange={(value) => setValue('price', value, { shouldValidate: true })}
+            onChange={(value) => {
+              priceEditedByPerson.current = true;
+              setValue('price', value, { shouldValidate: true });
+            }}
             decimalPlaces={6}
             min={0}
             error={errors.price?.message}
@@ -1466,13 +1621,21 @@ function InvestmentTransactionFormFields({
             label={t('transactionForm.accruedInterest', { currency: transactionCurrency })}
             prefix={currencySymbol}
             value={watchedAccruedInterest || undefined}
-            onChange={(value) => setValue('accruedInterest', value, { shouldValidate: true })}
+            onChange={(value) => {
+              interestEditedByPerson.current = true;
+              setValue('accruedInterest', value, { shouldValidate: true });
+            }}
             error={errors.accruedInterest?.message}
             allowNegative={false}
           />
           <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {t('transactionForm.accruedInterestHelp')}
           </div>
+          {redemptionRequest !== null && (
+            <div className="mt-1">
+              <BondRedemptionInfo result={redemption} currencyCode={transactionCurrency} />
+            </div>
+          )}
         </div>
       )}
 

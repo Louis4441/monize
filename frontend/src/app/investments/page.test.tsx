@@ -225,7 +225,8 @@ vi.mock('@/components/layout/PageLayout', () => ({
   PageLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="page-layout">{children}</div>,
 }));
 
-vi.mock('@/components/ui/Button', () => ({
+vi.mock('@/components/ui/Button', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/ui/Button')>()),
   Button: ({ children, onClick, disabled, ...rest }: any) => (
     <button onClick={onClick} disabled={disabled} {...rest}>{children}</button>
   ),
@@ -422,6 +423,12 @@ describe('InvestmentsPage', () => {
         expect(screen.getByText('Investments')).toBeInTheDocument();
         expect(screen.getByText('Track your investment portfolio')).toBeInTheDocument();
       });
+    });
+
+    it('no longer links to the Treasury bonds page (it lives under Securities)', async () => {
+      await renderPage();
+      await screen.findByText('Investments');
+      expect(screen.queryByRole('link', { name: 'Treasury bonds' })).not.toBeInTheDocument();
     });
 
     it('renders within page layout', async () => {

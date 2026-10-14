@@ -51,7 +51,8 @@ export function RuleTestResult({ test, title }: RuleTestResultProps) {
           {t('matchesNone', { scanned: test.scanned })}
         </p>
       )}
-      {test.conditionMatchedCount > 0 && test.matchedCount === 0 && (
+      {/* A run that still queues AI reviews has work: it is not "nothing would change". */}
+      {test.conditionMatchedCount > 0 && test.matchedCount === 0 && test.aiReviewRequests === 0 && (
         <p role="status" className="text-sm text-gray-600 dark:text-gray-300">
           {t('noChange', {
             matched: test.conditionMatchedCount,

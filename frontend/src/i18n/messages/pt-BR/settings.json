@@ -384,7 +384,8 @@
         "STRATEGIES": "Sinais de estratégia",
         "BANK_SYNC": "Conexões bancárias",
         "BANK_SYNC_ACTIVITY": "Resultados da sincronização bancária",
-        "EMAIL_RECEIPTS": "Recibos de e-mail"
+        "EMAIL_RECEIPTS": "Recibos de e-mail",
+        "BONDS": "Obrigações"
       },
       "channelNotApplicable": "Não aplicável a este tipo de notificação",
       "emailToggleLabel": "Email (relatório) para {category}",
@@ -816,7 +817,24 @@
       "totalRecords": "Total de registros",
       "skippedAttachments": "{count, plural, one {# anexo não foi restaurado} other {# anexos não foram restaurados}}: o backup não continha bytes utilizáveis para eles — estavam ausentes ou falharam na soma de verificação na exportação, ou o arquivo é anterior aos backups autossuficientes. Exporte um backup novo quando o armazenamento de anexos estiver saudável.",
       "unusableAiProviderKeys": "{count, plural, one {# provedor de IA foi restaurado sem uma chave de API utilizável} other {# provedores de IA foram restaurados sem chaves de API utilizáveis}}: o backup foi criado antes de as chaves dos provedores viajarem nele, então a chave armazenada pertence ao servidor que gerou o arquivo, ou este servidor não tem nenhuma chave de criptografia configurada para guardá-la. Abra Configurações → Provedores de IA e digite a chave de API novamente.",
-      "doneButton": "Concluído"
+      "unlinkedBondSecurities": "{count, plural, one {# título de renda fixa foi restaurado sem vínculo com seu instrumento de título} other {# títulos de renda fixa foram restaurados sem vínculo com seus instrumentos de título}}: o catálogo de títulos deste servidor não inclui a série (ou a inclui em outra moeda), então o motor de títulos não os avalia mais e os preços calculados deles não foram restaurados. Abra cada título e vincule-o novamente a um instrumento de título.",
+      "unlinkedBondSeries": "{count, plural, one {# transação de títulos perdeu sua série} other {# transações de títulos perderam sua série}} porque não foi possível obter a série da fonte oficial. Elas foram restauradas sem série e ficam sem ela até você obtê-la.",
+      "unrecoveredBondSeries": "Séries de títulos citadas no backup que não foi possível obter: {count}.",
+      "unrecoveredBondSeriesItem": "{series} ({country}): {reason}",
+      "unrecoveredBondSeriesMore": "e mais {count}",
+      "unrecoveredBondSeriesAction": "Para restaurá-las, abra o título, obtenha a série na página dele (Atualizar) e escolha a série nas transações que não a têm.",
+      "unrecoveredBondSeriesReason": {
+        "not-published": "o emissor ainda não publicou esta série",
+        "source-unavailable": "a fonte oficial não respondeu; tente novamente mais tarde",
+        "no-adapter": "este servidor não tem fonte para o país deste emissor",
+        "refused": "a resposta da fonte oficial não foi aceita",
+        "rate-limited": "a fonte oficial pediu para reduzir o ritmo; tente novamente mais tarde",
+        "not-attempted": "séries demais em uma única restauração; não tentada",
+        "other": "motivo desconhecido"
+      },
+      "doneButton": "Concluído",
+      "unlinkedBondSecuritiesList": "Ativos afetados: {symbols}.",
+      "unlinkedBondSecuritiesMore": "e mais {count}"
     },
     "storedBackups": {
       "heading": "Backups automáticos",
