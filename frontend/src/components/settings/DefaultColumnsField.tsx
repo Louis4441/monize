@@ -90,10 +90,10 @@ export function DefaultColumnsField({ initial, commit }: DefaultColumnsFieldProp
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
         {t('defaultViews.columnsHelp')}
       </p>
-      <div className="space-y-3">
+      <div className="space-y-3 border-l-2 border-gray-200 dark:border-gray-700 pl-4">
         {HIDDEN_COLUMN_TABLES.map((table) => (
           <fieldset key={table}>
-            <legend className="text-sm text-gray-900 dark:text-gray-100 mb-1">
+            <legend className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
               {t(`defaultViews.columnTables.${table}`)}
             </legend>
             <div className="flex flex-wrap gap-x-4 gap-y-1">

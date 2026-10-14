@@ -27,7 +27,6 @@ import { transferDirection } from '@/lib/transfer-label';
 import { usePayeeDisplay } from '@/hooks/usePayeeDisplay';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useLocalizedAmount } from '@/hooks/useLocalizedAmount';
-import type { StaleUnreconciledReason } from '@/lib/stale-reconciliation';
 import { LinkifiedText } from '@/components/ui/LinkifiedText';
 
 /**
@@ -247,13 +246,6 @@ export interface TransactionRowProps {
    * fits. Omitted means nothing hidden.
    */
   hidden?: ReadonlySet<string>;
-  /**
-   * Why this row is overdue for reconciliation, from `classifyStaleRow`.
-   * Undefined means either "not stale" or "no information" -- the caller only
-   * supplies it for accounts the user actually reconciles, and a page that
-   * could not load that context supplies it for none.
-   */
-  staleReason?: StaleUnreconciledReason;
 }
 
 export const TransactionRow = memo(function TransactionRow({
@@ -298,7 +290,6 @@ export const TransactionRow = memo(function TransactionRow({
   isHighlighted,
   showFxColumns = false,
   hidden = NO_HIDDEN_COLUMNS,
-  staleReason,
 }: TransactionRowProps) {
   const compactPadding = registerDateColumnPadding(compactDates);
   // True for every column not hidden, structural ones included; the register
@@ -307,9 +298,6 @@ export const TransactionRow = memo(function TransactionRow({
   const payeeLayout = registerPayeeLayout(density);
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
-  // The reconciliation chips live in the reconcile catalog so the register and
-  // the reconcile table say the same thing about the same row.
-  const tr = useTranslations('reconcile');
   const { formatCurrency, formatPercent } = useNumberFormat();
   // Read-only amounts, grouped in the user's number locale (en-US unchanged).
   const formatAmountLocal = useLocalizedAmount();
@@ -388,20 +376,6 @@ export const TransactionRow = memo(function TransactionRow({
                   </span>
                 ) : (
                   formatDate(transaction.transactionDate)
-                )}
-                {staleReason && (
-                  <span
-                    data-testid="stale-reconciliation-chip"
-                    data-stale={staleReason}
-                    className="inline-flex items-center rounded-full bg-amber-200 dark:bg-amber-800 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:text-amber-100"
-                    title={
-                      staleReason === 'missed'
-                        ? tr('stale.missedTooltip')
-                        : tr('stale.overdueTooltip')
-                    }
-                  >
-                    {staleReason === 'missed' ? tr('stale.missedChip') : tr('stale.overdueChip')}
-                  </span>
                 )}
               </span>
             </div>
@@ -657,20 +631,6 @@ export const TransactionRow = memo(function TransactionRow({
             </span>
           ) : (
             formatDate(transaction.transactionDate)
-          )}
-          {staleReason && (
-            <span
-              data-testid="stale-reconciliation-chip"
-              data-stale={staleReason}
-              className="inline-flex items-center rounded-full bg-amber-200 dark:bg-amber-800 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:text-amber-100"
-              title={
-                staleReason === 'missed'
-                  ? tr('stale.missedTooltip')
-                  : tr('stale.overdueTooltip')
-              }
-            >
-              {staleReason === 'missed' ? tr('stale.missedChip') : tr('stale.overdueChip')}
-            </span>
           )}
         </span>
       </td>

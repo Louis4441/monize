@@ -140,7 +140,7 @@ describe('TransactionFilterPanel', () => {
     render(<TransactionFilterPanel {...defaultProps} />);
 
     expect(screen.getByText('Filters')).toBeInTheDocument();
-    expect(screen.getByText('Show')).toBeInTheDocument();
+    expect(screen.getByText('Show filters')).toBeInTheDocument();
   });
 
   it('displays Hide when filters are expanded', () => {
@@ -267,13 +267,13 @@ describe('TransactionFilterPanel', () => {
     it('shows Show label when collapsed and Hide label when expanded', () => {
       const { rerender } = render(<TransactionFilterPanel {...defaultProps} filtersExpanded={false} />);
 
-      expect(screen.getByText('Show')).toBeInTheDocument();
+      expect(screen.getByText('Show filters')).toBeInTheDocument();
       expect(screen.queryByText('Hide')).not.toBeInTheDocument();
 
       rerender(<TransactionFilterPanel {...defaultProps} filtersExpanded={true} />);
 
       expect(screen.getByText('Hide')).toBeInTheDocument();
-      expect(screen.queryByText('Show')).not.toBeInTheDocument();
+      expect(screen.queryByText('Show filters')).not.toBeInTheDocument();
     });
   });
 

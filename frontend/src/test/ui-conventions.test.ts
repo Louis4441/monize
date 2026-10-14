@@ -2620,7 +2620,6 @@ describe("a status pill is Badge, not a hand-rolled rounded-full", () => {
     "/src/components/transactions/PayeeInfoWidget.tsx",
     "/src/components/transactions/TransactionFilterPanel.tsx",
     "/src/components/transactions/TransactionForm.tsx",
-    "/src/components/transactions/TransactionRow.tsx",
   ];
 
   function filesWithInlinePill(): string[] {
