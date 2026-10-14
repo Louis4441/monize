@@ -120,7 +120,7 @@ export function ColumnChooserMenu<C extends string>({
   };
 
   return (
-    <div ref={containerRef} className="relative inline-block">
+    <div ref={containerRef} className="relative inline-flex">
       <button
         ref={triggerRef}
         type="button"
