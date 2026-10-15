@@ -114,6 +114,64 @@
       },
       "deleted": "Posta kutusu silindi",
       "deleteFailed": "Posta kutusu silinemedi"
+    },
+    "import": {
+      "title": "Arşivlenmiş e-postaları içe aktar",
+      "description": "Bir dosya, iletilen bir e-postadan farklı olarak mağazanın göndericisini ve satın alma tarihini korur. Eski sipariş onaylarını okumak için dışa aktarılmış e-postaları yükleyin.",
+      "fileLabel": "E-posta dosyaları (.eml, .mbox, .msg veya .zip)",
+      "selected": "Seçilen: {count}",
+      "button": "İçe aktar",
+      "tooLarge": "{name} dosyası {max} boyutundan büyük. Dışa aktarmayı daha küçük dosyalara bölün.",
+      "tooLargeTotal": "Seçilen dosyalar birlikte {max} boyutundan büyük. Bunları daha küçük gruplar halinde içe aktarın.",
+      "tooMany": "Her içe aktarmada en fazla {max} dosya seçin.",
+      "failed": "İçe aktarma başarısız oldu",
+      "result": {
+        "heading": "İçe aktarma sonucu",
+        "file": "{name}: {stored} kaydedildi, {duplicates} yinelenen, {skipped} atlandı",
+        "summary": "{processed} e-posta işlendi.",
+        "truncated": "Bir içe aktarmanın sınırı olduğu için {count} ileti okunmadı. Bunları ikinci bir çalıştırmada yeniden içe aktarın.",
+        "busy": "Posta kutusu şu anda okunuyor. İçe aktarılan e-postalar sonraki okumada işlenecek.",
+        "errors": {
+          "unsupported_format": "{name}: bu biçim desteklenmiyor. Desteklenen biçimler .eml, .mbox, .msg ve .zip.",
+          "invalid_archive": "{name}: ZIP dosyası hasarlı veya okunamıyor.",
+          "archive_too_large": "{name}: ZIP dosyası açıldığında 100 MB'tan büyük oluyor. Dosyayı bölün veya içindeki .mbox dosyasını yükleyin.",
+          "empty": "{name}: dosyada e-posta yok."
+        },
+        "ignored": "{name}: arşivdeki {count} diğer dosya atlandı."
+      },
+      "guide": {
+        "toggle": "Sağlayıcınızdan e-postalar nasıl dışa aktarılır",
+        "gmailLabel": {
+          "title": "Gmail: etiketli tüm e-postalar",
+          "step1": "takeout.google.com adresini açın ve \"Deselect all\" seçeneğini seçin.",
+          "step2": "\"Mail\" seçeneğini işaretleyin ve \"All Mail data included\" seçeneğini seçin.",
+          "step3": "Yalnızca kendi etiketinizi seçin ve dışa aktarmayı oluşturun.",
+          "step4": "İndirilen .zip dosyasını olduğu gibi yükleyin. Açmanız gerekmez."
+        },
+        "gmailOne": {
+          "title": "Gmail: tek bir e-posta",
+          "step1": "E-postayı açın.",
+          "step2": "\"Diğer\" seçeneğini, ardından \"İletiyi indir\" seçeneğini seçin.",
+          "step3": ".eml dosyasını yükleyin."
+        },
+        "imap": {
+          "title": "Diğer sağlayıcılar: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Posta kutusunu IMAP ile Thunderbird'e ekleyin ve ImportExportTools NG eklentisini yükleyin.",
+          "step2": "E-postaları veya bir klasörü seçin ve sağ tıklayın.",
+          "step3": "ImportExportTools NG seçeneğini seçin, ardından EML veya mbox olarak dışa aktarın.",
+          "step4": "Dosyaları yükleyin."
+        },
+        "outlook": {
+          "title": "Masaüstü Outlook",
+          "body": "E-postaları seçin ve diskinizdeki bir klasöre sürükleyin. Outlook .msg dosyaları yazar. Bunları birkaç tane birden veya tek bir .zip dosyasında paketlenmiş olarak yükleyin."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "\"Mailbox\" seçeneğini, ardından \"Export Mailbox\" seçeneğini seçin. Apple Mail bir klasör yazar.",
+          "step2": "Klasörün içindeki mbox adlı dosyayı yükleyin veya .eml dosyaları almak için e-postaları Finder'a sürükleyin."
+        },
+        "tip": "İpucu: e-postaları bir betikle iletmek mağazanın göndericisini ve tarihini kaybettirir. Dosyaları içe aktarmak bunları korur."
+      }
     }
   },
   "parsers": {

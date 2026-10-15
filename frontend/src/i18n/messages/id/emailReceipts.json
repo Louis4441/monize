@@ -114,6 +114,64 @@
       },
       "deleted": "Kotak surel dihapus",
       "deleteFailed": "Kotak surel tidak dapat dihapus"
+    },
+    "import": {
+      "title": "Impor email yang diarsipkan",
+      "description": "File menyimpan pengirim dan tanggal pembelian dari toko, tidak seperti email yang diteruskan. Unggah email yang diekspor untuk membaca konfirmasi pesanan lama.",
+      "fileLabel": "File email (.eml, .mbox, .msg, atau .zip)",
+      "selected": "Dipilih: {count}",
+      "button": "Impor",
+      "tooLarge": "{name} lebih besar dari {max}. Bagi ekspor menjadi file yang lebih kecil.",
+      "tooLargeTotal": "File yang dipilih bersama-sama lebih besar dari {max}. Impor dalam kelompok yang lebih kecil.",
+      "tooMany": "Pilih paling banyak {max} file per impor.",
+      "failed": "Impor gagal",
+      "result": {
+        "heading": "Hasil impor",
+        "file": "{name}: {stored} disimpan, {duplicates} duplikat, {skipped} dilewati",
+        "summary": "{processed} email diproses.",
+        "truncated": "{count} pesan tidak dibaca karena satu impor memiliki batas. Impor lagi dalam proses kedua.",
+        "busy": "Kotak surat sedang dibaca sekarang. Email yang diimpor akan diproses pada pembacaan berikutnya.",
+        "errors": {
+          "unsupported_format": "{name}: format ini tidak didukung. Format yang didukung adalah .eml, .mbox, .msg, dan .zip.",
+          "invalid_archive": "{name}: file ZIP rusak atau tidak dapat dibaca.",
+          "archive_too_large": "{name}: file ZIP berukuran lebih dari 100 MB setelah diekstrak. Bagi file tersebut, atau unggah file .mbox di dalamnya.",
+          "empty": "{name}: file tidak berisi email."
+        },
+        "ignored": "{name}: {count} file lain di arsip dilewati."
+      },
+      "guide": {
+        "toggle": "Cara mengekspor email dari penyedia Anda",
+        "gmailLabel": {
+          "title": "Gmail: semua email dengan label",
+          "step1": "Buka takeout.google.com dan pilih \"Deselect all\".",
+          "step2": "Pilih \"Mail\" dan pilih \"All Mail data included\".",
+          "step3": "Pilih hanya label Anda dan buat ekspor.",
+          "step4": "Unggah file .zip yang diunduh apa adanya. Anda tidak perlu mengekstraknya."
+        },
+        "gmailOne": {
+          "title": "Gmail: satu email",
+          "step1": "Buka email.",
+          "step2": "Pilih \"Lainnya\", lalu \"Download pesan\".",
+          "step3": "Unggah file .eml."
+        },
+        "imap": {
+          "title": "Penyedia lain: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Tambahkan kotak surat ke Thunderbird melalui IMAP dan pasang add-on ImportExportTools NG.",
+          "step2": "Pilih email atau folder, lalu klik kanan.",
+          "step3": "Pilih ImportExportTools NG, lalu ekspor sebagai EML atau mbox.",
+          "step4": "Unggah file."
+        },
+        "outlook": {
+          "title": "Outlook desktop",
+          "body": "Pilih email dan seret ke folder di disk Anda. Outlook menulis file .msg. Unggah beberapa sekaligus atau dikemas dalam satu file .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Pilih \"Mailbox\", lalu \"Export Mailbox\". Apple Mail menulis sebuah folder.",
+          "step2": "Unggah file bernama mbox di dalam folder, atau seret email ke Finder untuk mendapatkan file .eml."
+        },
+        "tip": "Tips: meneruskan email dengan skrip menghilangkan pengirim dan tanggal toko. Mengimpor file mempertahankannya."
+      }
     }
   },
   "parsers": {

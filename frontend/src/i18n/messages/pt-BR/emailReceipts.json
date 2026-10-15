@@ -114,6 +114,64 @@
       },
       "deleted": "Caixa de e-mail excluída",
       "deleteFailed": "Não foi possível excluir a caixa de e-mail"
+    },
+    "import": {
+      "title": "Importar e-mails arquivados",
+      "description": "Um arquivo mantém o remetente e a data de compra da loja, ao contrário de um e-mail encaminhado. Envie e-mails exportados para ler confirmações de pedido antigas.",
+      "fileLabel": "Arquivos de e-mail (.eml, .mbox, .msg ou .zip)",
+      "selected": "Selecionados: {count}",
+      "button": "Importar",
+      "tooLarge": "{name} excede {max}. Divida a exportação em arquivos menores.",
+      "tooLargeTotal": "Os arquivos selecionados juntos excedem {max}. Importe-os em grupos menores.",
+      "tooMany": "Selecione no máximo {max} arquivos por importação.",
+      "failed": "A importação falhou",
+      "result": {
+        "heading": "Resultado da importação",
+        "file": "{name}: {stored} salvos, {duplicates} duplicados, {skipped} ignorados",
+        "summary": "{processed} e-mails processados.",
+        "truncated": "{count} mensagens não foram lidas porque uma importação tem um limite. Importe-as de novo em uma segunda execução.",
+        "busy": "A caixa de correio está sendo lida agora. Os e-mails importados serão processados na próxima leitura.",
+        "errors": {
+          "unsupported_format": "{name}: este formato não é compatível. Os formatos compatíveis são .eml, .mbox, .msg e .zip.",
+          "invalid_archive": "{name}: o arquivo ZIP está danificado ou não pode ser lido.",
+          "archive_too_large": "{name}: o arquivo ZIP excede 100 MB depois de descompactado. Divida-o ou envie o arquivo .mbox que ele contém.",
+          "empty": "{name}: o arquivo não contém e-mails."
+        },
+        "ignored": "{name}: {count} outros arquivos do pacote foram ignorados."
+      },
+      "guide": {
+        "toggle": "Como exportar e-mails do seu provedor",
+        "gmailLabel": {
+          "title": "Gmail: todos os e-mails com um marcador",
+          "step1": "Abra takeout.google.com e escolha \"Deselect all\".",
+          "step2": "Selecione \"Mail\" e escolha \"All Mail data included\".",
+          "step3": "Escolha apenas o seu marcador e crie a exportação.",
+          "step4": "Envie o arquivo .zip baixado como está. Você não precisa descompactá-lo."
+        },
+        "gmailOne": {
+          "title": "Gmail: um e-mail",
+          "step1": "Abra o e-mail.",
+          "step2": "Escolha \"Mais\" e depois \"Fazer download da mensagem\".",
+          "step3": "Envie o arquivo .eml."
+        },
+        "imap": {
+          "title": "Outros provedores: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Adicione a caixa de correio ao Thunderbird por IMAP e instale o complemento ImportExportTools NG.",
+          "step2": "Selecione os e-mails ou uma pasta e clique com o botão direito.",
+          "step3": "Escolha ImportExportTools NG e depois exporte como EML ou como mbox.",
+          "step4": "Envie os arquivos."
+        },
+        "outlook": {
+          "title": "Outlook para computador",
+          "body": "Selecione os e-mails e arraste-os para uma pasta no disco. O Outlook grava arquivos .msg. Envie-os, vários de uma vez ou reunidos em um único arquivo .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Escolha \"Caixa de Correio\" e depois \"Exportar Caixa de Correio\". O Apple Mail grava uma pasta.",
+          "step2": "Envie o arquivo chamado mbox dentro da pasta, ou arraste e-mails para o Finder para obter arquivos .eml."
+        },
+        "tip": "Dica: encaminhar e-mails com um script perde o remetente e a data da loja. Importar arquivos mantém ambos."
+      }
     }
   },
   "parsers": {

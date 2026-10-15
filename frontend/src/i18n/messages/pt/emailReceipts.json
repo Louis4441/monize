@@ -114,6 +114,64 @@
       },
       "deleted": "Caixa de correio eliminada",
       "deleteFailed": "Não foi possível eliminar a caixa de correio"
+    },
+    "import": {
+      "title": "Importar e-mails arquivados",
+      "description": "Um ficheiro mantém o remetente e a data de compra da loja, ao contrário de um e-mail reencaminhado. Carregue e-mails exportados para ler confirmações de encomenda antigas.",
+      "fileLabel": "Ficheiros de e-mail (.eml, .mbox, .msg ou .zip)",
+      "selected": "Selecionados: {count}",
+      "button": "Importar",
+      "tooLarge": "{name} excede {max}. Divida a exportação em ficheiros mais pequenos.",
+      "tooLargeTotal": "Os ficheiros selecionados em conjunto excedem {max}. Importe-os em grupos mais pequenos.",
+      "tooMany": "Selecione no máximo {max} ficheiros por importação.",
+      "failed": "A importação falhou",
+      "result": {
+        "heading": "Resultado da importação",
+        "file": "{name}: {stored} guardados, {duplicates} duplicados, {skipped} ignorados",
+        "summary": "{processed} e-mails processados.",
+        "truncated": "{count} mensagens não foram lidas porque uma importação tem um limite. Importe-as de novo numa segunda execução.",
+        "busy": "A caixa de correio está a ser lida neste momento. Os e-mails importados serão processados na próxima leitura.",
+        "errors": {
+          "unsupported_format": "{name}: este formato não é suportado. Os formatos suportados são .eml, .mbox, .msg e .zip.",
+          "invalid_archive": "{name}: o ficheiro ZIP está danificado ou não pode ser lido.",
+          "archive_too_large": "{name}: o ficheiro ZIP excede 100 MB depois de descomprimido. Divida-o ou carregue o ficheiro .mbox que contém.",
+          "empty": "{name}: o ficheiro não contém e-mails."
+        },
+        "ignored": "{name}: {count} outros ficheiros do arquivo foram ignorados."
+      },
+      "guide": {
+        "toggle": "Como exportar e-mails do seu fornecedor",
+        "gmailLabel": {
+          "title": "Gmail: todos os e-mails com uma etiqueta",
+          "step1": "Abra takeout.google.com e escolha \"Deselect all\".",
+          "step2": "Selecione \"Mail\" e escolha \"All Mail data included\".",
+          "step3": "Escolha apenas a sua etiqueta e crie a exportação.",
+          "step4": "Carregue o ficheiro .zip transferido tal como está. Não precisa de o descompactar."
+        },
+        "gmailOne": {
+          "title": "Gmail: um e-mail",
+          "step1": "Abra o e-mail.",
+          "step2": "Escolha \"Mais\" e depois \"Transferir mensagem\".",
+          "step3": "Carregue o ficheiro .eml."
+        },
+        "imap": {
+          "title": "Outros fornecedores: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Adicione a caixa de correio ao Thunderbird por IMAP e instale o suplemento ImportExportTools NG.",
+          "step2": "Selecione os e-mails ou uma pasta e clique com o botão direito.",
+          "step3": "Escolha ImportExportTools NG e depois exporte como EML ou como mbox.",
+          "step4": "Carregue os ficheiros."
+        },
+        "outlook": {
+          "title": "Outlook para computador",
+          "body": "Selecione os e-mails e arraste-os para uma pasta no disco. O Outlook escreve ficheiros .msg. Carregue-os, vários de uma vez ou agrupados num único ficheiro .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Escolha \"Caixa de Correio\" e depois \"Exportar Caixa de Correio\". O Apple Mail escreve uma pasta.",
+          "step2": "Carregue o ficheiro chamado mbox dentro da pasta, ou arraste e-mails para o Finder para obter ficheiros .eml."
+        },
+        "tip": "Dica: reencaminhar e-mails com um script perde o remetente e a data da loja. Importar ficheiros mantém-nos."
+      }
     }
   },
   "parsers": {

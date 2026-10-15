@@ -114,6 +114,64 @@
       },
       "deleted": "Đã xóa hộp thư",
       "deleteFailed": "Không thể xóa hộp thư"
+    },
+    "import": {
+      "title": "Nhập email đã lưu trữ",
+      "description": "Tệp giữ lại người gửi và ngày mua hàng của cửa hàng, khác với email được chuyển tiếp. Tải lên các email đã xuất để đọc các xác nhận đơn hàng cũ.",
+      "fileLabel": "Tệp email (.eml, .mbox, .msg hoặc .zip)",
+      "selected": "Đã chọn: {count}",
+      "button": "Nhập",
+      "tooLarge": "{name} lớn hơn {max}. Hãy chia bản xuất thành các tệp nhỏ hơn.",
+      "tooLargeTotal": "Các tệp đã chọn cộng lại lớn hơn {max}. Hãy nhập theo từng nhóm nhỏ hơn.",
+      "tooMany": "Chọn tối đa {max} tệp cho mỗi lần nhập.",
+      "failed": "Nhập không thành công",
+      "result": {
+        "heading": "Kết quả nhập",
+        "file": "{name}: đã lưu {stored}, trùng lặp {duplicates}, bỏ qua {skipped}",
+        "summary": "Đã xử lý {processed} email.",
+        "truncated": "{count} thư chưa được đọc vì mỗi lần nhập có một giới hạn. Hãy nhập lại chúng trong lần chạy thứ hai.",
+        "busy": "Hộp thư đang được đọc. Các email đã nhập sẽ được xử lý ở lần đọc tiếp theo.",
+        "errors": {
+          "unsupported_format": "{name}: định dạng này không được hỗ trợ. Các định dạng được hỗ trợ là .eml, .mbox, .msg và .zip.",
+          "invalid_archive": "{name}: tệp ZIP bị hỏng hoặc không đọc được.",
+          "archive_too_large": "{name}: tệp ZIP khi giải nén lớn hơn 100 MB. Hãy chia nhỏ tệp hoặc tải lên tệp .mbox bên trong.",
+          "empty": "{name}: tệp không có email."
+        },
+        "ignored": "{name}: đã bỏ qua {count} tệp khác trong kho lưu trữ."
+      },
+      "guide": {
+        "toggle": "Cách xuất email từ nhà cung cấp của bạn",
+        "gmailLabel": {
+          "title": "Gmail: tất cả email có nhãn",
+          "step1": "Mở takeout.google.com và chọn \"Deselect all\".",
+          "step2": "Chọn \"Mail\" và chọn \"All Mail data included\".",
+          "step3": "Chỉ chọn nhãn của bạn và tạo bản xuất.",
+          "step4": "Tải lên tệp .zip đã tải về, giữ nguyên. Bạn không cần giải nén."
+        },
+        "gmailOne": {
+          "title": "Gmail: một email",
+          "step1": "Mở email.",
+          "step2": "Chọn \"Khác\", rồi chọn \"Tải thư xuống\".",
+          "step3": "Tải lên tệp .eml."
+        },
+        "imap": {
+          "title": "Nhà cung cấp khác: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Thêm hộp thư vào Thunderbird qua IMAP và cài tiện ích ImportExportTools NG.",
+          "step2": "Chọn các email hoặc một thư mục rồi nhấp chuột phải.",
+          "step3": "Chọn ImportExportTools NG, rồi xuất dưới dạng EML hoặc mbox.",
+          "step4": "Tải lên các tệp."
+        },
+        "outlook": {
+          "title": "Outlook trên máy tính",
+          "body": "Chọn các email và kéo chúng vào một thư mục trên ổ đĩa. Outlook ghi các tệp .msg. Tải chúng lên, nhiều tệp cùng lúc hoặc gói trong một tệp .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Chọn \"Mailbox\", rồi \"Export Mailbox\". Apple Mail ghi ra một thư mục.",
+          "step2": "Tải lên tệp có tên mbox trong thư mục, hoặc kéo email vào Finder để có các tệp .eml."
+        },
+        "tip": "Mẹo: chuyển tiếp email bằng tập lệnh làm mất người gửi và ngày của cửa hàng. Nhập tệp giữ lại cả hai."
+      }
     }
   },
   "parsers": {

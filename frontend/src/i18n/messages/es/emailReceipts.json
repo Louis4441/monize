@@ -114,6 +114,64 @@
       },
       "deleted": "Buzón eliminado",
       "deleteFailed": "No se pudo eliminar el buzón"
+    },
+    "import": {
+      "title": "Importar correos archivados",
+      "description": "Un archivo conserva el remitente y la fecha de compra de la tienda, a diferencia de un correo reenviado. Suba correos exportados para leer confirmaciones de pedido antiguas.",
+      "fileLabel": "Archivos de correo (.eml, .mbox, .msg o .zip)",
+      "selected": "Seleccionados: {count}",
+      "button": "Importar",
+      "tooLarge": "{name} supera {max}. Divida la exportación en archivos más pequeños.",
+      "tooLargeTotal": "Los archivos seleccionados juntos superan {max}. Impórtelos en grupos más pequeños.",
+      "tooMany": "Seleccione como máximo {max} archivos por importación.",
+      "failed": "La importación falló",
+      "result": {
+        "heading": "Resultado de la importación",
+        "file": "{name}: {stored} guardados, {duplicates} duplicados, {skipped} omitidos",
+        "summary": "{processed} correos procesados.",
+        "truncated": "{count} mensajes no se leyeron porque una importación tiene un límite. Impórtelos de nuevo en una segunda ejecución.",
+        "busy": "El buzón se está leyendo ahora. Los correos importados se procesarán en la próxima lectura.",
+        "errors": {
+          "unsupported_format": "{name}: este formato no es compatible. Los formatos compatibles son .eml, .mbox, .msg y .zip.",
+          "invalid_archive": "{name}: el archivo ZIP está dañado o no se puede leer.",
+          "archive_too_large": "{name}: el archivo ZIP ocupa más de 100 MB al descomprimirse. Divídalo o suba el archivo .mbox que contiene.",
+          "empty": "{name}: el archivo no contiene correos."
+        },
+        "ignored": "{name}: se omitieron {count} otros archivos del archivo comprimido."
+      },
+      "guide": {
+        "toggle": "Cómo exportar correos desde su proveedor",
+        "gmailLabel": {
+          "title": "Gmail: todos los correos con una etiqueta",
+          "step1": "Abra takeout.google.com y elija «Anular la selección de todo».",
+          "step2": "Seleccione «Correo» y elija «Se incluyen todos los datos de Correo».",
+          "step3": "Elija solo su etiqueta y cree la exportación.",
+          "step4": "Suba el archivo .zip descargado tal cual. No necesita descomprimirlo."
+        },
+        "gmailOne": {
+          "title": "Gmail: un solo correo",
+          "step1": "Abra el correo.",
+          "step2": "Elija «Más» y después «Descargar mensaje».",
+          "step3": "Suba el archivo .eml."
+        },
+        "imap": {
+          "title": "Otros proveedores: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Añada el buzón a Thunderbird mediante IMAP e instale el complemento ImportExportTools NG.",
+          "step2": "Seleccione los correos o una carpeta y haga clic con el botón derecho.",
+          "step3": "Elija ImportExportTools NG y exporte como EML o como mbox.",
+          "step4": "Suba los archivos."
+        },
+        "outlook": {
+          "title": "Outlook de escritorio",
+          "body": "Seleccione los correos y arrástrelos a una carpeta de su disco. Outlook escribe archivos .msg. Suba varios a la vez o empaquetados en un solo archivo .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Elija «Buzón» y después «Exportar buzón». Apple Mail escribe una carpeta.",
+          "step2": "Suba el archivo llamado mbox dentro de la carpeta, o arrastre correos al Finder para obtener archivos .eml."
+        },
+        "tip": "Consejo: reenviar correos con un script pierde el remitente y la fecha de la tienda. Importar archivos los conserva."
+      }
     }
   },
   "parsers": {

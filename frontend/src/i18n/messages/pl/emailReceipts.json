@@ -114,6 +114,64 @@
       },
       "deleted": "Skrzynka pocztowa usunięta",
       "deleteFailed": "Nie udało się usunąć skrzynki pocztowej"
+    },
+    "import": {
+      "title": "Importuj zarchiwizowane wiadomości",
+      "description": "Plik zachowuje nadawcę i datę zakupu w sklepie, inaczej niż przekazana wiadomość. Wyślij wyeksportowane wiadomości, aby odczytać stare potwierdzenia zamówień.",
+      "fileLabel": "Pliki wiadomości (.eml, .mbox, .msg lub .zip)",
+      "selected": "Wybrano: {count}",
+      "button": "Importuj",
+      "tooLarge": "Plik {name} jest większy niż {max}. Podziel eksport na mniejsze pliki.",
+      "tooLargeTotal": "Wybrane pliki razem są większe niż {max}. Importuj je w mniejszych grupach.",
+      "tooMany": "Wybierz najwyżej {max} plików na jeden import.",
+      "failed": "Import nie powiódł się",
+      "result": {
+        "heading": "Wynik importu",
+        "file": "{name}: zapisano {stored}, duplikaty {duplicates}, pominięto {skipped}",
+        "summary": "Przetworzono wiadomości: {processed}.",
+        "truncated": "Nie odczytano wiadomości: {count}, ponieważ jeden import ma limit. Importuj je ponownie w drugim przebiegu.",
+        "busy": "Skrzynka jest teraz odczytywana. Zaimportowane wiadomości zostaną przetworzone przy następnym odczycie.",
+        "errors": {
+          "unsupported_format": "{name}: ten format nie jest obsługiwany. Obsługiwane formaty to .eml, .mbox, .msg i .zip.",
+          "invalid_archive": "{name}: plik ZIP jest uszkodzony lub nie można go odczytać.",
+          "archive_too_large": "{name}: plik ZIP po rozpakowaniu ma ponad 100 MB. Podziel go lub wyślij plik .mbox z jego wnętrza.",
+          "empty": "{name}: plik nie zawiera wiadomości."
+        },
+        "ignored": "{name}: pominięto inne pliki w archiwum: {count}."
+      },
+      "guide": {
+        "toggle": "Jak wyeksportować wiadomości od dostawcy poczty",
+        "gmailLabel": {
+          "title": "Gmail: wszystkie wiadomości z etykietą",
+          "step1": "Otwórz takeout.google.com i wybierz „Deselect all”.",
+          "step2": "Zaznacz „Mail” i wybierz „All Mail data included”.",
+          "step3": "Wybierz tylko swoją etykietę i utwórz eksport.",
+          "step4": "Wyślij pobrany plik .zip bez zmian. Nie musisz go rozpakowywać."
+        },
+        "gmailOne": {
+          "title": "Gmail: jedna wiadomość",
+          "step1": "Otwórz wiadomość.",
+          "step2": "Wybierz „Więcej”, a następnie „Pobierz wiadomość”.",
+          "step3": "Wyślij plik .eml."
+        },
+        "imap": {
+          "title": "Inni dostawcy: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Dodaj skrzynkę do programu Thunderbird przez IMAP i zainstaluj dodatek ImportExportTools NG.",
+          "step2": "Zaznacz wiadomości lub folder i kliknij prawym przyciskiem myszy.",
+          "step3": "Wybierz ImportExportTools NG, a następnie wyeksportuj jako EML lub jako mbox.",
+          "step4": "Wyślij pliki."
+        },
+        "outlook": {
+          "title": "Outlook na komputerze",
+          "body": "Zaznacz wiadomości i przeciągnij je do folderu na dysku. Outlook zapisuje pliki .msg. Wyślij je razem lub spakowane w jeden plik .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Wybierz „Skrzynka pocztowa”, a następnie „Eksportuj skrzynkę pocztową”. Apple Mail zapisuje folder.",
+          "step2": "Wyślij plik o nazwie mbox z wnętrza folderu lub przeciągnij wiadomości do programu Finder, aby uzyskać pliki .eml."
+        },
+        "tip": "Wskazówka: przekazywanie wiadomości skryptem gubi nadawcę i datę sklepu. Import plików je zachowuje."
+      }
     }
   },
   "parsers": {

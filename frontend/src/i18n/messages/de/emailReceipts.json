@@ -114,6 +114,64 @@
       },
       "deleted": "Postfach gelöscht",
       "deleteFailed": "Das Postfach konnte nicht gelöscht werden"
+    },
+    "import": {
+      "title": "Archivierte E-Mails importieren",
+      "description": "Eine Datei behält den Absender und das Kaufdatum des Shops, anders als eine weitergeleitete E-Mail. Laden Sie exportierte E-Mails hoch, um alte Bestellbestätigungen zu lesen.",
+      "fileLabel": "E-Mail-Dateien (.eml, .mbox, .msg oder .zip)",
+      "selected": "Ausgewählt: {count}",
+      "button": "Importieren",
+      "tooLarge": "{name} ist größer als {max}. Teilen Sie den Export in kleinere Dateien auf.",
+      "tooLargeTotal": "Die ausgewählten Dateien zusammen sind größer als {max}. Importieren Sie sie in kleineren Gruppen.",
+      "tooMany": "Wählen Sie höchstens {max} Dateien pro Import aus.",
+      "failed": "Der Import ist fehlgeschlagen",
+      "result": {
+        "heading": "Importergebnis",
+        "file": "{name}: {stored} gespeichert, {duplicates} Duplikate, {skipped} übersprungen",
+        "summary": "{processed} E-Mails verarbeitet.",
+        "truncated": "{count} Nachrichten wurden nicht gelesen, weil ein Import ein Limit hat. Importieren Sie sie in einem zweiten Durchgang erneut.",
+        "busy": "Das Postfach wird gerade gelesen. Die importierten E-Mails werden beim nächsten Lesen verarbeitet.",
+        "errors": {
+          "unsupported_format": "{name}: Dieses Format wird nicht unterstützt. Unterstützte Formate sind .eml, .mbox, .msg und .zip.",
+          "invalid_archive": "{name}: Die ZIP-Datei ist beschädigt oder kann nicht gelesen werden.",
+          "archive_too_large": "{name}: Die ZIP-Datei wird auf mehr als 100 MB entpackt. Teilen Sie sie auf oder laden Sie die darin enthaltene .mbox-Datei hoch.",
+          "empty": "{name}: Die Datei enthält keine E-Mails."
+        },
+        "ignored": "{name}: {count} andere Dateien im Archiv wurden übersprungen."
+      },
+      "guide": {
+        "toggle": "So exportieren Sie E-Mails bei Ihrem Anbieter",
+        "gmailLabel": {
+          "title": "Gmail: alle E-Mails mit einem Label",
+          "step1": "Öffnen Sie takeout.google.com und wählen Sie „Alle Auswahlen aufheben“.",
+          "step2": "Wählen Sie „E-Mail“ und dann „Alle E-Mail-Daten enthalten“.",
+          "step3": "Wählen Sie nur Ihr Label und erstellen Sie den Export.",
+          "step4": "Laden Sie die heruntergeladene .zip-Datei unverändert hoch. Sie müssen sie nicht entpacken."
+        },
+        "gmailOne": {
+          "title": "Gmail: eine E-Mail",
+          "step1": "Öffnen Sie die E-Mail.",
+          "step2": "Wählen Sie „Mehr“ und dann „Nachricht herunterladen“.",
+          "step3": "Laden Sie die .eml-Datei hoch."
+        },
+        "imap": {
+          "title": "Andere Anbieter: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Fügen Sie das Postfach in Thunderbird über IMAP hinzu und installieren Sie das Add-on ImportExportTools NG.",
+          "step2": "Wählen Sie die E-Mails oder einen Ordner aus und klicken Sie mit der rechten Maustaste.",
+          "step3": "Wählen Sie ImportExportTools NG und exportieren Sie dann als EML oder als mbox.",
+          "step4": "Laden Sie die Dateien hoch."
+        },
+        "outlook": {
+          "title": "Outlook für den Desktop",
+          "body": "Wählen Sie die E-Mails aus und ziehen Sie sie in einen Ordner auf Ihrer Festplatte. Outlook schreibt .msg-Dateien. Laden Sie sie hoch, mehrere auf einmal oder in einer .zip-Datei gepackt."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Wählen Sie „Postfach“ und dann „Postfach exportieren“. Apple Mail schreibt einen Ordner.",
+          "step2": "Laden Sie die Datei mit dem Namen mbox aus dem Ordner hoch oder ziehen Sie E-Mails in den Finder, um .eml-Dateien zu erhalten."
+        },
+        "tip": "Tipp: Das Weiterleiten von E-Mails mit einem Skript verliert den Absender und das Datum des Shops. Der Import von Dateien behält sie."
+      }
     }
   },
   "parsers": {

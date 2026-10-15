@@ -114,6 +114,64 @@
       },
       "deleted": "메일함을 삭제했습니다",
       "deleteFailed": "메일함을 삭제하지 못했습니다"
+    },
+    "import": {
+      "title": "보관된 이메일 가져오기",
+      "description": "파일은 전달된 이메일과 달리 쇼핑몰의 발신자와 구매 날짜를 유지합니다. 내보낸 이메일을 업로드하여 오래된 주문 확인 메일을 읽으세요.",
+      "fileLabel": "이메일 파일 (.eml, .mbox, .msg 또는 .zip)",
+      "selected": "선택됨: {count}",
+      "button": "가져오기",
+      "tooLarge": "{name}이(가) {max}보다 큽니다. 내보내기를 더 작은 파일로 나누세요.",
+      "tooLargeTotal": "선택한 파일을 모두 합치면 {max}보다 큽니다. 더 작은 묶음으로 나누어 가져오세요.",
+      "tooMany": "한 번에 최대 {max}개의 파일을 선택하세요.",
+      "failed": "가져오기에 실패했습니다",
+      "result": {
+        "heading": "가져오기 결과",
+        "file": "{name}: {stored}개 저장, {duplicates}개 중복, {skipped}개 건너뜀",
+        "summary": "이메일 {processed}개를 처리했습니다.",
+        "truncated": "한 번의 가져오기에는 제한이 있어 메시지 {count}개를 읽지 못했습니다. 두 번째 실행에서 다시 가져오세요.",
+        "busy": "메일함을 읽는 중입니다. 가져온 이메일은 다음 읽기 때 처리됩니다.",
+        "errors": {
+          "unsupported_format": "{name}: 이 형식은 지원하지 않습니다. 지원하는 형식은 .eml, .mbox, .msg, .zip입니다.",
+          "invalid_archive": "{name}: ZIP 파일이 손상되었거나 읽을 수 없습니다.",
+          "archive_too_large": "{name}: ZIP 파일의 압축을 풀면 100MB를 넘습니다. 파일을 나누거나 안에 있는 .mbox 파일을 업로드하세요.",
+          "empty": "{name}: 파일에 이메일이 없습니다."
+        },
+        "ignored": "{name}: 압축 파일 안의 다른 파일 {count}개를 건너뛰었습니다."
+      },
+      "guide": {
+        "toggle": "사용 중인 서비스에서 이메일을 내보내는 방법",
+        "gmailLabel": {
+          "title": "Gmail: 라벨이 있는 모든 이메일",
+          "step1": "takeout.google.com을 열고 \"모두 선택 해제\"를 선택하세요.",
+          "step2": "\"메일\"을 선택하고 \"모든 메일 데이터 포함\"을 선택하세요.",
+          "step3": "내 라벨만 선택하고 내보내기를 만드세요.",
+          "step4": "다운로드한 .zip 파일을 그대로 업로드하세요. 압축을 풀 필요가 없습니다."
+        },
+        "gmailOne": {
+          "title": "Gmail: 이메일 하나",
+          "step1": "이메일을 여세요.",
+          "step2": "\"더보기\"를 선택한 다음 \"메일 다운로드\"를 선택하세요.",
+          "step3": ".eml 파일을 업로드하세요."
+        },
+        "imap": {
+          "title": "기타 서비스: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "IMAP으로 Thunderbird에 메일함을 추가하고 ImportExportTools NG 추가 기능을 설치하세요.",
+          "step2": "이메일 또는 폴더를 선택하고 마우스 오른쪽 버튼으로 클릭하세요.",
+          "step3": "ImportExportTools NG를 선택한 다음 EML 또는 mbox로 내보내세요.",
+          "step4": "파일을 업로드하세요."
+        },
+        "outlook": {
+          "title": "Outlook 데스크톱",
+          "body": "이메일을 선택하여 디스크의 폴더로 끌어다 놓으세요. Outlook은 .msg 파일을 만듭니다. 여러 개를 한 번에 업로드하거나 .zip 파일 하나로 묶어 업로드하세요."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "\"메일함\"을 선택한 다음 \"메일함 내보내기\"를 선택하세요. Apple Mail은 폴더를 만듭니다.",
+          "step2": "폴더 안에 있는 mbox라는 이름의 파일을 업로드하거나, 이메일을 Finder로 끌어다 놓아 .eml 파일을 만드세요."
+        },
+        "tip": "팁: 스크립트로 이메일을 전달하면 쇼핑몰의 발신자와 날짜가 사라집니다. 파일을 가져오면 유지됩니다."
+      }
     }
   },
   "parsers": {

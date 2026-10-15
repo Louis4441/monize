@@ -114,6 +114,64 @@
       },
       "deleted": "信箱已刪除",
       "deleteFailed": "無法刪除信箱"
+    },
+    "import": {
+      "title": "匯入已封存的電子郵件",
+      "description": "與轉寄的郵件不同，檔案會保留商店的寄件者和購買日期。上傳已匯出的郵件，即可讀取舊的訂單確認。",
+      "fileLabel": "電子郵件檔案（.eml、.mbox、.msg 或 .zip）",
+      "selected": "已選取：{count}",
+      "button": "匯入",
+      "tooLarge": "{name} 超過 {max}。請將匯出內容拆分成較小的檔案。",
+      "tooLargeTotal": "所選檔案合計超過 {max}。請分成較小的批次匯入。",
+      "tooMany": "每次匯入最多選取 {max} 個檔案。",
+      "failed": "匯入失敗",
+      "result": {
+        "heading": "匯入結果",
+        "file": "{name}：已儲存 {stored} 封，重複 {duplicates} 封，已略過 {skipped} 封",
+        "summary": "已處理 {processed} 封郵件。",
+        "truncated": "由於單次匯入有上限，有 {count} 封郵件未被讀取。請在第二次執行中再次匯入。",
+        "busy": "信箱正在讀取中。已匯入的郵件將在下次讀取時處理。",
+        "errors": {
+          "unsupported_format": "{name}：不支援此格式。支援的格式為 .eml、.mbox、.msg 和 .zip。",
+          "invalid_archive": "{name}：ZIP 檔案已損毀或無法讀取。",
+          "archive_too_large": "{name}：ZIP 檔案解壓縮後超過 100 MB。請拆分檔案，或上傳其中的 .mbox 檔案。",
+          "empty": "{name}：檔案中沒有郵件。"
+        },
+        "ignored": "{name}：壓縮檔中另有 {count} 個檔案已略過。"
+      },
+      "guide": {
+        "toggle": "如何從您的郵件服務商匯出郵件",
+        "gmailLabel": {
+          "title": "Gmail：帶有標籤的所有郵件",
+          "step1": "開啟 takeout.google.com，然後選擇「全部取消選取」。",
+          "step2": "選取「郵件」，然後選擇「包含所有郵件資料」。",
+          "step3": "只選取您的標籤，然後建立匯出。",
+          "step4": "依原樣上傳下載的 .zip 檔案。無需解壓縮。"
+        },
+        "gmailOne": {
+          "title": "Gmail：一封郵件",
+          "step1": "開啟該郵件。",
+          "step2": "選擇「更多」，然後選擇「下載郵件」。",
+          "step3": "上傳 .eml 檔案。"
+        },
+        "imap": {
+          "title": "其他服務商：Outlook.com、Yahoo、Onet、WP、Interia、o2、iCloud、Zoho",
+          "step1": "透過 IMAP 將信箱新增到 Thunderbird，並安裝 ImportExportTools NG 附加元件。",
+          "step2": "選取郵件或資料夾，然後按一下滑鼠右鍵。",
+          "step3": "選擇 ImportExportTools NG，然後匯出為 EML 或 mbox。",
+          "step4": "上傳這些檔案。"
+        },
+        "outlook": {
+          "title": "Outlook 桌面版",
+          "body": "選取郵件並將其拖曳到磁碟上的資料夾。Outlook 會寫入 .msg 檔案。可一次上傳多個，也可打包成一個 .zip 檔案上傳。"
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "選擇「郵箱」，然後選擇「輸出郵箱」。Apple Mail 會寫入一個資料夾。",
+          "step2": "上傳資料夾內名為 mbox 的檔案，或將郵件拖曳到 Finder 以取得 .eml 檔案。"
+        },
+        "tip": "提示：用指令碼轉寄郵件會遺失商店的寄件者和日期。匯入檔案則會保留。"
+      }
     }
   },
   "parsers": {
