@@ -119,6 +119,8 @@
       "title": "Impor email yang diarsipkan",
       "description": "File menyimpan pengirim dan tanggal pembelian dari toko, tidak seperti email yang diteruskan. Unggah email yang diekspor untuk membaca konfirmasi pesanan lama.",
       "fileLabel": "File email (.eml, .mbox, .msg, atau .zip)",
+      "chooseFiles": "Pilih file",
+      "noFileChosen": "Belum ada file yang dipilih",
       "selected": "Dipilih: {count}",
       "button": "Impor",
       "tooLarge": "{name} lebih besar dari {max}. Bagi ekspor menjadi file yang lebih kecil.",

@@ -119,6 +119,8 @@
       "title": "匯入已封存的電子郵件",
       "description": "與轉寄的郵件不同，檔案會保留商店的寄件者和購買日期。上傳已匯出的郵件，即可讀取舊的訂單確認。",
       "fileLabel": "電子郵件檔案（.eml、.mbox、.msg 或 .zip）",
+      "chooseFiles": "選擇檔案",
+      "noFileChosen": "未選擇檔案",
       "selected": "已選取：{count}",
       "button": "匯入",
       "tooLarge": "{name} 超過 {max}。請將匯出內容拆分成較小的檔案。",

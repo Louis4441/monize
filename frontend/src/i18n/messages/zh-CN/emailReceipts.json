@@ -119,6 +119,8 @@
       "title": "导入已归档的邮件",
       "description": "与转发的邮件不同，文件会保留商店的发件人和购买日期。上传已导出的邮件，即可读取旧的订单确认。",
       "fileLabel": "邮件文件（.eml、.mbox、.msg 或 .zip）",
+      "chooseFiles": "选择文件",
+      "noFileChosen": "未选择文件",
       "selected": "已选择：{count}",
       "button": "导入",
       "tooLarge": "{name} 超过 {max}。请将导出内容拆分成较小的文件。",

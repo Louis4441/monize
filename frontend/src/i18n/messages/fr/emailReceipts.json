@@ -119,6 +119,8 @@
       "title": "Importer des e-mails archivés",
       "description": "Un fichier conserve l'expéditeur et la date d'achat de la boutique, contrairement à un e-mail transféré. Envoyez des e-mails exportés pour lire d'anciennes confirmations de commande.",
       "fileLabel": "Fichiers d'e-mails (.eml, .mbox, .msg ou .zip)",
+      "chooseFiles": "Choisir des fichiers",
+      "noFileChosen": "Aucun fichier choisi",
       "selected": "Sélection : {count}",
       "button": "Importer",
       "tooLarge": "{name} dépasse {max}. Divisez l'export en fichiers plus petits.",

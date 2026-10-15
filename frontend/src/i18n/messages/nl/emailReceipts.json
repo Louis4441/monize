@@ -119,6 +119,8 @@
       "title": "Gearchiveerde e-mails importeren",
       "description": "Een bestand behoudt de afzender en de aankoopdatum van de winkel, anders dan een doorgestuurde e-mail. Upload geëxporteerde e-mails om oude orderbevestigingen te lezen.",
       "fileLabel": "E-mailbestanden (.eml, .mbox, .msg of .zip)",
+      "chooseFiles": "Bestanden kiezen",
+      "noFileChosen": "Geen bestanden gekozen",
       "selected": "Geselecteerd: {count}",
       "button": "Importeren",
       "tooLarge": "{name} is groter dan {max}. Splits de export in kleinere bestanden.",

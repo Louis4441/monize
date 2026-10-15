@@ -119,6 +119,8 @@
       "title": "Nhập email đã lưu trữ",
       "description": "Tệp giữ lại người gửi và ngày mua hàng của cửa hàng, khác với email được chuyển tiếp. Tải lên các email đã xuất để đọc các xác nhận đơn hàng cũ.",
       "fileLabel": "Tệp email (.eml, .mbox, .msg hoặc .zip)",
+      "chooseFiles": "Chọn tệp",
+      "noFileChosen": "Chưa chọn tệp nào",
       "selected": "Đã chọn: {count}",
       "button": "Nhập",
       "tooLarge": "{name} lớn hơn {max}. Hãy chia bản xuất thành các tệp nhỏ hơn.",

@@ -127,6 +127,8 @@ export function MailboxImportCard() {
           >
             {t("fileLabel")}
           </label>
+          {/* The native control's button and "no file" text are the browser's,
+              in the browser's language: it is hidden and labelled here instead. */}
           <input
             id={`${guideId}-file`}
             ref={inputRef}
@@ -135,13 +137,23 @@ export function MailboxImportCard() {
             accept={ACCEPT}
             onChange={handleChange}
             disabled={isImporting}
-            className="block w-full cursor-pointer text-sm text-gray-500 file:mr-4 file:cursor-pointer file:rounded file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 dark:text-gray-400 dark:file:bg-blue-900/30 dark:file:text-blue-300 dark:hover:file:bg-blue-900/50"
+            className="sr-only"
           />
-          {files.length > 0 && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t("selected", { count: count(files.length) })}
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isImporting}
+              onClick={() => inputRef.current?.click()}
+            >
+              {t("chooseFiles")}
+            </Button>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {files.length > 0
+                ? t("selected", { count: count(files.length) })
+                : t("noFileChosen")}
+            </span>
+          </div>
         </div>
 
         <Button

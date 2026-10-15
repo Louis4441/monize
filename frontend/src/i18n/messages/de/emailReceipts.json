@@ -119,6 +119,8 @@
       "title": "Archivierte E-Mails importieren",
       "description": "Eine Datei behält den Absender und das Kaufdatum des Shops, anders als eine weitergeleitete E-Mail. Laden Sie exportierte E-Mails hoch, um alte Bestellbestätigungen zu lesen.",
       "fileLabel": "E-Mail-Dateien (.eml, .mbox, .msg oder .zip)",
+      "chooseFiles": "Dateien auswählen",
+      "noFileChosen": "Keine Dateien ausgewählt",
       "selected": "Ausgewählt: {count}",
       "button": "Importieren",
       "tooLarge": "{name} ist größer als {max}. Teilen Sie den Export in kleinere Dateien auf.",

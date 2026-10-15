@@ -119,6 +119,8 @@
       "title": "[XX-Import archived emails-XX]",
       "description": "[XX-A file keeps the sender and the purchase date of the shop, unlike a forwarded email. Upload exported emails to read old order confirmations.-XX]",
       "fileLabel": "[XX-Email files (.eml, .mbox, .msg or .zip)-XX]",
+      "chooseFiles": "[XX-Choose files-XX]",
+      "noFileChosen": "[XX-No files chosen-XX]",
       "selected": "[XX-Selected: {count}-XX]",
       "button": "[XX-Import-XX]",
       "tooLarge": "[XX-{name} is larger than {max}. Split the export into smaller files.-XX]",

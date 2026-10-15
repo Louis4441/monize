@@ -119,6 +119,8 @@
       "title": "Importa e-mail archiviate",
       "description": "Un file conserva il mittente e la data di acquisto del negozio, a differenza di una e-mail inoltrata. Carica le e-mail esportate per leggere vecchie conferme d'ordine.",
       "fileLabel": "File di e-mail (.eml, .mbox, .msg o .zip)",
+      "chooseFiles": "Scegli file",
+      "noFileChosen": "Nessun file selezionato",
       "selected": "Selezionati: {count}",
       "button": "Importa",
       "tooLarge": "{name} supera {max}. Dividi l'esportazione in file più piccoli.",

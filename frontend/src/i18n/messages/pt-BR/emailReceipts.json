@@ -119,6 +119,8 @@
       "title": "Importar e-mails arquivados",
       "description": "Um arquivo mantém o remetente e a data de compra da loja, ao contrário de um e-mail encaminhado. Envie e-mails exportados para ler confirmações de pedido antigas.",
       "fileLabel": "Arquivos de e-mail (.eml, .mbox, .msg ou .zip)",
+      "chooseFiles": "Escolher arquivos",
+      "noFileChosen": "Nenhum arquivo escolhido",
       "selected": "Selecionados: {count}",
       "button": "Importar",
       "tooLarge": "{name} excede {max}. Divida a exportação em arquivos menores.",

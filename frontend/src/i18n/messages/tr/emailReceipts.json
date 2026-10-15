@@ -119,6 +119,8 @@
       "title": "Arşivlenmiş e-postaları içe aktar",
       "description": "Bir dosya, iletilen bir e-postadan farklı olarak mağazanın göndericisini ve satın alma tarihini korur. Eski sipariş onaylarını okumak için dışa aktarılmış e-postaları yükleyin.",
       "fileLabel": "E-posta dosyaları (.eml, .mbox, .msg veya .zip)",
+      "chooseFiles": "Dosya seç",
+      "noFileChosen": "Dosya seçilmedi",
       "selected": "Seçilen: {count}",
       "button": "İçe aktar",
       "tooLarge": "{name} dosyası {max} boyutundan büyük. Dışa aktarmayı daha küçük dosyalara bölün.",

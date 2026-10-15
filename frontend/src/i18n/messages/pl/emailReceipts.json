@@ -119,6 +119,8 @@
       "title": "Importuj zarchiwizowane wiadomości",
       "description": "Plik zachowuje nadawcę i datę zakupu w sklepie, inaczej niż przekazana wiadomość. Wyślij wyeksportowane wiadomości, aby odczytać stare potwierdzenia zamówień.",
       "fileLabel": "Pliki wiadomości (.eml, .mbox, .msg lub .zip)",
+      "chooseFiles": "Wybierz pliki",
+      "noFileChosen": "Nie wybrano plików",
       "selected": "Wybrano: {count}",
       "button": "Importuj",
       "tooLarge": "Plik {name} jest większy niż {max}. Podziel eksport na mniejsze pliki.",

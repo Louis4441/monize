@@ -119,6 +119,8 @@
       "title": "보관된 이메일 가져오기",
       "description": "파일은 전달된 이메일과 달리 쇼핑몰의 발신자와 구매 날짜를 유지합니다. 내보낸 이메일을 업로드하여 오래된 주문 확인 메일을 읽으세요.",
       "fileLabel": "이메일 파일 (.eml, .mbox, .msg 또는 .zip)",
+      "chooseFiles": "파일 선택",
+      "noFileChosen": "선택한 파일 없음",
       "selected": "선택됨: {count}",
       "button": "가져오기",
       "tooLarge": "{name}이(가) {max}보다 큽니다. 내보내기를 더 작은 파일로 나누세요.",
