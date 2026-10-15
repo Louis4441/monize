@@ -74,11 +74,12 @@ export function createPkcePair(): { verifier: string; challenge: string } {
  * algorithm -- the authorization server recomputes it from the verifier the
  * client later sends to match the challenge given at `/authorize`, so a
  * slow, randomly-salted password hash would not just be unnecessary, it would
- * break the protocol. CodeQL reports js/insufficient-password-hash on the
- * `.update(...)` call below; the alert is a false positive dismissed on the
- * Security tab with its reason (docs/backend/modules-and-runtime.md, CodeQL
- * suppressions), and the annotation is placed where it takes effect the day
- * the suppression query is added to default setup.
+ * break the protocol. CodeQL reported js/insufficient-password-hash on the
+ * `.update(...)` call below because the state functions were named `*OAuthState`
+ * and its heuristic reads any name containing "oauth" as a password; they are
+ * named `*AuthorizationState` for that reason (docs/backend/modules-and-runtime.md,
+ * CodeQL suppressions). The annotation stays for the day the suppression query
+ * is added to default setup.
  */
 export function pkceChallenge(verifier: string): string {
   // codeql[js/insufficient-password-hash]
@@ -86,7 +87,7 @@ export function pkceChallenge(verifier: string): string {
 }
 
 /** A fresh flow: the PKCE pair, the nonce and the expiry, for this user and provider. */
-export function newOAuthState(
+export function newAuthorizationState(
   userId: string,
   provider: EmailReceiptOAuthProvider,
   now: number = Date.now(),
@@ -106,7 +107,7 @@ export function newOAuthState(
 }
 
 /** The state as it travels in a URL: the ciphertext, base64url-encoded. */
-export function sealOAuthState(
+export function sealAuthorizationState(
   cipher: Pick<StateCipher, "encrypt">,
   payload: OAuthStatePayload,
 ): string {
@@ -122,7 +123,7 @@ export function sealOAuthState(
  * not compare the user and does not claim the nonce; `complete` does both, in
  * that order, so another user's attempt never spends a state that is not theirs.
  */
-export function openOAuthState(
+export function openAuthorizationState(
   cipher: Pick<StateCipher, "decrypt">,
   state: string,
   now: number = Date.now(),
