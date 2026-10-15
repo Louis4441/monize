@@ -33,7 +33,11 @@ import {
  *
  * The financial today is fixed by faking `Date` alone (every timer stays real,
  * so the pool and the transactions are untouched): 2026-10-13, a Tuesday. The
- * database clock is not faked; `retrieved_at` is seeded relative to `NOW()`.
+ * database clock is not faked, so a timestamp is seeded on the clock its reader
+ * compares it with: `retrieved_at` relative to `NOW()` (the freshness read is
+ * SQL), `dismissed_at` relative to `daysAgo` (`purgeOld` takes its cutoffs from
+ * the faked `Date`). Seeding the latter from `NOW()` passed only while the real
+ * date was within a day of TODAY.
  */
 describe("BondNotificationService (integration)", () => {
   jest.setTimeout(240000);
@@ -106,6 +110,11 @@ describe("BondNotificationService (integration)", () => {
        ON CONFLICT (code) DO NOTHING`,
     );
   });
+
+  /** A timestamp `days` before the faked `Date`, the clock `purgeOld` reads. */
+  function daysAgo(days: number): Date {
+    return new Date(Date.now() - days * 86_400_000);
+  }
 
   /** Store a series whose sale window covers every purchase date the cases use. */
   async function seedSeries(
@@ -332,8 +341,8 @@ describe("BondNotificationService (integration)", () => {
 
     // Dismissed 31 days ago: any other notification would be purged now.
     await owner.query(
-      `UPDATE notifications SET dismissed_at = NOW() - INTERVAL '31 days',
-                                is_read = true`,
+      `UPDATE notifications SET dismissed_at = $1, is_read = true`,
+      [daysAgo(31)],
     );
     await writeDoor.purgeOld();
     expect(await rowsOf("BOND_REDEMPTION_UNBOOKED")).toHaveLength(1);
@@ -341,9 +350,9 @@ describe("BondNotificationService (integration)", () => {
     expect(await rowsOf("BOND_REDEMPTION_UNBOOKED")).toHaveLength(1);
 
     // Dismissed over a year ago: forgotten, so the state raises it afresh.
-    await owner.query(
-      `UPDATE notifications SET dismissed_at = NOW() - INTERVAL '366 days'`,
-    );
+    await owner.query(`UPDATE notifications SET dismissed_at = $1`, [
+      daysAgo(366),
+    ]);
     await writeDoor.purgeOld();
     expect(await rowsOf("BOND_REDEMPTION_UNBOOKED")).toHaveLength(0);
     expect(await service.evaluateUser(held.userId)).toBe(1);
