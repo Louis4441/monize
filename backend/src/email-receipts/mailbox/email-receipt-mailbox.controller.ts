@@ -133,7 +133,7 @@ export class EmailReceiptMailboxController {
       "Import archived emails (.eml, .mbox, .msg, .zip) into my receipts mailbox, then process what is stored",
   })
   @ApiConsumes("multipart/form-data")
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @UseInterceptors(
     // Outside the FilesInterceptor, so multer's untranslated size error is
     // localized before it reaches the client.

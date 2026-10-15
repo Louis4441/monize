@@ -11,7 +11,7 @@ Plan: `email-receipts-archive-import.md`.
       one transaction per file, the 5,000 cap) and `processStoredNow` on the
       poll service under the poll lease.
 - [x] Backend: `POST /email-receipts/mailbox/import` (multer memory storage,
-      20 files x 25 MB, translated 413, throttle 5/min); English and pseudo
+      20 files x 25 MB, translated 413, throttle 30/min); English and pseudo
       locale strings.
 - [x] Frontend: `MailboxImportCard` in the Mailbox tab (upload, per-file
       result, the provider guide); API client and types; English and pseudo

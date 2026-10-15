@@ -114,7 +114,7 @@ describe("EmailReceiptMailboxController", () => {
     expect(limitOf("pollNow")).toBe(3);
     expect(limitOf("upsert")).toBe(10);
     expect(limitOf("updateSettings")).toBe(20);
-    expect(limitOf("importArchive")).toBe(5);
+    expect(limitOf("importArchive")).toBe(30);
   });
 
   describe("import", () => {

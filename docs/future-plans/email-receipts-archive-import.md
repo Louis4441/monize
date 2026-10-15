@@ -90,7 +90,7 @@ Out (follow-ups, each its own agreement):
    "Poll now"; the response says so. What one run does not reach is processed
    by later polls, as for polled mail.
 6. **Access.** `POST /email-receipts/mailbox/import`, the mailbox controller's
-   guards (JWT, owner only), throttled to 5 a minute. No mailbox is a 404
+   guards (JWT, owner only), throttled to 30 a minute (section 6). No mailbox is a 404
    (`errors.emailReceipts.mailboxNotFound`). The mailbox need not be enabled or
    reachable. The file content is untrusted, as an IMAP message is: it can only
    choose which approved parser reads the email and which days to look at
@@ -127,3 +127,32 @@ interface EmailReceiptImportResult {
 - Integration is not required: no new query shape; the insert is the poll's.
 - The fixture derived from a real Allegro email is masked (no real name,
   address, telephone or order number).
+
+## 6. Splitting in the browser (follow-up)
+
+A Google Takeout export of one label is easily larger than the request limits
+(an observed `monize.mbox` was 117.7 MiB, its `.zip` 62 MiB). The person should
+not need a script, so the browser plans the upload and the server's limits stay
+as they are (decision 4).
+
+1. **Upload planner** (`frontend/src/lib/email-import/`). The selected files are
+   turned into a list of upload parts, then packed into requests: at most 20
+   parts, 99 MiB and 5,000 messages per request, each part at most 24 MiB. The
+   20-file pick limit goes away; one selection may hold up to 1 GiB in total.
+2. **Large `.mbox`** (above 24 MiB): scanned in 4 MiB slices
+   (`Blob.slice().arrayBuffer()`) for separators by the backend's rule (a line
+   starting `From ` at the start of the file or after an empty line, LF or
+   CRLF). A part is a `File.slice()` of whole messages, so nothing is copied. A
+   single message above 24 MiB is not sent and is counted in the result.
+3. **Large `.zip`** (above 24 MiB): read locally with `fflate`'s streaming
+   `Unzip` (loaded by a dynamic `import()` only for this path). Mail entries
+   become parts the same way (an mbox entry is split as it inflates, holding at
+   most one part in memory); other entries are counted as ignored; a nested zip
+   is not followed. A `.zip` up to 24 MiB, and every `.eml` / `.msg`, is sent as
+   it is.
+4. **Requests** go one after another; each response's per-file counts are
+   summed under the original file name. A 429 waits and retries (the backend
+   throttle becomes 30 a minute, still bounded per request by decision 4); any
+   other failure stops the run and reports what was already imported.
+5. **Progress**: "Sending part N of M" with a cancel button; a cancelled run
+   keeps what was imported (the import is idempotent).
