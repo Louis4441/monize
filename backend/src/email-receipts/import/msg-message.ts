@@ -218,21 +218,32 @@ export function cfbHeaderFits(bytes: Buffer): boolean {
 }
 
 /**
- * Whether every directory entry declares a stream that fits in the file.
- * msgreader allocates a buffer of the declared size before it reads a stream,
- * so a 2 MB file declaring a 2 GB stream would allocate 2 GB.
+ * Whether the directory's declared stream sizes fit the file. msgreader
+ * allocates a buffer of the declared size before it reads a stream, so a 2 MB
+ * file declaring a 2 GB stream would allocate 2 GB, and thousands of entries
+ * each declaring the whole file would allocate that many times over. Each size
+ * is at most the file, and their sum at most twice the file: real streams sit
+ * in distinct sectors, and only the root entry (the mini stream container) is
+ * counted twice, once itself and once through the small streams inside it.
  */
 export function streamsFitFile(
   entries: ReadonlyArray<{ sizeBlock?: unknown }>,
   fileBytes: number,
 ): boolean {
-  return entries.every(
-    ({ sizeBlock }) =>
-      typeof sizeBlock === "number" &&
-      Number.isInteger(sizeBlock) &&
-      sizeBlock >= 0 &&
-      sizeBlock <= fileBytes,
-  );
+  let total = 0;
+  for (const { sizeBlock } of entries) {
+    if (
+      typeof sizeBlock !== "number" ||
+      !Number.isInteger(sizeBlock) ||
+      sizeBlock < 0 ||
+      sizeBlock > fileBytes
+    ) {
+      return false;
+    }
+    total += sizeBlock;
+    if (total > 2 * fileBytes) return false;
+  }
+  return true;
 }
 
 /**

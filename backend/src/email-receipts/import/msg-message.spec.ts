@@ -289,6 +289,18 @@ describe("streamsFitFile", () => {
     );
   });
 
+  it("refuses sizes that each fit but together pass twice the file", () => {
+    expect(streamsFitFile([{ sizeBlock: 100 }, { sizeBlock: 100 }], 100)).toBe(
+      true,
+    );
+    expect(
+      streamsFitFile(
+        [{ sizeBlock: 100 }, { sizeBlock: 100 }, { sizeBlock: 1 }],
+        100,
+      ),
+    ).toBe(false);
+  });
+
   it.each([101, -1, 1.5, "5", undefined])(
     "refuses a declared size of %p in a 100-byte file",
     (sizeBlock) => {
