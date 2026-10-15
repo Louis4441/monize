@@ -391,6 +391,7 @@
     "importNoFile": "İçe aktarmak için en az bir .eml, .mbox, .msg veya .zip dosyası seçin.",
     "importFileTooLarge": "Bir dosya {{ limit }} MB sınırından büyük.",
     "importRequestTooLarge": "Dosyalar birlikte {{ limit }} MB sınırından büyük. Bunları daha küçük gruplar halinde içe aktarın.",
+    "importInProgress": "Bir içe aktarma zaten çalışıyor. Bitmesini bekleyin.",
     "parserPayeeNotFound": "Bu ayrıştırıcının alacaklısı bulunamadı.",
     "parserNotFound": "{{ id }} kimlikli makbuz ayrıştırıcısı bulunamadı",
     "parserRevisionConflict": "Bu ayrıştırıcı siz açtıktan sonra değiştirilmiş. Yeniden yükleyin ve tekrar deneyin.",

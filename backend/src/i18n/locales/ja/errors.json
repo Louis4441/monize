@@ -391,6 +391,7 @@
     "importNoFile": "インポートする .eml、.mbox、.msg、または .zip ファイルを 1 つ以上選択してください。",
     "importFileTooLarge": "ファイルの 1 つが上限の {{ limit }} MB を超えています。",
     "importRequestTooLarge": "ファイルの合計が上限の {{ limit }} MB を超えています。小さなグループに分けてインポートしてください。",
+    "importInProgress": "インポートはすでに実行中です。終了するまでお待ちください。",
     "parserPayeeNotFound": "このプロフィールの取引先が見つかりませんでした。",
     "parserNotFound": "レシートプロフィール {{ id }} が見つかりません",
     "parserRevisionConflict": "このプロフィールは、開いた後に変更されました。再読み込みしてからもう一度お試しください。",

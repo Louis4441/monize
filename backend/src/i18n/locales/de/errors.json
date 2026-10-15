@@ -391,6 +391,7 @@
     "importNoFile": "Wählen Sie mindestens eine .eml-, .mbox-, .msg- oder .zip-Datei zum Importieren aus.",
     "importFileTooLarge": "Eine Datei ist größer als das Limit von {{ limit }} MB.",
     "importRequestTooLarge": "Die Dateien zusammen sind größer als das Limit von {{ limit }} MB. Importieren Sie sie in kleineren Gruppen.",
+    "importInProgress": "Ein Import läuft bereits. Warten Sie, bis er abgeschlossen ist.",
     "parserPayeeNotFound": "Der Zahlungsempfänger dieses Profils wurde nicht gefunden.",
     "parserNotFound": "Beleg-Profil {{ id }} nicht gefunden",
     "parserRevisionConflict": "Dieser Profil wurde geändert, seit Sie ihn geöffnet haben. Laden Sie ihn neu und versuchen Sie es erneut.",

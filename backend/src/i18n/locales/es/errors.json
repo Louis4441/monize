@@ -391,6 +391,7 @@
     "importNoFile": "Elija al menos un archivo .eml, .mbox, .msg o .zip para importar.",
     "importFileTooLarge": "Un archivo supera el límite de {{ limit }} MB.",
     "importRequestTooLarge": "Los archivos juntos superan el límite de {{ limit }} MB. Impórtelos en grupos más pequeños.",
+    "importInProgress": "Ya hay una importación en curso. Espere a que termine.",
     "parserPayeeNotFound": "No se encontró el beneficiario de este perfil.",
     "parserNotFound": "No se encontró el perfil de recibos {{ id }}",
     "parserRevisionConflict": "Este perfil se modificó desde que lo abrió. Vuelva a cargarlo e inténtelo de nuevo.",

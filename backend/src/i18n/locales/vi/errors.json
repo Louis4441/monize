@@ -391,6 +391,7 @@
     "importNoFile": "Chọn ít nhất một tệp .eml, .mbox, .msg hoặc .zip để nhập.",
     "importFileTooLarge": "Một tệp lớn hơn giới hạn {{ limit }} MB.",
     "importRequestTooLarge": "Các tệp cộng lại lớn hơn giới hạn {{ limit }} MB. Hãy nhập theo từng nhóm nhỏ hơn.",
+    "importInProgress": "Một lần nhập đang chạy. Hãy đợi đến khi hoàn tất.",
     "parserPayeeNotFound": "Không tìm thấy người nhận của trình phân tích này.",
     "parserNotFound": "Không tìm thấy trình phân tích biên lai {{ id }}",
     "parserRevisionConflict": "Trình phân tích này đã được thay đổi kể từ khi bạn mở nó. Hãy tải lại và thử lại.",

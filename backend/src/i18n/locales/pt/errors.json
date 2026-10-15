@@ -391,6 +391,7 @@
     "importNoFile": "Escolha pelo menos um ficheiro .eml, .mbox, .msg ou .zip para importar.",
     "importFileTooLarge": "Um ficheiro excede o limite de {{ limit }} MB.",
     "importRequestTooLarge": "Os ficheiros em conjunto excedem o limite de {{ limit }} MB. Importe-os em grupos mais pequenos.",
+    "importInProgress": "Já está a decorrer uma importação. Aguarde até terminar.",
     "parserPayeeNotFound": "O beneficiário deste analisador não foi encontrado.",
     "parserNotFound": "Analisador de recibos {{ id }} não encontrado",
     "parserRevisionConflict": "Este analisador foi alterado desde que o abriu. Volte a carregá-lo e tente novamente.",

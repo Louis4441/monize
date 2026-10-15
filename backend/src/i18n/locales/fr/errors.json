@@ -391,6 +391,7 @@
     "importNoFile": "Choisissez au moins un fichier .eml, .mbox, .msg ou .zip à importer.",
     "importFileTooLarge": "Un fichier dépasse la limite de {{ limit }} Mo.",
     "importRequestTooLarge": "Les fichiers dépassent ensemble la limite de {{ limit }} Mo. Importez-les par groupes plus petits.",
+    "importInProgress": "Une importation est déjà en cours. Attendez qu'elle se termine.",
     "parserPayeeNotFound": "Le bénéficiaire de cet profil est introuvable.",
     "parserNotFound": "Profil de reçus {{ id }} introuvable",
     "parserRevisionConflict": "Cet profil a été modifié depuis que vous l'avez ouvert. Rechargez-le et réessayez.",

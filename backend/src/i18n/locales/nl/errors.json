@@ -391,6 +391,7 @@
     "importNoFile": "Kies minstens één .eml-, .mbox-, .msg- of .zip-bestand om te importeren.",
     "importFileTooLarge": "Een bestand is groter dan de limiet van {{ limit }} MB.",
     "importRequestTooLarge": "De bestanden samen zijn groter dan de limiet van {{ limit }} MB. Importeer ze in kleinere groepen.",
+    "importInProgress": "Er loopt al een import. Wacht tot deze klaar is.",
     "parserPayeeNotFound": "De begunstigde van deze profiel is niet gevonden.",
     "parserNotFound": "Bonprofiel {{ id }} niet gevonden",
     "parserRevisionConflict": "Deze profiel is gewijzigd sinds u hem opende. Laad hem opnieuw en probeer het nogmaals.",

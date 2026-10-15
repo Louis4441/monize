@@ -391,6 +391,7 @@
     "importNoFile": "Pilih setidaknya satu file .eml, .mbox, .msg, atau .zip untuk diimpor.",
     "importFileTooLarge": "Satu file lebih besar dari batas {{ limit }} MB.",
     "importRequestTooLarge": "Semua file bersama-sama lebih besar dari batas {{ limit }} MB. Impor dalam kelompok yang lebih kecil.",
+    "importInProgress": "Impor sedang berjalan. Tunggu hingga selesai.",
     "parserPayeeNotFound": "Penerima pembayaran untuk parser ini tidak ditemukan.",
     "parserNotFound": "Parser struk {{ id }} tidak ditemukan",
     "parserRevisionConflict": "Parser ini telah diubah sejak Anda membukanya. Muat ulang dan coba lagi.",

@@ -2,10 +2,11 @@ import "reflect-metadata";
 import { GUARDS_METADATA } from "@nestjs/common/constants";
 import {
   BadRequestException,
+  HttpException,
   PayloadTooLargeException,
   type ExecutionContext,
 } from "@nestjs/common";
-import { lastValueFrom, of, throwError } from "rxjs";
+import { Subject, lastValueFrom, of, throwError } from "rxjs";
 import {
   EMAIL_IMPORT_FILE_LIMIT_MB,
   EMAIL_IMPORT_REQUEST_LIMIT_BYTES,
@@ -16,11 +17,12 @@ import { EmailReceiptMailboxController } from "./email-receipt-mailbox.controlle
 import { ALLOW_DELEGATE_KEY } from "../../delegation/decorators/delegate-access.decorator";
 
 /** An HTTP context whose request declares `length` as its Content-Length. */
-const httpContext = (length: string | undefined) =>
+const httpContext = (length: string | undefined, userId?: string) =>
   ({
     switchToHttp: () => ({
       getRequest: () => ({
         headers: length === undefined ? {} : { "content-length": length },
+        ...(userId === undefined ? {} : { user: { id: userId } }),
       }),
     }),
   }) as unknown as ExecutionContext;
@@ -189,6 +191,49 @@ describe("EmailReceiptMailboxController", () => {
           lastValueFrom(interceptor.intercept(httpContext(length), { handle })),
         ).resolves.toBe("ok");
       }
+    });
+
+    it("holds one import per user at a time, before multer reads the body", async () => {
+      const interceptor = new EmailReceiptUploadErrorInterceptor();
+      const running = new Subject<string>();
+      const first = lastValueFrom(
+        interceptor.intercept(httpContext("1024", "user-a"), {
+          handle: () => running,
+        }),
+      );
+      const handle = jest.fn(() => of("second"));
+      const refused = await lastValueFrom(
+        interceptor.intercept(httpContext("1024", "user-a"), { handle }),
+      ).catch((e: unknown) => e);
+      expect(refused).toBeInstanceOf(HttpException);
+      expect((refused as HttpException).getStatus()).toBe(429);
+      expect(
+        JSON.stringify((refused as HttpException).getResponse()),
+      ).toContain("emailReceiptImportInProgress");
+      expect(handle).not.toHaveBeenCalled();
+      // Another user is not held by it.
+      await expect(
+        lastValueFrom(
+          interceptor.intercept(httpContext("1024", "user-b"), { handle }),
+        ),
+      ).resolves.toBe("second");
+
+      running.next("done");
+      running.complete();
+      await expect(first).resolves.toBe("done");
+      // Released after it finished, and after a failure too.
+      await expect(
+        lastValueFrom(
+          interceptor.intercept(httpContext("1024", "user-a"), {
+            handle: () => throwError(() => new Error("boom")),
+          }),
+        ),
+      ).rejects.toThrow("boom");
+      await expect(
+        lastValueFrom(
+          interceptor.intercept(httpContext("1024", "user-a"), { handle }),
+        ),
+      ).resolves.toBe("second");
     });
 
     it("passes other errors and results through", async () => {

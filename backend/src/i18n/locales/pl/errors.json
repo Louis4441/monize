@@ -391,6 +391,7 @@
     "importNoFile": "Wybierz co najmniej jeden plik .eml, .mbox, .msg lub .zip do importu.",
     "importFileTooLarge": "Jeden plik jest większy niż limit {{ limit }} MB.",
     "importRequestTooLarge": "Pliki razem są większe niż limit {{ limit }} MB. Importuj je w mniejszych grupach.",
+    "importInProgress": "Import już trwa. Poczekaj, aż się zakończy.",
     "parserPayeeNotFound": "Nie znaleziono odbiorcy tego parsera.",
     "parserNotFound": "Nie znaleziono parsera paragonów {{ id }}",
     "parserRevisionConflict": "Ten parser został zmieniony od chwili jego otwarcia. Załaduj go ponownie i spróbuj jeszcze raz.",

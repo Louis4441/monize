@@ -391,6 +391,7 @@
     "importNoFile": "請至少選擇一個 .eml、.mbox、.msg 或 .zip 檔案進行匯入。",
     "importFileTooLarge": "有一個檔案超過 {{ limit }} MB 的限制。",
     "importRequestTooLarge": "檔案合計超過 {{ limit }} MB 的限制。請分成較小的批次匯入。",
+    "importInProgress": "已有匯入正在進行。請等待其完成。",
     "parserPayeeNotFound": "找不到此解析器的收款方。",
     "parserNotFound": "找不到收據解析器 {{ id }}",
     "parserRevisionConflict": "此解析器在您開啟後已被變更。請重新載入後再試。",

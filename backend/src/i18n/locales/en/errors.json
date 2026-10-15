@@ -391,6 +391,7 @@
     "importNoFile": "Choose at least one .eml, .mbox, .msg or .zip file to import.",
     "importFileTooLarge": "A file is larger than the {{ limit }} MB limit.",
     "importRequestTooLarge": "The files together are larger than the {{ limit }} MB limit. Import them in smaller groups.",
+    "importInProgress": "An import is already running. Wait until it finishes.",
     "parserPayeeNotFound": "The payee of this parser was not found.",
     "parserNotFound": "Receipt parser {{ id }} not found",
     "parserRevisionConflict": "This parser was changed since you opened it. Reload it and try again.",
