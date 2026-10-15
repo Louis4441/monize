@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { MailboxForm } from '@/components/email-receipts/MailboxForm';
+import { MailboxImportCard } from '@/components/email-receipts/MailboxImportCard';
 import { MailboxStatus } from '@/components/email-receipts/MailboxStatus';
 import { OAuthConnectButtons } from '@/components/email-receipts/OAuthConnectButtons';
 import { OAuthMailboxPanel } from '@/components/email-receipts/OAuthMailboxPanel';
@@ -65,6 +66,7 @@ export function MailboxSection() {
     setState((prev) => (prev.status === 'ready' ? { ...prev, mailbox } : prev));
 
   let body;
+  let hasMailbox = false;
   if (state.status === 'error') {
     body = (
       <div role="alert">
@@ -89,6 +91,7 @@ export function MailboxSection() {
     body = <LoadingSpinner text={t('loading')} />;
   } else {
     const { mailbox, providers } = state;
+    hasMailbox = mailbox !== null;
     const isOAuth = mailbox?.authMethod === 'oauth2';
     body = (
       <div className="space-y-6">
@@ -134,6 +137,11 @@ export function MailboxSection() {
       </h2>
       <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">{t('description')}</p>
       <Card padding="md">{body}</Card>
+      {hasMailbox && (
+        <div className="mt-6">
+          <MailboxImportCard />
+        </div>
+      )}
     </section>
   );
 }

@@ -114,6 +114,64 @@
       },
       "deleted": "[XX-Mailbox deleted-XX]",
       "deleteFailed": "[XX-Could not delete the mailbox-XX]"
+    },
+    "import": {
+      "title": "[XX-Import archived emails-XX]",
+      "description": "[XX-A file keeps the sender and the purchase date of the shop, unlike a forwarded email. Upload exported emails to read old order confirmations.-XX]",
+      "fileLabel": "[XX-Email files (.eml, .mbox, .msg or .zip)-XX]",
+      "selected": "[XX-Selected: {count}-XX]",
+      "button": "[XX-Import-XX]",
+      "tooLarge": "[XX-{name} is larger than {max}. Split the export into smaller files.-XX]",
+      "tooLargeTotal": "[XX-The selected files together are larger than {max}. Import them in smaller groups.-XX]",
+      "tooMany": "[XX-Select at most {max} files per import.-XX]",
+      "failed": "[XX-The import failed-XX]",
+      "result": {
+        "heading": "[XX-Import result-XX]",
+        "file": "[XX-{name}: {stored} stored, {duplicates} duplicates, {skipped} skipped-XX]",
+        "summary": "[XX-{processed} emails processed.-XX]",
+        "truncated": "[XX-{count} messages were not read because one import has a limit. Import them again in a second run.-XX]",
+        "busy": "[XX-The mailbox is being read right now. The imported emails will be processed at the next read.-XX]",
+        "errors": {
+          "unsupported_format": "[XX-{name}: this format is not supported. Supported formats are .eml, .mbox, .msg and .zip.-XX]",
+          "invalid_archive": "[XX-{name}: the ZIP file is damaged or cannot be read.-XX]",
+          "archive_too_large": "[XX-{name}: the ZIP file expands to more than 100 MB. Split it, or upload the .mbox file inside.-XX]",
+          "empty": "[XX-{name}: the file holds no emails.-XX]"
+        },
+        "ignored": "[XX-{name}: {count} other files in the archive were skipped.-XX]"
+      },
+      "guide": {
+        "toggle": "[XX-How to export emails from your provider-XX]",
+        "gmailLabel": {
+          "title": "[XX-Gmail: all emails with a label-XX]",
+          "step1": "[XX-Open takeout.google.com and choose Deselect all.-XX]",
+          "step2": "[XX-Select Mail and choose All Mail data included.-XX]",
+          "step3": "[XX-Choose only your label and create the export.-XX]",
+          "step4": "[XX-Upload the downloaded .zip file as it is. You do not need to unpack it.-XX]"
+        },
+        "gmailOne": {
+          "title": "[XX-Gmail: one email-XX]",
+          "step1": "[XX-Open the email.-XX]",
+          "step2": "[XX-Choose More, then Download message.-XX]",
+          "step3": "[XX-Upload the .eml file.-XX]"
+        },
+        "imap": {
+          "title": "[XX-Other providers: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho-XX]",
+          "step1": "[XX-Add the mailbox to Thunderbird over IMAP and install the ImportExportTools NG add-on.-XX]",
+          "step2": "[XX-Select the emails or a folder and right-click.-XX]",
+          "step3": "[XX-Choose ImportExportTools NG, then export as EML or as mbox.-XX]",
+          "step4": "[XX-Upload the files.-XX]"
+        },
+        "outlook": {
+          "title": "[XX-Outlook desktop-XX]",
+          "body": "[XX-Select the emails and drag them to a folder on your disk. Outlook writes .msg files. Upload them, several at once or packed into one .zip file.-XX]"
+        },
+        "apple": {
+          "title": "[XX-Apple Mail-XX]",
+          "step1": "[XX-Choose Mailbox, then Export Mailbox. Apple Mail writes a folder.-XX]",
+          "step2": "[XX-Upload the file named mbox inside the folder, or drag emails to Finder to get .eml files.-XX]"
+        },
+        "tip": "[XX-Tip: forwarding emails with a script loses the sender and the date of the shop. Importing files keeps them.-XX]"
+      }
     }
   },
   "parsers": {

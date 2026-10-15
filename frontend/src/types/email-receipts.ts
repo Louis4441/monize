@@ -180,6 +180,41 @@ export interface EmailReceiptPollResult {
   error?: string;
 }
 
+/** Why one uploaded archive file was refused; `null` on a file that was read. */
+export type EmailReceiptImportFileError =
+  | 'unsupported_format'
+  | 'invalid_archive'
+  | 'archive_too_large'
+  | 'empty';
+
+/** What the import did with one uploaded file. */
+export interface EmailReceiptImportFileResult {
+  name: string;
+  /** `null` when the file was refused. */
+  format: 'eml' | 'mbox' | 'msg' | 'zip' | null;
+  /** Messages found in the file. */
+  messages: number;
+  /** New rows, stored as pending. */
+  stored: number;
+  /** Messages that were already imported. */
+  duplicates: number;
+  /** Messages stored as skipped (too large or undecodable). */
+  skipped: number;
+  /** ZIP entries that are not mail files; 0 for any other format. */
+  ignoredEntries: number;
+  error: EmailReceiptImportFileError | null;
+}
+
+export interface EmailReceiptImportResult {
+  files: EmailReceiptImportFileResult[];
+  /** Messages not read because of the per-request message cap. */
+  truncated: number;
+  /** Stored emails the run took through the pipeline. */
+  processed: number;
+  /** The poll lease was held: nothing was processed, the rows wait for the next read. */
+  busy: boolean;
+}
+
 /** Which OAuth providers the operator configured, and the redirect URI to register. */
 export interface EmailReceiptOAuthProviders {
   google: boolean;

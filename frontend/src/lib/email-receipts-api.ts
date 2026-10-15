@@ -5,6 +5,7 @@ import type {
   CreateEmailReceiptParserPayload,
   EmailReceiptAskAiResult,
   EmailReceiptDetail,
+  EmailReceiptImportResult,
   EmailReceiptListItem,
   EmailReceiptMailbox,
   EmailReceiptMailboxTestResult,
@@ -83,6 +84,22 @@ export const emailReceiptsApi = {
 
     pollNow: async (): Promise<EmailReceiptPollResult> => {
       const response = await apiClient.post<EmailReceiptPollResult>(`${MAILBOX}/poll`);
+      return response.data;
+    },
+
+    /**
+     * Upload exported `.eml`, `.mbox`, `.msg` or `.zip` files into the mailbox (at most 20 files,
+     * 25 MB each). Each file is answered on its own: a refused one carries an
+     * `error` and the rest are still read. The multipart header replaces the
+     * client's JSON default, as in the other uploads; axios adds the boundary.
+     */
+    import: async (files: readonly File[]): Promise<EmailReceiptImportResult> => {
+      const formData = new FormData();
+      for (const file of files) formData.append('files', file);
+      const response = await apiClient.post<EmailReceiptImportResult>(`${MAILBOX}/import`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 180_000,
+      });
       return response.data;
     },
   },

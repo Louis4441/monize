@@ -1,7 +1,29 @@
 import "reflect-metadata";
 import { GUARDS_METADATA } from "@nestjs/common/constants";
+import {
+  BadRequestException,
+  PayloadTooLargeException,
+  type ExecutionContext,
+} from "@nestjs/common";
+import { lastValueFrom, of, throwError } from "rxjs";
+import {
+  EMAIL_IMPORT_FILE_LIMIT_MB,
+  EMAIL_IMPORT_REQUEST_LIMIT_BYTES,
+  EmailReceiptUploadErrorInterceptor,
+} from "../import/email-receipt-upload-error.interceptor";
+import type { EmailReceiptImportResult } from "../import/email-receipt-import.service";
 import { EmailReceiptMailboxController } from "./email-receipt-mailbox.controller";
 import { ALLOW_DELEGATE_KEY } from "../../delegation/decorators/delegate-access.decorator";
+
+/** An HTTP context whose request declares `length` as its Content-Length. */
+const httpContext = (length: string | undefined) =>
+  ({
+    switchToHttp: () => ({
+      getRequest: () => ({
+        headers: length === undefined ? {} : { "content-length": length },
+      }),
+    }),
+  }) as unknown as ExecutionContext;
 
 describe("EmailReceiptMailboxController", () => {
   const req = { user: { id: "user-1" } };
@@ -13,9 +35,11 @@ describe("EmailReceiptMailboxController", () => {
     updateSettings: jest.fn(),
   };
   const poll = { pollNow: jest.fn() };
+  const importer = { importFiles: jest.fn() };
   const controller = new EmailReceiptMailboxController(
     mailbox as never,
     poll as never,
+    importer as never,
   );
   const proto = EmailReceiptMailboxController.prototype;
 
@@ -90,5 +114,100 @@ describe("EmailReceiptMailboxController", () => {
     expect(limitOf("pollNow")).toBe(3);
     expect(limitOf("upsert")).toBe(10);
     expect(limitOf("updateSettings")).toBe(20);
+    expect(limitOf("importArchive")).toBe(5);
+  });
+
+  describe("import", () => {
+    const result: EmailReceiptImportResult = {
+      files: [],
+      truncated: 0,
+      processed: 0,
+      busy: false,
+    };
+
+    it("imports the uploaded files for the JWT user", async () => {
+      importer.importFiles.mockResolvedValue(result);
+      const files = [
+        { originalname: "a.eml", buffer: Buffer.from("x") },
+      ] as Express.Multer.File[];
+      await expect(controller.importArchive(req, files)).resolves.toBe(result);
+      expect(importer.importFiles).toHaveBeenCalledWith("user-1", files);
+    });
+
+    it("refuses a request with no file, before the service is called", () => {
+      expect(() => controller.importArchive(req, undefined)).toThrow(
+        BadRequestException,
+      );
+      expect(() => controller.importArchive(req, [])).toThrow(
+        BadRequestException,
+      );
+      expect(importer.importFiles).not.toHaveBeenCalled();
+    });
+
+    it("answers 200 on the route import", () => {
+      expect(Reflect.getMetadata("path", proto.importArchive)).toBe("import");
+      expect(Reflect.getMetadata("__httpCode__", proto.importArchive)).toBe(
+        200,
+      );
+    });
+
+    it("turns multer's size error into a 413 naming the limit", async () => {
+      const interceptor = new EmailReceiptUploadErrorInterceptor();
+      const failing = {
+        handle: () =>
+          throwError(() => new PayloadTooLargeException("File too large")),
+      };
+      const error = await lastValueFrom(
+        interceptor.intercept(httpContext("1024"), failing),
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(PayloadTooLargeException);
+      expect(
+        JSON.stringify((error as PayloadTooLargeException).getResponse()),
+      ).toContain(String(EMAIL_IMPORT_FILE_LIMIT_MB));
+    });
+
+    it("refuses a body declared above the request limit before multer runs", async () => {
+      const interceptor = new EmailReceiptUploadErrorInterceptor();
+      const handle = jest.fn(() => of("ok"));
+      for (const length of [String(EMAIL_IMPORT_REQUEST_LIMIT_BYTES + 1)]) {
+        const error = await lastValueFrom(
+          interceptor.intercept(httpContext(length), { handle }),
+        ).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(PayloadTooLargeException);
+        expect(
+          JSON.stringify((error as PayloadTooLargeException).getResponse()),
+        ).toContain("emailReceiptImportRequestTooLarge");
+      }
+      expect(handle).not.toHaveBeenCalled();
+      // At the limit, and undeclared or unreadable (the frontend route bounds those).
+      for (const length of [
+        String(EMAIL_IMPORT_REQUEST_LIMIT_BYTES),
+        undefined,
+        "abc",
+      ]) {
+        await expect(
+          lastValueFrom(interceptor.intercept(httpContext(length), { handle })),
+        ).resolves.toBe("ok");
+      }
+    });
+
+    it("passes other errors and results through", async () => {
+      const interceptor = new EmailReceiptUploadErrorInterceptor();
+      const boom = new Error("boom");
+      await expect(
+        lastValueFrom(
+          interceptor.intercept(httpContext("1024"), {
+            handle: () => throwError(() => boom),
+          }),
+        ),
+      ).rejects.toBe(boom);
+      await expect(
+        lastValueFrom(
+          interceptor.intercept(httpContext("1024"), {
+            handle: () => of("ok"),
+          }),
+        ),
+      ).resolves.toBe("ok");
+    });
   });
 });

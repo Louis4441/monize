@@ -894,6 +894,79 @@ describe("Poll now", () => {
   });
 });
 
+describe("processStoredNow (the archive import's processing step)", () => {
+  it("processes pending and rematch rows under the lease without touching IMAP", async () => {
+    const h = setup();
+    h.mailbox.getView.mockResolvedValue(view({ enabled: false }));
+    h.pending.push("r1", "r2");
+    h.rematch.push("r2", "r3");
+
+    await expect(h.service.processStoredNow(USER)).resolves.toEqual({
+      processed: 3,
+      busy: false,
+    });
+
+    expect(h.mailbox.loadConnection).not.toHaveBeenCalled();
+    expect(h.imap.fetchSince).not.toHaveBeenCalled();
+    expect(h.mailbox.advanceCursor).not.toHaveBeenCalled();
+    expect(h.pipeline.process).toHaveBeenCalledTimes(3);
+    expect(h.jobClaims.claimLease).toHaveBeenCalledWith(
+      "email_receipt_poll",
+      USER,
+      MAILBOX,
+      POLL_LEASE_MS,
+    );
+    expect(h.attention.evaluate).toHaveBeenCalledWith(USER);
+    expect(h.jobClaims.releaseLease).toHaveBeenCalledWith(
+      "email_receipt_poll",
+      USER,
+      MAILBOX,
+      TOKEN,
+    );
+  });
+
+  it("does nothing and says busy when the lease is held", async () => {
+    const h = setup();
+    h.jobClaims.claimLease.mockResolvedValue(null);
+    h.pending.push("r1");
+
+    await expect(h.service.processStoredNow(USER)).resolves.toEqual({
+      processed: 0,
+      busy: true,
+    });
+
+    expect(h.pipeline.process).not.toHaveBeenCalled();
+    expect(h.jobClaims.releaseLease).not.toHaveBeenCalled();
+    expect(h.attention.evaluate).not.toHaveBeenCalled();
+  });
+
+  it("is a 404 when the user has no mailbox", async () => {
+    const h = setup();
+    h.mailbox.getView.mockResolvedValue(null);
+    await expect(h.service.processStoredNow(USER)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(h.jobClaims.claimLease).not.toHaveBeenCalled();
+  });
+
+  it("runs the AI step only in automatic mode", async () => {
+    const h = setup();
+    await h.service.processStoredNow(USER);
+    expect(h.ai.runAutomaticStep).not.toHaveBeenCalled();
+
+    h.mailbox.getView.mockResolvedValue(view({ aiMode: "automatic" }));
+    await h.service.processStoredNow(USER);
+    expect(h.ai.runAutomaticStep).toHaveBeenCalledWith(USER);
+  });
+
+  it("releases the lease when processing throws", async () => {
+    const h = setup();
+    h.attention.evaluate.mockRejectedValue(new Error("boom"));
+    await expect(h.service.processStoredNow(USER)).rejects.toThrow("boom");
+    expect(h.jobClaims.releaseLease).toHaveBeenCalledTimes(1);
+  });
+});
+
 /** Make the mocked mail extraction answer with `value` for every message. */
 function mockMailText(value: ReturnType<typeof mail>): void {
   (extractMailText as jest.Mock).mockResolvedValue(value);

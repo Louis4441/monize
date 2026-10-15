@@ -68,7 +68,11 @@ Out (follow-ups, each its own agreement):
    `maxMessageBytes`, `undecodable`). The fallback arrival time of an mbox
    message is the date on its `From ` separator line, else the upload time.
 4. **Bounded.** Per request: at most 20 files, 25 MB each (multer limits, a
-   translated 413), at most 5,000 messages in total; a message beyond the cap is
+   translated 413), at most 100 MB in total (multer holds the files in memory:
+   the backend refuses a declared `Content-Length` above it before multer
+   reads the body, and the frontend's streaming route for this path,
+   `LARGE_UPLOAD_ROUTES` in `frontend/src/lib/proxy-body-limit.ts`, cuts an
+   undeclared body off at the same ceiling), at most 5,000 messages in total; a message beyond the cap is
    not read and the response says how many were left out. The mbox scan is
    linear, line-based, and builds no regular expression from input. A `.zip` is
    read entry by entry with a ceiling on what it may expand to: at most 2,000

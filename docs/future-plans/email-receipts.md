@@ -197,6 +197,9 @@ section 10.5).
     original (Gmail then keeps the original body); the parser path, which reads
     the visible text, has no such limit.
 
+    Archived mail (`.eml`, `.mbox`, `.zip`, Outlook `.msg`) is imported through
+    the same row builder; see `email-receipts-archive-import.md`.
+
 ## 3a. OAuth2 login (Google, Microsoft 365)
 
 Google and Microsoft 365 refuse a plain password on IMAP for most accounts, so
