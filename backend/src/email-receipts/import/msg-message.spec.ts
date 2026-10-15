@@ -1,5 +1,11 @@
-import type { FieldsData } from "@kenjiuno/msgreader";
-import { buildRfc822FromMsg, readMsgAsRfc822 } from "./msg-message";
+import MsgReader, { type FieldsData } from "@kenjiuno/msgreader";
+import { burn } from "@kenjiuno/msgreader/lib/Burner";
+import {
+  buildRfc822FromMsg,
+  cfbHeaderFits,
+  readMsgAsRfc822,
+  streamsFitFile,
+} from "./msg-message";
 import { extractMailText } from "../imap/mail-text.util";
 
 /** The fields msgreader returns for a message; only what the builder reads. */
@@ -171,4 +177,122 @@ describe("readMsgAsRfc822", () => {
     ]);
     expect(readMsgAsRfc822(bytes)).toBeNull();
   });
+
+  /** A real compound file: a synthetic message written by msgreader's own burner. */
+  const BODY_STREAM = "__substg1.0_1000001F";
+  // Each stream is padded to one big block: the burner's mini stream is not
+  // what this test is about.
+  const utf16Block = (text: string): Buffer => {
+    const block = Buffer.alloc(4096);
+    Buffer.from(text, "utf16le").copy(block);
+    return block;
+  };
+  const doc = (name: string, data: Buffer) => ({
+    name,
+    type: 2,
+    length: data.length,
+    binaryProvider: () => data,
+  });
+  const realMsg = (): Buffer =>
+    Buffer.from(
+      burn([
+        { name: "Root Entry", type: 5, length: 0, children: [1, 2, 3, 4] },
+        doc("__substg1.0_0037001F", utf16Block("Order 42")),
+        doc(BODY_STREAM, utf16Block("Total 10.00 PLN")),
+        doc("__substg1.0_0C1F001F", utf16Block("orders@shop.example.com")),
+        doc("__properties_version1.0", Buffer.alloc(32)),
+      ]),
+    );
+
+  it("reads a real compound file through the same row builder", async () => {
+    const source = readMsgAsRfc822(realMsg());
+    expect(source).not.toBeNull();
+    const mail = await extractMailText(source as Buffer);
+    expect(mail).toMatchObject({
+      fromDomain: "shop.example.com",
+      subject: "Order 42",
+    });
+    expect(mail.text).toContain("Total 10.00 PLN");
+  });
+
+  it("refuses a directory entry declaring a stream larger than the file, before reading it", () => {
+    const bytes = realMsg();
+    const entry = bytes.indexOf(Buffer.from(BODY_STREAM, "utf16le"));
+    expect(entry).toBeGreaterThan(0);
+    // [MS-CFB] 2.6.1: the stream size is at offset 0x78 of a directory entry.
+    bytes.writeUInt32LE(0x7fffffff, entry + 0x78);
+    // msgreader would allocate the declared 2 GB before it noticed the chain
+    // ends, so the refusal must come before it reads any stream.
+    const read = jest.spyOn(MsgReader.prototype, "getFileData");
+    try {
+      expect(readMsgAsRfc822(bytes)).toBeNull();
+      expect(read).not.toHaveBeenCalled();
+    } finally {
+      read.mockRestore();
+    }
+  });
+
+  it("refuses a header whose DIFAT count passes the sectors in the file", () => {
+    const bytes = realMsg();
+    bytes.writeUInt32LE(0xffffffff, 0x48);
+    expect(cfbHeaderFits(bytes)).toBe(false);
+    expect(readMsgAsRfc822(bytes)).toBeNull();
+  });
+
+  it("keeps msgreader's internal reader where the structure check reads it", () => {
+    const bytes = realMsg();
+    expect(cfbHeaderFits(bytes)).toBe(true);
+    const reader = (
+      new MsgReader(
+        bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer,
+      ) as unknown as {
+        reader: { parse(): void; propertyData: unknown };
+      }
+    ).reader;
+    reader.parse();
+    expect(Array.isArray(reader.propertyData)).toBe(true);
+  });
+});
+
+describe("cfbHeaderFits", () => {
+  const header = (shift: number, counts: number[] = [1, 0, 0]) => {
+    const bytes = Buffer.alloc(4096);
+    Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]).copy(bytes);
+    bytes.writeUInt16LE(shift, 0x1e);
+    [0x2c, 0x40, 0x48].forEach((offset, index) =>
+      bytes.writeUInt32LE(counts[index], offset),
+    );
+    return bytes;
+  };
+
+  it("accepts 512- and 4096-byte sectors with counts the file can hold", () => {
+    expect(cfbHeaderFits(header(9, [8, 8, 8]))).toBe(true);
+    expect(cfbHeaderFits(header(12, [1, 1, 1]))).toBe(true);
+  });
+
+  it("refuses an unknown sector size, a count past the file, a short or foreign file", () => {
+    expect(cfbHeaderFits(header(10))).toBe(false);
+    expect(cfbHeaderFits(header(9, [9, 0, 0]))).toBe(false);
+    expect(cfbHeaderFits(header(12, [0, 2, 0]))).toBe(false);
+    expect(cfbHeaderFits(header(9).subarray(0, 511))).toBe(false);
+    expect(cfbHeaderFits(Buffer.alloc(4096))).toBe(false);
+  });
+});
+
+describe("streamsFitFile", () => {
+  it("accepts sizes from zero to the file length", () => {
+    expect(streamsFitFile([{ sizeBlock: 0 }, { sizeBlock: 100 }], 100)).toBe(
+      true,
+    );
+  });
+
+  it.each([101, -1, 1.5, "5", undefined])(
+    "refuses a declared size of %p in a 100-byte file",
+    (sizeBlock) => {
+      expect(streamsFitFile([{ sizeBlock }], 100)).toBe(false);
+    },
+  );
 });

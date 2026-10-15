@@ -11,6 +11,22 @@ import MsgReader, { type FieldsData } from "@kenjiuno/msgreader";
  * is RFC 2047 encoded; bodies are base64 UTF-8.
  */
 
+const OLE_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+const CFB_HEADER_BYTES = 512;
+/** Header offsets of the FAT, mini FAT and DIFAT sector counts ([MS-CFB] 2.2). */
+const CFB_COUNT_OFFSETS = [0x2c, 0x40, 0x48] as const;
+
+/**
+ * The parts of msgreader's internal `Reader` read before any stream data is:
+ * `parse()` builds the directory, `propertyData` is every entry with its
+ * declared stream size. Pinned with the exact dependency version;
+ * `msg-message.spec.ts` fails if an upgrade moves them.
+ */
+interface CfbReader {
+  parse(): void;
+  propertyData?: ReadonlyArray<{ sizeBlock?: unknown }>;
+}
+
 const WANTED_HEADERS = ["from", "date", "message-id", "subject"] as const;
 type WantedHeader = (typeof WANTED_HEADERS)[number];
 type HeaderValues = Partial<Record<WantedHeader, string>>;
@@ -185,16 +201,62 @@ export function buildRfc822FromMsg(data: FieldsData): Buffer {
 }
 
 /**
+ * Whether the compound-file header is one msgreader can walk in time linear in
+ * the file: a known sector size, and sector counts no larger than the sectors
+ * the file holds. msgreader loops over the DIFAT count from the header without a
+ * cycle check, so an unbounded count would spin.
+ */
+export function cfbHeaderFits(bytes: Buffer): boolean {
+  if (bytes.length < CFB_HEADER_BYTES) return false;
+  if (!bytes.subarray(0, OLE_MAGIC.length).equals(OLE_MAGIC)) return false;
+  const shift = bytes.readUInt16LE(0x1e);
+  if (shift !== 9 && shift !== 12) return false;
+  const sectors = Math.floor(bytes.length / 2 ** shift);
+  return CFB_COUNT_OFFSETS.every(
+    (offset) => bytes.readUInt32LE(offset) <= sectors,
+  );
+}
+
+/**
+ * Whether every directory entry declares a stream that fits in the file.
+ * msgreader allocates a buffer of the declared size before it reads a stream,
+ * so a 2 MB file declaring a 2 GB stream would allocate 2 GB.
+ */
+export function streamsFitFile(
+  entries: ReadonlyArray<{ sizeBlock?: unknown }>,
+  fileBytes: number,
+): boolean {
+  return entries.every(
+    ({ sizeBlock }) =>
+      typeof sizeBlock === "number" &&
+      Number.isInteger(sizeBlock) &&
+      sizeBlock >= 0 &&
+      sizeBlock <= fileBytes,
+  );
+}
+
+/**
  * The RFC 5322 source of a `.msg` file, or null when it cannot be read (not an
- * OLE file, damaged, or a message class msgreader reports an error for).
+ * OLE file, damaged, a header or a stream size that does not fit the file, or a
+ * message class msgreader reports an error for). The structure is checked
+ * before msgreader reads any stream data.
  */
 export function readMsgAsRfc822(bytes: Buffer): Buffer | null {
+  if (!cfbHeaderFits(bytes)) return null;
   try {
     const arrayBuffer = bytes.buffer.slice(
       bytes.byteOffset,
       bytes.byteOffset + bytes.byteLength,
     ) as ArrayBuffer;
-    const data = new MsgReader(arrayBuffer).getFileData();
+    const msg = new MsgReader(arrayBuffer);
+    const reader = (msg as unknown as { reader?: CfbReader }).reader;
+    if (typeof reader?.parse !== "function") return null;
+    reader.parse();
+    const entries = reader.propertyData;
+    if (!Array.isArray(entries) || !streamsFitFile(entries, bytes.length)) {
+      return null;
+    }
+    const data = msg.getFileData();
     if (data.error || data.dataType !== "msg") return null;
     return buildRfc822FromMsg(data);
   } catch {
