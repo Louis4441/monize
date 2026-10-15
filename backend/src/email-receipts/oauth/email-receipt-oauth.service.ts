@@ -23,12 +23,12 @@ import {
 } from "./oauth-config.service";
 import { OAuthTokenError } from "./oauth-errors";
 import {
-  newOAuthState,
+  newAuthorizationState,
   OAUTH_STATE_PURPOSE,
   OAUTH_STATE_TTL_MS,
-  openOAuthState,
+  openAuthorizationState,
   OAuthStateError,
-  sealOAuthState,
+  sealAuthorizationState,
 } from "./oauth-state";
 import { OAuthTokenClient } from "./oauth-token.client";
 
@@ -82,14 +82,14 @@ export class EmailReceiptOAuthService {
     const spec = this.config.spec(dto.provider);
     if (!client || !spec) throw providerNotConfigured();
 
-    const { payload, challenge } = newOAuthState(userId, dto.provider);
+    const { payload, challenge } = newAuthorizationState(userId, dto.provider);
     const url = new URL(spec.authorizeUrl);
     const params = url.searchParams;
     params.set("client_id", client.clientId);
     params.set("redirect_uri", this.config.redirectUri());
     params.set("response_type", "code");
     params.set("scope", spec.scopes.join(" "));
-    params.set("state", sealOAuthState(this.encryption, payload));
+    params.set("state", sealAuthorizationState(this.encryption, payload));
     params.set("code_challenge", challenge);
     params.set("code_challenge_method", "S256");
     for (const [key, value] of Object.entries(spec.authorizeParams)) {
@@ -249,7 +249,7 @@ export class EmailReceiptOAuthService {
   private async claimState(userId: string, sealed: string) {
     let state;
     try {
-      state = openOAuthState(this.encryption, sealed);
+      state = openAuthorizationState(this.encryption, sealed);
     } catch (error) {
       if (error instanceof OAuthStateError) throw invalidState();
       throw error;

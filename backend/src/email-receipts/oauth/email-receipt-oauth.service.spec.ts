@@ -8,12 +8,12 @@ import { EmailReceiptOAuthConfig } from "./oauth-config.service";
 import { EmailReceiptOAuthService } from "./email-receipt-oauth.service";
 import { OAuthTokenError } from "./oauth-errors";
 import {
-  newOAuthState,
+  newAuthorizationState,
   OAUTH_STATE_PURPOSE,
   OAUTH_STATE_TTL_MS,
-  openOAuthState,
+  openAuthorizationState,
   pkceChallenge,
-  sealOAuthState,
+  sealAuthorizationState,
 } from "./oauth-state";
 
 jest.mock("../../common/db/scoped-db", () =>
@@ -151,7 +151,7 @@ describe("EmailReceiptOAuthService.start", () => {
     expect(p.get("state")).toMatch(/^[A-Za-z0-9_-]+$/);
     // The challenge is the S256 of the verifier sealed in the state, and the
     // verifier itself is not in the URL.
-    const opened = openOAuthState(encryption, p.get("state") as string);
+    const opened = openAuthorizationState(encryption, p.get("state") as string);
     expect(opened).toMatchObject({ userId: USER, provider: "google" });
     expect(p.get("code_challenge")).toBe(pkceChallenge(opened.verifier));
     expect(authorizationUrl).not.toContain(opened.verifier);
@@ -227,8 +227,8 @@ describe("EmailReceiptOAuthService.complete (INV-RECEIPT-007)", () => {
   it("exchanges the code with the state's own PKCE verifier and the redirect URI", async () => {
     const { service, tokens } = setup();
     tokens.exchangeCode.mockResolvedValue(grant());
-    const { payload } = newOAuthState(USER, "microsoft");
-    const state = sealOAuthState(encryption, payload);
+    const { payload } = newAuthorizationState(USER, "microsoft");
+    const state = sealAuthorizationState(encryption, payload);
 
     await service.complete(USER, { code: CODE, state });
 
@@ -303,12 +303,12 @@ describe("EmailReceiptOAuthService.complete (INV-RECEIPT-007)", () => {
 
   it("refuses garbage, a state sealed for nobody, and an expired one, writing nothing", async () => {
     const { service, tokens, mailboxRepo, singleUse } = setup();
-    const { payload } = newOAuthState(
+    const { payload } = newAuthorizationState(
       USER,
       "google",
       Date.now() - 2 * OAUTH_STATE_TTL_MS,
     );
-    const expired = sealOAuthState(encryption, payload);
+    const expired = sealAuthorizationState(encryption, payload);
 
     for (const state of ["garbage", "AAAA", expired]) {
       await expect(
