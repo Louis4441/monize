@@ -172,6 +172,13 @@ export class EmailReceipt {
   @Column({ type: "jsonb", nullable: true })
   parsed: Record<string, unknown> | null;
 
+  /**
+   * A trade profile's reading (`ParsedTrade`, design "Trade confirmations"), or
+   * null for every email read as a receipt.
+   */
+  @Column({ type: "jsonb", nullable: true })
+  trade: Record<string, unknown> | null;
+
   @Column({ type: "uuid", name: "transaction_id", nullable: true })
   transactionId: string | null;
 

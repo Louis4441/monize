@@ -553,6 +553,7 @@
       "reprocess": "Xử lý lại",
       "link": "Chọn giao dịch",
       "recognizeAi": "Nhận dạng bằng AI",
+      "recognizeTradeAi": "Nhận diện là giao dịch bằng AI",
       "approve": "Phê duyệt",
       "draftParser": "Chuẩn bị hồ sơ với AI",
       "createParser": "Tạo hồ sơ",
@@ -644,11 +645,21 @@
       "wait_line": "Một dòng cho biết đơn hàng chưa chốt, nên email sẽ được đọc lại sau.",
       "no_html": "Trình phân tích này đọc phần HTML của email, mà email này không có HTML.",
       "schema_org": "Không cần trình phân tích: đơn hàng được đọc từ dữ liệu có cấu trúc (schema.org) trong email.",
-      "item_amount_missing": "Một mục hàng không có số tiền, và email không có tổng duy nhất nào để gán cho nó."
+      "item_amount_missing": "Một mục hàng không có số tiền, và email không có tổng duy nhất nào để gán cho nó.",
+      "trade_no_action": "Trình phân tích không tìm thấy giao dịch mua hay bán trong email này.",
+      "trade_no_symbol": "Trình phân tích không tìm thấy mã chứng khoán trong email này.",
+      "trade_no_quantity": "Trình phân tích không tìm thấy số lượng cổ phần trong email này.",
+      "trade_no_amount": "Trình phân tích không tìm thấy tổng cũng như giá trong email này.",
+      "trade_no_account": "Trình phân tích không xác định được giao dịch này thuộc tài khoản nào.",
+      "trade_exists": "Các tài khoản của bạn đã có giao dịch này, nên không có gì được đề xuất.",
+      "trade_linked": "Đã liên kết với giao dịch mà nó báo cáo, nên không có gì được đề xuất."
     },
     "reasonUnknown": "Lý do: {reason}",
     "requestNote": "Yêu cầu xem xét ({state}): {note}",
     "parsedHeading": "Những gì trình phân tích đã đọc",
+    "tradeHeading": "Giao dịch đọc từ email",
+    "tradeCandidatesHeading": "Các giao dịch hiện có có thể là giao dịch này",
+    "tradeCandidatesHelp": "Các giao dịch đầu tư này có thể là giao dịch mà email này báo cáo. Hãy liên kết giao dịch đúng: không tạo giao dịch mới, và hóa đơn hoặc khoản gửi đã lên lịch mà nó thanh toán sẽ được đánh dấu là đã thanh toán.",
     "notParsed": "Chưa đọc được gì từ email này.",
     "candidatesHeading": "Các giao dịch phù hợp",
     "candidatesHelp": "Nhiều giao dịch phù hợp với email này như nhau. Hãy chọn giao dịch mà nó đã thanh toán.",
@@ -747,6 +758,9 @@
   },
   "recognize": {
     "title": "Nhận dạng bằng AI",
+    "tradeTitle": "Nhận diện là giao dịch bằng AI",
+    "tradeMessage": "AI sẽ đọc email này như một xác nhận giao dịch của công ty môi giới và đề xuất giao dịch đầu tư mà nó báo cáo (tài khoản, mua hoặc bán, mã, số lượng và tổng). Không có gì được lưu cho đến khi bạn phê duyệt.",
+    "tradeConfirm": "Nhận diện là giao dịch",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "không có người nhận",
     "confirmMessage": "Email này được liên kết với giao dịch {summary}. AI sẽ đọc email và đề xuất cách chia giao dịch này theo sản phẩm. Tiếp tục với giao dịch này?",
@@ -765,7 +779,8 @@
     "handoffFailed": "Yêu cầu đã được xếp hàng, nhưng không thể mở email trong cuộc trò chuyện. Yêu cầu chờ trong hộp thư xem xét của AI cho một tác nhân (ví dụ qua MCP).",
     "inboxLink": "Mở hộp thư xem xét của AI",
     "opened": "Đã mở cuộc trò chuyện kèm email. Hãy đọc tin nhắn và nhấn Gửi.",
-    "chatPrompt": "Hãy nhận dạng các sản phẩm, số lượng và giá trong email đơn hàng đính kèm, rồi chia giao dịch ngày {date} của tôi ({payee}, {amount}) theo sản phẩm, mỗi sản phẩm có một danh mục. Hãy nhận yêu cầu xem xét AI {requestId} và gửi đề xuất của bạn cho yêu cầu đó."
+    "chatPrompt": "Hãy nhận dạng các sản phẩm, số lượng và giá trong email đơn hàng đính kèm, rồi chia giao dịch ngày {date} của tôi ({payee}, {amount}) theo sản phẩm, mỗi sản phẩm có một danh mục. Hãy nhận yêu cầu xem xét AI {requestId} và gửi đề xuất của bạn cho yêu cầu đó.",
+    "tradeChatPrompt": "Hãy nhận diện giao dịch trong email xác nhận của công ty môi giới đính kèm: tài khoản, mua hay bán, mã, số lượng, tổng đã khớp và ngày. Nhận yêu cầu xem xét bằng AI {requestId} và gửi giao dịch cho nó."
   },
   "hub": {
     "tabs": {
@@ -903,6 +918,8 @@
         "body": "Không có email đã lưu nào có người gửi tại {domain}."
       },
       "help": "Nhấp vào một email để đọc và chọn giao dịch mà email đó đã thanh toán. Sau đó đánh dấu tối đa {max} email để viết hồ sơ; chỉ có thể đánh dấu một email khi nó đã có giao dịch.",
+      "tradeToggle": "Các email này là xác nhận giao dịch của công ty môi giới (chúng tạo giao dịch đầu tư, nên không ghép với giao dịch ngân hàng nào)",
+      "tradeHelp": "Nhấp vào email để đọc, rồi tích tối đa {max} xác nhận giao dịch để viết trình phân tích. Không cần chọn giao dịch.",
       "columns": {
         "select": "Dùng",
         "date": "Ngày",
@@ -913,6 +930,7 @@
       "needsTransaction": "Hãy chọn giao dịch cho email này trước.",
       "limitReached": "Tối đa {max} mẫu. Bỏ đánh dấu một mẫu để chọn mẫu khác.",
       "noTransaction": "Chưa chọn",
+      "tradeNoTransaction": "Không cần cho xác nhận giao dịch",
       "selectedCount": "Đã đánh dấu {count}/{max} mẫu",
       "continue": "Tiếp tục đến trợ lý",
       "emailLoading": "Đang tải email",
@@ -923,6 +941,8 @@
     "generate": {
       "help": "Trợ lý đọc các email này cùng các giao dịch mà chúng đã thanh toán và soạn bản nháp hồ sơ cho {domain}. Chưa có gì được duyệt.",
       "reviseHelp": "Hãy cho trợ lý biết cần thay đổi gì. Trợ lý sẽ cập nhật cùng bản nháp đó từ các email và giao dịch này.",
+      "tradeHelp": "Trợ lý đọc các xác nhận giao dịch này và viết bản nháp trình phân tích cho {domain} đề xuất giao dịch đầu tư mà mỗi email báo cáo. Chưa có gì được phê duyệt.",
+      "tradeSample": "Xác nhận giao dịch",
       "feedbackLabel": "Cần thay đổi gì",
       "feedbackPlaceholder": "Ví dụ: tổng cộng là dòng ghi Số tiền đã thanh toán, không phải tạm tính.",
       "send": "Gửi cho AI",
@@ -969,6 +989,8 @@
       "parsedDate": "Ngày: {date}",
       "parsedTotal": "Tổng cộng: {total}",
       "parsedLines": "{count, plural, one {# dòng} other {# dòng}}",
+      "parsedTrade": "{action, select, BUY {Mua} other {Bán}} {quantity} cổ phần {symbol}",
+      "tradeInconsistent": "Giá không khớp với tổng, nên giao dịch sẽ không được áp dụng tự động",
       "noExpectation": "Không có",
       "noMatch": "Không có giao dịch",
       "agreesYes": "Có",
@@ -991,8 +1013,17 @@
         "not_applicable": "Hồ sơ này không đọc",
         "skip_line": "Đã bỏ qua (có dòng bỏ qua)",
         "wait_line": "Đang chờ (đơn hàng chưa chốt)",
-        "no_html": "Không có phần HTML"
+        "no_html": "Không có phần HTML",
+        "trade": "Đề xuất một giao dịch"
       }
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Mua} other {Bán}}: {quantity} cổ phần {symbol} với {total}, ngày {date}.",
+    "account": "Tài khoản nêu trong email: {account}",
+    "priceMismatch": "Giá trung bình không khớp với số lượng và tổng, nên giao dịch này sẽ không được áp dụng tự động.",
+    "incomplete": "Trình phân tích không đọc được một giao dịch đầy đủ từ email này.",
+    "totalFromPrice": "tổng suy ra từ giá",
+    "dateUnknown": "ngày email đến"
   }
 }

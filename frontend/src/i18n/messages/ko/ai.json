@@ -112,6 +112,7 @@
     "total": "합계",
     "cashImpact": "현금 영향",
     "bondSeries": "시리즈",
+    "marksPaid": "지불 완료로 표시",
     "accruedInterest": "경과 이자",
     "redemptionSplit": "상환 내역",
     "redemptionSplitValue": "원금 {principal} + 이자 {interest} = 지급액 {payout}",

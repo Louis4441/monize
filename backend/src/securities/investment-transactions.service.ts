@@ -1133,7 +1133,16 @@ export class InvestmentTransactionsService {
   async create(
     userId: string,
     createDto: CreateInvestmentTransactionDto,
-    options: { deferBondRecompute?: boolean } = {},
+    options: {
+      deferBondRecompute?: boolean;
+      /**
+       * Runs first in the write's transaction, after the holdings lock and
+       * before anything is written; a throw rolls the whole creation back.
+       * How a confirmed AI review request is marked applied together with the
+       * row it proposed.
+       */
+      beforeWrite?: (manager: EntityManager) => Promise<void>;
+    } = {},
   ): Promise<InvestmentTransaction> {
     const account = await this.accountsService.findOne(
       userId,
@@ -1214,6 +1223,8 @@ export class InvestmentTransactionsService {
       // xact lock is re-entrant, so taking it here costs nothing and is what
       // keeps this path in the one order every holdings writer uses.
       await lockHoldingScope(manager, [createDto.accountId]);
+
+      await options.beforeWrite?.(manager);
 
       // A removal the account cannot cover (OVER_REMOVAL,
       // REMOVAL_EXCEEDS_SERIES) is refused after the mutation, in this

@@ -159,6 +159,8 @@ describe('emailReceiptsApi', () => {
       expect(client.post).toHaveBeenLastCalledWith('/email-receipts/r-1/ask-ai', {});
       await emailReceiptsApi.receipts.askAi('r-1', 'tx-9');
       expect(client.post).toHaveBeenLastCalledWith('/email-receipts/r-1/ask-ai', { transactionId: 'tx-9' });
+      await emailReceiptsApi.receipts.askAi('r-1', undefined, { asTrade: true });
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/r-1/ask-ai', { asTrade: true });
       // The synchronous draft route is gone: parsers are drafted through the chat.
       expect((emailReceiptsApi.receipts as Record<string, unknown>).draftParser).toBeUndefined();
 

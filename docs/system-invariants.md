@@ -190,11 +190,12 @@ implied.
 | INV-RULE-005 | A rule pass that settles loan installments folds chronologically, and its preview and commit fold the same | enforced |
 | INV-RECEIPT-001 | A receipt mailbox is read, never written | enforced |
 | INV-RECEIPT-002 | A receipt email is stored once, and the poll cursor moves with the rows it covers | enforced |
-| INV-RECEIPT-003 | A receipt changes the ledger only through the review card and the confirm path, and never moves money | enforced |
+| INV-RECEIPT-003 | A receipt changes the ledger only through the review card and the confirm path, and never moves money (a trade confirmation is INV-RECEIPT-008) | enforced |
 | INV-RECEIPT-004 | A receipt mailbox connection reaches only a public address unless the owner is an admin or the operator allowed the host | enforced |
 | INV-RECEIPT-005 | A mailbox password or OAuth token is encrypted at rest and never returned | enforced |
 | INV-RECEIPT-006 | One poll per mailbox at a time across replicas | enforced |
 | INV-RECEIPT-007 | An OAuth callback completes only the flow the same user started, once | enforced |
+| INV-RECEIPT-008 | A trade confirmation creates an investment transaction only through the review card and the confirm path | enforced |
 | INV-SEARCH-001 | A transaction search string has one door: one parser, one clause builder, escaped once | partial |
 | INV-SEARCH-002 | A single bare search term finds exactly what it found before the search syntax | enforced |
 | INV-SEARCH-003 | Every term of a search holds on the row the query counts; every call site searches at split grain | enforced |
@@ -7521,6 +7522,51 @@ Crash semantics     --
 Failure response    400
 Required tests      Present: oauth-state.spec.ts, email-receipt-mailbox
                     integration (replay and foreign user against the real table).
+Status              enforced
+```
+
+### INV-RECEIPT-008 -- a trade confirmation creates a transaction only through the review card
+
+```text
+Statement           A brokerage trade-confirmation email (a profile with a
+                    `trade` section) creates an investment transaction only by
+                    /ai/actions/confirm with the signed create_investment_transaction
+                    card built for it. This is the one way a receipt moves money
+                    (INV-RECEIPT-003 excludes it), and it is bounded the same way:
+                    the card is signed, single-use and expires, and the
+                    email_trade request is marked applied in the write's own
+                    transaction. The executed total is the fact and the price
+                    follows it (INV-TRADE-001); the security is the user's own,
+                    found by ticker without guessing; a trade the ledger already
+                    holds is not proposed. Auto-apply, when the user turned it
+                    on, calls the same confirm and only for an approved profile,
+                    a complete reading whose price agrees with its shares and
+                    total, and a card that built. A trade that pays a scheduled
+                    bill or deposit posts that occurrence instead of creating a
+                    second row (the due date is signed), and linking a trade
+                    email to a transaction already in the ledger marks the
+                    schedule paid with no money written.
+Source of truth     ai_review_requests (kind email_trade), investment_transactions
+Enforcement         EmailReceiptTradeService queues the request claimed by the
+                    receipts key and AiReviewWorkService.submitTrade builds and
+                    stores the card (AiReviewRequestsService.enqueueTrade, one open
+                    request per email by uq_ai_review_requests_trade_open); confirm
+                    passes create() a beforeWrite hook that runs
+                    AiReviewRequestsService.markTradeApplied under the holdings
+                    lock, before any row is written. No agent can claim or submit
+                    the kind: it is born claimed, and submit refuses it.
+Concurrency scope   email_receipts row (pipeline), holdings scope (confirm)
+Retry semantics     a second confirm of the same card is refused by the
+                    single-use claim and by markTradeApplied; a reprocess closes
+                    the email's open request and queues a new one
+Crash semantics     the request stays proposed until the write commits
+Failure response    409 when the request is no longer proposed or has expired;
+                    the proposal stays in the inbox when auto-apply is refused
+Required tests      Present: email-receipt-trade.service.spec.ts,
+                    ai-review-work.service.spec.ts, ai-actions.service.spec.ts,
+                    investment-transactions.service.spec.ts.
+                    Absent: an integration test against real PostgreSQL (the
+                    migration and the two-connection race of two confirms).
 Status              enforced
 ```
 

@@ -46,6 +46,23 @@ export interface AiReviewEnqueueClaimedInput {
   readonly claimedBy: string;
 }
 
+/**
+ * A request to CREATE the investment transaction a brokerage's trade
+ * confirmation email reports (`email_trade`). It has no transaction: there is
+ * none yet. It is born claimed by the receipts module's own key and its
+ * proposal is stored by the same module (`AiReviewWorkService.submitTrade`).
+ */
+export interface AiReviewEnqueueTradeInput {
+  readonly emailReceiptId: string;
+  readonly instruction: string;
+  /**
+   * The claim key the request is born with, e.g. `email-receipts` (a profile's
+   * own proposal), or null for a request that waits `pending` for the assistant
+   * or an agent ("Recognize as a trade with AI").
+   */
+  readonly claimedBy: string | null;
+}
+
 export interface AiReviewEnqueueForReceiptInput {
   readonly transactionId: string;
   readonly emailReceiptId: string;
@@ -286,6 +303,44 @@ export class AiReviewRequestsService {
           input.instruction.trim().slice(0, MAX_AI_REVIEW_INSTRUCTION_LENGTH),
           born.status,
           born.claimedBy,
+          input.emailReceiptId,
+        ],
+      ),
+    );
+    return row ? toRequest(row) : null;
+  }
+
+  /**
+   * Queue the proposal of a trade confirmation, already claimed, in the caller's
+   * transaction. At most one is open per email, held by the partial unique index
+   * `uq_ai_review_requests_trade_open`; the caller closes the email's earlier
+   * requests first (`closeReceiptRequests`), so a reprocess replaces the
+   * proposal, and the unique index is the backstop for a writer that skipped
+   * that. Returns null when one is still open.
+   */
+  async enqueueTrade(
+    m: EntityManager,
+    userId: string,
+    input: AiReviewEnqueueTradeInput,
+  ): Promise<AiReviewRequest | null> {
+    const [row] = returnedRows<RequestRow>(
+      await m.query(
+        `INSERT INTO ai_review_requests
+           (user_id, transaction_id, rule_id, kind, instruction, status,
+            claimed_by, claimed_at, email_receipt_id)
+         VALUES ($1::uuid, NULL, NULL, 'email_trade', $2::text,
+                 CASE WHEN $3::text IS NULL THEN 'pending' ELSE 'claimed' END,
+                 $3::text,
+                 CASE WHEN $3::text IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+                 $4::uuid)
+         ON CONFLICT (email_receipt_id)
+           WHERE kind = 'email_trade' AND status IN ('pending', 'claimed', 'proposed')
+         DO NOTHING
+         RETURNING *`,
+        [
+          userId,
+          input.instruction.trim().slice(0, MAX_AI_REVIEW_INSTRUCTION_LENGTH),
+          input.claimedBy,
           input.emailReceiptId,
         ],
       ),
@@ -755,6 +810,42 @@ export class AiReviewRequestsService {
             AND status = 'proposed'
          RETURNING id`,
         [id, userId, transactionId],
+      ),
+    );
+    if (applied.length === 0) {
+      throw new ConflictException(
+        tr(
+          "errors.aiReview.notProposed",
+          "This AI review request is no longer waiting for approval, so its proposal was not applied.",
+        ),
+      );
+    }
+  }
+
+  /**
+   * Mark a proposed `email_trade` request `applied` inside the transaction that
+   * creates the investment transaction it proposed, so the two commit or roll
+   * back together. The UPDATE is bound to the user, to the kind and to
+   * `proposed`: a request that was dismissed or expired since the card was built
+   * matches nothing and the caller's write is refused (409) before it happens.
+   * The caller runs this first, under the holdings lock.
+   */
+  async markTradeApplied(
+    m: EntityManager,
+    userId: string,
+    id: string,
+  ): Promise<void> {
+    const applied = returnedRows<{ id: string }>(
+      await m.query(
+        `UPDATE ai_review_requests
+            SET status = 'applied'
+          WHERE id = $1
+            AND user_id = $2
+            AND kind = 'email_trade'
+            AND status = 'proposed'
+            AND expires_at > CURRENT_TIMESTAMP
+         RETURNING id`,
+        [id, userId],
       ),
     );
     if (applied.length === 0) {

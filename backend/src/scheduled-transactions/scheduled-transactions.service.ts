@@ -448,6 +448,16 @@ function sameOverrideMutationBasis(
   );
 }
 
+/**
+ * A hook run inside a posting transaction. Named, so a function taking it is not
+ * mistaken for one that holds a transaction (`transaction-fan-out.guard.spec.ts`
+ * reads a parameter typed `EntityManager` that way).
+ */
+export type PostBeforeWrite = (manager: EntityManager) => Promise<void>;
+
+/** How far from a trade's day a scheduled investment may be due and still be the one the trade paid. */
+export const TRADE_SCHEDULE_WINDOW_DAYS = 7;
+
 @Injectable()
 export class ScheduledTransactionsService {
   private readonly logger = new Logger(ScheduledTransactionsService.name);
@@ -2761,6 +2771,54 @@ export class ScheduledTransactionsService {
     };
   }
 
+  /**
+   * The active scheduled investment transaction a brokerage trade pays: same
+   * account, direction and security, an unposted occurrence due within
+   * `TRADE_SCHEDULE_WINDOW_DAYS` of the trade's day, and the same commission
+   * (a posting uses the schedule's own). Exactly one qualifies, or none: with
+   * two, which bill the trade paid is a guess, and a guess marks the wrong one
+   * paid.
+   */
+  async findInvestmentOccurrenceForTrade(
+    userId: string,
+    trade: {
+      accountId: string;
+      securityId: string;
+      action: InvestmentAction;
+      date: string;
+      commission: number;
+    },
+  ): Promise<{ id: string; name: string; dueDate: string } | null> {
+    const rows = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(ScheduledTransaction)
+        .createQueryBuilder("st")
+        .where("st.userId = :userId", { userId })
+        .andWhere("st.isActive = true")
+        .andWhere("st.isInvestment = true")
+        .andWhere("st.accountId = :accountId", { accountId: trade.accountId })
+        .andWhere("st.investmentAction = :action", { action: trade.action })
+        .andWhere("st.investmentSecurityId = :securityId", {
+          securityId: trade.securityId,
+        })
+        .andWhere(
+          "st.nextDueDate BETWEEN (:date::date - :days::int) AND (:date::date + :days::int)",
+          { date: trade.date, days: TRADE_SCHEDULE_WINDOW_DAYS },
+        )
+        .andWhere("COALESCE(st.investmentCommission, 0) = :commission", {
+          commission: trade.commission,
+        })
+        .take(2)
+        .getMany(),
+    );
+    if (rows.length !== 1) return null;
+    return {
+      id: rows[0].id,
+      name: rows[0].name,
+      dueDate: ensureYMD(rows[0].nextDueDate),
+    };
+  }
+
   async post(
     userId: string,
     id: string,
@@ -2779,6 +2837,20 @@ export class ScheduledTransactionsService {
        * skipped on the posted row. Set from the verified identity only.
        */
       actorIsNotOwner?: boolean;
+      /**
+       * Runs inside the posting transaction after the schedule is locked and
+       * confirmed still due, before the occurrence is claimed or anything is
+       * written; a throw rolls the whole post back. How an approved AI review
+       * request is marked applied together with the occurrence it paid.
+       */
+      beforeWrite?: PostBeforeWrite;
+      /**
+       * Mark the occurrence paid WITHOUT writing any money: the payment already
+       * exists in the ledger (a trade the person entered by hand, which an email
+       * confirmed). The occurrence is claimed and the schedule advances exactly
+       * as for a post; nothing is created.
+       */
+      recordOnly?: boolean;
     } = {},
   ): Promise<ScheduledTransaction | null> {
     const scheduled = await this.findOne(userId, id);
@@ -3510,6 +3582,8 @@ export class ScheduledTransactionsService {
         }
       }
 
+      await options.beforeWrite?.(m);
+
       // Claim the occurrence. The unique key on
       // (scheduled_transaction_id, original_due_date) is what makes the claim
       // the serialization point rather than the lock alone: it survives a
@@ -3536,7 +3610,9 @@ export class ScheduledTransactionsService {
       }
       const claimId = claimed[0].id;
 
-      if (current.isInvestment) {
+      if (options.recordOnly) {
+        // The payment is already in the ledger: claim and advance only.
+      } else if (current.isInvestment) {
         // Post from the locked row, not the pre-lock `scheduled` snapshot: a
         // concurrent edit that switched the action/funding/security between the
         // snapshot read and this lock would otherwise post the stale action to

@@ -112,6 +112,7 @@
     "total": "Разом",
     "cashImpact": "Вплив на готівку",
     "bondSeries": "Серія",
+    "marksPaid": "Позначає як сплачене",
     "accruedInterest": "Накопичені відсотки",
     "redemptionSplit": "Розбивка погашення",
     "redemptionSplitValue": "Номінал {principal} + відсотки {interest} = виплата {payout}",

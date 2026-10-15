@@ -171,6 +171,52 @@ export interface ReceiptMatchDefinition {
   amountTolerance?: string;
 }
 
+/** The most account rules a trade section may hold. */
+export const MAX_TRADE_ACCOUNT_RULES = 20;
+/** The most decimals a share quantity may have (the `investment_transactions.quantity` scale). */
+export const MAX_TRADE_QUANTITY_DECIMALS = 8;
+
+/**
+ * Which brokerage account a trade email is for: the first rule whose glob
+ * matches the text the `account` entries read wins; `defaultAccountId` covers
+ * the rest. The ids are UUIDs of the user's INVESTMENT accounts; ownership and
+ * type are checked when the proposal is built, in the proposal's transaction.
+ */
+export interface ReceiptTradeAccountRule {
+  match: string;
+  accountId: string;
+}
+
+/**
+ * The `trade` section of a profile (trade-confirmation emails, a brokerage's
+ * "your order has been filled"): the email is read as ONE investment
+ * transaction to create, not as a purchase paid from a bank transaction. Every
+ * field is a list of entries read exactly like the receipt fields (a line
+ * pattern or a labelled `{label, value, within}`); the capture each takes is in
+ * brackets. `quantity`, `symbol`, `action` and one of `total`/`price` are
+ * required; `commission`, `date` and `account` are optional.
+ */
+export interface ReceiptTradeDefinition {
+  /** The words that say the direction: `{action}` is searched for "buy" or "sell". */
+  action: ReceiptFieldEntry[];
+  /** The ticker as the broker writes it: `{symbol}`. */
+  symbol: ReceiptFieldEntry[];
+  /** The number of shares, fractions allowed: `{quantity}`. */
+  quantity: ReceiptFieldEntry[];
+  /** The executed total, the fact (commission included for a buy): `{amount}`. */
+  total?: ReceiptFieldEntry[];
+  /** The average price per share, a cross-check and the fallback to the total: `{amount}`. */
+  price?: ReceiptFieldEntry[];
+  /** The commission, when the email states one: `{amount}`. */
+  commission?: ReceiptFieldEntry[];
+  /** The day of the trade, `YYYY-MM-DD` or "October 15, 2026" (time ignored): `{date}`; else the email's day. */
+  date?: ReceiptFieldEntry[];
+  /** The account text the broker prints (for `accountRules`): `{account}`. */
+  account?: ReceiptFieldEntry[];
+  accountRules?: ReceiptTradeAccountRule[];
+  defaultAccountId?: string;
+}
+
 /**
  * A per-merchant parser (the `definition` jsonb of `email_receipt_parsers`).
  * A field's entries are tried in array order; an entry is a line pattern or a
@@ -235,6 +281,12 @@ export interface ReceiptParserDefinition {
    * 1/10000 arithmetic). The proposal adds the difference to its last split line.
    */
   balanceTolerance?: string;
+  /**
+   * A trade confirmation (see {@link ReceiptTradeDefinition}). A profile with
+   * this section reads nothing else: it holds no receipt field, item or match
+   * section (`trade_conflict`).
+   */
+  trade?: ReceiptTradeDefinition;
   /** The parser applies only when a line matches one of these; else the next parser for the domain. */
   requireLine?: string[];
   /** A line matching one of these makes the receipt `ignored` (`skip_line`). */
@@ -353,4 +405,54 @@ export interface ReceiptTrace {
   skipIfLine: ReceiptTraceHit | null;
   waitIfLine: ReceiptTraceHit | null;
   items: ReceiptTraceItem[];
+}
+
+/** What a trade email says about the direction; the only two the pipeline creates. */
+export type ParsedTradeAction = "BUY" | "SELL";
+
+/** The first thing missing from a trade that is not complete. */
+export type ParsedTradeReason =
+  | "trade_no_action"
+  | "trade_no_symbol"
+  | "trade_no_quantity"
+  | "trade_no_amount"
+  | "trade_no_account";
+
+/**
+ * What a `trade` profile read from one email. `quantity` is a share count with
+ * at most 8 decimals; `total`, `price` and `commission` are non-negative
+ * integers in 1/10000 units; `date` is `YYYY-MM-DD`. `consistent` says whether
+ * quantity times price agrees with the executed total (price rounding and one
+ * cent allowed): null when the email states no price, so there is nothing to
+ * cross-check. `complete` means the email stated everything a proposal needs;
+ * only a complete AND consistent reading can auto-apply.
+ */
+export interface ParsedTrade {
+  action: ParsedTradeAction | null;
+  symbol: string | null;
+  quantity: number | null;
+  total: number | null;
+  price: number | null;
+  commission: number | null;
+  /** The trade's day, else null (the proposal then uses the email's day). */
+  date: string | null;
+  /** The account text the email printed, when the profile reads one. */
+  accountText: string | null;
+  /** The account the profile's rules (or its default) chose; null when none applies. */
+  accountId: string | null;
+  complete: boolean;
+  consistent: boolean | null;
+  reason: ParsedTradeReason | null;
+}
+
+/** Why a trade profile read what it read, for the `test` operation. */
+export interface ReceiptTradeTrace {
+  action: ReceiptTraceHit | null;
+  symbol: ReceiptTraceHit | null;
+  quantity: ReceiptTraceHit | null;
+  total: ReceiptTraceHit | null;
+  price: ReceiptTraceHit | null;
+  commission: ReceiptTraceHit | null;
+  date: ReceiptTraceHit | null;
+  account: ReceiptTraceHit | null;
 }

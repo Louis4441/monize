@@ -22,7 +22,7 @@ import type { EmailReceiptCandidateSummary, EmailReceiptListItem } from '@/types
 
 const logger = createLogger('RecognizeWithAi');
 
-type Step = 'confirm' | 'candidates' | 'pick';
+type Step = 'confirm' | 'candidates' | 'pick' | 'trade';
 
 type Phase =
   | { kind: 'idle' }
@@ -35,6 +35,8 @@ type Candidates = { status: 'loading' } | { status: 'error' } | { status: 'ready
 
 interface RecognizeWithAiDialogProps {
   receipt: EmailReceiptListItem;
+  /** Read the email as a brokerage trade confirmation: the AI proposes the investment transaction it reports. */
+  asTrade?: boolean;
   onClose: () => void;
   /** The request was queued (the email is now in review): the list behind the dialog reloads. */
   onChanged: () => void;
@@ -57,15 +59,15 @@ interface RecognizeWithAiDialogProps {
  * other opens the picker. The server refuses a transfer, a void or an investment
  * row, and the error is shown here.
  */
-export function RecognizeWithAiDialog({ receipt, onClose, onChanged }: RecognizeWithAiDialogProps) {
+export function RecognizeWithAiDialog({ receipt, asTrade = false, onClose, onChanged }: RecognizeWithAiDialogProps) {
   const t = useTranslations('emailReceipts.recognize');
   const tc = useTranslations('common');
   const router = useRouter();
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
 
-  const needsCandidates = receipt.transaction === null && receipt.status === 'ambiguous';
-  const [step, setStep] = useState<Step>(receipt.transaction ? 'confirm' : needsCandidates ? 'candidates' : 'pick');
+  const needsCandidates = !asTrade && receipt.transaction === null && receipt.status === 'ambiguous';
+  const [step, setStep] = useState<Step>(asTrade ? 'trade' : receipt.transaction ? 'confirm' : needsCandidates ? 'candidates' : 'pick');
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [candidates, setCandidates] = useState<Candidates>({ status: 'loading' });
   // Bumped by the retry button; each value is one request.
@@ -102,7 +104,11 @@ export function RecognizeWithAiDialog({ receipt, onClose, onChanged }: Recognize
     setPhase({ kind: 'running', transactionId });
     let requestId: string;
     try {
-      requestId = (await emailReceiptsApi.receipts.askAi(receipt.id, transactionId)).requestId;
+      requestId = (
+        await (asTrade
+          ? emailReceiptsApi.receipts.askAi(receipt.id, transactionId, { asTrade: true })
+          : emailReceiptsApi.receipts.askAi(receipt.id, transactionId))
+      ).requestId;
     } catch (error) {
       logger.error(error);
       setPhase({ kind: 'error', message: getErrorMessage(error, t('failed')) });
@@ -119,15 +125,21 @@ export function RecognizeWithAiDialog({ receipt, onClose, onChanged }: Recognize
     }
     try {
       const detail = await emailReceiptsApi.receipts.get(receipt.id);
-      if (detail.transaction === null) throw new Error('The email has no transaction after the request was queued');
+      // A trade creates a transaction, so the email has none; any other request is about one.
+      if (!asTrade && detail.transaction === null) {
+        throw new Error('The email has no transaction after the request was queued');
+      }
       const id = stageChatHandoff({
         files: [buildReceiptAttachment(detail)],
-        draft: t('chatPrompt', {
-          date: formatDate(detail.transaction.date),
-          payee: detail.transaction.payeeName ?? t('noPayee'),
-          amount: formatCurrency(detail.transaction.amount, detail.transaction.currencyCode),
-          requestId,
-        }),
+        draft:
+          asTrade || detail.transaction === null
+            ? t('tradeChatPrompt', { requestId })
+            : t('chatPrompt', {
+                date: formatDate(detail.transaction.date),
+                payee: detail.transaction.payeeName ?? t('noPayee'),
+                amount: formatCurrency(detail.transaction.amount, detail.transaction.currencyCode),
+                requestId,
+              }),
       });
       toast.success(t('opened'));
       router.push(`/ai?handoff=${id}`);
@@ -157,7 +169,18 @@ export function RecognizeWithAiDialog({ receipt, onClose, onChanged }: Recognize
     );
   } else {
     let content;
-    if (step === 'confirm' && receipt.transaction) {
+    if (step === 'trade') {
+      content = (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700 dark:text-gray-300">{t('tradeMessage')}</p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button isLoading={running} disabled={running} onClick={() => void run()}>
+              {t('tradeConfirm')}
+            </Button>
+          </div>
+        </div>
+      );
+    } else if (step === 'confirm' && receipt.transaction) {
       content = (
         <div className="space-y-4">
           <p className="text-sm text-gray-700 dark:text-gray-300">
@@ -271,7 +294,7 @@ export function RecognizeWithAiDialog({ receipt, onClose, onChanged }: Recognize
   }
 
   return (
-    <Modal isOpen onClose={onClose} maxWidth="2xl" padding="md" pushHistory title={t('title')}>
+    <Modal isOpen onClose={onClose} maxWidth="2xl" padding="md" pushHistory title={asTrade ? t('tradeTitle') : t('title')}>
       {body}
     </Modal>
   );

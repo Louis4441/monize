@@ -18,7 +18,11 @@ import type { EmailReceiptCategoryAiService } from "../ai/email-receipt-category
 import { EmailReceiptMailbox } from "../entities/email-receipt-mailbox.entity";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
-import type { ParsedReceipt } from "../parsing/receipt-parser.types";
+import type {
+  ParsedReceipt,
+  ParsedTrade,
+} from "../parsing/receipt-parser.types";
+import type { TradeOutcome } from "./email-receipt-trade.service";
 import {
   autoApplyAllowed,
   describeFailure,
@@ -147,6 +151,39 @@ const submitted = (): AiReviewSubmitResult => ({
 const request = (id = "rq-1"): AiReviewRequest =>
   Object.assign(new AiReviewRequest(), { id });
 
+const TRADE_DEFINITION = {
+  version: 2,
+  trade: {
+    action: ["Type: {action}"],
+    symbol: ["Symbol: {symbol}"],
+    quantity: ["Shares: {quantity}"],
+    total: ["Total cost: {amount}"],
+    defaultAccountId: "33333333-3333-4333-8333-333333333333",
+  },
+};
+
+const TRADE_BODY = [
+  "Type: Fractional Buy",
+  "Symbol: XCNS",
+  "Shares: 75.9878",
+  "Total cost: $2,000.00",
+].join("\n");
+
+const TRADE_READING: ParsedTrade = {
+  action: "BUY",
+  symbol: "XCNS",
+  quantity: 75.9878,
+  total: 20_000_000,
+  price: null,
+  commission: null,
+  date: null,
+  accountText: null,
+  accountId: "33333333-3333-4333-8333-333333333333",
+  complete: true,
+  consistent: null,
+  reason: null,
+};
+
 interface World {
   receipt: EmailReceipt | null;
   mailbox: EmailReceiptMailbox;
@@ -243,6 +280,15 @@ function setup(over: Partial<World> = {}) {
     ),
   } as unknown as jest.Mocked<EmailReceiptCategoryAiService>;
 
+  const trades = {
+    process: jest.fn(async (): Promise<TradeOutcome> => ({
+      status: "review",
+      reason: null,
+      requestId: "rq-trade",
+      trade: TRADE_READING,
+      autoApply: null,
+    })),
+  };
   const service = new EmailReceiptPipelineService(
     dataSource as never,
     requests,
@@ -250,9 +296,11 @@ function setup(over: Partial<World> = {}) {
     actions,
     payees,
     categoryAi,
+    trades as never,
   );
   return {
     service,
+    trades,
     world,
     payees,
     categoryAi,
@@ -348,6 +396,7 @@ describe("EmailReceiptPipelineService.process", () => {
           statusReason: null,
           parserId: null,
           parsed: null,
+          trade: null,
           transactionId: null,
           candidateTransactionIds: [],
           matchKind: null,
@@ -1944,6 +1993,99 @@ describe("EmailReceiptPipelineService.process: the email's own schema.org order"
     expect(storedParsed(h)).toMatchObject({
       source: "schema_org",
       items: [{ name: "Bundle", amount: 150000 }],
+    });
+  });
+
+  describe("a trade profile", () => {
+    const tradeWorld = () =>
+      setup({
+        receipt: receiptRow({ bodyText: TRADE_BODY }),
+        parsers: [parserRow({ definition: TRADE_DEFINITION })],
+      });
+
+    it("hands the lines to the trade reader and stores its reading, matching no bank transaction", async () => {
+      const h = tradeWorld();
+      const result = await run(h);
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
+      expect(h.trades.process).toHaveBeenCalledWith(
+        h.manager,
+        USER,
+        expect.objectContaining({ id: RECEIPT }),
+        expect.objectContaining({
+          lines: TRADE_BODY.split("\n"),
+          mailboxAutoApply: false,
+        }),
+      );
+      expect(result).toMatchObject({
+        status: "review",
+        requestId: "rq-trade",
+        transactionId: null,
+        matchKind: null,
+        autoApplied: false,
+      });
+      expect(h.lastUpdate()[1]).toMatchObject({
+        status: "review",
+        parserId: "parser-1",
+        parsed: null,
+        trade: TRADE_READING,
+        aiReviewRequestId: "rq-trade",
+      });
+      expect(h.work.submit).not.toHaveBeenCalled();
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+    });
+
+    it("does not close the request the trade service just queued", async () => {
+      const h = tradeWorld();
+      await run(h);
+      expect(h.order).not.toContain("close");
+    });
+
+    it("closes the requests of an email whose trade holds none", async () => {
+      const h = tradeWorld();
+      h.trades.process.mockResolvedValueOnce({
+        status: "ignored",
+        reason: "trade_exists",
+        requestId: null,
+        trade: TRADE_READING,
+        autoApply: null,
+      });
+      const result = await run(h);
+      expect(result).toMatchObject({ status: "ignored", requestId: null });
+      expect(h.order).toContain("close");
+    });
+
+    it("confirms the card the trade service passed the gate with, as an approval does", async () => {
+      const h = tradeWorld();
+      h.world.mailbox = mailboxRow({ autoApply: true });
+      h.trades.process.mockResolvedValueOnce({
+        status: "review",
+        reason: null,
+        requestId: "rq-trade",
+        trade: { ...TRADE_READING, consistent: true },
+        autoApply: action,
+      });
+      const result = await run(h);
+      expect(h.trades.process).toHaveBeenCalledWith(
+        h.manager,
+        USER,
+        expect.anything(),
+        expect.objectContaining({ mailboxAutoApply: true }),
+      );
+      expect(h.actions.confirm).toHaveBeenCalledWith(USER, {
+        actionId: action.actionId,
+        signature: action.signature,
+        descriptor: action.descriptor,
+      });
+      expect(result.autoApplied).toBe(true);
+    });
+
+    it("never reads a trade profile's email as a receipt", async () => {
+      const h = tradeWorld();
+      await run(h);
+      expect(h.manager.query).not.toHaveBeenCalledWith(
+        expect.stringContaining("JOIN accounts a"),
+        expect.anything(),
+      );
     });
   });
 });

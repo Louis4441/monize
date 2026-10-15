@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsIn,
   IsInt,
   IsObject,
   IsOptional,
@@ -206,20 +207,45 @@ export class GenerateParserWithAiDto {
   @IsReceiptDomain()
   domain: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
+    enum: ["receipt", "trade"],
+    description:
+      "What the profile reads: an order email that enriches a bank transaction (default), or a brokerage trade confirmation that creates an investment transaction.",
+  })
+  @IsOptional()
+  @IsIn(["receipt", "trade"])
+  kind?: "receipt" | "trade";
+
+  @ApiPropertyOptional({
     type: [ReceiptTransactionPairDto],
     minItems: 1,
     maxItems: PARSER_GENERATE_MAX_SAMPLES,
     description:
-      "1 to 5 emails of the domain, each with the transaction it paid for; an email at most once.",
+      "kind receipt: 1 to 5 emails of the domain, each with the transaction it paid for; an email at most once.",
   })
+  @ValidateIf((o: GenerateParserWithAiDto) => o.kind !== "trade")
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(PARSER_GENERATE_MAX_SAMPLES)
   @ArrayUnique((sample: ReceiptTransactionPairDto) => sample?.receiptId)
   @ValidateNested({ each: true })
   @Type(() => ReceiptTransactionPairDto)
-  samples: ReceiptTransactionPairDto[];
+  samples?: ReceiptTransactionPairDto[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    minItems: 1,
+    maxItems: PARSER_GENERATE_MAX_SAMPLES,
+    description:
+      "kind trade: 1 to 5 trade-confirmation emails of the domain (a trade pays no bank transaction, so none is paired).",
+  })
+  @ValidateIf((o: GenerateParserWithAiDto) => o.kind === "trade")
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(PARSER_GENERATE_MAX_SAMPLES)
+  @ArrayUnique()
+  @IsUUID("all", { each: true })
+  tradeReceiptIds?: string[];
 
   @ApiPropertyOptional({
     nullable: true,

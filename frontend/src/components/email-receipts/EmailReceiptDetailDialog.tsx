@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { EmailBodyView } from '@/components/email-receipts/EmailBodyView';
+import { TradeReadingView } from '@/components/email-receipts/TradeReadingView';
 import { ParsedReceiptView } from '@/components/email-receipts/ParsedReceiptView';
 import { ReceiptTransactionPicker } from '@/components/email-receipts/ReceiptTransactionPicker';
 import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge';
@@ -21,7 +22,7 @@ import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { isReceiptActionable, readParsedReceipt } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
-import type { EmailReceiptDetail, EmailReceiptStatus } from '@/types/email-receipts';
+import { readParsedTrade, type EmailReceiptDetail, type EmailReceiptStatus } from '@/types/email-receipts';
 
 const logger = createLogger('EmailReceiptDetail');
 
@@ -118,9 +119,16 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
   } else {
     const { detail } = state;
     const parsed = readParsedReceipt(detail.parsed);
-    const canLink = detail.candidates.length > 0 && isReceiptActionable(detail);
+    const trade = readParsedTrade(detail.trade);
+    // A trade email is linked to the investment transaction it reports, even once it was
+    // closed as already booked (that is when linking marks its scheduled bill paid).
+    const canLink =
+      detail.candidates.length > 0 &&
+      (trade !== null
+        ? detail.status !== 'skipped' && detail.displayState !== 'applied'
+        : isReceiptActionable(detail));
     // An email the matcher could not tie to a transaction can be tied by hand.
-    const canPick = PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);
+    const canPick = trade === null && PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);
     const reasonKey = detail.statusReason ? `reasons.${detail.statusReason}` : null;
 
     body = (
@@ -207,31 +215,42 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
           </div>
         )}
 
-        <section aria-labelledby="receipt-parsed-heading" className="space-y-2">
-          <h3 id="receipt-parsed-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {t('parsedHeading')}
-          </h3>
-          {parsed ? (
-            <ParsedReceiptView parsed={parsed} categoryLabels={categoryLabels} />
-          ) : (
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t('notParsed')}</p>
-          )}
-        </section>
+        {trade ? (
+          <section aria-labelledby="receipt-trade-heading" className="space-y-2">
+            <h3 id="receipt-trade-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {t('tradeHeading')}
+            </h3>
+            <TradeReadingView trade={trade} fallbackDate={detail.effectiveDate} />
+          </section>
+        ) : (
+          <>
+            <section aria-labelledby="receipt-parsed-heading" className="space-y-2">
+              <h3 id="receipt-parsed-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {t('parsedHeading')}
+              </h3>
+              {parsed ? (
+                <ParsedReceiptView parsed={parsed} categoryLabels={categoryLabels} />
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t('notParsed')}</p>
+              )}
+            </section>
 
-        <section aria-labelledby="receipt-structured-heading" className="space-y-2">
-          <h3 id="receipt-structured-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {t('structured.heading')}
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{t('structured.help')}</p>
-          <StructuredOrderView order={detail.structuredOrder ?? null} />
-        </section>
+            <section aria-labelledby="receipt-structured-heading" className="space-y-2">
+              <h3 id="receipt-structured-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {t('structured.heading')}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('structured.help')}</p>
+              <StructuredOrderView order={detail.structuredOrder ?? null} />
+            </section>
+          </>
+        )}
 
         {detail.candidates.length > 0 && (
           <section aria-labelledby="receipt-candidates-heading" className="space-y-2">
             <h3 id="receipt-candidates-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {t('candidatesHeading')}
+              {trade ? t('tradeCandidatesHeading') : t('candidatesHeading')}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{t('candidatesHelp')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{trade ? t('tradeCandidatesHelp') : t('candidatesHelp')}</p>
             <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
               {detail.candidates.map((candidate) => (
                 <li key={candidate.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">

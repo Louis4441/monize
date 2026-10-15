@@ -553,6 +553,7 @@
       "reprocess": "Yeniden işle",
       "link": "İşlem seç",
       "recognizeAi": "Yapay zekâ ile tanı",
+      "recognizeTradeAi": "Yapay zekâ ile işlem olarak tanı",
       "approve": "Onayla",
       "draftParser": "Yapay Zeka ile profil hazırla",
       "createParser": "Profil oluştur",
@@ -644,11 +645,21 @@
       "wait_line": "Bir satır siparişin henüz kesinleşmediğini söylüyor, bu yüzden e-posta daha sonra yeniden okunacak.",
       "no_html": "Bu ayrıştırıcı e-postanın HTML kısmını okur ve bu e-postada HTML yok.",
       "schema_org": "Ayrıştırıcıya gerek kalmadı: sipariş, e-postadaki yapılandırılmış verilerden (schema.org) okundu.",
-      "item_amount_missing": "Bir kalemin tutarı yok ve e-postada ona verilecek tek bir toplam yok."
+      "item_amount_missing": "Bir kalemin tutarı yok ve e-postada ona verilecek tek bir toplam yok.",
+      "trade_no_action": "Ayrıştırıcı bu e-postada ne alım ne satım buldu.",
+      "trade_no_symbol": "Ayrıştırıcı bu e-postada hisse kodu bulamadı.",
+      "trade_no_quantity": "Ayrıştırıcı bu e-postada adet bilgisi bulamadı.",
+      "trade_no_amount": "Ayrıştırıcı bu e-postada ne toplam ne de fiyat buldu.",
+      "trade_no_account": "Ayrıştırıcı bu işlemin hangi hesaba ait olduğunu belirleyemedi.",
+      "trade_exists": "Hesaplarınızda bu işlem zaten var, bu yüzden hiçbir şey önerilmedi.",
+      "trade_linked": "Bildirdiği işleme bağlandı, bu yüzden hiçbir şey önerilmedi."
     },
     "reasonUnknown": "Neden: {reason}",
     "requestNote": "İnceleme isteği ({state}): {note}",
     "parsedHeading": "Ayrıştırıcının okuduğu",
+    "tradeHeading": "E-postadan okunan işlem",
+    "tradeCandidatesHeading": "Bu işlem olabilecek mevcut işlemler",
+    "tradeCandidatesHelp": "Bu yatırım işlemleri, bu e-postanın bildirdiği işlem olabilir. Doğru olanı bağlayın: yeni işlem oluşturulmaz ve ödediği planlı fatura ya da yatırım ödendi olarak işaretlenir.",
     "notParsed": "Bu e-postadan henüz bir şey okunmadı.",
     "candidatesHeading": "Uyan işlemler",
     "candidatesHelp": "Birden çok işlem bu e-postaya eşit derecede uyuyor. E-postanın ödediği işlemi seçin.",
@@ -747,6 +758,9 @@
   },
   "recognize": {
     "title": "Yapay zekâ ile tanı",
+    "tradeTitle": "Yapay zekâ ile işlem olarak tanı",
+    "tradeMessage": "Yapay zekâ bu e-postayı aracı kurum işlem onayı olarak okuyacak ve bildirdiği yatırım işlemini önerecek (hesap, alım veya satım, hisse kodu, adet ve toplam). Siz onaylayana kadar hiçbir şey kaydedilmez.",
+    "tradeConfirm": "İşlem olarak tanı",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "alıcı yok",
     "confirmMessage": "Bu e-posta {summary} işlemine bağlı. Yapay zekâ e-postayı okuyacak ve bu işlemin ürünlere göre nasıl bölüneceğini önerecek. Bu işlemle devam edilsin mi?",
@@ -765,7 +779,8 @@
     "handoffFailed": "İstek kuyruğa alındı, ancak e-posta sohbette açılamadı. Yapay zekâ inceleme kutusunda bir ajanı (örneğin MCP üzerinden) bekliyor.",
     "inboxLink": "Yapay zekâ inceleme kutusunu aç",
     "opened": "Sohbet, e-posta ekli olarak açıldı. Mesajı okuyun ve Gönder'e basın.",
-    "chatPrompt": "Ekteki sipariş e-postasındaki ürünleri, miktarları ve fiyatları tanı; {date} tarihli işlemimi ({payee}, {amount}) her biri için bir kategoriyle ürünlere göre böl. {requestId} numaralı yapay zekâ inceleme isteğini üstlen ve önerini onun için gönder."
+    "chatPrompt": "Ekteki sipariş e-postasındaki ürünleri, miktarları ve fiyatları tanı; {date} tarihli işlemimi ({payee}, {amount}) her biri için bir kategoriyle ürünlere göre böl. {requestId} numaralı yapay zekâ inceleme isteğini üstlen ve önerini onun için gönder.",
+    "tradeChatPrompt": "Ekteki aracı kurum onay e-postasındaki işlemi tanıyın: hesap, alım mı satım mı, hisse kodu, adet, gerçekleşen toplam ve tarih. {requestId} yapay zekâ inceleme isteğini üstlenin ve işlemi onun için gönderin."
   },
   "hub": {
     "tabs": {
@@ -903,6 +918,8 @@
         "body": "Saklanan hiçbir e-postanın göndericisi {domain} alan adında değil."
       },
       "help": "Bir e-postayı okumak için üzerine tıklayın ve ödediği işlemi seçin. Ardından profili yazmak için en fazla {max} e-posta işaretleyin; bir e-posta ancak işlemi olduktan sonra işaretlenebilir.",
+      "tradeToggle": "Bu e-postalar aracı kurum işlem onaylarıdır (yatırım işlemi oluştururlar, bu yüzden banka işlemi eşleştirilmez)",
+      "tradeHelp": "Okumak için bir e-postaya tıklayın, ardından profili yazmak için en fazla {max} işlem onayı işaretleyin. İşlem seçmeniz gerekmez.",
       "columns": {
         "select": "Kullan",
         "date": "Tarih",
@@ -913,6 +930,7 @@
       "needsTransaction": "Önce bu e-posta için bir işlem seçin.",
       "limitReached": "En fazla {max} örnek. Başka birini seçmek için birinin işaretini kaldırın.",
       "noTransaction": "Seçilmedi",
+      "tradeNoTransaction": "İşlem onayı için gerekmez",
       "selectedCount": "{max} örnekten {count} tanesi işaretlendi",
       "continue": "Asistana geç",
       "emailLoading": "E-posta yükleniyor",
@@ -923,6 +941,8 @@
     "generate": {
       "help": "Asistan bu e-postaları ve ödedikleri işlemleri okur ve {domain} için bir profil taslağı yazar. Henüz hiçbir şey onaylanmadı.",
       "reviseHelp": "Asistana neyi değiştireceğini söyleyin. Aynı taslağı bu e-postalar ve işlemlerden yeniden günceller.",
+      "tradeHelp": "Asistan bu işlem onaylarını okur ve her birinin bildirdiği yatırım işlemini öneren {domain} için bir profil taslağı yazar. Henüz hiçbir şey onaylanmadı.",
+      "tradeSample": "İşlem onayı",
       "feedbackLabel": "Neyin değişmesi gerekiyor",
       "feedbackPlaceholder": "Örneğin: toplam, ara toplam değil, Ödenen tutar yazan satırdır.",
       "send": "Yapay zekâya gönder",
@@ -969,6 +989,8 @@
       "parsedDate": "Tarih: {date}",
       "parsedTotal": "Toplam: {total}",
       "parsedLines": "{count, plural, one {# satır} other {# satır}}",
+      "parsedTrade": "{action, select, BUY {Alır} other {Satar}}: {symbol} için {quantity} adet",
+      "tradeInconsistent": "Fiyat toplamla uyuşmuyor, bu yüzden otomatik uygulanmayacak",
       "noExpectation": "Yok",
       "noMatch": "İşlem yok",
       "agreesYes": "Evet",
@@ -991,8 +1013,17 @@
         "not_applicable": "Bu profil tarafından okunmadı",
         "skip_line": "Atlandı (atlama satırı bulundu)",
         "wait_line": "Beklemede (sipariş kesin değil)",
-        "no_html": "HTML bölümü yok"
+        "no_html": "HTML bölümü yok",
+        "trade": "Bir işlem önerir"
       }
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Alım} other {Satım}}: {symbol} için {quantity} adet, {total}, tarih {date}.",
+    "account": "E-postada belirtilen hesap: {account}",
+    "priceMismatch": "Ortalama fiyat adet ve toplamla uyuşmuyor, bu yüzden bu işlem otomatik uygulanmayacak.",
+    "incomplete": "Ayrıştırıcı bu e-postadan tam bir işlem okuyamadı.",
+    "totalFromPrice": "fiyattan çıkan toplam",
+    "dateUnknown": "e-postanın geldiği gün"
   }
 }

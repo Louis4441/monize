@@ -112,6 +112,7 @@
     "total": "Total",
     "cashImpact": "Impacto en efectivo",
     "bondSeries": "Serie",
+    "marksPaid": "Marca como pagado",
     "accruedInterest": "Intereses devengados",
     "redemptionSplit": "Desglose de la amortización",
     "redemptionSplitValue": "Principal {principal} + intereses {interest} = pago {payout}",

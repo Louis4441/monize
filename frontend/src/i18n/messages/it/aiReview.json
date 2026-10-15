@@ -38,11 +38,14 @@
     "transactionMissing": "Questa transazione non esiste più",
     "rule": "Regola: {name}",
     "manualRequest": "Richiesta manualmente",
+    "trade": "{action, select, BUY {Acquisto di {quantity} quote di {symbol}} other {Vendita di {quantity} quote di {symbol}}}",
     "receiptInstruction": {
       "automatic": "Completa questa transazione dall'email dell'ordine allegata: suddividila per articolo con una categoria ciascuno, oppure imposta la descrizione.",
       "chat": "Hai chiesto di riconoscere l'email dell'ordine allegata: suddividi questa transazione per prodotto con una categoria ciascuno, oppure imposta la descrizione.",
       "categorize": "Assegna una categoria a ogni articolo dell'email dell'ordine allegata che nessuna regola ha categorizzato, poi proponi la suddivisione di questa transazione o imposta la descrizione.",
-      "parsed": "Un parser salvato ha letto l'email dell'ordine e propone queste righe di categoria e questa descrizione per la transazione."
+      "parsed": "Un parser salvato ha letto l'email dell'ordine e propone queste righe di categoria e questa descrizione per la transazione.",
+      "trade": "Un'email di conferma di un'operazione letta da un profilo salvato propone questa transazione di investimento. Prima di approvare, controlla conto, titolo, quote e totale presso il tuo broker.",
+      "tradeChat": "Hai chiesto di riconoscere la conferma di operazione allegata: proponi la transazione di investimento che riporta."
     },
     "emailReceipt": "Ricevuta via email: {subject} da {sender}",
     "emailReceiptMissing": "Ricevuta via email (l'email è stata eliminata)",

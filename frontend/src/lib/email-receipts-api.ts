@@ -209,11 +209,11 @@ export const emailReceiptsApi = {
      * one named. No provider is called: the request waits, pending, for the
      * assistant in the chat (or an MCP agent) to claim it by id.
      */
-    askAi: async (id: string, transactionId?: string): Promise<EmailReceiptAskAiResult> => {
-      const response = await apiClient.post<EmailReceiptAskAiResult>(
-        `${RECEIPTS}/${id}/ask-ai`,
-        transactionId === undefined ? {} : { transactionId },
-      );
+    askAi: async (id: string, transactionId?: string, options: { asTrade?: boolean } = {}): Promise<EmailReceiptAskAiResult> => {
+      const response = await apiClient.post<EmailReceiptAskAiResult>(`${RECEIPTS}/${id}/ask-ai`, {
+        ...(transactionId === undefined ? {} : { transactionId }),
+        ...(options.asTrade ? { asTrade: true } : {}),
+      });
       return response.data;
     },
   },

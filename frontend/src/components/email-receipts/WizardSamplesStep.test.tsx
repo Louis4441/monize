@@ -29,6 +29,9 @@ async function renderStep(over: Partial<React.ComponentProps<typeof WizardSample
     domain: 'allegro.pl',
     picks: {},
     selected: new Set<string>(),
+    kind: 'receipt' as const,
+    onKindChange: vi.fn(),
+    onSubject: vi.fn(),
     onPick: vi.fn(),
     onToggle: vi.fn(),
     onContinue: vi.fn(),
@@ -182,5 +185,37 @@ describe('WizardSamplesStep', () => {
     api.list.mockResolvedValue([]);
     await renderStep();
     expect(screen.getByText('No emails from this domain')).toBeInTheDocument();
+  });
+
+  describe('trade confirmations', () => {
+    it('switches to trade mode: an email can be ticked with no transaction, and none is asked for', async () => {
+      const props = await renderStep({ kind: 'trade' });
+      const box = screen.getByRole('checkbox', { name: 'Use the email Order 2 as a sample' });
+      expect(box).toBeEnabled();
+      expect(box).not.toHaveAttribute('title');
+      expect(screen.getAllByText('Not needed for a trade confirmation').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Choose a transaction for this email first.')).not.toBeInTheDocument();
+      await click(box);
+      // The subject is remembered, since a trade sample has no transaction line to name it.
+      expect(props.onSubject).toHaveBeenCalledWith('r-2', 'Order 2');
+      expect(props.onToggle).toHaveBeenCalledWith('r-2');
+    });
+
+    it('offers the switch, which asks the wizard to change kind', async () => {
+      const props = await renderStep();
+      await click(screen.getByRole('checkbox', { name: /brokerage trade confirmations/ }));
+      expect(props.onKindChange).toHaveBeenCalledWith('trade');
+    });
+
+    it('turns back to receipts when the switch is cleared', async () => {
+      const props = await renderStep({ kind: 'trade' });
+      await click(screen.getByRole('checkbox', { name: /brokerage trade confirmations/ }));
+      expect(props.onKindChange).toHaveBeenCalledWith('receipt');
+    });
+
+    it('still allows at most five samples', async () => {
+      await renderStep({ kind: 'trade', selected: new Set(['r-1', 'r-2', 'r-3', 'r-4', 'r-5']) });
+      expect(screen.getByRole('checkbox', { name: 'Use the email Order 6 as a sample' })).toBeDisabled();
+    });
   });
 });

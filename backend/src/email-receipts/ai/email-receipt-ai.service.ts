@@ -24,6 +24,7 @@ import { describeFailure } from "../pipeline/email-receipt-pipeline.service";
 import {
   RECEIPT_AUTOMATIC_AI_INSTRUCTION,
   RECEIPT_CHAT_INSTRUCTION,
+  RECEIPT_TRADE_CHAT_INSTRUCTION,
 } from "../pipeline/receipt-instructions";
 import { loadLinkableTransaction } from "../pipeline/linkable-transaction";
 import {
@@ -96,7 +97,8 @@ export type AiRequestOutcome =
 export interface AskAiResult {
   ok: true;
   requestId: string;
-  transactionId: string;
+  /** The transaction the request is about; null for a trade, which creates one. */
+  transactionId: string | null;
 }
 
 /** What the automatic step of one poll did. */
@@ -304,6 +306,7 @@ export class EmailReceiptAiService {
     userId: string,
     receiptId: string,
     transactionId?: string | null,
+    options: { asTrade?: boolean } = {},
   ): Promise<AskAiResult> {
     return withScopedDb(this.dataSource, async (m) => {
       const receipt = await m.getRepository(EmailReceipt).findOne({
@@ -331,6 +334,37 @@ export class EmailReceiptAiService {
             "This email's proposal has already been applied to a transaction.",
           ),
         );
+      }
+      // "Recognize as a trade": the email reports an investment transaction to
+      // create, so there is no bank transaction to choose. The request waits
+      // pending for the assistant or an agent, which proposes the trade.
+      if (options.asTrade) {
+        await closeReceiptRequests(m, userId, receipt.id);
+        const trade = await this.requests.enqueueTrade(m, userId, {
+          emailReceiptId: receipt.id,
+          instruction: RECEIPT_TRADE_CHAT_INSTRUCTION,
+          claimedBy: null,
+        });
+        if (!trade) {
+          throw new ConflictException(
+            tr(
+              "errors.emailReceipts.openRequestExists",
+              "Another review request is already open for this transaction. Finish or dismiss it first.",
+            ),
+          );
+        }
+        await m.getRepository(EmailReceipt).update(
+          { id: receipt.id, userId },
+          {
+            status: "review",
+            statusReason: null,
+            aiReviewRequestId: trade.id,
+            transactionId: null,
+            matchKind: null,
+            candidateTransactionIds: [],
+          },
+        );
+        return { ok: true as const, requestId: trade.id, transactionId: null };
       }
       const chosen = transactionId
         ? await loadLinkableTransaction(m, userId, transactionId)

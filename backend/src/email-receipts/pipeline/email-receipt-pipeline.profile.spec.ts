@@ -229,6 +229,7 @@ function setup(over: Partial<World> = {}) {
       resolveByName: jest.fn(async () => world.sellerPayee),
     } as unknown as PayeesService,
     categoryAi,
+    { process: jest.fn() } as never,
   );
   return {
     service,

@@ -811,6 +811,7 @@ CREATE TABLE email_receipts (
     status_reason VARCHAR(40),
     parser_id UUID REFERENCES email_receipt_parsers(id) ON DELETE SET NULL,
     parsed JSONB,
+    trade JSONB,
     transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
     candidate_transaction_ids UUID[] NOT NULL DEFAULT '{}'::uuid[],
     match_kind VARCHAR(20),
@@ -880,11 +881,13 @@ CREATE TABLE ai_review_requests (
     email_receipt_ids UUID[],
     parser_domain VARCHAR(255),
     CONSTRAINT ck_ai_review_requests_kind
-      CHECK (kind IN ('transaction_review', 'email_receipt', 'email_parser_draft')),
+      CHECK (kind IN ('transaction_review', 'email_receipt', 'email_parser_draft', 'email_trade')),
     CONSTRAINT ck_ai_review_requests_email_receipt_ids
       CHECK (email_receipt_ids IS NULL OR cardinality(email_receipt_ids) <= 5),
     CONSTRAINT ck_ai_review_requests_transaction_required
-      CHECK (kind = 'email_parser_draft' OR transaction_id IS NOT NULL),
+      CHECK (kind IN ('email_parser_draft', 'email_trade') OR transaction_id IS NOT NULL),
+    CONSTRAINT ck_ai_review_requests_trade_shape
+      CHECK (kind <> 'email_trade' OR transaction_id IS NULL),
     CONSTRAINT ck_ai_review_requests_parser_draft_shape
       CHECK (
         (kind = 'email_parser_draft'
@@ -919,6 +922,9 @@ CREATE INDEX idx_ai_review_requests_email_receipt
 CREATE UNIQUE INDEX uq_ai_review_requests_parser_draft_open
     ON ai_review_requests(user_id, parser_domain)
     WHERE kind = 'email_parser_draft' AND status IN ('pending', 'claimed', 'proposed');
+CREATE UNIQUE INDEX uq_ai_review_requests_trade_open
+    ON ai_review_requests(email_receipt_id)
+    WHERE kind = 'email_trade' AND status IN ('pending', 'claimed', 'proposed');
 
 -- Securities (stocks, bonds, mutual funds, ETFs)
 -- Defined before scheduled_transactions because that table (and others below)

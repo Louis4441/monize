@@ -112,6 +112,7 @@
     "total": "Gesamt",
     "cashImpact": "Auswirkung auf Barbestand",
     "bondSeries": "Serie",
+    "marksPaid": "Markiert als bezahlt",
     "accruedInterest": "Aufgelaufene Zinsen",
     "redemptionSplit": "Aufteilung der Rückzahlung",
     "redemptionSplitValue": "Kapital {principal} + Zinsen {interest} = Auszahlung {payout}",

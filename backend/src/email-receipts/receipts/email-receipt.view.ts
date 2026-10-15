@@ -59,6 +59,8 @@ export interface EmailReceiptListItem {
   parserId: string | null;
   parserName: string | null;
   aiReviewRequestId: string | null;
+  /** The email was read by a trade profile: it proposes an investment transaction to create, so bank-transaction actions do not apply. */
+  isTrade: boolean;
   displayState: EmailReceiptDisplayState | null;
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
@@ -89,6 +91,12 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
    */
   structuredOrder: SchemaOrgOrder | null;
   parsed: Record<string, unknown> | null;
+  /**
+   * What a profile with a `trade` section read (`ParsedTrade`), or null: such an
+   * email proposes an investment transaction to create, not a split of a bank
+   * transaction, so `parsed` and `candidates` are empty for it.
+   */
+  trade: Record<string, unknown> | null;
   candidates: EmailReceiptCandidateSummary[];
 }
 

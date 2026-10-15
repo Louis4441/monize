@@ -112,6 +112,7 @@
     "total": "合計",
     "cashImpact": "現金への影響",
     "bondSeries": "シリーズ",
+    "marksPaid": "支払い済みにします",
     "accruedInterest": "経過利子",
     "redemptionSplit": "償還の内訳",
     "redemptionSplitValue": "元本 {principal} + 利子 {interest} = 支払額 {payout}",

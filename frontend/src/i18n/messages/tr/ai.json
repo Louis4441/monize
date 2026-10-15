@@ -112,6 +112,7 @@
     "total": "Toplam",
     "cashImpact": "Nakit etkisi",
     "bondSeries": "Seri",
+    "marksPaid": "Ödendi olarak işaretler",
     "accruedInterest": "Birikmiş faiz",
     "redemptionSplit": "İtfa dağılımı",
     "redemptionSplitValue": "Anapara {principal} + faiz {interest} = ödeme {payout}",

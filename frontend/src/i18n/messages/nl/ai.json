@@ -112,6 +112,7 @@
     "total": "Totaal",
     "cashImpact": "Kaseffect",
     "bondSeries": "Serie",
+    "marksPaid": "Markeert als betaald",
     "accruedInterest": "Opgelopen rente",
     "redemptionSplit": "Splitsing van de aflossing",
     "redemptionSplitValue": "Hoofdsom {principal} + rente {interest} = uitkering {payout}",

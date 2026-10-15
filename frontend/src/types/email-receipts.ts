@@ -208,6 +208,8 @@ export interface EmailReceiptListItem {
   parserId: string | null;
   parserName: string | null;
   aiReviewRequestId: string | null;
+  /** Read by a trade profile: it proposes an investment transaction to create, so the bank-transaction actions do not apply. */
+  isTrade: boolean;
   displayState: EmailReceiptDisplayState | null;
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
@@ -330,7 +332,59 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
   structuredOrder: SchemaOrgOrder | null;
   /** The stored `ParsedReceipt`; read it through `readParsedReceipt`. */
   parsed: Record<string, unknown> | null;
+  /** What a profile with a `trade` section read (`ParsedTrade`); read it through `readParsedTrade`. Null for every other email. */
+  trade: Record<string, unknown> | null;
   candidates: EmailReceiptCandidateSummary[];
+}
+
+/**
+ * What a profile with a `trade` section read from a brokerage trade confirmation
+ * (`ParsedTrade` in `backend/src/email-receipts/parsing/receipt-parser.types.ts`).
+ * `quantity` is a share count; `total`, `price` and `commission` are in 1/10000
+ * units (convert once with `fromReceiptUnits`); `date` is `YYYY-MM-DD`. A value
+ * the email did not state is `null`.
+ */
+export interface ParsedTrade {
+  action: 'BUY' | 'SELL' | null;
+  symbol: string | null;
+  quantity: number | null;
+  total: number | null;
+  price: number | null;
+  commission: number | null;
+  date: string | null;
+  accountText: string | null;
+  accountId: string | null;
+  complete: boolean;
+  /** Whether shares times price agrees with the total; null when the email states no price to check. */
+  consistent: boolean | null;
+  reason: string | null;
+}
+
+const isNullableNumber = (value: unknown): value is number | null => value === null || typeof value === 'number';
+const isNullableString = (value: unknown): value is string | null => value === null || typeof value === 'string';
+
+/** The stored trade as a typed object, or null when it is absent or not the shape this client reads. */
+export function readParsedTrade(value: Record<string, unknown> | null | undefined): ParsedTrade | null {
+  if (!value) return null;
+  const { action, symbol, quantity, total, price, commission, date, accountText, accountId, complete, consistent, reason } =
+    value;
+  if (
+    (action !== 'BUY' && action !== 'SELL' && action !== null) ||
+    !isNullableString(symbol) ||
+    !isNullableNumber(quantity) ||
+    !isNullableNumber(total) ||
+    !isNullableNumber(price) ||
+    !isNullableNumber(commission) ||
+    !isNullableString(date) ||
+    !isNullableString(accountText) ||
+    !isNullableString(accountId) ||
+    typeof complete !== 'boolean' ||
+    (consistent !== null && typeof consistent !== 'boolean') ||
+    !isNullableString(reason)
+  ) {
+    return null;
+  }
+  return { action, symbol, quantity, total, price, commission, date, accountText, accountId, complete, consistent, reason };
 }
 
 /**
@@ -341,7 +395,8 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
 export interface EmailReceiptAskAiResult {
   ok: true;
   requestId: string;
-  transactionId: string;
+  /** The transaction the request is about; null for a trade, which creates one. */
+  transactionId: string | null;
 }
 
 /**
@@ -650,6 +705,8 @@ export type ReceiptTrace = Record<ReceiptTraceField, ReceiptTraceHit | null> & {
 export type ReceiptOutcome = 'read' | 'not_applicable' | 'skip_line' | 'wait_line' | 'no_html';
 
 export interface EmailReceiptParserTestResult {
+  /** For a profile with a `trade` section: what it read. Such a profile is not matched to a bank transaction, so `parsed` and `match` are then empty. */
+  trade?: { parsed: ParsedTrade };
   parsed: ParsedReceipt;
   /** Which entry and which line read each value. Absent from a server that predates it. */
   trace?: ReceiptTrace;
@@ -684,7 +741,12 @@ export interface ParserSamplePair {
 /** `POST /email-receipt-parsers/generate-with-ai`: 1 to 5 samples; `parserId` and `feedback` revise an existing draft. */
 export interface GenerateParserWithAiPayload {
   domain: string;
-  samples: ParserSamplePair[];
+  /** What the profile reads: an order email (default) or a brokerage trade confirmation. */
+  kind?: 'receipt' | 'trade';
+  /** kind receipt: each email with the transaction it paid for. */
+  samples?: ParserSamplePair[];
+  /** kind trade: the confirmation emails (a trade pays no bank transaction). */
+  tradeReceiptIds?: string[];
   parserId?: string;
   feedback?: string;
 }
@@ -726,6 +788,7 @@ export const PARSER_PREVIEW_OUTCOMES = [
   'skip_line',
   'wait_line',
   'no_html',
+  'trade',
 ] as const;
 export type ParserPreviewOutcome = (typeof PARSER_PREVIEW_OUTCOMES)[number];
 
@@ -738,6 +801,8 @@ export interface ParserPreviewItem {
   /** How the draft would read the email; the server's `ParserPreviewOutcome`. */
   outcome: ParserPreviewOutcome;
   statusReason: string | null;
+  /** For a trade profile: what it read (shares, ticker, direction); null for a receipt or when a guard stopped the read. */
+  trade: { action: 'BUY' | 'SELL' | null; symbol: string | null; quantity: number | null; consistent: boolean | null } | null;
   parsed: { date: string | null; total: number | null; currency: string | null; lineCount: number } | null;
   match: ParserPreviewTransaction | null;
   expected: ParserPreviewTransaction | null;

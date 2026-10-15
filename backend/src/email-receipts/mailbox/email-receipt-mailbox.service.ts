@@ -304,7 +304,7 @@ export class EmailReceiptMailboxService {
         `UPDATE ai_review_requests
             SET status = 'rejected'
           WHERE user_id = $1
-            AND kind IN ('email_receipt', 'email_parser_draft')
+            AND kind IN ('email_receipt', 'email_parser_draft', 'email_trade')
             AND status IN ('pending', 'claimed', 'proposed')`,
         [userId],
       );

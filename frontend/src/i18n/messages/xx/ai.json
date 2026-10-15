@@ -129,6 +129,7 @@
     "total": "[XX-Total-XX]",
     "cashImpact": "[XX-Cash impact-XX]",
     "bondSeries": "[XX-Series-XX]",
+    "marksPaid": "[XX-Marks as paid-XX]",
     "accruedInterest": "[XX-Accrued interest-XX]",
     "redemptionSplit": "[XX-Redemption split-XX]",
     "redemptionSplitValue": "[XX-Principal {principal} + interest {interest} = payout {payout}-XX]",

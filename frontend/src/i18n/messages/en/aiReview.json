@@ -38,11 +38,14 @@
     "transactionMissing": "This transaction no longer exists",
     "rule": "Rule: {name}",
     "manualRequest": "Requested manually",
+    "trade": "{action, select, BUY {Buy {quantity} shares of {symbol}} other {Sell {quantity} shares of {symbol}}}",
     "receiptInstruction": {
       "automatic": "Enrich this transaction from the attached order email: split it by line items with a category each, or set the description.",
       "chat": "You asked for the attached order email to be recognized: split this transaction by product with a category each, or set the description.",
       "categorize": "Assign a category to each item of the attached order email that no rule categorized, then propose the split of this transaction or set the description.",
-      "parsed": "A saved parser read the order email and proposes these category lines and this description for the transaction."
+      "parsed": "A saved parser read the order email and proposes these category lines and this description for the transaction.",
+      "trade": "A trade confirmation email read by a saved profile proposes this investment transaction. Check the account, the security, the shares and the total against your brokerage before approving.",
+      "tradeChat": "You asked for the attached trade confirmation to be recognized: propose the investment transaction it reports."
     },
     "emailReceipt": "Email receipt: {subject} from {sender}",
     "emailReceiptMissing": "Email receipt (the email was deleted)",

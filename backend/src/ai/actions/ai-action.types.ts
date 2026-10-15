@@ -380,6 +380,22 @@ export interface CreateInvestmentTransactionDescriptor extends BaseDescriptor {
   description: string | null;
   /** The bond series resolved at preview time (INV-BOND-007); null for a non-bond. */
   bondInstrumentId: string | null;
+  /**
+   * The `email_trade` AI review request this creation answers. Not part of the
+   * transaction (nothing on it reads the id) and not an envelope field: it is
+   * signed with the rest, so a client cannot point an approval at another
+   * request, and confirm marks that request applied in the transaction that
+   * writes the row.
+   */
+  aiReviewRequestId?: string;
+  /**
+   * The scheduled bill or deposit this trade pays. When set (with
+   * `scheduledDueDate`, the occurrence the card was built for), confirm posts
+   * that occurrence with the figures above instead of creating a second row, so
+   * the schedule is marked paid and advances. Signed with the rest.
+   */
+  scheduledTransactionId?: string;
+  scheduledDueDate?: string;
 }
 
 /**
@@ -971,6 +987,8 @@ export interface AiActionPreview {
   accruedInterest?: number;
   /** The bond series a program-linked security's row acts on (e.g. EDO1036). */
   bondSeriesCode?: string | null;
+  /** create_investment_transaction: the bill or deposit that approving this marks paid. */
+  scheduledName?: string | null;
   /** REDEEM of a bond-linked security: the redemption split the card shows. */
   bondRedemptionSplit?: BondRedemptionSplitPreview | null;
   // create_security display fields (symbol/securityName/securityCurrency above

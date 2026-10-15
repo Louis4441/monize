@@ -233,16 +233,27 @@ describe("EmailReceiptsController", () => {
       transactionId: "t1",
       userId: "someone-else",
     } as never);
-    expect(ai.askAi).toHaveBeenCalledWith("user-1", ID, "t1");
+    expect(ai.askAi).toHaveBeenCalledWith("user-1", ID, "t1", {
+      asTrade: false,
+    });
   });
 
   it.each([{}, { transactionId: null }, { transactionId: "" }])(
     "asks the AI about the email's own transaction for the body %j",
     async (body) => {
       await controller.askAi(req, ID, body as never);
-      expect(ai.askAi).toHaveBeenCalledWith("user-1", ID, null);
+      expect(ai.askAi).toHaveBeenCalledWith("user-1", ID, null, {
+        asTrade: false,
+      });
     },
   );
+
+  it("asks the AI to recognize the email as a trade only when the body says so", async () => {
+    await controller.askAi(req, ID, { asTrade: true } as never);
+    expect(ai.askAi).toHaveBeenCalledWith("user-1", ID, null, {
+      asTrade: true,
+    });
+  });
 
   it("answers the overview for the JWT user", async () => {
     receipts.overview.mockResolvedValue({ parsers: { approved: 1, draft: 0 } });

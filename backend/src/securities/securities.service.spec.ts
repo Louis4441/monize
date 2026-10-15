@@ -2320,6 +2320,65 @@ describe("SecuritiesService", () => {
     });
   });
 
+  describe("resolveByTradeSymbol", () => {
+    const exact = { ...mockSecurity, id: "sec-a", symbol: "XCNS" };
+    const suffixed = { ...mockSecurity, id: "sec-b", symbol: "XCNS.TO" };
+    const other = { ...mockSecurity, id: "sec-c", symbol: "XCNS.V" };
+
+    function qb(rows: unknown[]) {
+      const builder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      securitiesRepository.createQueryBuilder.mockReturnValueOnce(builder);
+      return builder;
+    }
+
+    it("returns no match for a blank ticker without hitting the database", async () => {
+      expect(await service.resolveByTradeSymbol("user-1", " ")).toEqual({
+        match: null,
+        candidates: [],
+      });
+      expect(securitiesRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it("looks only at symbols (the ticker or the ticker with an exchange suffix), never names, and escapes LIKE metacharacters", async () => {
+      const builder = qb([suffixed]);
+      await service.resolveByTradeSymbol("user-1", "X_NS");
+      const [clause, params] = builder.andWhere.mock.calls[0];
+      expect(clause).toMatch(/symbol\) = LOWER\(:symbol\)/);
+      expect(clause).not.toMatch(/name/);
+      expect(params).toEqual({ symbol: "X_NS", suffixed: "X\\_NS.%" });
+    });
+
+    it("matches the ticker the broker prints to the user's exchange-suffixed symbol", async () => {
+      qb([suffixed]);
+      const result = await service.resolveByTradeSymbol("user-1", "xcns");
+      expect(result).toEqual({ match: suffixed, candidates: [] });
+    });
+
+    it("prefers the exact symbol over suffixed ones", async () => {
+      qb([exact, suffixed]);
+      const result = await service.resolveByTradeSymbol("user-1", "XCNS");
+      expect(result.match).toBe(exact);
+    });
+
+    it("never guesses between several suffixed securities", async () => {
+      qb([suffixed, other]);
+      const result = await service.resolveByTradeSymbol("user-1", "XCNS");
+      expect(result).toEqual({ match: null, candidates: [suffixed, other] });
+    });
+
+    it("finds nothing for an unknown ticker", async () => {
+      qb([]);
+      const result = await service.resolveByTradeSymbol("user-1", "NOPE");
+      expect(result).toEqual({ match: null, candidates: [] });
+    });
+  });
+
   describe("resolveBySymbolOrName", () => {
     const secA = {
       ...mockSecurity,

@@ -553,6 +553,7 @@
       "reprocess": "Reprocesar",
       "link": "Elegir transacción",
       "recognizeAi": "Reconocer con IA",
+      "recognizeTradeAi": "Reconocer como operación con IA",
       "approve": "Aprobar",
       "draftParser": "Preparar un perfil con IA",
       "createParser": "Crear perfil",
@@ -644,11 +645,21 @@
       "wait_line": "Una línea indica que el pedido todavía no es definitivo, así que el correo se leerá de nuevo más adelante.",
       "no_html": "Este perfil lee la parte HTML del correo, y este correo no la tiene.",
       "schema_org": "No hizo falta ningún perfil: el pedido se leyó de los datos estructurados (schema.org) del correo.",
-      "item_amount_missing": "Un artículo no tiene importe y el correo no tiene un único total que asignarle."
+      "item_amount_missing": "Un artículo no tiene importe y el correo no tiene un único total que asignarle.",
+      "trade_no_action": "El perfil no encontró ninguna compra ni venta en este correo.",
+      "trade_no_symbol": "El perfil no encontró ningún símbolo bursátil en este correo.",
+      "trade_no_quantity": "El perfil no encontró ninguna cantidad de participaciones en este correo.",
+      "trade_no_amount": "El perfil no encontró ni un total ni un precio en este correo.",
+      "trade_no_account": "El perfil no pudo saber a qué cuenta corresponde esta operación.",
+      "trade_exists": "Tus cuentas ya contienen esta operación, así que no se propuso nada.",
+      "trade_linked": "Vinculado a la transacción que informa, así que no se propuso nada."
     },
     "reasonUnknown": "Motivo: {reason}",
     "requestNote": "Solicitud de revisión ({state}): {note}",
     "parsedHeading": "Lo que leyó el perfil",
+    "tradeHeading": "Operación leída del correo",
+    "tradeCandidatesHeading": "Transacciones existentes que podrían ser esta operación",
+    "tradeCandidatesHelp": "Estas transacciones de inversión podrían ser la operación que informa este correo. Vincula la que sea: no se crea ninguna transacción nueva, y se marca como pagado el recibo o ingreso programado que cubre.",
     "notParsed": "Todavía no se ha leído nada de este correo.",
     "candidatesHeading": "Transacciones que encajan",
     "candidatesHelp": "Varias transacciones encajan igual de bien con este correo. Elige la que pagó.",
@@ -747,6 +758,9 @@
   },
   "recognize": {
     "title": "Reconocer con IA",
+    "tradeTitle": "Reconocer como operación con IA",
+    "tradeMessage": "La IA leerá este correo como confirmación de una operación de corretaje y propondrá la transacción de inversión que informa (cuenta, compra o venta, símbolo, participaciones y total). No se guarda nada hasta que lo apruebes.",
+    "tradeConfirm": "Reconocer como operación",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "sin beneficiario",
     "confirmMessage": "Este correo está vinculado a la transacción {summary}. La IA leerá el correo y propondrá cómo desglosar esta transacción por producto. ¿Continuar con esta transacción?",
@@ -765,7 +779,8 @@
     "handoffFailed": "La solicitud está en cola, pero no se pudo abrir el correo en el chat. Espera en la bandeja de revisión de IA a que la tome un agente (por ejemplo, mediante MCP).",
     "inboxLink": "Abrir la bandeja de revisión de IA",
     "opened": "Se abrió el chat con el correo adjunto. Lee el mensaje y pulsa Enviar.",
-    "chatPrompt": "Reconoce los productos, las cantidades y los precios del correo de pedido adjunto y desglosa mi transacción del {date} ({payee}, {amount}) por producto, con una categoría para cada uno. Toma la solicitud de revisión de IA {requestId} y envía tu propuesta para ella."
+    "chatPrompt": "Reconoce los productos, las cantidades y los precios del correo de pedido adjunto y desglosa mi transacción del {date} ({payee}, {amount}) por producto, con una categoría para cada uno. Toma la solicitud de revisión de IA {requestId} y envía tu propuesta para ella.",
+    "tradeChatPrompt": "Reconoce la operación del correo de confirmación del corredor adjunto: la cuenta, si es compra o venta, el símbolo, las participaciones, el total ejecutado y la fecha. Reclama la solicitud de revisión con IA {requestId} y envía la operación para ella."
   },
   "hub": {
     "tabs": {
@@ -903,6 +918,8 @@
         "body": "Ningún correo guardado tiene un remitente en {domain}."
       },
       "help": "Haz clic en un correo para leerlo y elegir la transacción que pagó. Después marca hasta {max} correos a partir de los cuales escribir el perfil; un correo solo se puede marcar cuando tiene una transacción.",
+      "tradeToggle": "Estos correos son confirmaciones de operaciones de un corredor (crean una transacción de inversión, así que no se asocia ninguna transacción bancaria)",
+      "tradeHelp": "Haz clic en un correo para leerlo y marca hasta {max} confirmaciones para escribir el perfil. No hace falta elegir ninguna transacción.",
       "columns": {
         "select": "Usar",
         "date": "Fecha",
@@ -913,6 +930,7 @@
       "needsTransaction": "Primero elige una transacción para este correo.",
       "limitReached": "Como máximo {max} muestras. Desmarca una para elegir otra.",
       "noTransaction": "Ninguna elegida",
+      "tradeNoTransaction": "No hace falta en una confirmación de operación",
       "selectedCount": "{count} de {max} muestras marcadas",
       "continue": "Continuar con el asistente",
       "emailLoading": "Cargando el correo",
@@ -923,6 +941,8 @@
     "generate": {
       "help": "El asistente lee estos correos y las transacciones que pagaron y escribe un borrador de perfil para {domain}. Todavía no hay nada aprobado.",
       "reviseHelp": "Dile al asistente qué cambiar. Actualiza el mismo borrador a partir de estos correos y transacciones.",
+      "tradeHelp": "El asistente lee estas confirmaciones y escribe un borrador de perfil para {domain} que propone la transacción de inversión que informa cada una. Todavía no se aprueba nada.",
+      "tradeSample": "Confirmación de operación",
       "feedbackLabel": "Qué debe cambiar",
       "feedbackPlaceholder": "Por ejemplo: el total es la línea que dice Importe pagado, no el subtotal.",
       "send": "Enviar a la IA",
@@ -969,6 +989,8 @@
       "parsedDate": "Fecha: {date}",
       "parsedTotal": "Total: {total}",
       "parsedLines": "{count, plural, one {# línea} other {# líneas}}",
+      "parsedTrade": "{action, select, BUY {Compra} other {Vende}} {quantity} participaciones de {symbol}",
+      "tradeInconsistent": "El precio no coincide con el total, así que no se aplicará automáticamente",
       "noExpectation": "Ninguna",
       "noMatch": "Sin transacción",
       "agreesYes": "Sí",
@@ -991,8 +1013,17 @@
         "not_applicable": "No lo lee este perfil",
         "skip_line": "Omitido (se encontró una línea de omisión)",
         "wait_line": "En espera (pedido no definitivo)",
-        "no_html": "Sin parte HTML"
+        "no_html": "Sin parte HTML",
+        "trade": "Propone una operación"
       }
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Compra} other {Venta}}: {quantity} participaciones de {symbol} por {total}, con fecha {date}.",
+    "account": "Cuenta indicada en el correo: {account}",
+    "priceMismatch": "El precio medio no coincide con las participaciones y el total, así que esta operación no se aplicará automáticamente.",
+    "incomplete": "El perfil no pudo leer una operación completa en este correo.",
+    "totalFromPrice": "el total que implica el precio",
+    "dateUnknown": "el día en que llegó el correo"
   }
 }

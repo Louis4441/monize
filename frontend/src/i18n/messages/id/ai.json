@@ -112,6 +112,7 @@
     "total": "Total",
     "cashImpact": "Dampak kas",
     "bondSeries": "Seri",
+    "marksPaid": "Menandai sebagai lunas",
     "accruedInterest": "Bunga berjalan",
     "redemptionSplit": "Pemecahan penebusan",
     "redemptionSplitValue": "Pokok {principal} + bunga {interest} = pembayaran {payout}",

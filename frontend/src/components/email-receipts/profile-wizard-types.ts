@@ -15,3 +15,6 @@ export interface WizardDraft {
 
 /** The most emails a profile is written from at once. */
 export const WIZARD_MAX_SAMPLES = 5;
+
+/** What the profile being written reads: an order email (paired with its bank transaction) or a brokerage trade confirmation. */
+export type WizardKind = 'receipt' | 'trade';

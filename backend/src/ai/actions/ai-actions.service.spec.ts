@@ -58,8 +58,10 @@ describe("AiActionsService", () => {
   let attachments: Record<string, jest.Mock>;
   let attachmentStore: Record<string, jest.Mock>;
   let singleUseTokens: SingleUseTokenMock;
+  let scheduled: { post: jest.Mock };
   let aiReviewRequests: {
     markApplied: jest.Mock;
+    markTradeApplied: jest.Mock;
     isExemptFromWriteLimit: jest.Mock;
   };
 
@@ -117,8 +119,10 @@ describe("AiActionsService", () => {
       releaseForPrompt: jest.fn(),
     };
     singleUseTokens = createSingleUseTokenMock();
+    scheduled = { post: jest.fn().mockResolvedValue(null) };
     aiReviewRequests = {
       markApplied: jest.fn().mockResolvedValue(undefined),
+      markTradeApplied: jest.fn().mockResolvedValue(undefined),
       isExemptFromWriteLimit: jest.fn().mockResolvedValue(false),
     };
     service = new AiActionsService(
@@ -134,6 +138,7 @@ describe("AiActionsService", () => {
       {} as never,
       {} as never,
       aiReviewRequests as never,
+      scheduled as never,
     );
   });
 
@@ -1045,6 +1050,107 @@ describe("AiActionsService", () => {
     expect(result).toEqual({
       type: "create_investment_transaction",
       id: "inv-tx-new",
+    });
+  });
+
+  describe("a creation that answers an email_trade request", () => {
+    const TRADE_REQUEST = "70000000-0000-4000-8000-000000000001";
+
+    it("passes the plain two-argument create when no request is named", async () => {
+      await service.confirm(USER, dtoFor(createInvestmentDescriptor()));
+      expect(investments.create.mock.calls[0]).toHaveLength(2);
+      expect(aiReviewRequests.markTradeApplied).not.toHaveBeenCalled();
+    });
+
+    it("hands create() a hook that marks the request applied on the write's own manager, before the write", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({ aiReviewRequestId: TRADE_REQUEST }),
+        ),
+      );
+      const options = investments.create.mock.calls[0][2];
+      expect(typeof options.beforeWrite).toBe("function");
+      // Nothing is marked outside the write's transaction ...
+      expect(aiReviewRequests.markTradeApplied).not.toHaveBeenCalled();
+      // ... the hook does it on the manager create() passes.
+      const manager = { tx: "manager" };
+      await options.beforeWrite(manager);
+      expect(aiReviewRequests.markTradeApplied).toHaveBeenCalledWith(
+        manager,
+        USER,
+        TRADE_REQUEST,
+      );
+    });
+
+    it("posts the scheduled bill it pays instead of creating a second row, marking the request applied in that post", async () => {
+      const SCHEDULE = "80000000-0000-4000-8000-000000000001";
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({
+            aiReviewRequestId: TRADE_REQUEST,
+            scheduledTransactionId: SCHEDULE,
+            scheduledDueDate: "2026-10-16",
+            description: "Email receipt: filled",
+          }),
+        ),
+      );
+      expect(investments.create).not.toHaveBeenCalled();
+      const [user, id, postDto, options] = scheduled.post.mock.calls[0];
+      expect(user).toBe(USER);
+      expect(id).toBe(SCHEDULE);
+      expect(postDto).toEqual({
+        transactionDate: "2026-01-15",
+        investmentQuantity: 10,
+        investmentPrice: 150,
+        description: "Email receipt: filled",
+      });
+      expect(options.expectedDueDate).toBe("2026-10-16");
+      const manager = { tx: "m" };
+      await options.beforeWrite(manager);
+      expect(aiReviewRequests.markTradeApplied).toHaveBeenCalledWith(
+        manager,
+        USER,
+        TRADE_REQUEST,
+      );
+    });
+
+    it("lets the schedule's refusal (it moved on since the card) stop the approval", async () => {
+      scheduled.post.mockRejectedValue(new Error("already posted"));
+      await expect(
+        service.confirm(
+          USER,
+          dtoFor(
+            createInvestmentDescriptor({
+              aiReviewRequestId: TRADE_REQUEST,
+              scheduledTransactionId: "80000000-0000-4000-8000-000000000001",
+              scheduledDueDate: "2026-10-16",
+            }),
+          ),
+        ),
+      ).rejects.toThrow("already posted");
+      expect(investments.create).not.toHaveBeenCalled();
+    });
+
+    it("lets a refusal by the hook stop the creation", async () => {
+      aiReviewRequests.markTradeApplied.mockRejectedValue(
+        new Error("no longer open"),
+      );
+      investments.create.mockImplementation(
+        async (_u: string, _dto: unknown, options: any) => {
+          await options.beforeWrite({});
+          return { id: "inv-tx-new" };
+        },
+      );
+      await expect(
+        service.confirm(
+          USER,
+          dtoFor(
+            createInvestmentDescriptor({ aiReviewRequestId: TRADE_REQUEST }),
+          ),
+        ),
+      ).rejects.toThrow("no longer open");
     });
   });
 

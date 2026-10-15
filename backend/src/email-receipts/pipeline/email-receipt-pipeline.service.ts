@@ -1,7 +1,5 @@
 import {
-  BadRequestException,
   ConflictException,
-  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -43,7 +41,10 @@ import {
 import { matchReceipt } from "../matching/match-receipt";
 import { completeness, parseReceiptLines } from "../parsing/parse-receipt";
 import { resolveMatchConfig } from "../parsing/receipt-match-config";
-import type { ParsedReceipt } from "../parsing/receipt-parser.types";
+import type {
+  ParsedReceipt,
+  ParsedTrade,
+} from "../parsing/receipt-parser.types";
 import {
   applyCategoryHistory,
   loadItemCategoryHistory,
@@ -55,8 +56,9 @@ import {
   type ReceiptProposalTransaction,
 } from "../proposal/build-receipt-proposal";
 import { autoApplyAllowed, type AutoApplyFacts } from "./auto-apply-gate";
+import { EmailReceiptTradeService } from "./email-receipt-trade.service";
 import { chooseReceiptParser } from "./choose-receipt-parser";
-import { describeFailure } from "./receipt-failure";
+import { describeFailure, isRefusal, refusalNote } from "./receipt-failure";
 import { loadLinkableTransaction } from "./linkable-transaction";
 import { loadReceiptCandidates } from "./receipt-candidates";
 import { ReceiptSourceLines } from "./receipt-source-lines";
@@ -96,8 +98,6 @@ export const RECEIPT_SCHEMA_ORG_REASON = "schema_org";
 
 /** At most this many approved parsers are considered for one email. */
 const MAX_PARSERS_CONSIDERED = 1000;
-/** The longest note a refused proposal leaves on its request. */
-const MAX_REFUSAL_NOTE = 400;
 
 /** What `process` does and refuses, by who asked. */
 export interface ProcessReceiptOptions {
@@ -155,6 +155,8 @@ interface Stored {
   reason: string | null;
   parserId: string | null;
   parsed: ParsedReceipt | null;
+  /** A trade profile's reading; absent (stored as null) for every other email. */
+  trade?: ParsedTrade | null;
   transactionId: string | null;
   candidateIds: string[];
   matchKind: EmailReceiptMatchKind | null;
@@ -180,11 +182,6 @@ interface Committed {
     categories: ReadonlyMap<string, string>;
   };
 }
-
-const isRefusal = (error: unknown): boolean =>
-  error instanceof BadRequestException ||
-  error instanceof NotFoundException ||
-  error instanceof ConflictException;
 
 export { describeFailure };
 
@@ -217,6 +214,7 @@ export class EmailReceiptPipelineService {
     private readonly actions: AiActionsService,
     private readonly payees: PayeesService,
     private readonly categoryAi: EmailReceiptCategoryAiService,
+    private readonly trades: EmailReceiptTradeService,
   ) {}
 
   async process(
@@ -399,6 +397,29 @@ export class EmailReceiptPipelineService {
           candidateIds: [],
           matchKind: null,
         });
+      }
+      // A trade profile reads a brokerage confirmation: the email proposes an
+      // investment transaction to CREATE, so nothing below (payee, items,
+      // matching a bank transaction) applies to it.
+      if (definition.trade) {
+        const traded = await this.trades.process(m, userId, receipt, {
+          parser: choice.parser,
+          definition: definition.trade,
+          lines: sources.forSource(definition.source) ?? [],
+          mailboxAutoApply: autoApplyOn,
+        });
+        const committed = await this.finish(m, userId, receipt, {
+          status: traded.status,
+          reason: traded.reason,
+          parserId: choice.parser.id,
+          parsed: null,
+          trade: traded.trade,
+          transactionId: null,
+          candidateIds: [],
+          matchKind: null,
+          requestId: traded.requestId,
+        });
+        return { ...committed, autoApply: traded.autoApply };
       }
       payee = choice.parser.payeeId
         ? await m.getRepository(Payee).findOne({
@@ -895,6 +916,8 @@ export class EmailReceiptPipelineService {
         parserId: stored.parserId,
         parsed:
           stored.parsed as unknown as QueryDeepPartialEntity<EmailReceipt>["parsed"],
+        trade: (stored.trade ??
+          null) as unknown as QueryDeepPartialEntity<EmailReceipt>["trade"],
         transactionId: stored.transactionId,
         candidateTransactionIds: stored.candidateIds,
         matchKind: stored.matchKind,
@@ -977,14 +1000,6 @@ function unchanged(receipt: EmailReceipt): ProcessReceiptResult {
     autoApplied: false,
     unchanged: true,
   };
-}
-
-function refusalNote(error: unknown): string {
-  const message =
-    error instanceof HttpException
-      ? error.message
-      : "The proposal was refused.";
-  return message.slice(0, MAX_REFUSAL_NOTE);
 }
 
 function receiptNotFound(id: string): NotFoundException {

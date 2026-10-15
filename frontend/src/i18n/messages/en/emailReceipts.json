@@ -553,6 +553,7 @@
       "reprocess": "Reprocess",
       "link": "Choose transaction",
       "recognizeAi": "Recognize with AI",
+      "recognizeTradeAi": "Recognize as a trade with AI",
       "approve": "Approve",
       "draftParser": "Prepare a profile with AI",
       "createParser": "Create profile",
@@ -644,11 +645,21 @@
       "wait_line": "A line says the order is not final yet, so the email will be read again later.",
       "no_html": "This profile reads the HTML part of the email, and this email has none.",
       "schema_org": "No profile was needed: the order was read from the structured data (schema.org) in the email.",
-      "item_amount_missing": "An item has no amount, and the email has no single total to give it."
+      "item_amount_missing": "An item has no amount, and the email has no single total to give it.",
+      "trade_no_action": "The profile found no buy or sell in this email.",
+      "trade_no_symbol": "The profile found no ticker symbol in this email.",
+      "trade_no_quantity": "The profile found no number of shares in this email.",
+      "trade_no_amount": "The profile found neither a total nor a price in this email.",
+      "trade_no_account": "The profile could not tell which account this trade is for.",
+      "trade_exists": "Your accounts already hold this trade, so nothing was proposed.",
+      "trade_linked": "Linked to the transaction it reports, so nothing was proposed."
     },
     "reasonUnknown": "Reason: {reason}",
     "requestNote": "Review request ({state}): {note}",
     "parsedHeading": "What the profile read",
+    "tradeHeading": "Trade read from the email",
+    "tradeCandidatesHeading": "Existing transactions that could be this trade",
+    "tradeCandidatesHelp": "These investment transactions could be the trade this email reports. Link the one it is: no new transaction is created, and a scheduled bill or deposit it pays is marked paid.",
     "notParsed": "Nothing has been read from this email yet.",
     "candidatesHeading": "Transactions that fit",
     "candidatesHelp": "Several transactions fit this email equally well. Choose the one it paid for.",
@@ -747,6 +758,9 @@
   },
   "recognize": {
     "title": "Recognize with AI",
+    "tradeTitle": "Recognize as a trade with AI",
+    "tradeMessage": "The AI will read this email as a brokerage trade confirmation and propose the investment transaction it reports (account, buy or sell, ticker, shares and total). Nothing is saved until you approve it.",
+    "tradeConfirm": "Recognize as a trade",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "no payee",
     "confirmMessage": "This email is linked to the transaction {summary}. The AI will read the email and propose how to split this transaction by product. Continue with this transaction?",
@@ -765,7 +779,8 @@
     "handoffFailed": "The request is queued, but the email could not be opened in the chat. It waits in the AI review inbox for an agent (for example over MCP).",
     "inboxLink": "Open the AI review inbox",
     "opened": "Opened the chat with the email attached. Read the message and press Send.",
-    "chatPrompt": "Recognize the products, quantities and prices in the attached order email and split my transaction of {date} ({payee}, {amount}) by product with a category for each. Claim AI review request {requestId} and submit your proposal for it."
+    "chatPrompt": "Recognize the products, quantities and prices in the attached order email and split my transaction of {date} ({payee}, {amount}) by product with a category for each. Claim AI review request {requestId} and submit your proposal for it.",
+    "tradeChatPrompt": "Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy or a sell, the ticker, the shares, the executed total and the date. Claim AI review request {requestId} and submit the trade for it."
   },
   "hub": {
     "tabs": {
@@ -903,6 +918,8 @@
         "body": "No stored email has a sender at {domain}."
       },
       "help": "Click an email to read it, and choose the transaction it paid for. Then tick up to {max} emails to write the profile from; an email can be ticked only once it has a transaction.",
+      "tradeToggle": "These emails are brokerage trade confirmations (they create an investment transaction, so no bank transaction is paired)",
+      "tradeHelp": "Click an email to read it, then tick up to {max} trade confirmations to write the profile from. No transaction needs to be chosen.",
       "columns": {
         "select": "Use",
         "date": "Date",
@@ -913,6 +930,7 @@
       "needsTransaction": "Choose a transaction for this email first.",
       "limitReached": "At most {max} samples. Untick one to choose another.",
       "noTransaction": "None chosen",
+      "tradeNoTransaction": "Not needed for a trade confirmation",
       "selectedCount": "{count} of {max} samples ticked",
       "continue": "Continue to the assistant",
       "emailLoading": "Loading the email",
@@ -923,6 +941,8 @@
     "generate": {
       "help": "The assistant reads these emails and the transactions they paid for and writes a draft profile for {domain}. Nothing is approved yet.",
       "reviseHelp": "Tell the assistant what to change. It updates the same draft from these emails and transactions.",
+      "tradeHelp": "The assistant reads these trade confirmations and writes a draft profile for {domain} that proposes the investment transaction each one reports. Nothing is approved yet.",
+      "tradeSample": "Trade confirmation",
       "feedbackLabel": "What should change",
       "feedbackPlaceholder": "For example: the total is the line that says Amount paid, not the subtotal.",
       "send": "Send to AI",
@@ -969,6 +989,8 @@
       "parsedDate": "Date: {date}",
       "parsedTotal": "Total: {total}",
       "parsedLines": "{count, plural, one {# line} other {# lines}}",
+      "parsedTrade": "{action, select, BUY {Buys} other {Sells}} {quantity} shares of {symbol}",
+      "tradeInconsistent": "The price does not match the total, so it will not be applied automatically",
       "noExpectation": "None",
       "noMatch": "No transaction",
       "agreesYes": "Yes",
@@ -991,8 +1013,17 @@
         "not_applicable": "Not read by this profile",
         "skip_line": "Skipped (skip line found)",
         "wait_line": "On hold (order not final)",
-        "no_html": "No HTML part"
+        "no_html": "No HTML part",
+        "trade": "Proposes a trade"
       }
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Buy} other {Sell}} {quantity} shares of {symbol} for {total}, dated {date}.",
+    "account": "Account named in the email: {account}",
+    "priceMismatch": "The average price does not match the shares and the total, so this trade will not be applied automatically.",
+    "incomplete": "The profile could not read a complete trade from this email.",
+    "totalFromPrice": "the total implied by the price",
+    "dateUnknown": "the day the email arrived"
   }
 }

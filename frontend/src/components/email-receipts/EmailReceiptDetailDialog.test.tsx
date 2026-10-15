@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import toast from 'react-hot-toast';
 import { render, screen, fireEvent, act, within } from '@/test/render';
 import { EmailReceiptDetailDialog } from './EmailReceiptDetailDialog';
-import { makeDetail, PARSED_RECEIPT } from './email-receipts-fixtures';
+import { makeDetail, PARSED_RECEIPT, PARSED_TRADE } from './email-receipts-fixtures';
 
 const api = vi.hoisted(() => ({ get: vi.fn(), link: vi.fn() }));
 const txApi = vi.hoisted(() => ({ getAll: vi.fn() }));
@@ -328,6 +328,68 @@ describe('EmailReceiptDetailDialog', () => {
       'href',
       '/transactions?targetTransactionId=tx-1',
     );
+  });
+
+  describe('a trade confirmation', () => {
+    const tradeDetail = (over = {}) =>
+      makeDetail({ status: 'review', displayState: 'proposed', parserName: 'Wealthsimple', trade: PARSED_TRADE, ...over });
+
+    it('lists the existing investment transactions a trade email could be, and links the chosen one', async () => {
+      api.get.mockResolvedValue(
+        tradeDetail({
+          status: 'ignored',
+          statusReason: 'trade_exists',
+          displayState: null,
+          candidates: [{ id: 'it-1', date: '2026-10-15', amount: 2000, currencyCode: 'CAD', payeeName: 'XCNS.TO', description: '75.9878' }],
+        }),
+      );
+      api.link.mockResolvedValue(tradeDetail({ status: 'ignored', statusReason: 'trade_linked', displayState: null }));
+      await renderDialog();
+      expect(screen.getByRole('heading', { name: 'Existing transactions that could be this trade' })).toBeInTheDocument();
+      expect(screen.getByText(/a scheduled bill or deposit it pays is marked paid/)).toBeInTheDocument();
+      expect(screen.queryByText('Several transactions fit this email equally well. Choose the one it paid for.')).not.toBeInTheDocument();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Link to this transaction' }));
+      });
+      await act(async () => {});
+      expect(api.link).toHaveBeenCalledWith('r-1', 'it-1');
+      expect(toast.success).toHaveBeenCalledWith('Email linked to the transaction');
+      expect(screen.getByText('Linked to the transaction it reports, so nothing was proposed.')).toBeInTheDocument();
+    });
+
+    it('offers no link once the proposal was applied', async () => {
+      api.get.mockResolvedValue(
+        tradeDetail({
+          displayState: 'applied',
+          candidates: [{ id: 'it-1', date: '2026-10-15', amount: 2000, currencyCode: 'CAD', payeeName: 'XCNS.TO', description: null }],
+        }),
+      );
+      await renderDialog();
+      expect(screen.queryByRole('button', { name: 'Link to this transaction' })).not.toBeInTheDocument();
+    });
+
+    it('shows the trade the profile read instead of a receipt, with no candidates or structured data', async () => {
+      api.get.mockResolvedValue(tradeDetail());
+      await renderDialog();
+      expect(screen.getByRole('heading', { name: 'Trade read from the email' })).toBeInTheDocument();
+      expect(screen.getByText(/Buy 75\.9878 shares of XCNS for 2,000\.00/)).toBeInTheDocument();
+      expect(screen.queryByText('What the profile read')).not.toBeInTheDocument();
+      expect(screen.queryByText('Nothing has been read from this email yet.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Structured data (schema.org)')).not.toBeInTheDocument();
+    });
+
+    it('does not offer to pick a bank transaction for an email that creates one', async () => {
+      api.get.mockResolvedValue(tradeDetail({ status: 'parse_failed', statusReason: 'trade_no_symbol', displayState: null }));
+      await renderDialog();
+      expect(screen.getByText('The profile found no ticker symbol in this email.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /choose a transaction|pick a transaction/i })).not.toBeInTheDocument();
+    });
+
+    it('says why a trade already in the ledger was not proposed', async () => {
+      api.get.mockResolvedValue(tradeDetail({ status: 'ignored', statusReason: 'trade_exists', displayState: null }));
+      await renderDialog();
+      expect(screen.getByText('Your accounts already hold this trade, so nothing was proposed.')).toBeInTheDocument();
+    });
   });
 
   it('says nothing has been read, rather than showing an empty result, when there is no parse', async () => {

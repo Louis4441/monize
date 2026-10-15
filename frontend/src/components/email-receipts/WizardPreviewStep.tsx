@@ -24,6 +24,8 @@ interface WizardPreviewStepProps {
   answer: string | null;
   /** The ticked samples and the transactions they were paired with; empty when starting from an existing draft. */
   pairs: readonly ParserSamplePair[];
+  /** The ticked emails when they differ from the pairs' (a trade sample has no transaction to pair). */
+  selectedReceiptIds?: readonly string[];
   /** Revising needs samples to send; false when the wizard started from an existing draft. */
   canReviseWithAi: boolean;
   onBackToAi: () => void;
@@ -41,7 +43,7 @@ type PreviewState = { status: 'loading' } | { status: 'error' } | { status: 'rea
  * and processes the domain's emails, then reports where they ended. Mount it keyed on
  * the draft's id and revision, so a revised draft is previewed afresh.
  */
-export function WizardPreviewStep({ domain, draft, answer, pairs, canReviseWithAi, onBackToAi, onBackToSamples, onAccepted, onClose }: WizardPreviewStepProps) {
+export function WizardPreviewStep({ domain, draft, answer, pairs, selectedReceiptIds, canReviseWithAi, onBackToAi, onBackToSamples, onAccepted, onClose }: WizardPreviewStepProps) {
   const t = useTranslations('emailReceipts.profileWizard.preview');
   const [state, setState] = useState<PreviewState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -53,7 +55,7 @@ export function WizardPreviewStep({ domain, draft, answer, pairs, canReviseWithA
     let cancelled = false;
     emailReceiptsApi.parsers
       .preview(draft.parserId, {
-        selectedReceiptIds: pairs.map((pair) => pair.receiptId),
+        selectedReceiptIds: selectedReceiptIds ? [...selectedReceiptIds] : pairs.map((pair) => pair.receiptId),
         ...(pairs.length > 0 ? { expected: [...pairs] } : {}),
       })
       .then((result) => {
@@ -67,7 +69,7 @@ export function WizardPreviewStep({ domain, draft, answer, pairs, canReviseWithA
     return () => {
       cancelled = true;
     };
-  }, [draft.parserId, draft.revision, pairs, attempt]);
+  }, [draft.parserId, draft.revision, pairs, selectedReceiptIds, attempt]);
 
   const accept = async () => {
     setAccepting(true);

@@ -553,6 +553,7 @@
       "reprocess": "再処理",
       "link": "取引を選択",
       "recognizeAi": "AIで認識",
+      "recognizeTradeAi": "AIで取引として認識",
       "approve": "承認",
       "draftParser": "AIでプロフィールを準備",
       "createParser": "プロフィールを作成",
@@ -644,11 +645,21 @@
       "wait_line": "注文がまだ確定していないことを示す行があるため、メールは後でもう一度読み取られます。",
       "no_html": "このプロフィールはメールのHTML部分を読み取りますが、このメールにはHTML部分がありません。",
       "schema_org": "プロフィールは不要でした。注文はメール内の構造化データ (schema.org) から読み取られました。",
-      "item_amount_missing": "明細に金額がなく、メールにも割り当てられる単一の合計がありません。"
+      "item_amount_missing": "明細に金額がなく、メールにも割り当てられる単一の合計がありません。",
+      "trade_no_action": "プロフィールはこのメールで購入も売却も見つけられませんでした。",
+      "trade_no_symbol": "プロフィールはこのメールでティッカーシンボルを見つけられませんでした。",
+      "trade_no_quantity": "プロフィールはこのメールで数量を見つけられませんでした。",
+      "trade_no_amount": "プロフィールはこのメールで合計も価格も見つけられませんでした。",
+      "trade_no_account": "プロフィールは、この取引がどの口座のものか判断できませんでした。",
+      "trade_exists": "この取引はすでに口座に記録されているため、何も提案されませんでした。",
+      "trade_linked": "報告されている取引に紐づけたため、何も提案されませんでした。"
     },
     "reasonUnknown": "理由: {reason}",
     "requestNote": "レビュー依頼 ({state}): {note}",
     "parsedHeading": "プロフィールが読み取った内容",
+    "tradeHeading": "メールから読み取った取引",
+    "tradeCandidatesHeading": "この取引になりうる既存の取引",
+    "tradeCandidatesHelp": "これらの投資取引は、このメールが報告する取引かもしれません。該当するものを紐づけてください。新しい取引は作成されず、その取引が支払う予定の請求や入金は支払い済みになります。",
     "notParsed": "このメールからはまだ何も読み取られていません。",
     "candidatesHeading": "一致する取引",
     "candidatesHelp": "このメールと同じ程度に一致する取引が複数あります。このメールが支払った取引を選んでください。",
@@ -747,6 +758,9 @@
   },
   "recognize": {
     "title": "AIで認識",
+    "tradeTitle": "AIで取引として認識",
+    "tradeMessage": "AIはこのメールを証券会社の取引確認として読み取り、報告されている投資取引(口座、購入か売却か、ティッカー、数量、合計金額)を提案します。承認するまで何も保存されません。",
+    "tradeConfirm": "取引として認識",
     "transactionSummary": "{date}、{amount}、{payee}",
     "noPayee": "支払先なし",
     "confirmMessage": "このメールは取引 {summary} に紐づいています。AIがメールを読み取り、この取引を商品ごとに分割する方法を提案します。この取引で続行しますか？",
@@ -765,7 +779,8 @@
     "handoffFailed": "依頼はキューに追加されましたが、チャットでメールを開けませんでした。AIレビュー受信箱でエージェント (たとえばMCP経由) を待ちます。",
     "inboxLink": "AIレビュー受信箱を開く",
     "opened": "メールを添付してチャットを開きました。メッセージを確認して送信を押してください。",
-    "chatPrompt": "添付された注文メールの商品、数量、価格を認識し、{date} の私の取引 ({payee}、{amount}) を、それぞれにカテゴリを付けて商品ごとに分割してください。AIレビュー依頼 {requestId} を引き受け、その提案を送信してください。"
+    "chatPrompt": "添付された注文メールの商品、数量、価格を認識し、{date} の私の取引 ({payee}、{amount}) を、それぞれにカテゴリを付けて商品ごとに分割してください。AIレビュー依頼 {requestId} を引き受け、その提案を送信してください。",
+    "tradeChatPrompt": "添付の証券会社の確認メールにある取引を認識してください:口座、購入か売却か、ティッカー、数量、約定合計金額、日付。AIレビューリクエスト{requestId}を受け取り、その取引を提出してください。"
   },
   "hub": {
     "tabs": {
@@ -903,6 +918,8 @@
         "body": "{domain} に送信者がいる保存済みメールはありません。"
       },
       "help": "メールをクリックして内容を読み、そのメールの支払いに対応する取引を選択します。次に、プロフィールの作成に使うメールを最大 {max} 件チェックします。メールをチェックできるのは、取引を選択した後だけです。",
+      "tradeToggle": "これらのメールは証券会社の取引確認です(投資取引を作成するため、銀行取引は対応づけません)",
+      "tradeHelp": "メールをクリックして読み、プロフィールの元にする取引確認を最大{max}件選択してください。取引を選ぶ必要はありません。",
       "columns": {
         "select": "使用",
         "date": "日付",
@@ -913,6 +930,7 @@
       "needsTransaction": "先にこのメールの取引を選択してください。",
       "limitReached": "サンプルは最大 {max} 件までです。別のものを選ぶには、どれかのチェックを外してください。",
       "noTransaction": "未選択",
+      "tradeNoTransaction": "取引確認には不要です",
       "selectedCount": "{max} 件中 {count} 件のサンプルをチェック済み",
       "continue": "アシスタントに進む",
       "emailLoading": "メールを読み込み中",
@@ -923,6 +941,8 @@
     "generate": {
       "help": "アシスタントがこれらのメールとその支払いに対応する取引を読み取り、{domain} のプロフィールの下書きを作成します。まだ何も承認されていません。",
       "reviseHelp": "変更してほしい点をアシスタントに伝えてください。これらのメールと取引から、同じ下書きを更新します。",
+      "tradeHelp": "アシスタントはこれらの取引確認を読み取り、それぞれが報告する投資取引を提案する{domain}用のプロフィール案を作成します。まだ何も承認されません。",
+      "tradeSample": "取引確認",
       "feedbackLabel": "変更する内容",
       "feedbackPlaceholder": "例: 合計は小計ではなく、「お支払い金額」と書かれた行です。",
       "send": "AIに送信",
@@ -969,6 +989,8 @@
       "parsedDate": "日付: {date}",
       "parsedTotal": "合計: {total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
+      "parsedTrade": "{action, select, BUY {購入} other {売却}}: {symbol} × {quantity}",
+      "tradeInconsistent": "価格が合計金額と一致しないため、自動的には適用されません",
       "noExpectation": "なし",
       "noMatch": "取引なし",
       "agreesYes": "はい",
@@ -991,8 +1013,17 @@
         "not_applicable": "このプロフィールでは読み取れません",
         "skip_line": "スキップ (スキップ行を検出)",
         "wait_line": "保留 (注文が未確定)",
-        "no_html": "HTML部分なし"
+        "no_html": "HTML部分なし",
+        "trade": "取引を提案"
       }
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {購入} other {売却}}: {symbol} × {quantity}、{total}、日付 {date}。",
+    "account": "メールに記載の口座: {account}",
+    "priceMismatch": "平均価格が数量と合計金額に一致しないため、この取引は自動的には適用されません。",
+    "incomplete": "プロフィールはこのメールから完全な取引を読み取れませんでした。",
+    "totalFromPrice": "価格から求めた合計",
+    "dateUnknown": "メールが届いた日"
   }
 }

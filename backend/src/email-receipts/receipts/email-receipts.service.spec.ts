@@ -57,8 +57,16 @@ function setup() {
   const pipeline = {
     process: jest.fn(),
   } as unknown as jest.Mocked<EmailReceiptPipelineService>;
-  const service = new EmailReceiptsService(dataSource as never, pipeline);
-  return { service, manager, receiptRepo, pipeline };
+  const tradeLinks = {
+    candidates: jest.fn(async () => []),
+    link: jest.fn(async () => undefined),
+  };
+  const service = new EmailReceiptsService(
+    dataSource as never,
+    pipeline,
+    tradeLinks as never,
+  );
+  return { service, manager, receiptRepo, pipeline, tradeLinks };
 }
 
 const locked = (over: Partial<EmailReceipt> = {}) =>
@@ -148,6 +156,7 @@ describe("EmailReceiptsService.list", () => {
       parserId: "p1",
       parserName: "Shop",
       aiReviewRequestId: "rq1",
+      isTrade: false,
       displayState: "proposed",
       requestNote: null,
       transaction: {
@@ -468,6 +477,7 @@ describe("EmailReceiptsService.get", () => {
     expect(detail.bodyHtml).toBe("<p>Order total: <b>9.99</b></p>");
     expect(manager.query.mock.calls[0][0]).toContain("r.body_html");
     expect(detail.parsed).toEqual({ total: 99900 });
+    expect(detail.trade).toBeNull();
     expect(detail.candidates.map((c) => c.id)).toEqual(["t2", "t1"]);
     expect(detail.candidates[0]).toMatchObject({
       amount: -9.99,
@@ -477,6 +487,25 @@ describe("EmailReceiptsService.get", () => {
       USER,
       ["t2", "t1", "gone"],
     ]);
+  });
+
+  it("returns what a trade profile read, and the SELECT asks for it", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValueOnce([
+      {
+        ...row({ status: "review" }),
+        body_text: "Symbol: XCNS",
+        body_html: null,
+        parsed: null,
+        trade: { symbol: "XCNS", quantity: 75.9878 },
+        candidate_transaction_ids: [],
+      },
+    ]);
+    const detail = await service.get(USER, ID);
+    expect(manager.query.mock.calls[0][0]).toContain("r.trade");
+    expect(detail.trade).toEqual({ symbol: "XCNS", quantity: 75.9878 });
+    expect(detail.parsed).toBeNull();
+    expect(detail.candidates).toEqual([]);
   });
 
   it("has no bodyHtml for an email with no HTML part", async () => {
@@ -612,23 +641,58 @@ describe("EmailReceiptsService.reprocess and link", () => {
   });
 
   it("link hands the pipeline the transaction, which checks it in the writing transaction", async () => {
-    const { service, manager, pipeline } = setup();
-    manager.query.mockResolvedValueOnce([
-      { ...row(), body_text: "", parsed: null, candidate_transaction_ids: [] },
-    ]);
+    const { service, manager, pipeline, tradeLinks } = setup();
+    manager.query
+      .mockResolvedValueOnce([{ is_trade: false }])
+      .mockResolvedValueOnce([
+        {
+          ...row(),
+          body_text: "",
+          parsed: null,
+          trade: null,
+          candidate_transaction_ids: [],
+        },
+      ]);
     await service.link(USER, ID, "t9");
     expect(pipeline.process).toHaveBeenCalledWith(USER, ID, {
       link: { transactionId: "t9" },
     });
+    expect(tradeLinks.link).not.toHaveBeenCalled();
+  });
+
+  it("links a trade email to the investment transaction it reports, not through the bank-transaction pipeline", async () => {
+    const { service, manager, pipeline, tradeLinks } = setup();
+    manager.query
+      .mockResolvedValueOnce([{ is_trade: true }])
+      .mockResolvedValueOnce([
+        {
+          ...row({ status: "ignored" }),
+          body_text: "",
+          parsed: null,
+          trade: { accountId: "a1", symbol: "XCNS", action: "BUY" },
+          candidate_transaction_ids: [],
+        },
+      ]);
+    await service.link(USER, ID, "it-9");
+    expect(tradeLinks.link).toHaveBeenCalledWith(USER, ID, "it-9");
+    expect(pipeline.process).not.toHaveBeenCalled();
+    // The detail then offers the investment transactions as its candidates.
+    expect(tradeLinks.candidates).toHaveBeenCalledWith(
+      manager,
+      USER,
+      { accountId: "a1", symbol: "XCNS", action: "BUY" },
+      expect.any(String),
+    );
   });
 
   it("a refusal from the pipeline propagates and nothing is read after it", async () => {
     const { service, manager, pipeline } = setup();
+    manager.query.mockResolvedValueOnce([{ is_trade: false }]);
     pipeline.process.mockRejectedValue(new ConflictException("applied"));
     await expect(service.link(USER, ID, "t9")).rejects.toBeInstanceOf(
       ConflictException,
     );
-    expect(manager.query).not.toHaveBeenCalled();
+    expect(manager.query).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -781,6 +845,10 @@ describe("EmailReceiptsService.overview", () => {
     expect(manager.query).toHaveBeenCalledTimes(1);
     const [sql, params] = manager.query.mock.calls[0];
     expect(String(sql)).toContain("user_id = $1");
+    // A trade confirmation's proposal waits for approval like a receipt's.
+    expect(String(sql)).toContain(
+      "rq.kind IN ('email_receipt', 'email_trade')",
+    );
     expect(params[0]).toBe(USER);
     expect(overview).toEqual({
       mailbox: {
@@ -874,7 +942,7 @@ describe("EmailReceiptsService.overview", () => {
     const sql = String(manager.query.mock.calls[0][0]);
     expect(sql).toContain("r.status = 'no_parser'");
     expect(sql).toContain("unnest(p.from_domains)");
-    expect(sql).toContain("kind = 'email_receipt'");
+    expect(sql).toContain("kind IN ('email_receipt', 'email_trade')");
     expect(sql).toContain("rq.status = 'proposed'");
     expect(sql).toContain("rq.expires_at > CURRENT_TIMESTAMP");
   });

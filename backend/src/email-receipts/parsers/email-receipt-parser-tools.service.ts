@@ -31,8 +31,10 @@ import {
 import {
   RECEIPT_PARSER_VERSION,
   type ParsedReceipt,
+  type ParsedTrade,
   type ReceiptParserDefinition,
   type ReceiptTrace,
+  type ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
 import {
   collectParserCategoryIds,
@@ -98,6 +100,26 @@ export interface LlmParsedReceipt {
 }
 
 /**
+ * What a trade profile read from one tested email, in the units a model reads:
+ * shares, decimal money. `consistent` null means the email states no price to
+ * check against the total.
+ */
+export interface LlmParsedTrade {
+  action: "BUY" | "SELL" | null;
+  symbol: string | null;
+  quantity: number | null;
+  total: number | null;
+  price: number | null;
+  commission: number | null;
+  date: string | null;
+  accountText: string | null;
+  accountId: string | null;
+  complete: boolean;
+  consistent: boolean | null;
+  reason: string | null;
+}
+
+/**
  * What the profile's matching would do with one tested email, compactly: the
  * strategy that decided, the transaction it matched, how many candidates each
  * strategy kept (spec 3a). Reads only.
@@ -129,6 +151,8 @@ export interface ParserToolTestEmail {
   trace: ReceiptTrace;
   /** What the definition's `match` section would do with this email (design 5.5). */
   match: ParserToolMatch;
+  /** For a trade profile: what it read and which line read each value. Such a profile has no bank match, and `parsed` is empty. */
+  trade?: { parsed: LlmParsedTrade; trace: ReceiptTradeTrace };
   /**
    * The transaction the caller says this email paid for and whether the parsed
    * date and total agree with it; null when the sample named none.
@@ -172,6 +196,8 @@ export interface ParserToolCategories {
   categories: Array<{ id: string; name: string }>;
   totalCount: number;
   truncated: boolean;
+  /** The user's investment accounts (id and name), for a trade profile's `accountRules` and `defaultAccountId`. */
+  investmentAccounts: Array<{ id: string; name: string }>;
   /** The whole parser language, which the tool's description has no room for. */
   guide: string;
 }
@@ -250,6 +276,23 @@ function toLlmParsed(
   };
 }
 
+function toLlmTrade(trade: ParsedTrade): LlmParsedTrade {
+  return {
+    action: trade.action,
+    symbol: trade.symbol,
+    quantity: trade.quantity,
+    total: units(trade.total),
+    price: units(trade.price),
+    commission: units(trade.commission),
+    date: trade.date,
+    accountText: trade.accountText,
+    accountId: trade.accountId,
+    complete: trade.complete,
+    consistent: trade.consistent,
+    reason: trade.reason,
+  };
+}
+
 @Injectable()
 export class EmailReceiptParserToolsService {
   constructor(
@@ -268,7 +311,23 @@ export class EmailReceiptParserToolsService {
       loadQualifiedCategoryNames(m, userId),
     );
     const all = [...names.entries()];
+    const accounts = await withScopedDb(this.dataSource, async (m) =>
+      returnedRows<{ id: string; name: string }>(
+        await m.query(
+          `SELECT id, name
+             FROM accounts
+            WHERE user_id = $1
+              AND account_type = 'INVESTMENT'
+              AND account_sub_type IS DISTINCT FROM 'INVESTMENT_CASH'
+              AND is_closed = false
+            ORDER BY name ASC
+            LIMIT 50`,
+          [userId],
+        ),
+      ),
+    );
     return {
+      investmentAccounts: accounts,
       categories: all
         .slice(0, PARSER_TOOL_MAX_CATEGORIES)
         .map(([id, name]) => ({ id, name })),
@@ -379,6 +438,14 @@ export class EmailReceiptParserToolsService {
           receiptId: receipt.id,
           subject: receipt.subject,
           effectiveDate: run.effectiveDate.toISOString(),
+          ...(run.trade
+            ? {
+                trade: {
+                  parsed: toLlmTrade(run.trade.parsed),
+                  trace: run.trade.trace,
+                },
+              }
+            : {}),
           parsed: toLlmParsed(parsed, categoryNames),
           outcome,
           trace: { ...trace, items: trace.items.slice(0, TRACE_MAX_ITEMS) },
@@ -428,7 +495,9 @@ export class EmailReceiptParserToolsService {
         emails,
         allComplete:
           unknownCategoryIds.length === 0 &&
-          emails.every((email) => email.parsed.complete),
+          emails.every((email) =>
+            email.trade ? email.trade.parsed.complete : email.parsed.complete,
+          ),
         allAgree: emails.some((email) => email.agreement !== null)
           ? emails.every((email) => email.agreement?.agrees !== false)
           : null,

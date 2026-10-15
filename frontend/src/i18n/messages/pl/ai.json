@@ -112,6 +112,7 @@
     "total": "Suma",
     "cashImpact": "Wpływ na gotówkę",
     "bondSeries": "Seria",
+    "marksPaid": "Oznacza jako zapłacone",
     "accruedInterest": "Naliczone odsetki",
     "redemptionSplit": "Rozkład wykupu",
     "redemptionSplitValue": "Kapitał {principal} + odsetki {interest} = wypłata {payout}",

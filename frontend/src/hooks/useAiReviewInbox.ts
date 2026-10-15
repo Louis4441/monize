@@ -42,7 +42,10 @@ const isConflict = (error: unknown) => error instanceof AxiosError && error.resp
 
 /** The requests a kind filter shows. A parser draft has no card, so it is under "all" only. */
 export function itemsOfKind(items: readonly AiReviewItem[], kind: AiReviewKindFilter): AiReviewItem[] {
-  return kind === 'all' ? [...items] : items.filter((item) => item.kind === kind);
+  if (kind === 'all') return [...items];
+  // A trade confirmation is an order email's proposal too.
+  if (kind === 'email_receipt') return items.filter((item) => item.kind === 'email_receipt' || item.kind === 'email_trade');
+  return items.filter((item) => item.kind === kind);
 }
 
 /**

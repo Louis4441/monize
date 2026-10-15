@@ -54,6 +54,14 @@ type ReceiptFilter = (typeof FILTERS)[number];
 /** States from which the detail dialog can link the email to a transaction. */
 const LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['ambiguous', 'unmatched', 'no_parser', 'parse_failed'];
 
+/**
+ * States from which a trade email can be linked to the investment transaction it
+ * reports: it was read (its proposal waits, was dismissed or was refused), or the
+ * trade was already in the ledger (`ignored`, which is where "link" marks the
+ * scheduled bill it pays as paid).
+ */
+const TRADE_LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['parse_failed', 'review', 'review_conflict', 'ignored'];
+
 /** The list answers one pair of filters (state and sender domain, `''` for all); `items === null` is a request that failed. */
 interface LoadedList {
   filter: ReceiptFilter;
@@ -125,7 +133,7 @@ export function EmailReceiptsManager() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [parserFor, setParserFor] = useState<EmailReceiptListItem | null>(null);
-  const [recognizeFor, setRecognizeFor] = useState<EmailReceiptListItem | null>(null);
+  const [recognizeFor, setRecognizeFor] = useState<{ receipt: EmailReceiptListItem; asTrade: boolean } | null>(null);
   const startParserDraft = useParserDraftWithAi();
 
   // Only the newest request may write the list, and a reload after an action
@@ -408,7 +416,9 @@ export function EmailReceiptsManager() {
         onClick: () => setDetailId(receipt.id),
         // The candidates of an ambiguous email, or the picker of one the matcher
         // could not tie to a transaction.
-        hidden: !LINKABLE_STATUSES.includes(receipt.status),
+        hidden: receipt.isTrade
+          ? !TRADE_LINKABLE_STATUSES.includes(receipt.status) || receipt.displayState === 'applied'
+          : !LINKABLE_STATUSES.includes(receipt.status),
         disabled,
       },
       {
@@ -418,7 +428,19 @@ export function EmailReceiptsManager() {
         label: t('actions.recognizeAi'),
         icon: 'reconcile',
         tone: 'accent',
-        onClick: () => setRecognizeFor(receipt),
+        onClick: () => setRecognizeFor({ receipt, asTrade: false }),
+        // A trade email creates a transaction: there is no bank transaction to split.
+        hidden: receipt.isTrade || !canRecognizeWithAi(receipt),
+        disabled,
+      },
+      {
+        // The email is a brokerage trade confirmation: the AI proposes the
+        // investment transaction it reports. Offered where "Recognize with AI" is.
+        key: 'recognizeTradeAi',
+        label: t('actions.recognizeTradeAi'),
+        icon: 'reconcile',
+        tone: 'accent',
+        onClick: () => setRecognizeFor({ receipt, asTrade: true }),
         hidden: !canRecognizeWithAi(receipt),
         disabled,
       },
@@ -722,8 +744,9 @@ export function EmailReceiptsManager() {
 
       {recognizeFor !== null && (
         <RecognizeWithAiDialog
-          key={recognizeFor.id}
-          receipt={recognizeFor}
+          key={`${recognizeFor.receipt.id}:${recognizeFor.asTrade}`}
+          receipt={recognizeFor.receipt}
+          asTrade={recognizeFor.asTrade}
           onClose={() => setRecognizeFor(null)}
           onChanged={() => void reload()}
         />

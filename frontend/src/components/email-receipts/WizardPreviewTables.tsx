@@ -13,6 +13,9 @@ import {
   type ParserPreviewResult,
 } from '@/types/email-receipts';
 
+/** The reasons a trade profile gives for a reading it could not complete (`ParsedTradeReason`). */
+const TRADE_REASONS: readonly string[] = ['trade_no_action', 'trade_no_symbol', 'trade_no_quantity', 'trade_no_amount', 'trade_no_account'] as const;
+
 const MUTED = 'text-gray-500 dark:text-gray-400';
 
 /** What the draft read from one email: date, total and the number of lines, each "not stated" when the email did not say. */
@@ -20,6 +23,7 @@ function ParsedCell({ item }: { item: ParserPreviewItem }) {
   const t = useTranslations('emailReceipts.profileWizard.preview');
   const { formatDate } = useDateFormat();
   const { formatCurrency, formatNumber } = useNumberFormat();
+  const { formatShareQuantity } = useNumberFormat();
   const parsed = item.parsed;
   if (parsed === null) return <span className={MUTED}>{t('nothingRead')}</span>;
   // The server sends the total in money units; a total with no currency is shown as a bare number.
@@ -29,6 +33,27 @@ function ParsedCell({ item }: { item: ParserPreviewItem }) {
       : parsed.currency
         ? formatCurrency(parsed.total, parsed.currency)
         : formatNumber(parsed.total, 2);
+  if (item.trade !== null) {
+    // A trade profile: what the confirmation reports. The total has no currency of its own here.
+    return (
+      <div className="space-y-0.5">
+        {item.trade.action !== null && item.trade.symbol !== null && item.trade.quantity !== null ? (
+          <div>
+            {t('parsedTrade', {
+              action: item.trade.action,
+              quantity: formatShareQuantity(item.trade.quantity),
+              symbol: item.trade.symbol,
+            })}
+          </div>
+        ) : (
+          <div className={MUTED}>{t('nothingRead')}</div>
+        )}
+        <div>{t('parsedDate', { date: parsed.date === null ? t('notStated') : formatDate(parsed.date) })}</div>
+        <div>{t('parsedTotal', { total })}</div>
+        {item.trade.consistent === false && <div className="text-xs text-amber-800 dark:text-amber-300">{t('tradeInconsistent')}</div>}
+      </div>
+    );
+  }
   return (
     <div className="space-y-0.5">
       <div>{t('parsedDate', { date: parsed.date === null ? t('notStated') : formatDate(parsed.date) })}</div>
@@ -56,6 +81,8 @@ function OutcomeLabel({ outcome }: { outcome: ParserPreviewOutcome }) {
 /** A parse reason the catalog names is shown in words; any other is shown as sent. */
 function ReasonLabel({ reason }: { reason: string }) {
   const t = useTranslations('emailReceipts.parsed.reasons');
+  const tTrade = useTranslations('emailReceipts.detail.reasons');
+  if (TRADE_REASONS.includes(reason)) return <>{tTrade(reason as 'trade_no_action')}</>;
   const known = (PARSED_RECEIPT_REASONS as readonly string[]).includes(reason);
   return <>{known ? t(reason as ParsedReceiptReason) : reason}</>;
 }

@@ -112,6 +112,7 @@
     "total": "合計",
     "cashImpact": "現金影響",
     "bondSeries": "系列",
+    "marksPaid": "標記為已付款",
     "accruedInterest": "應計利息",
     "redemptionSplit": "贖回拆分",
     "redemptionSplitValue": "本金 {principal} + 利息 {interest} = 支付 {payout}",

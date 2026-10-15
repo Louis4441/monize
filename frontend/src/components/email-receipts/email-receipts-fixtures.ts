@@ -83,6 +83,7 @@ export function makeReceipt(overrides: Partial<EmailReceiptListItem> = {}): Emai
     parserId: null,
     parserName: null,
     aiReviewRequestId: null,
+    isTrade: false,
     displayState: null,
     requestNote: null,
     transaction: null,
@@ -99,6 +100,7 @@ export function makeDetail(overrides: Partial<EmailReceiptDetail> = {}): EmailRe
     lines: { text: ['Thank you for your order.', 'Total 25.00'], html: null },
     structuredOrder: null,
     parsed: null,
+    trade: null,
     candidates: [],
     ...overrides,
   };
@@ -141,3 +143,19 @@ export function makeOverview(overrides: Partial<EmailReceiptsOverview> = {}): Em
     ...overrides,
   };
 }
+
+/** A `ParsedTrade` as the API stores it: the total in 1/10000 units. */
+export const PARSED_TRADE = {
+  action: 'BUY',
+  symbol: 'XCNS',
+  quantity: 75.9878,
+  total: 20_000_000,
+  price: 263_200,
+  commission: null,
+  date: '2026-10-15',
+  accountText: 'RRSP',
+  accountId: 'acc-rrsp',
+  complete: true,
+  consistent: true,
+  reason: null,
+};

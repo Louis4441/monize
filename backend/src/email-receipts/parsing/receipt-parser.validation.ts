@@ -42,6 +42,9 @@ import {
   ReceiptParserDefinition,
   ReceiptRecordStep,
   ReceiptSingleItemsDefinition,
+  ReceiptTradeAccountRule,
+  ReceiptTradeDefinition,
+  MAX_TRADE_ACCOUNT_RULES,
 } from "./receipt-parser.types";
 
 /**
@@ -101,6 +104,10 @@ const SINGLE_NAME_CAPTURES: FieldCaptures = {
   allowed: ["name"],
   required: ["name"],
 };
+const captureOf = (name: string): FieldCaptures => ({
+  allowed: [name],
+  required: [name],
+});
 const AMOUNT_CAPTURES: FieldCaptures = {
   allowed: ["amount"],
   required: ["amount"],
@@ -131,6 +138,7 @@ const TOP_LEVEL_KEYS: readonly string[] = [
   "tag",
   "aiCategories",
   "balanceTolerance",
+  "trade",
   "items",
   "categoryRules",
   "defaultCategoryId",
@@ -139,6 +147,28 @@ const TOP_LEVEL_KEYS: readonly string[] = [
   "defaultCategory",
   "shippingCategory",
   "feesCategory",
+  "requireLine",
+  "skipIfLine",
+  "waitIfLine",
+];
+const TRADE_KEYS: readonly string[] = [
+  "action",
+  "symbol",
+  "quantity",
+  "total",
+  "price",
+  "commission",
+  "date",
+  "account",
+  "accountRules",
+  "defaultAccountId",
+];
+const TRADE_ACCOUNT_RULE_KEYS: readonly string[] = ["match", "accountId"];
+/** The top-level keys a profile with a `trade` section may also hold. */
+const TRADE_COMPATIBLE_KEYS: readonly string[] = [
+  "version",
+  "source",
+  "trade",
   "requireLine",
   "skipIfLine",
   "waitIfLine",
@@ -874,6 +904,112 @@ function checkBalanceTolerance(value: unknown, errors: Errors): string | null {
   return value;
 }
 
+function checkTradeAccountRules(
+  value: unknown,
+  errors: Errors,
+): ReceiptTradeAccountRule[] | null {
+  const path = "trade.accountRules";
+  if (!Array.isArray(value)) {
+    errors.add(path, "invalid_type");
+    return null;
+  }
+  if (value.length > MAX_TRADE_ACCOUNT_RULES) {
+    errors.add(path, "too_many");
+    return null;
+  }
+  const before = errors.list.length;
+  const out: ReceiptTradeAccountRule[] = [];
+  value.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    if (!isPlainObject(entry)) {
+      errors.add(entryPath, "invalid_type");
+      return;
+    }
+    checkKeys(entry, TRADE_ACCOUNT_RULE_KEYS, `${entryPath}.`, errors);
+    const matchOk = checkPattern(
+      entry.match,
+      `${entryPath}.match`,
+      NO_CAPTURES,
+      errors,
+    );
+    const accountId = checkUuid(
+      entry.accountId,
+      `${entryPath}.accountId`,
+      errors,
+    );
+    if (matchOk && accountId !== null) {
+      out.push({ match: entry.match as string, accountId });
+    }
+  });
+  return errors.list.length === before ? out : null;
+}
+
+/**
+ * The `trade` section: `action`, `symbol` and `quantity` are required lists, at
+ * least one of `total` and `price` must be present, and the account must be
+ * decidable: `defaultAccountId`, or `account` entries with `accountRules`.
+ */
+function checkTrade(
+  value: unknown,
+  errors: Errors,
+): ReceiptTradeDefinition | null {
+  if (!isPlainObject(value)) {
+    errors.add("trade", "invalid_type");
+    return null;
+  }
+  const before = errors.list.length;
+  checkKeys(value, TRADE_KEYS, "trade.", errors);
+  const fields: [keyof ReceiptTradeDefinition, FieldCaptures, boolean][] = [
+    ["action", captureOf("action"), true],
+    ["symbol", captureOf("symbol"), true],
+    ["quantity", captureOf("quantity"), true],
+    ["total", AMOUNT_CAPTURES, false],
+    ["price", AMOUNT_CAPTURES, false],
+    ["commission", AMOUNT_CAPTURES, false],
+    ["date", captureOf("date"), false],
+    ["account", captureOf("account"), false],
+  ];
+  const out: Record<string, unknown> = {};
+  for (const [field, captures, required] of fields) {
+    if (value[field] === undefined) {
+      if (required) errors.add(`trade.${field}`, "empty");
+      continue;
+    }
+    const patterns = checkPatternList(
+      value[field],
+      `trade.${field}`,
+      captures,
+      errors,
+      1,
+    );
+    if (patterns !== null) out[field] = patterns;
+  }
+  if (value.total === undefined && value.price === undefined) {
+    errors.add("trade.total", "trade_amount_missing");
+  }
+  if (value.accountRules !== undefined) {
+    const rules = checkTradeAccountRules(value.accountRules, errors);
+    if (rules !== null) out.accountRules = rules;
+  }
+  if (value.defaultAccountId !== undefined) {
+    const id = checkUuid(
+      value.defaultAccountId,
+      "trade.defaultAccountId",
+      errors,
+    );
+    if (id !== null) out.defaultAccountId = id;
+  }
+  const decidable =
+    value.defaultAccountId !== undefined ||
+    (Array.isArray(value.accountRules) &&
+      value.accountRules.length > 0 &&
+      value.account !== undefined);
+  if (!decidable) errors.add("trade.defaultAccountId", "trade_account_missing");
+  return errors.list.length === before
+    ? (out as unknown as ReceiptTradeDefinition)
+    : null;
+}
+
 /**
  * Validate an untrusted value as a receipt parser definition (version 2, the
  * only one). Refuses unknown keys at every level, wrong types, another
@@ -950,6 +1086,19 @@ export function validateReceiptParserDefinition(
       errors.add("aiCategories", "invalid_type");
     }
   }
+  if (input.trade !== undefined) {
+    const trade = checkTrade(input.trade, errors);
+    if (trade !== null) out.trade = trade;
+    // A trade profile reads a brokerage confirmation, nothing else.
+    for (const key of Object.keys(input)) {
+      if (
+        TOP_LEVEL_KEYS.includes(key) &&
+        !TRADE_COMPATIBLE_KEYS.includes(key)
+      ) {
+        errors.add(key, "trade_conflict");
+      }
+    }
+  }
   if (input.items !== undefined) {
     const items = checkItems(input.items, errors);
     if (items !== null) out.items = items;
@@ -989,6 +1138,21 @@ export function validateReceiptParserDefinition(
   return errors.list.length > 0
     ? { ok: false, errors: errors.list }
     : { ok: true, definition: out as unknown as ReceiptParserDefinition };
+}
+
+/**
+ * Every account id a `trade` section refers to, each once (the rules, then the
+ * default). The proposal checks each is the user's INVESTMENT account when it
+ * builds the card, so a foreign id fails there and nowhere writes a row.
+ */
+export function collectParserAccountIds(
+  definition: ReceiptParserDefinition,
+): string[] {
+  const trade = definition.trade;
+  if (!trade) return [];
+  const ids = (trade.accountRules ?? []).map((rule) => rule.accountId);
+  if (trade.defaultAccountId) ids.push(trade.defaultAccountId);
+  return [...new Set(ids)];
 }
 
 /**

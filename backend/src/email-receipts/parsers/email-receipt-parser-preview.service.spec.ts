@@ -4,6 +4,10 @@ import { Payee } from "../../payees/entities/payee.entity";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import {
+  WEALTHSIMPLE_BUY_BODY,
+  WEALTHSIMPLE_TRADE_DEFINITION,
+} from "../parsing/fixtures/wealthsimple-trade";
+import {
   EmailReceiptParserPreviewService,
   PARSER_PREVIEW_MAX_OTHERS,
 } from "./email-receipt-parser-preview.service";
@@ -337,5 +341,55 @@ describe("EmailReceiptParserPreviewService.preview", () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(parserRepo.findOne).not.toHaveBeenCalled();
+  });
+});
+
+describe("EmailReceiptParserPreviewService.preview of a trade profile", () => {
+  const tradeParser = () =>
+    parserRow({
+      fromDomains: ["wealthsimple.com"],
+      definition: WEALTHSIMPLE_TRADE_DEFINITION as never,
+    });
+  const filled = (id: string, over: Record<string, unknown> = {}) =>
+    mail(id, { body_text: WEALTHSIMPLE_BUY_BODY, ...over });
+
+  it("reports a complete trade as `trade`, with what it read, and looks up no bank transaction", async () => {
+    const { service, manager } = setup({
+      parser: tradeParser(),
+      selected: [filled(R1)],
+      others: [
+        filled(R2, {
+          body_text: WEALTHSIMPLE_BUY_BODY.replace("Symbol:", "Ticker:"),
+        }),
+        filled(R3, { body_text: "Hello\nWorld" }),
+      ],
+    });
+
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      outcome: "trade",
+      statusReason: null,
+      parsed: { date: "2026-10-15", total: 2000 },
+      trade: {
+        action: "BUY",
+        symbol: "XCNS",
+        quantity: 75.9878,
+        consistent: true,
+      },
+      match: null,
+    });
+    expect(
+      result.others.map((o) => [o.receiptId, o.outcome, o.statusReason]),
+    ).toEqual([
+      [R2, "parse_failed", "trade_no_symbol"],
+      [R3, "not_applicable", null],
+    ]);
+    expect(result.others[0].trade).toMatchObject({ symbol: null });
+    expect(result.others[1].trade).toBeNull();
+    const sqls = manager.query.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((q) => q.includes("JOIN accounts"))).toBe(false);
   });
 });

@@ -512,6 +512,10 @@ export class AiActionBuilderService {
   buildCreateInvestmentTransaction(
     userId: string,
     preview: CreateInvestmentTransactionPreview,
+    options: {
+      aiReviewRequestId?: string;
+      scheduled?: { id: string; name: string; dueDate: string };
+    } = {},
   ): PendingAiAction {
     const { actionId, expiresAt } = this.newEnvelope();
     const descriptor: CreateInvestmentTransactionDescriptor = {
@@ -531,6 +535,15 @@ export class AiActionBuilderService {
       exchangeRate: preview.exchangeRate,
       description: preview.description,
       bondInstrumentId: preview.bondInstrumentId,
+      ...(options.aiReviewRequestId
+        ? { aiReviewRequestId: options.aiReviewRequestId }
+        : {}),
+      ...(options.scheduled
+        ? {
+            scheduledTransactionId: options.scheduled.id,
+            scheduledDueDate: options.scheduled.dueDate,
+          }
+        : {}),
     };
     return {
       actionId,
@@ -556,6 +569,7 @@ export class AiActionBuilderService {
         accruedInterest: preview.accruedInterest,
         bondSeriesCode: preview.bondSeriesCode,
         bondRedemptionSplit: preview.redemptionSplit,
+        ...(options.scheduled ? { scheduledName: options.scheduled.name } : {}),
       },
     };
   }

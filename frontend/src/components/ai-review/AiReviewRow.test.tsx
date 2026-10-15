@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { AiReviewRow } from './AiReviewRow';
-import { makeReviewItem, PROPOSED_ACTION } from './ai-review-fixtures';
+import { makeReviewItem, makeTradeItem, PROPOSED_ACTION } from './ai-review-fixtures';
 import type { AiReviewItem } from '@/types/ai-review';
 
 function renderRow(item: AiReviewItem) {
@@ -268,6 +268,39 @@ describe('AiReviewRow', () => {
     it('spans the card row across the extra column', () => {
       const { container } = renderSelectable(proposed());
       expect(container.querySelector('td[colspan="5"]')).not.toBeNull();
+    });
+  });
+
+  describe('a trade confirmation (email_trade)', () => {
+    it('names the trade and the email, with no transaction of its own', () => {
+      renderRow(makeTradeItem());
+      expect(screen.getByText('Buy 75.9878 shares of XCNS')).toBeInTheDocument();
+      expect(screen.getByText(/Email receipt: Your order has been filled from notifications@o\.wealthsimple\.com/)).toBeInTheDocument();
+      expect(screen.queryByText('This transaction no longer exists')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'View transaction' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'View email receipts' })).toHaveAttribute('href', '/email-receipts?tab=emails');
+    });
+
+    it('reads a sell as a sell', () => {
+      renderRow(makeTradeItem({ trade: { ...makeTradeItem().trade!, action: 'SELL' } }));
+      expect(screen.getByText('Sell 75.9878 shares of XCNS')).toBeInTheDocument();
+    });
+
+    it('shows its fixed instruction in the reader\'s language and never says it waits for an agent', () => {
+      renderRow(makeTradeItem({ status: 'claimed' }));
+      expect(screen.getByText(/proposes this investment transaction\. Check the account/)).toBeInTheDocument();
+      expect(screen.queryByText(/Waiting for an AI agent/)).not.toBeInTheDocument();
+    });
+
+    it('shows the confirmation card of a proposed trade', () => {
+      renderRow(makeTradeItem({ proposal: { action: PROPOSED_ACTION } }));
+      expect(screen.getByRole('button', { name: /confirm|approve/i })).toBeInTheDocument();
+    });
+
+    it('lets the person dismiss one whose card can no longer be built, with the reason', () => {
+      renderRow(makeTradeItem({ proposal: { error: 'You have no security with the ticker "XCNS".' } }));
+      expect(screen.getByRole('alert')).toHaveTextContent('You have no security with the ticker "XCNS".');
+      expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
     });
   });
 });

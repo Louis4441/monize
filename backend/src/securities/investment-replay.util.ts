@@ -286,11 +286,7 @@ export function investmentIncomeAmount(tx: {
  * capital flow.
  */
 export type InvestedFlowKind =
-  | "capitalIn"
-  | "capitalOut"
-  | "income"
-  | "reinvestedIncome"
-  | "none";
+  "capitalIn" | "capitalOut" | "income" | "reinvestedIncome" | "none";
 
 export const INVESTED_FLOW_KIND_BY_BASE_ACTION: ReadonlyMap<
   InvestmentAction,

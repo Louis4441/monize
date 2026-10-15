@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { render, screen, fireEvent, act, within } from '@/test/render';
 import { EmailReceiptsManager } from './EmailReceiptsManager';
 import { makeDetail, makeMailbox, makeParser, makeReceipt } from './email-receipts-fixtures';
+import type { EmailReceiptListItem } from '@/types/email-receipts';
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -607,6 +608,51 @@ describe('EmailReceiptsManager', () => {
       await renderManager();
       await runAction('Order unmatched', 'Reprocess');
       expect(screen.getByRole('alert')).toHaveTextContent('This email could not be read');
+    });
+  });
+
+  describe('a trade confirmation', () => {
+    const trade = (over: Partial<EmailReceiptListItem> = {}) =>
+      makeReceipt({ id: 'r-trade', subject: 'Order trade', isTrade: true, status: 'review', displayState: 'proposed', ...over });
+
+    it('offers "Recognize as a trade with AI" where "Recognize with AI" is, and the trade email only the former', async () => {
+      api.list.mockResolvedValue([...all, trade({ status: 'parse_failed', displayState: null, statusReason: 'trade_no_symbol' })]);
+      await renderManager();
+      expect(await allActions('Order unmatched')).toContain('Recognize as a trade with AI');
+      expect(await allActions('Order unmatched')).toContain('Recognize with AI');
+      const tradeActions = await allActions('Order trade');
+      expect(tradeActions).toContain('Recognize as a trade with AI');
+      // A trade creates a transaction: there is no bank transaction to split.
+      expect(tradeActions).not.toContain('Recognize with AI');
+    });
+
+    it('offers no recognition for an email with a proposal waiting or an applied one', async () => {
+      api.list.mockResolvedValue([...all]);
+      await renderManager();
+      for (const subject of ['Order proposed', 'Order applied', 'Order ignored', 'Order skipped', 'Order pending']) {
+        expect(await allActions(subject), subject).not.toContain('Recognize as a trade with AI');
+      }
+    });
+
+    it('lets a trade email be linked to the transaction it reports, even once it was closed as already booked', async () => {
+      api.list.mockResolvedValue([
+        trade({ id: 'r-booked', subject: 'Order booked', status: 'ignored', displayState: null, statusReason: 'trade_exists' }),
+        trade({ id: 'r-applied', subject: 'Order trade applied', displayState: 'applied' }),
+      ]);
+      await renderManager();
+      expect(await allActions('Order booked')).toContain('Choose transaction');
+      expect(await allActions('Order trade applied')).not.toContain('Choose transaction');
+    });
+
+    it('opens the trade dialog, which queues the request as a trade', async () => {
+      api.list.mockResolvedValue([trade({ status: 'no_parser', displayState: null, isTrade: false, id: 'r-np', subject: 'Order np' })]);
+      api.askAi.mockResolvedValue({ ok: true, requestId: 'req-t', transactionId: null });
+      api.get.mockResolvedValue(makeDetail({ id: 'r-np', transaction: null, bodyText: 'Symbol: XCNS' }));
+      await renderManager();
+      await runAction('Order np', 'Recognize as a trade with AI');
+      expect(screen.getByRole('dialog', { name: 'Recognize as a trade with AI' })).toBeInTheDocument();
+      await click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Recognize as a trade' }));
+      expect(api.askAi).toHaveBeenCalledWith('r-np', undefined, { asTrade: true });
     });
   });
 

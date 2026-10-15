@@ -38,11 +38,14 @@
     "transactionMissing": "Esta transação não existe mais",
     "rule": "Regra: {name}",
     "manualRequest": "Solicitado manualmente",
+    "trade": "{action, select, BUY {Compra de {quantity} cotas de {symbol}} other {Venda de {quantity} cotas de {symbol}}}",
     "receiptInstruction": {
       "automatic": "Complete esta transação a partir do e-mail do pedido anexado: divida-a por item com uma categoria cada, ou defina a descrição.",
       "chat": "Você pediu o reconhecimento do e-mail do pedido anexado: divida esta transação por produto com uma categoria cada, ou defina a descrição.",
       "categorize": "Atribua uma categoria a cada item do e-mail do pedido anexado que nenhuma regra categorizou e, depois, proponha a divisão desta transação ou defina a descrição.",
-      "parsed": "Um analisador salvo leu o e-mail do pedido e propõe estas linhas de categoria e esta descrição para a transação."
+      "parsed": "Um analisador salvo leu o e-mail do pedido e propõe estas linhas de categoria e esta descrição para a transação.",
+      "trade": "Um e-mail de confirmação de negociação lido por um analisador salvo propõe esta transação de investimento. Antes de aprovar, confira a conta, o ativo, as cotas e o total na sua corretora.",
+      "tradeChat": "Você pediu para reconhecer a confirmação de negociação anexada: proponha a transação de investimento que ela informa."
     },
     "emailReceipt": "Recibo por e-mail: {subject} de {sender}",
     "emailReceiptMissing": "Recibo por e-mail (o e-mail foi excluído)",

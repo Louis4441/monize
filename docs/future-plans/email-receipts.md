@@ -27,6 +27,10 @@ drafted by the user's AI provider from one sample email and approved by the
 user) and then runs deterministically. The AI is not called per email unless the
 user chose that.
 
+A brokerage's trade-confirmation email is the other half of the same idea (it
+has no bank transaction to enrich; it IS the missing transaction):
+[`email-receipt-trades.md`](./email-receipt-trades.md).
+
 Out of scope for this branch: receipt photos and OCR (a vision pass over an
 image attachment), more than one mailbox per user, POP3, and attaching the
 email's PDF parts to the transaction. Section 11 records them.

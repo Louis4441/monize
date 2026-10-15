@@ -62,8 +62,8 @@ export function AiReviewRow({
 }: AiReviewRowProps) {
   const t = useTranslations('aiReview');
   const { formatDate } = useDateFormat();
-  const { formatCurrency } = useNumberFormat();
-  const { transaction, proposal, parserDraft } = item;
+  const { formatCurrency, formatShareQuantity } = useNumberFormat();
+  const { transaction, proposal, parserDraft, trade } = item;
 
   const action = proposal && 'action' in proposal ? proposal.action : null;
   const proposalError = proposal && 'error' in proposal ? proposal.error : null;
@@ -88,12 +88,20 @@ export function AiReviewRow({
           </Td>
         )}
         <Td className={`${CELL} whitespace-nowrap`}>
-          {transaction ? formatDate(transaction.date) : parserDraft ? formatDate(new Date(item.createdAt)) : ''}
+          {transaction
+            ? formatDate(transaction.date)
+            : trade
+              ? formatDate(trade.date)
+              : parserDraft
+                ? formatDate(new Date(item.createdAt))
+                : ''}
         </Td>
         <Td className={`${CELL} min-w-0 break-words`}>
           <div className="font-medium">
             {parserDraft ? (
               t('row.parserDraft', { count: parserDraft.emailCount, domain: parserDraft.domain })
+            ) : trade ? (
+              t('row.trade', { action: trade.action, quantity: formatShareQuantity(trade.quantity), symbol: trade.symbol })
             ) : transaction ? (
               (transaction.payeeName ?? <span className="text-gray-500 dark:text-gray-400">{t('row.noPayee')}</span>)
             ) : (
@@ -105,7 +113,7 @@ export function AiReviewRow({
               <Link href="/email-receipts?tab=emails" className="text-blue-600 hover:underline dark:text-blue-400">
                 {t('row.viewEmailReceipts')}
               </Link>
-            ) : item.kind === 'email_receipt' ? (
+            ) : item.kind === 'email_receipt' || item.kind === 'email_trade' ? (
               <>
                 {item.emailReceipt
                   ? t('row.emailReceipt', { subject: item.emailReceipt.subject, sender: item.emailReceipt.fromAddress })

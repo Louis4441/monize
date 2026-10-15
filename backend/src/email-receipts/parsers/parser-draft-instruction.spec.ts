@@ -6,10 +6,12 @@ import {
 const RECEIPT = "30000000-0000-4000-8000-000000000001";
 const TX = "40000000-0000-4000-8000-000000000001";
 
+type Paid = NonNullable<WizardInstructionSample["transaction"]>;
+
 const sample = (
   index: number,
-  over: Partial<WizardInstructionSample["transaction"]> = {},
-): WizardInstructionSample => ({
+  over: Partial<Paid> = {},
+): WizardInstructionSample & { transaction: Paid } => ({
   receiptId: `3000000${index}-0000-4000-8000-000000000001`,
   transaction: {
     id: `4000000${index}-0000-4000-8000-000000000001`,
@@ -115,5 +117,30 @@ describe("buildWizardParserDraftInstruction", () => {
       revision: null,
     });
     expect(text).toContain(`1 e:30000000 tx:${TX} 2026-09-11 -15.5 EUR`);
+  });
+});
+
+describe("buildWizardParserDraftInstruction of trade confirmations", () => {
+  it("asks for a trade profile, lists the emails and pairs them with no transaction", () => {
+    const text = buildWizardParserDraftInstruction({
+      domain: "wealthsimple.com",
+      samples: [
+        { receiptId: RECEIPT, transaction: null },
+        {
+          receiptId: "30000002-0000-4000-8000-000000000001",
+          transaction: null,
+        },
+      ],
+      revision: null,
+      kind: "trade",
+    });
+    expect(text).toContain("trade-confirmation profile");
+    expect(text).toContain("investmentAccounts");
+    expect(text).toContain("wealthsimple.com");
+    expect(text).toContain("1 e:30000000");
+    expect(text).toContain("2 e:30000002");
+    expect(text).not.toContain("tx:");
+    expect(text).not.toContain("samples of receiptId and transactionId");
+    expect(text.length).toBeLessThanOrEqual(1000);
   });
 });

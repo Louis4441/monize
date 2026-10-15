@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { WIZARD_MAX_SAMPLES, type ChosenTransaction, type WizardDraft } from '@/components/email-receipts/profile-wizard-types';
+import { WIZARD_MAX_SAMPLES, type ChosenTransaction, type WizardDraft, type WizardKind } from '@/components/email-receipts/profile-wizard-types';
 import { WizardGenerateStep, type WizardSample } from '@/components/email-receipts/WizardGenerateStep';
 import { WizardPreviewStep } from '@/components/email-receipts/WizardPreviewStep';
 import { WizardSamplesStep } from '@/components/email-receipts/WizardSamplesStep';
@@ -39,6 +39,10 @@ export function ProfileWizard({ domain, onClose, onFinished }: ProfileWizardProp
   const [step, setStep] = useState<Step>('samples');
   const [picks, setPicks] = useState<Readonly<Record<string, ChosenTransaction>>>({});
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // A trade confirmation pays no bank transaction: its samples are emails only.
+  const [kind, setKind] = useState<WizardKind>('receipt');
+  // The subjects of the ticked emails, for the lines that name a sample with no transaction.
+  const [subjects, setSubjects] = useState<Readonly<Record<string, string>>>({});
   const [draft, setDraft] = useState<WizardDraft | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
   // The draft the domain already has, from the uncovered list; null when there is none or it is unknown.
@@ -68,16 +72,19 @@ export function ProfileWizard({ domain, onClose, onFinished }: ProfileWizardProp
 
   const samples: WizardSample[] = useMemo(
     () =>
-      [...selected].flatMap((receiptId) => {
+      [...selected].flatMap((receiptId): WizardSample[] => {
+        if (kind === 'trade') return [{ receiptId, chosen: null, subject: subjects[receiptId] ?? '' }];
         const chosen = picks[receiptId];
-        return chosen ? [{ receiptId, chosen }] : [];
+        return chosen ? [{ receiptId, chosen, subject: chosen.subject }] : [];
       }),
-    [selected, picks],
+    [selected, picks, kind, subjects],
   );
   const pairs: ParserSamplePair[] = useMemo(
-    () => samples.map((sample) => ({ receiptId: sample.receiptId, transactionId: sample.chosen.transactionId })),
+    () => samples.flatMap((sample) => (sample.chosen ? [{ receiptId: sample.receiptId, transactionId: sample.chosen.transactionId }] : [])),
     [samples],
   );
+
+  const tradeIds = useMemo(() => (kind === 'trade' ? samples.map((sample) => sample.receiptId) : undefined), [kind, samples]);
 
   const toggle = (receiptId: string) =>
     setSelected((current) => {
@@ -152,6 +159,12 @@ export function ProfileWizard({ domain, onClose, onFinished }: ProfileWizardProp
             domain={domain}
             picks={picks}
             selected={selected}
+            kind={kind}
+            onKindChange={(next) => {
+              setKind(next);
+              setSelected(new Set());
+            }}
+            onSubject={(receiptId, subject) => setSubjects((current) => ({ ...current, [receiptId]: subject }))}
             onPick={(receiptId, chosen) => setPicks((current) => ({ ...current, [receiptId]: chosen }))}
             onToggle={toggle}
             onContinue={() => setStep('generate')}
@@ -163,6 +176,7 @@ export function ProfileWizard({ domain, onClose, onFinished }: ProfileWizardProp
         <WizardGenerateStep
           domain={domain}
           samples={samples}
+          kind={kind}
           draft={draft}
           onQueued={() => {
             // The agent revises or writes the draft later: wait on what the domain has now.
@@ -184,6 +198,7 @@ export function ProfileWizard({ domain, onClose, onFinished }: ProfileWizardProp
           draft={draft}
           answer={answer}
           pairs={pairs}
+          selectedReceiptIds={tradeIds}
           canReviseWithAi={canReviseWithAi}
           onBackToAi={() => setStep('generate')}
           onBackToSamples={() => setStep('samples')}

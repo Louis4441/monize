@@ -23,8 +23,10 @@ import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "../receipts/dto/email-receip
 import { dryRunReceipt } from "./receipt-dry-run";
 import type {
   ParsedReceipt,
+  ParsedTrade,
   ReceiptParserDefinition,
   ReceiptTrace,
+  ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
 import {
   collectParserCategoryIds,
@@ -100,6 +102,12 @@ export interface EmailReceiptParserTestResult {
     amount: number;
     payeeName: string | null;
   } | null;
+  /**
+   * For a profile with a `trade` section: what it read and which line read each
+   * value. Such a profile is not matched to a bank transaction, so `parsed`,
+   * `trace`, `match` and `transaction` are then empty. Absent for a receipt.
+   */
+  trade?: { parsed: ParsedTrade; trace: ReceiptTradeTrace };
 }
 
 /**
@@ -401,6 +409,7 @@ export class EmailReceiptParsersService {
       const run = await dryRunReceipt(m, userId, definition, receipt, payee);
       const { parsed, trace, outcome, match, candidates, hit } = run;
       return {
+        ...(run.trade ? { trade: run.trade } : {}),
         parsed,
         trace,
         outcome,

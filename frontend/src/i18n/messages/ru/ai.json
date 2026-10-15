@@ -112,6 +112,7 @@
     "total": "Итого",
     "cashImpact": "Влияние на денежные средства",
     "bondSeries": "Серия",
+    "marksPaid": "Отмечает как оплаченное",
     "accruedInterest": "Накопленные проценты",
     "redemptionSplit": "Разбивка погашения",
     "redemptionSplitValue": "Номинал {principal} + проценты {interest} = выплата {payout}",

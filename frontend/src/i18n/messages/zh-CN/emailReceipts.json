@@ -553,6 +553,7 @@
       "reprocess": "重新处理",
       "link": "选择交易",
       "recognizeAi": "用 AI 识别",
+      "recognizeTradeAi": "用 AI 识别为交易",
       "approve": "批准",
       "draftParser": "使用 AI 准备配置文件",
       "createParser": "创建配置文件",
@@ -644,11 +645,21 @@
       "wait_line": "有一行表明订单尚未最终确定，因此稍后会再次读取该邮件。",
       "no_html": "此解析器读取邮件的 HTML 部分，而这封邮件没有 HTML。",
       "schema_org": "无需解析器：订单是从邮件中的结构化数据（schema.org）读取的。",
-      "item_amount_missing": "某个明细没有金额，而邮件中也没有可分配给它的单一合计。"
+      "item_amount_missing": "某个明细没有金额，而邮件中也没有可分配给它的单一合计。",
+      "trade_no_action": "解析器在这封邮件中没有找到买入或卖出。",
+      "trade_no_symbol": "解析器在这封邮件中没有找到股票代码。",
+      "trade_no_quantity": "解析器在这封邮件中没有找到份数。",
+      "trade_no_amount": "解析器在这封邮件中既没有找到合计，也没有找到价格。",
+      "trade_no_account": "解析器无法判断这笔交易属于哪个账户。",
+      "trade_exists": "你的账户中已有这笔交易，因此没有提出任何建议。",
+      "trade_linked": "已关联到它所报告的交易，因此没有提出任何建议。"
     },
     "reasonUnknown": "原因：{reason}",
     "requestNote": "审核请求（{state}）：{note}",
     "parsedHeading": "解析器读取的内容",
+    "tradeHeading": "从邮件中读取的交易",
+    "tradeCandidatesHeading": "可能是这笔交易的现有交易",
+    "tradeCandidatesHelp": "这些投资交易可能就是这封邮件报告的交易。请关联正确的一笔：不会创建新交易，它所支付的计划账单或存款会被标记为已付款。",
     "notParsed": "尚未从这封邮件中读取到任何内容。",
     "candidatesHeading": "匹配的交易",
     "candidatesHelp": "有多笔交易与这封邮件同样匹配。请选择它所支付的那一笔。",
@@ -747,6 +758,9 @@
   },
   "recognize": {
     "title": "用 AI 识别",
+    "tradeTitle": "用 AI 识别为交易",
+    "tradeMessage": "AI 会把这封邮件当作券商的交易确认来读取，并提出它所报告的投资交易（账户、买入或卖出、股票代码、份数和合计）。在你批准之前不会保存任何内容。",
+    "tradeConfirm": "识别为交易",
     "transactionSummary": "{date}，{amount}，{payee}",
     "noPayee": "无收款人",
     "confirmMessage": "此邮件已关联到交易 {summary}。AI 将读取邮件，并提议如何按商品拆分这笔交易。要使用这笔交易继续吗？",
@@ -765,7 +779,8 @@
     "handoffFailed": "请求已排队，但无法在聊天中打开该邮件。它会在 AI 审核收件箱中等待代理（例如通过 MCP）处理。",
     "inboxLink": "打开 AI 审核收件箱",
     "opened": "已打开聊天并附上该邮件。请阅读消息并点击“发送”。",
-    "chatPrompt": "请识别所附订单邮件中的商品、数量和价格，并将我 {date} 的交易（{payee}，{amount}）按商品拆分，并为每项指定类别。请认领 AI 审核请求 {requestId}，并为它提交你的提议。"
+    "chatPrompt": "请识别所附订单邮件中的商品、数量和价格，并将我 {date} 的交易（{payee}，{amount}）按商品拆分，并为每项指定类别。请认领 AI 审核请求 {requestId}，并为它提交你的提议。",
+    "tradeChatPrompt": "识别所附券商确认邮件中的交易：账户、是买入还是卖出、股票代码、份数、成交合计和日期。领取 AI 审核请求 {requestId} 并为它提交这笔交易。"
   },
   "hub": {
     "tabs": {
@@ -903,6 +918,8 @@
         "body": "没有任何已保存的邮件的发件人位于 {domain}。"
       },
       "help": "点击邮件进行阅读，并选择它所支付的交易。然后勾选最多 {max} 封邮件，用来编写配置文件；邮件只有在有了交易之后才能勾选。",
+      "tradeToggle": "这些邮件是券商的交易确认（它们会创建投资交易，因此不配对银行交易）",
+      "tradeHelp": "点击邮件阅读，然后勾选最多 {max} 封交易确认来编写解析器。无需选择交易。",
       "columns": {
         "select": "使用",
         "date": "日期",
@@ -913,6 +930,7 @@
       "needsTransaction": "请先为这封邮件选择交易。",
       "limitReached": "最多 {max} 个样本。取消勾选一个后才能选择其他的。",
       "noTransaction": "未选择",
+      "tradeNoTransaction": "交易确认不需要",
       "selectedCount": "已勾选 {count}/{max} 个样本",
       "continue": "继续前往助手",
       "emailLoading": "正在加载邮件",
@@ -923,6 +941,8 @@
     "generate": {
       "help": "助手会阅读这些邮件及其所支付的交易，并为 {domain} 编写配置文件草稿。目前尚未批准任何内容。",
       "reviseHelp": "告诉助手需要更改什么。它会根据这些邮件和交易更新同一份草稿。",
+      "tradeHelp": "助手会读取这些交易确认，并为 {domain} 编写一个解析器草稿，提出每封邮件所报告的投资交易。目前还没有批准任何内容。",
+      "tradeSample": "交易确认",
       "feedbackLabel": "需要更改什么",
       "feedbackPlaceholder": "例如：合计是标有“实付金额”的那一行，而不是小计。",
       "send": "发送给 AI",
@@ -969,6 +989,8 @@
       "parsedDate": "日期：{date}",
       "parsedTotal": "合计：{total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
+      "parsedTrade": "{action, select, BUY {买入} other {卖出}} {quantity} 份 {symbol}",
+      "tradeInconsistent": "价格与合计不符，因此不会自动应用",
       "noExpectation": "无",
       "noMatch": "无交易",
       "agreesYes": "是",
@@ -991,8 +1013,17 @@
         "not_applicable": "此配置文件未读取",
         "skip_line": "已跳过（发现跳过行）",
         "wait_line": "已搁置（订单未最终确定）",
-        "no_html": "没有 HTML 部分"
+        "no_html": "没有 HTML 部分",
+        "trade": "提出一笔交易"
       }
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {买入} other {卖出}}：{quantity} 份 {symbol}，金额 {total}，日期 {date}。",
+    "account": "邮件中注明的账户：{account}",
+    "priceMismatch": "平均价格与份数和合计不符，因此这笔交易不会自动应用。",
+    "incomplete": "解析器无法从这封邮件中读取完整的交易。",
+    "totalFromPrice": "由价格推算出的合计",
+    "dateUnknown": "邮件到达的当天"
   }
 }

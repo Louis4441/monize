@@ -38,11 +38,14 @@
     "transactionMissing": "Giao dịch này không còn tồn tại",
     "rule": "Quy tắc: {name}",
     "manualRequest": "Yêu cầu thủ công",
+    "trade": "{action, select, BUY {Mua {quantity} cổ phần {symbol}} other {Bán {quantity} cổ phần {symbol}}}",
     "receiptInstruction": {
       "automatic": "Bổ sung giao dịch này từ email đơn hàng đính kèm: tách theo từng mặt hàng với một danh mục cho mỗi mặt hàng, hoặc đặt mô tả.",
       "chat": "Bạn đã yêu cầu nhận dạng email đơn hàng đính kèm: tách giao dịch này theo sản phẩm với một danh mục cho mỗi sản phẩm, hoặc đặt mô tả.",
       "categorize": "Gán danh mục cho từng mặt hàng trong email đơn hàng đính kèm mà chưa quy tắc nào phân loại, sau đó đề xuất cách tách giao dịch này hoặc đặt mô tả.",
-      "parsed": "Một trình phân tích đã lưu đã đọc email đơn hàng và đề xuất các dòng danh mục cùng mô tả này cho giao dịch."
+      "parsed": "Một trình phân tích đã lưu đã đọc email đơn hàng và đề xuất các dòng danh mục cùng mô tả này cho giao dịch.",
+      "trade": "Email xác nhận giao dịch do một trình phân tích đã lưu đọc đề xuất giao dịch đầu tư này. Trước khi phê duyệt, hãy đối chiếu tài khoản, chứng khoán, số lượng và tổng với công ty môi giới của bạn.",
+      "tradeChat": "Bạn đã yêu cầu nhận diện xác nhận giao dịch đính kèm: hãy đề xuất giao dịch đầu tư mà nó báo cáo."
     },
     "emailReceipt": "Hóa đơn qua email: {subject} từ {sender}",
     "emailReceiptMissing": "Hóa đơn qua email (email đã bị xóa)",

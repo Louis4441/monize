@@ -112,6 +112,7 @@
     "total": "Tổng",
     "cashImpact": "Tác động tiền mặt",
     "bondSeries": "Series",
+    "marksPaid": "Đánh dấu là đã thanh toán",
     "accruedInterest": "Lãi tích lũy",
     "redemptionSplit": "Phần tách hoàn trả",
     "redemptionSplitValue": "Gốc {principal} + lãi {interest} = thanh toán {payout}",

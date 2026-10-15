@@ -16,6 +16,7 @@ import {
 } from "../../attachments/attachments.service";
 import { RelayAttachmentStore } from "../relay/relay-attachment.store";
 import { PayeesService, CreatePayeeOptions } from "../../payees/payees.service";
+import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import { CreateTransactionDto } from "../../transactions/dto/create-transaction.dto";
@@ -125,6 +126,8 @@ export class AiActionsService {
     private readonly transactionRulesService: TransactionRulesService,
     private readonly transactionRulesRunService: TransactionRulesRunService,
     private readonly aiReviewRequests: AiReviewRequestsService,
+    @Inject(forwardRef(() => ScheduledTransactionsService))
+    private readonly scheduledTransactionsService: ScheduledTransactionsService,
   ) {}
 
   async confirm(
@@ -1059,10 +1062,53 @@ export class AiActionsService {
       description: descriptor.description ?? undefined,
       bondInstrumentId: descriptor.bondInstrumentId ?? undefined,
     });
-    const transaction = await this.investmentTransactionsService.create(
-      userId,
-      dto,
-    );
+    // A creation that answers an `email_trade` request marks it applied in the
+    // write's own transaction, under the holdings lock and before anything is
+    // written: a request dismissed or expired since the card was built refuses
+    // the creation (409) with nothing changed, and the two commit or roll back
+    // together.
+    const reviewRequestId = descriptor.aiReviewRequestId;
+    // A trade that pays a scheduled bill or deposit posts THAT occurrence with
+    // the figures the card showed (the schedule's own post creates the row, marks
+    // the occurrence paid and advances the schedule), so no second row is made.
+    // The due date is signed: a schedule that has moved on since the card was
+    // built refuses with a conflict and nothing is written.
+    if (
+      typeof descriptor.scheduledTransactionId === "string" &&
+      typeof descriptor.scheduledDueDate === "string" &&
+      typeof reviewRequestId === "string"
+    ) {
+      await this.scheduledTransactionsService.post(
+        userId,
+        descriptor.scheduledTransactionId,
+        {
+          transactionDate: descriptor.transactionDate,
+          investmentQuantity: descriptor.quantity ?? undefined,
+          investmentPrice: descriptor.price ?? undefined,
+          description: descriptor.description ?? undefined,
+        },
+        {
+          expectedDueDate: descriptor.scheduledDueDate,
+          beforeWrite: (m) =>
+            this.aiReviewRequests.markTradeApplied(m, userId, reviewRequestId),
+        },
+      );
+      return {
+        type: "create_investment_transaction",
+        id: descriptor.scheduledTransactionId,
+      };
+    }
+    const transaction =
+      typeof reviewRequestId === "string"
+        ? await this.investmentTransactionsService.create(userId, dto, {
+            beforeWrite: (m) =>
+              this.aiReviewRequests.markTradeApplied(
+                m,
+                userId,
+                reviewRequestId,
+              ),
+          })
+        : await this.investmentTransactionsService.create(userId, dto);
     return { type: "create_investment_transaction", id: transaction.id };
   }
 

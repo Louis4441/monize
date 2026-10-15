@@ -553,6 +553,7 @@
       "reprocess": "重新處理",
       "link": "選擇交易",
       "recognizeAi": "用 AI 辨識",
+      "recognizeTradeAi": "用 AI 辨識為交易",
       "approve": "核准",
       "draftParser": "使用 AI 準備設定檔",
       "createParser": "建立設定檔",
@@ -644,11 +645,21 @@
       "wait_line": "有一行表示訂單尚未最終確定，因此稍後會再次讀取該郵件。",
       "no_html": "此解析器讀取郵件的 HTML 部分，而這封郵件沒有 HTML。",
       "schema_org": "無需解析器：訂單是從郵件中的結構化資料（schema.org）讀取的。",
-      "item_amount_missing": "某個明細沒有金額，而郵件中也沒有可分配給它的單一合計。"
+      "item_amount_missing": "某個明細沒有金額，而郵件中也沒有可分配給它的單一合計。",
+      "trade_no_action": "解析器在這封郵件中找不到買入或賣出。",
+      "trade_no_symbol": "解析器在這封郵件中找不到股票代號。",
+      "trade_no_quantity": "解析器在這封郵件中找不到份數。",
+      "trade_no_amount": "解析器在這封郵件中找不到合計，也找不到價格。",
+      "trade_no_account": "解析器無法判斷這筆交易屬於哪個帳戶。",
+      "trade_exists": "你的帳戶中已有這筆交易，因此沒有提出任何建議。",
+      "trade_linked": "已連結到它所回報的交易，因此沒有提出任何建議。"
     },
     "reasonUnknown": "原因：{reason}",
     "requestNote": "審核請求（{state}）：{note}",
     "parsedHeading": "解析器讀取的內容",
+    "tradeHeading": "從郵件中讀取的交易",
+    "tradeCandidatesHeading": "可能是這筆交易的現有交易",
+    "tradeCandidatesHelp": "這些投資交易可能就是這封郵件回報的交易。請連結正確的一筆：不會建立新交易，它所支付的排程帳單或存款會被標記為已付款。",
     "notParsed": "尚未從這封郵件中讀取到任何內容。",
     "candidatesHeading": "相符的交易",
     "candidatesHelp": "有多筆交易與這封郵件同樣相符。請選擇它所支付的那一筆。",
@@ -747,6 +758,9 @@
   },
   "recognize": {
     "title": "用 AI 辨識",
+    "tradeTitle": "用 AI 辨識為交易",
+    "tradeMessage": "AI 會把這封郵件當作券商的交易確認來讀取，並提出它所回報的投資交易（帳戶、買入或賣出、股票代號、份數和合計）。在你核准之前不會儲存任何內容。",
+    "tradeConfirm": "辨識為交易",
     "transactionSummary": "{date}，{amount}，{payee}",
     "noPayee": "無收款人",
     "confirmMessage": "此郵件已連結到交易 {summary}。AI 將讀取郵件，並提議如何依商品拆分這筆交易。要使用這筆交易繼續嗎？",
@@ -765,7 +779,8 @@
     "handoffFailed": "請求已排入佇列，但無法在聊天中開啟該郵件。它會在 AI 審核收件匣中等待代理（例如透過 MCP）處理。",
     "inboxLink": "開啟 AI 審核收件匣",
     "opened": "已開啟聊天並附上該郵件。請閱讀訊息並按下「傳送」。",
-    "chatPrompt": "請辨識所附訂單郵件中的商品、數量和價格，並將我 {date} 的交易（{payee}，{amount}）依商品拆分，並為每項指定類別。請認領 AI 審核請求 {requestId}，並為它提交你的提議。"
+    "chatPrompt": "請辨識所附訂單郵件中的商品、數量和價格，並將我 {date} 的交易（{payee}，{amount}）依商品拆分，並為每項指定類別。請認領 AI 審核請求 {requestId}，並為它提交你的提議。",
+    "tradeChatPrompt": "辨識所附券商確認郵件中的交易：帳戶、是買入還是賣出、股票代號、份數、成交合計和日期。領取 AI 審查請求 {requestId} 並為它提交這筆交易。"
   },
   "hub": {
     "tabs": {
@@ -903,6 +918,8 @@
         "body": "沒有任何已儲存的郵件的寄件者位於 {domain}。"
       },
       "help": "點擊郵件進行閱讀，並選擇它所支付的交易。然後勾選最多 {max} 封郵件，用來撰寫設定檔；郵件只有在有了交易之後才能勾選。",
+      "tradeToggle": "這些郵件是券商的交易確認（它們會建立投資交易，因此不配對銀行交易）",
+      "tradeHelp": "點擊郵件閱讀，然後勾選最多 {max} 封交易確認來撰寫解析器。無需選擇交易。",
       "columns": {
         "select": "使用",
         "date": "日期",
@@ -913,6 +930,7 @@
       "needsTransaction": "請先為這封郵件選擇交易。",
       "limitReached": "最多 {max} 個樣本。取消勾選一個後才能選擇其他的。",
       "noTransaction": "未選擇",
+      "tradeNoTransaction": "交易確認不需要",
       "selectedCount": "已勾選 {count}/{max} 個樣本",
       "continue": "繼續前往助理",
       "emailLoading": "正在載入郵件",
@@ -923,6 +941,8 @@
     "generate": {
       "help": "助理會閱讀這些郵件及其所支付的交易，並為 {domain} 撰寫設定檔草稿。目前尚未核准任何內容。",
       "reviseHelp": "告訴助理需要變更什麼。它會根據這些郵件和交易更新同一份草稿。",
+      "tradeHelp": "助理會讀取這些交易確認，並為 {domain} 撰寫解析器草稿，提出每封郵件所回報的投資交易。目前還沒有核准任何內容。",
+      "tradeSample": "交易確認",
       "feedbackLabel": "需要變更什麼",
       "feedbackPlaceholder": "例如：合計是標有「實付金額」的那一行，而不是小計。",
       "send": "傳送給 AI",
@@ -969,6 +989,8 @@
       "parsedDate": "日期：{date}",
       "parsedTotal": "合計：{total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
+      "parsedTrade": "{action, select, BUY {買入} other {賣出}} {quantity} 份 {symbol}",
+      "tradeInconsistent": "價格與合計不符，因此不會自動套用",
       "noExpectation": "無",
       "noMatch": "無交易",
       "agreesYes": "是",
@@ -991,8 +1013,17 @@
         "not_applicable": "此設定檔未讀取",
         "skip_line": "已略過（發現略過行）",
         "wait_line": "已擱置（訂單尚未最終確定）",
-        "no_html": "沒有 HTML 部分"
+        "no_html": "沒有 HTML 部分",
+        "trade": "提出一筆交易"
       }
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {買入} other {賣出}}：{quantity} 份 {symbol}，金額 {total}，日期 {date}。",
+    "account": "郵件中註明的帳戶：{account}",
+    "priceMismatch": "平均價格與份數和合計不符，因此這筆交易不會自動套用。",
+    "incomplete": "解析器無法從這封郵件中讀取完整的交易。",
+    "totalFromPrice": "由價格推算出的合計",
+    "dateUnknown": "郵件送達的當天"
   }
 }

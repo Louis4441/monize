@@ -1,3 +1,4 @@
+import { escapeLikePattern } from "../transactions/transaction-search.util";
 import {
   Inject,
   Injectable,
@@ -1445,6 +1446,44 @@ export class SecuritiesService {
       return { match: partial[0], candidates: [] };
     }
     return { match: null, candidates: partial };
+  }
+
+  /**
+   * Resolve the ticker a broker's trade confirmation prints to the user's
+   * security, strictly: the symbol itself (any case) or the symbol with an
+   * exchange suffix (`XCNS` finds `XCNS.TO`), never a name or a fragment. An
+   * exact symbol wins over suffixed ones; several suffixed securities and no
+   * exact one are `candidates`, never a guess. A trade written to the wrong
+   * security is a wrong ledger, so the loose matching `resolveBySymbolOrName`
+   * does for a person typing in chat is not used for an email.
+   */
+  async resolveByTradeSymbol(
+    userId: string,
+    ticker: string,
+  ): Promise<SecurityMatchResult> {
+    const symbol = (ticker ?? "").trim();
+    if (!symbol) return { match: null, candidates: [] };
+    const rows = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .createQueryBuilder("security")
+        .where("security.userId = :userId", { userId })
+        .andWhere(
+          "(LOWER(security.symbol) = LOWER(:symbol) OR LOWER(security.symbol) LIKE LOWER(:suffixed))",
+          { symbol, suffixed: `${escapeLikePattern(symbol)}.%` },
+        )
+        .orderBy("security.symbol", "ASC")
+        .take(10)
+        .getMany(),
+    );
+    const exact = rows.filter(
+      (row) => row.symbol.toLowerCase() === symbol.toLowerCase(),
+    );
+    if (exact.length === 1) return { match: exact[0], candidates: [] };
+    if (exact.length === 0 && rows.length === 1) {
+      return { match: rows[0], candidates: [] };
+    }
+    return { match: null, candidates: rows };
   }
 
   /**

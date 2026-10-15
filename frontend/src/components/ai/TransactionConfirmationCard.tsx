@@ -191,6 +191,11 @@ export function TransactionConfirmationCard({
         label: t('confirmAction.bondSeries'),
         value: preview.bondSeriesCode,
       });
+    if (preview.scheduledName)
+      rows.push({
+        label: t('confirmAction.marksPaid'),
+        value: preview.scheduledName,
+      });
     if (preview.quantity !== undefined && preview.quantity !== null)
       rows.push({
         label: t('confirmAction.shares'),

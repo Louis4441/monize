@@ -10,8 +10,8 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 const samples = [
-  { receiptId: 'r-1', chosen: { transactionId: 'tx-1', summary: 'Sep 1, 25.00, Allegro', subject: 'Order 1' } },
-  { receiptId: 'r-2', chosen: { transactionId: 'tx-2', summary: 'Sep 2, 30.00, Allegro', subject: 'Order 2' } },
+  { receiptId: 'r-1', chosen: { transactionId: 'tx-1', summary: 'Sep 1, 25.00, Allegro', subject: 'Order 1' }, subject: 'Order 1' },
+  { receiptId: 'r-2', chosen: { transactionId: 'tx-2', summary: 'Sep 2, 30.00, Allegro', subject: 'Order 2' }, subject: 'Order 2' },
 ];
 
 function refusal(data: unknown) {
@@ -25,10 +25,13 @@ async function click(element: HTMLElement) {
   await act(async () => {});
 }
 
-async function renderStep(draft: { parserId: string; revision: number | null } | null = null) {
+async function renderStep(
+  draft: { parserId: string; revision: number | null } | null = null,
+  extra: Partial<React.ComponentProps<typeof WizardGenerateStep>> = {},
+) {
   const props = { onGenerated: vi.fn(), onQueued: vi.fn(), onBack: vi.fn() };
   await act(async () => {
-    render(<WizardGenerateStep domain="allegro.pl" samples={samples} draft={draft} {...props} />);
+    render(<WizardGenerateStep domain="allegro.pl" samples={samples} kind="receipt" draft={draft} {...props} {...extra} />);
   });
   return props;
 }
@@ -143,5 +146,43 @@ describe('WizardGenerateStep', () => {
     const props = await renderStep();
     await click(screen.getByRole('button', { name: 'Back' }));
     expect(props.onBack).toHaveBeenCalledTimes(1);
+  });
+
+  describe('trade confirmations', () => {
+    const tradeSamples = [
+      { receiptId: 'r-1', chosen: null, subject: 'Your order has been filled' },
+      { receiptId: 'r-2', chosen: null, subject: 'Your order has been filled (2)' },
+    ];
+
+    it('sends the emails only, as a trade request, and says nothing is paired', async () => {
+      api.generateWithAi.mockResolvedValue({ parserId: 'p-1', revision: 1, answer: 'Done' });
+      const props = await renderStep(null, { kind: 'trade', samples: tradeSamples });
+      expect(screen.getByText('Your order has been filled')).toBeInTheDocument();
+      expect(screen.getAllByText('Trade confirmation')).toHaveLength(2);
+      expect(screen.getByText(/proposes the investment transaction each one reports/)).toBeInTheDocument();
+      await click(screen.getByRole('button', { name: 'Send to AI' }));
+      expect(api.generateWithAi).toHaveBeenCalledWith({
+        domain: 'allegro.pl',
+        kind: 'trade',
+        tradeReceiptIds: ['r-1', 'r-2'],
+      });
+      expect(props.onGenerated).toHaveBeenCalledWith({ parserId: 'p-1', revision: 1 }, 'Done');
+    });
+
+    it('revises the same draft with a note', async () => {
+      api.generateWithAi.mockResolvedValue({ parserId: 'p-1', revision: 2, answer: 'ok' });
+      await renderStep({ parserId: 'p-1', revision: 1 }, { kind: 'trade', samples: tradeSamples });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('What should change'), { target: { value: 'Read the commission' } });
+      });
+      await click(screen.getByRole('button', { name: 'Send note to AI' }));
+      expect(api.generateWithAi).toHaveBeenCalledWith({
+        domain: 'allegro.pl',
+        kind: 'trade',
+        tradeReceiptIds: ['r-1', 'r-2'],
+        parserId: 'p-1',
+        feedback: 'Read the commission',
+      });
+    });
   });
 });

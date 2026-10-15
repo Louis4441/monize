@@ -1,4 +1,9 @@
 import {
+  WEALTHSIMPLE_BUY_BODY,
+  WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+  WEALTHSIMPLE_TRADE_DEFINITION,
+} from "../parsing/fixtures/wealthsimple-trade";
+import {
   ConflictException,
   NotFoundException,
   BadRequestException,
@@ -138,8 +143,23 @@ describe("EmailReceiptParserToolsService.listCategories", () => {
       ],
       totalCount: 2,
       truncated: false,
+      investmentAccounts: [],
       guide: EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE,
     });
+  });
+
+  it("lists the user's open investment accounts, cash accounts apart, for a trade profile's account rules", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([{ id: "acc-1", name: "RRSP" }]);
+
+    const result = await service.listCategories(USER);
+
+    expect(result.investmentAccounts).toEqual([{ id: "acc-1", name: "RRSP" }]);
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(String(sql)).toContain("account_type = 'INVESTMENT'");
+    expect(String(sql)).toContain("IS DISTINCT FROM 'INVESTMENT_CASH'");
+    expect(String(sql)).toContain("is_closed = false");
+    expect(params).toEqual([USER]);
   });
 
   it("is bounded, and says when more exist", async () => {
@@ -895,6 +915,58 @@ describe("EmailReceiptParserToolsService.saveDraft", () => {
       expect(manager.query).not.toHaveBeenCalled();
       expect(requests.proposeParserDraft).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("EmailReceiptParserToolsService.testDefinition of a trade profile", () => {
+  it("reports what the profile read as shares and decimal money, with no bank match, and counts a complete trade as complete", async () => {
+    const { service, receiptRepo, manager } = setup();
+    receiptRepo.find.mockResolvedValue([
+      receipt({ bodyText: WEALTHSIMPLE_BUY_BODY }),
+    ]);
+
+    const result = await service.testDefinition(USER, {
+      definition: WEALTHSIMPLE_TRADE_DEFINITION,
+      receiptIds: [R1],
+    });
+
+    expect(result.valid).toBe(true);
+    const [email] = result.emails;
+    expect(email.trade?.parsed).toEqual({
+      action: "BUY",
+      symbol: "XCNS",
+      quantity: 75.9878,
+      total: 2000,
+      price: 26.32,
+      commission: null,
+      date: "2026-10-15",
+      accountText: "RRSP",
+      accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+      complete: true,
+      consistent: true,
+      reason: null,
+    });
+    expect(email.trade?.trace.symbol?.line.text).toBe("Symbol: XCNS");
+    expect(email.outcome).toBe("read");
+    expect(email.match.outcome).toBe("unmatched");
+    expect(result.allComplete).toBe(true);
+    // No candidate query: a trade creates a transaction, it does not find one.
+    expect(manager.query).not.toHaveBeenCalled();
+  });
+
+  it("is not complete when the trade is not", async () => {
+    const { service, receiptRepo } = setup();
+    receiptRepo.find.mockResolvedValue([
+      receipt({
+        bodyText: WEALTHSIMPLE_BUY_BODY.replace("Symbol:", "Ticker:"),
+      }),
+    ]);
+    const result = await service.testDefinition(USER, {
+      definition: WEALTHSIMPLE_TRADE_DEFINITION,
+      receiptIds: [R1],
+    });
+    expect(result.emails[0].trade?.parsed.reason).toBe("trade_no_symbol");
+    expect(result.allComplete).toBe(false);
   });
 });
 

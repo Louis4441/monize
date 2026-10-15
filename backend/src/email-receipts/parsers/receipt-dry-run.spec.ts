@@ -1,7 +1,13 @@
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { Category } from "../../categories/entities/category.entity";
 import {
+  WEALTHSIMPLE_BUY_BODY,
+  WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+  WEALTHSIMPLE_TRADE_DEFINITION,
+} from "../parsing/fixtures/wealthsimple-trade";
+import {
   compareWithExpected,
+  dryRunReceipt,
   loadTransactionSummaries,
   summarizeTransaction,
 } from "./receipt-dry-run";
@@ -230,5 +236,63 @@ describe("loadTransactionSummaries", () => {
     const result = await loadTransactionSummaries(manager as never, USER, [T1]);
     expect(result.size).toBe(0);
     expect(manager.query).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("dryRunReceipt of a trade profile", () => {
+  const receipt = {
+    id: "r1",
+    subject: "Your order has been filled",
+    bodyText: WEALTHSIMPLE_BUY_BODY,
+    bodyHtml: null,
+    receivedAt: new Date("2026-10-15T16:10:19Z"),
+    originalSentAt: null,
+  };
+
+  it("reads the trade, looks up no bank transaction and matches nothing", async () => {
+    const m = { query: jest.fn() };
+    const run = await dryRunReceipt(
+      m as never,
+      USER,
+      WEALTHSIMPLE_TRADE_DEFINITION,
+      receipt,
+      null,
+    );
+    expect(run.trade?.parsed).toMatchObject({
+      action: "BUY",
+      symbol: "XCNS",
+      quantity: 75.9878,
+      accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+      complete: true,
+      consistent: true,
+    });
+    expect(run.trade?.trace.symbol?.line.text).toBe("Symbol: XCNS");
+    expect(run.outcome).toBe("read");
+    expect(run.match.kind).toBe("unmatched");
+    expect(run.candidates).toEqual([]);
+    expect(run.hit).toBeUndefined();
+    expect(m.query).not.toHaveBeenCalled();
+  });
+
+  it("reports the guard that stops the pipeline reading the email", async () => {
+    const run = await dryRunReceipt(
+      { query: jest.fn() } as never,
+      USER,
+      WEALTHSIMPLE_TRADE_DEFINITION,
+      { ...receipt, bodyText: "Hello\nSomething else" },
+      null,
+    );
+    expect(run.outcome).toBe("not_applicable");
+  });
+
+  it("says no_html for a profile that reads the HTML part of an email with none", async () => {
+    const run = await dryRunReceipt(
+      { query: jest.fn() } as never,
+      USER,
+      { ...WEALTHSIMPLE_TRADE_DEFINITION, source: "html" },
+      receipt,
+      null,
+    );
+    expect(run.outcome).toBe("no_html");
   });
 });

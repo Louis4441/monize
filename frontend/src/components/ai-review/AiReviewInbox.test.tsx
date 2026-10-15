@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { render, screen, fireEvent, within, act } from '@/test/render';
 import { AiReviewInbox } from './AiReviewInbox';
-import { makeReviewItem, PROPOSED_ACTION } from './ai-review-fixtures';
+import { makeReviewItem, makeTradeItem, PROPOSED_ACTION } from './ai-review-fixtures';
 import type { AiReviewItem } from '@/types/ai-review';
 
 const api = vi.hoisted(() => ({ list: vi.fn(), dismiss: vi.fn(), approveBatch: vi.fn() }));
@@ -306,6 +306,16 @@ describe('AiReviewInbox', () => {
       await click(screen.getByRole('button', { name: 'All' }));
       expect(nav.replace).toHaveBeenLastCalledWith('/ai-reviews', { scroll: false });
       expect(api.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('lists a trade confirmation under Email receipts, not under transaction reviews', async () => {
+      api.list.mockResolvedValue([makeTradeItem({ proposal: { action: PROPOSED_ACTION } }), makeReviewItem({ id: 'rule-1' })]);
+      await renderInbox();
+      await click(screen.getByRole('button', { name: 'Email receipts' }));
+      expect(screen.getByText('Buy 75.9878 shares of XCNS')).toBeInTheDocument();
+      expect(screen.queryByText('Rule: Allegro orders')).not.toBeInTheDocument();
+      await click(screen.getByRole('button', { name: 'All' }));
+      expect(screen.getByText('Buy 75.9878 shares of XCNS')).toBeInTheDocument();
     });
 
     it('starts from ?kind= and ignores a value that is no kind', async () => {

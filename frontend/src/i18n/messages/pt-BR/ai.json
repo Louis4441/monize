@@ -112,6 +112,7 @@
     "total": "Total",
     "cashImpact": "Impacto no caixa",
     "bondSeries": "Série",
+    "marksPaid": "Marca como pago",
     "accruedInterest": "Juros acumulados",
     "redemptionSplit": "Divisão do resgate",
     "redemptionSplitValue": "Principal {principal} + juros {interest} = pagamento {payout}",

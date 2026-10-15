@@ -13,6 +13,7 @@ export function makeReviewItem(overrides: Partial<AiReviewItem> = {}): AiReviewI
     ruleName: 'Allegro orders',
     emailReceipt: null,
     parserDraft: null,
+    trade: null,
     createdAt: '2026-09-01T10:00:00.000Z',
     expiresAt: '2026-10-01T10:00:00.000Z',
     transaction: {
@@ -50,3 +51,35 @@ export const PROPOSED_ACTION = {
   signature: 'sig-1',
   expiresAt: 1_900_000_000_000,
 };
+
+/** A proposed `email_trade` request: a brokerage confirmation read by a profile (no transaction yet). */
+export function makeTradeItem(overrides: Partial<AiReviewItem> = {}): AiReviewItem {
+  return makeReviewItem({
+    id: 'req-trade',
+    kind: 'email_trade',
+    status: 'proposed',
+    instruction: 'A trade confirmation email read by a saved profile proposes this investment transaction.',
+    instructionKey: 'trade',
+    transactionId: null,
+    ruleId: null,
+    ruleName: null,
+    emailReceipt: {
+      id: 'rcpt-1',
+      fromAddress: 'notifications@o.wealthsimple.com',
+      subject: 'Your order has been filled',
+      receivedAt: '2026-10-15T16:10:19.000Z',
+    },
+    trade: {
+      accountId: 'acc-rrsp',
+      action: 'BUY',
+      symbol: 'XCNS',
+      quantity: 75.9878,
+      totalAmount: 2000,
+      commission: 0,
+      date: '2026-10-15',
+      description: 'Email receipt: Your order has been filled',
+    },
+    transaction: null,
+    ...overrides,
+  });
+}

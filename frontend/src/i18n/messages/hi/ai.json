@@ -112,6 +112,7 @@
     "total": "कुल",
     "cashImpact": "नकद प्रभाव",
     "bondSeries": "सीरीज़",
+    "marksPaid": "भुगतान किया हुआ चिह्नित करता है",
     "accruedInterest": "उपार्जित ब्याज",
     "redemptionSplit": "मोचन विभाजन",
     "redemptionSplitValue": "मूलधन {principal} + ब्याज {interest} = भुगतान {payout}",

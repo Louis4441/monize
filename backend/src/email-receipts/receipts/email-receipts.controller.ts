@@ -196,6 +196,8 @@ export class EmailReceiptsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: AskAiEmailReceiptDto,
   ) {
-    return this.ai.askAi(req.user.id, id, dto.transactionId || null);
+    return this.ai.askAi(req.user.id, id, dto.transactionId || null, {
+      asTrade: dto.asTrade === true,
+    });
   }
 }

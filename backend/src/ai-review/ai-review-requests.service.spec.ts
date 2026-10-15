@@ -1019,3 +1019,104 @@ describe("AiReviewRequestsService.isExemptFromWriteLimit (email-receipts design 
     ).resolves.toBe(false);
   });
 });
+
+describe("AiReviewRequestsService trade requests (email_trade)", () => {
+  const RECEIPT = "40000000-0000-4000-8000-000000000001";
+  const REQUEST = "50000000-0000-4000-8000-000000000002";
+  const tradeRow = (over: Record<string, unknown> = {}) => ({
+    id: REQUEST,
+    user_id: USER,
+    transaction_id: null,
+    rule_id: null,
+    kind: "email_trade",
+    instruction: "A trade confirmation proposes this investment transaction",
+    status: "claimed",
+    claimed_by: "email-receipts",
+    claimed_at: new Date("2026-10-15T10:00:00Z"),
+    proposal: null,
+    created_at: new Date("2026-10-15T10:00:00Z"),
+    updated_at: new Date("2026-10-15T10:00:00Z"),
+    expires_at: new Date("2026-11-14T10:00:00Z"),
+    email_receipt_id: RECEIPT,
+    ...over,
+  });
+  const input = {
+    emailReceiptId: RECEIPT,
+    instruction: " A trade confirmation proposes this investment transaction ",
+    claimedBy: "email-receipts",
+  };
+
+  it("queues one claimed request for the email, with no transaction and no rule, on the caller's manager", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValueOnce([tradeRow()]);
+
+    const created = await service.enqueueTrade(manager as never, USER, input);
+
+    expect(created).toMatchObject({
+      kind: "email_trade",
+      status: "claimed",
+      claimedBy: "email-receipts",
+      emailReceiptId: RECEIPT,
+      transactionId: null,
+      ruleId: null,
+    });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(/INSERT INTO ai_review_requests/);
+    expect(sql).toMatch(/'email_trade'/);
+    // The index that holds "one open trade request per email" is the arbiter.
+    expect(sql).toMatch(
+      /ON CONFLICT \(email_receipt_id\)\s+WHERE kind = 'email_trade' AND status IN \('pending', 'claimed', 'proposed'\)\s+DO NOTHING/,
+    );
+    expect(params).toEqual([
+      USER,
+      "A trade confirmation proposes this investment transaction",
+      "email-receipts",
+      RECEIPT,
+    ]);
+  });
+
+  it("queues it pending, unclaimed, when no claim key is given (Recognize as a trade)", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValueOnce([
+      tradeRow({ status: "pending", claimed_by: null, claimed_at: null }),
+    ]);
+    const created = await service.enqueueTrade(manager as never, USER, {
+      ...input,
+      claimedBy: null,
+    });
+    expect(created).toMatchObject({ status: "pending", claimedBy: null });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(/CASE WHEN \$3::text IS NULL THEN 'pending'/);
+    expect(params[2]).toBeNull();
+  });
+
+  it("returns null when the email already has an open trade request", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValueOnce([]);
+    expect(
+      await service.enqueueTrade(manager as never, USER, input),
+    ).toBeNull();
+  });
+
+  it("marks the request applied only while it is a proposed, unexpired trade request of the user", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[{ id: REQUEST }], 1]);
+
+    await service.markTradeApplied(manager as never, USER, REQUEST);
+
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(/SET status = 'applied'/);
+    expect(sql).toMatch(
+      /WHERE id = \$1\s+AND user_id = \$2\s+AND kind = 'email_trade'\s+AND status = 'proposed'\s+AND expires_at > CURRENT_TIMESTAMP/,
+    );
+    expect(params).toEqual([REQUEST, USER]);
+  });
+
+  it("refuses with a conflict when it was dismissed or expired since the card was built, so the creation rolls back", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([[], 0]);
+    await expect(
+      service.markTradeApplied(manager as never, USER, REQUEST),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+});

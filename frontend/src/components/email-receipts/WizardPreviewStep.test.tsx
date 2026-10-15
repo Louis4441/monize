@@ -25,6 +25,7 @@ const item = (over: Partial<ParserPreviewItem> = {}): ParserPreviewItem => ({
   effectiveDate: '2026-09-01T10:00:00.000Z',
   outcome: 'matched',
   statusReason: null,
+  trade: null,
   parsed: { date: '2026-09-01', total: 25, currency: 'USD', lineCount: 2 },
   match: null,
   expected: { transactionId: 'tx-1', summary: 'Sep 1, 25.00, Allegro' },

@@ -23,9 +23,12 @@ import { OAuthTokenClient } from "./oauth/oauth-token.client";
 import { EmailReceiptParserGenerateService } from "./parsers/email-receipt-parser-generate.service";
 import { EmailReceiptParsersController } from "./parsers/email-receipt-parsers.controller";
 import { EmailReceiptParsersModule } from "./parsers/email-receipt-parsers.module";
+import { EmailReceiptTradeLinkService } from "./receipts/email-receipt-trade-link.service";
+import { EmailReceiptTradeService } from "./pipeline/email-receipt-trade.service";
 import { EmailReceiptPipelineService } from "./pipeline/email-receipt-pipeline.service";
 import { EmailReceiptPollService } from "./poll/email-receipt-poll.service";
 import { EmailReceiptsAttentionAlertService } from "./poll/email-receipts-attention-alert.service";
+import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
 import { EmailReceiptsController } from "./receipts/email-receipts.controller";
 import { EmailReceiptsService } from "./receipts/email-receipts.service";
 
@@ -59,6 +62,8 @@ import { EmailReceiptsService } from "./receipts/email-receipts.service";
     AiReviewModule,
     AiReviewQueueModule,
     TransactionsModule,
+    // The scheduled bill or deposit a linked trade pays: marked paid on link.
+    forwardRef(() => ScheduledTransactionsModule),
     // For NotificationDispatchService: the poll raises one "emails need
     // attention" notification per user through the dispatch seam.
     NotificationsModule,
@@ -82,6 +87,8 @@ import { EmailReceiptsService } from "./receipts/email-receipts.service";
     EmailReceiptOAuthService,
     { provide: ImapMailboxClient, useClass: ImapFlowMailboxClient },
     EmailReceiptPipelineService,
+    EmailReceiptTradeService,
+    EmailReceiptTradeLinkService,
     EmailReceiptPollService,
     EmailReceiptsAttentionAlertService,
     EmailReceiptsService,

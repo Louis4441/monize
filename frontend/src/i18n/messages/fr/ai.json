@@ -112,6 +112,7 @@
     "total": "Total",
     "cashImpact": "Impact sur les liquidités",
     "bondSeries": "Série",
+    "marksPaid": "Marque comme payé",
     "accruedInterest": "Intérêts courus",
     "redemptionSplit": "Répartition du remboursement",
     "redemptionSplitValue": "Capital {principal} + intérêts {interest} = versement {payout}",

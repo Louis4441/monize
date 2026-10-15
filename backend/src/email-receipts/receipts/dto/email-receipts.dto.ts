@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsISO8601,
@@ -119,6 +120,14 @@ export class AskAiEmailReceiptDto {
   @ValidateIf((_o, v) => v !== null && v !== "")
   @IsUUID()
   transactionId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      "Recognize the email as a brokerage trade confirmation: the AI proposes the investment transaction it reports (no bank transaction is involved).",
+  })
+  @IsOptional()
+  @IsBoolean()
+  asTrade?: boolean;
 }
 
 /** Body of `POST /email-receipts/process-batch`. */

@@ -11,16 +11,21 @@ import {
 } from "../matching/match-receipt";
 import {
   parseReceiptLinesTraced,
+  readLineGuards,
+  receiptOutcome,
   type ReceiptOutcome,
 } from "../parsing/parse-receipt";
+import { parseTradeLinesTraced } from "../parsing/parse-trade";
 import {
   resolveMatchConfig,
   type ResolvedMatchConfig,
 } from "../parsing/receipt-match-config";
 import type {
   ParsedReceipt,
+  ParsedTrade,
   ReceiptParserDefinition,
   ReceiptTrace,
+  ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
 import { loadReceiptCandidates } from "../pipeline/receipt-candidates";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
@@ -57,7 +62,42 @@ export interface ReceiptDryRun {
   match: ReceiptMatchResult;
   /** The candidate the matcher chose, when it chose one. */
   hit: ReceiptMatchCandidate | undefined;
+  /**
+   * A trade profile's reading and what read each value. Present only for a
+   * definition with a `trade` section, which is not matched to a bank
+   * transaction: `parsed`, `trace` and `match` are then the empty reading of a
+   * receipt and no candidate was looked up.
+   */
+  trade?: { parsed: ParsedTrade; trace: ReceiptTradeTrace };
 }
+
+const EMPTY_PARSED: ParsedReceipt = {
+  orderId: null,
+  total: null,
+  paid: null,
+  payee: null,
+  shipping: null,
+  discount: null,
+  items: [],
+  shippingCategoryId: null,
+  discountCategoryId: null,
+  complete: false,
+  reason: "no_total",
+};
+
+const EMPTY_TRACE: ReceiptTrace = {
+  orderId: null,
+  reference: null,
+  total: null,
+  paid: null,
+  shipping: null,
+  discount: null,
+  payee: null,
+  requireLine: null,
+  skipIfLine: null,
+  waitIfLine: null,
+  items: [],
+};
 
 /**
  * Read one stored email with `definition` and say what the matcher would do
@@ -72,6 +112,9 @@ export async function dryRunReceipt(
   receipt: DryRunReceipt,
   payee: DryRunPayee | null,
 ): Promise<ReceiptDryRun> {
+  if (definition.trade) {
+    return dryRunTrade(definition, definition.trade, receipt);
+  }
   // The lines of the source the definition chose (`text` or `html`); the trace's
   // line numbers refer to them. `no_html`: it reads HTML, the email has none.
   const { parsed, trace, outcome } = parseReceiptLinesTraced(
@@ -111,6 +154,36 @@ export async function dryRunReceipt(
     candidates,
     match,
     hit,
+  };
+}
+
+/**
+ * The dry run of a trade profile: the lines are read with the `trade` section
+ * and nothing is matched, because a trade creates a transaction rather than
+ * finding one. Reads only.
+ */
+function dryRunTrade(
+  definition: ReceiptParserDefinition,
+  trade: NonNullable<ReceiptParserDefinition["trade"]>,
+  receipt: DryRunReceipt,
+): ReceiptDryRun {
+  const lines = new ReceiptSourceLines(receipt).forSource(definition.source);
+  const effectiveDate = effectiveReceiptDate(receipt);
+  const read = parseTradeLinesTraced(trade, lines ?? []);
+  return {
+    parsed: EMPTY_PARSED,
+    trace: EMPTY_TRACE,
+    outcome:
+      lines === null
+        ? "no_html"
+        : receiptOutcome(readLineGuards(definition, lines)),
+    effectiveDate,
+    purchaseDate: effectiveDate.toISOString().slice(0, 10),
+    matchConfig: resolveMatchConfig(undefined),
+    candidates: [],
+    match: { kind: "unmatched", considered: 0, attempts: [] },
+    hit: undefined,
+    trade: { parsed: read.trade, trace: read.trace },
   };
 }
 

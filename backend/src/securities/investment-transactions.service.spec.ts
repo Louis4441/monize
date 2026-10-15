@@ -478,6 +478,29 @@ describe("InvestmentTransactionsService", () => {
       expect(result).toEqual(mockBuyTransaction);
     });
 
+    it("runs the caller's beforeWrite hook first in the write's transaction, before any row is created", async () => {
+      const beforeWrite = jest.fn().mockResolvedValue(undefined);
+      await service.create(userId, createBuyDto, { beforeWrite });
+      expect(beforeWrite).toHaveBeenCalledTimes(1);
+      expect(beforeWrite.mock.invocationCallOrder[0]).toBeLessThan(
+        investmentTransactionsRepository.create.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("writes nothing when the beforeWrite hook refuses", async () => {
+      const beforeWrite = jest
+        .fn()
+        .mockRejectedValue(new ConflictException("no longer open"));
+      await expect(
+        service.create(userId, createBuyDto, { beforeWrite }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(investmentTransactionsRepository.create).not.toHaveBeenCalled();
+      expect(investmentTransactionsRepository.save).not.toHaveBeenCalled();
+      expect(
+        holdingsService.rebuildScopesFromTransactions,
+      ).not.toHaveBeenCalled();
+    });
+
     it("recomputes the bond-engine prices of its security after the commit (R7)", async () => {
       await service.create(userId, createBuyDto);
       expect(

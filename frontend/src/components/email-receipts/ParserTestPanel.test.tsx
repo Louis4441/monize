@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, within } from '@/test/render';
 import { ParserTestPanel } from './ParserTestPanel';
-import { makeReceipt, PARSED_RECEIPT } from './email-receipts-fixtures';
+import { makeReceipt, PARSED_RECEIPT, PARSED_TRADE } from './email-receipts-fixtures';
 
 const api = vi.hoisted(() => ({ list: vi.fn(), test: vi.fn() }));
 vi.mock('@/lib/email-receipts-api', () => ({
@@ -231,5 +231,22 @@ describe('ParserTestPanel', () => {
     await renderPanel();
     expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
     expect(screen.queryByText(/No emails are stored yet/)).not.toBeInTheDocument();
+  });
+
+  it('shows the trade a trade profile read and no bank-transaction match', async () => {
+    api.test.mockResolvedValue({
+      trade: { parsed: PARSED_TRADE },
+      parsed: { ...PARSED_RECEIPT, total: null, complete: false, reason: 'no_total' },
+      outcome: 'read',
+      match: { kind: 'unmatched', considered: 0, attempts: [] },
+      candidateCount: 0,
+      transaction: null,
+    });
+    await renderPanel();
+    await choose('r-1');
+    await runTest();
+    expect(screen.getByText(/Buy 75\.9878 shares of XCNS for 2,000\.00/)).toBeInTheDocument();
+    expect(screen.queryByText('Transaction match')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
