@@ -123,20 +123,24 @@
       "noFileChosen": "Nenhum arquivo escolhido",
       "selected": "Selecionados: {count}",
       "button": "Importar",
-      "tooLarge": "{name} excede {max}. Divida a exportação em arquivos menores.",
+      "preparing": "Preparando os arquivos...",
+      "sending": "Enviando a parte {current} de {total}",
+      "cancel": "Cancelar",
       "tooLargeTotal": "Os arquivos selecionados juntos excedem {max}. Importe-os em grupos menores.",
-      "tooMany": "Selecione no máximo {max} arquivos por importação.",
       "failed": "A importação falhou",
       "result": {
         "heading": "Resultado da importação",
         "file": "{name}: {stored} salvos, {duplicates} duplicados, {skipped} ignorados",
         "summary": "{processed} e-mails processados.",
         "truncated": "{count} mensagens não foram lidas porque uma importação tem um limite. Importe-as de novo em uma segunda execução.",
+        "oversized": "{name}: {count} mensagens maiores que {max} não foram enviadas.",
+        "stopped": "A importação parou após {done} de {total} partes. Os e-mails já importados são mantidos. Importe os mesmos arquivos de novo para continuar. Os e-mails já importados não são salvos duas vezes.",
+        "cancelled": "A importação foi cancelada após {done} de {total} partes. Os e-mails já importados são mantidos.",
         "busy": "A caixa de correio está sendo lida agora. Os e-mails importados serão processados na próxima leitura.",
         "errors": {
           "unsupported_format": "{name}: este formato não é compatível. Os formatos compatíveis são .eml, .mbox, .msg e .zip.",
           "invalid_archive": "{name}: o arquivo ZIP está danificado ou não pode ser lido.",
-          "archive_too_large": "{name}: o arquivo ZIP excede 100 MB depois de descompactado. Divida-o ou envie o arquivo .mbox que ele contém.",
+          "archive_too_large": "{name}: o arquivo ZIP descompactado excede o limite de importação. Descompacte-o e envie o arquivo .mbox que ele contém.",
           "empty": "{name}: o arquivo não contém e-mails."
         },
         "ignored": "{name}: {count} outros arquivos do pacote foram ignorados."
@@ -148,7 +152,7 @@
           "step1": "Abra takeout.google.com e escolha \"Deselect all\".",
           "step2": "Selecione \"Mail\" e escolha \"All Mail data included\".",
           "step3": "Escolha apenas o seu marcador e crie a exportação.",
-          "step4": "Envie o arquivo .zip baixado como está. Você não precisa descompactá-lo."
+          "step4": "Envie o arquivo .zip baixado do jeito que está, por maior que seja. Você não precisa descompactá-lo."
         },
         "gmailOne": {
           "title": "Gmail: um e-mail",

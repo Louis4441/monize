@@ -123,20 +123,24 @@
       "noFileChosen": "Aucun fichier choisi",
       "selected": "Sélection : {count}",
       "button": "Importer",
-      "tooLarge": "{name} dépasse {max}. Divisez l'export en fichiers plus petits.",
+      "preparing": "Préparation des fichiers...",
+      "sending": "Envoi de la partie {current} sur {total}",
+      "cancel": "Annuler",
       "tooLargeTotal": "Les fichiers sélectionnés dépassent ensemble {max}. Importez-les par groupes plus petits.",
-      "tooMany": "Sélectionnez au maximum {max} fichiers par import.",
       "failed": "L'import a échoué",
       "result": {
         "heading": "Résultat de l'import",
         "file": "{name} : {stored} enregistrés, {duplicates} doublons, {skipped} ignorés",
         "summary": "{processed} e-mails traités.",
         "truncated": "{count} messages n'ont pas été lus, car un import a une limite. Importez-les à nouveau lors d'une seconde passe.",
+        "oversized": "{name} : {count} messages de plus de {max} n'ont pas été envoyés.",
+        "stopped": "L'importation s'est arrêtée après {done} parties sur {total}. Les e-mails déjà importés sont conservés. Importez de nouveau les mêmes fichiers pour continuer. Les e-mails déjà importés ne sont pas enregistrés deux fois.",
+        "cancelled": "L'importation a été annulée après {done} parties sur {total}. Les e-mails déjà importés sont conservés.",
         "busy": "La boîte aux lettres est en cours de lecture. Les e-mails importés seront traités à la prochaine lecture.",
         "errors": {
           "unsupported_format": "{name} : ce format n'est pas pris en charge. Les formats pris en charge sont .eml, .mbox, .msg et .zip.",
           "invalid_archive": "{name} : le fichier ZIP est endommagé ou illisible.",
-          "archive_too_large": "{name} : le fichier ZIP dépasse 100 Mo une fois décompressé. Divisez-le ou envoyez le fichier .mbox qu'il contient.",
+          "archive_too_large": "{name} : le fichier ZIP décompressé dépasse la limite d'importation. Décompressez-le et importez le fichier .mbox qu'il contient.",
           "empty": "{name} : le fichier ne contient aucun e-mail."
         },
         "ignored": "{name} : {count} autres fichiers de l'archive ont été ignorés."
@@ -148,7 +152,7 @@
           "step1": "Ouvrez takeout.google.com et choisissez « Tout désélectionner ».",
           "step2": "Sélectionnez « Mail » et choisissez « Toutes les données Mail incluses ».",
           "step3": "Choisissez uniquement votre libellé et créez l'export.",
-          "step4": "Envoyez le fichier .zip téléchargé tel quel. Vous n'avez pas besoin de le décompresser."
+          "step4": "Envoyez le fichier .zip téléchargé tel quel, quelle que soit sa taille. Vous n'avez pas besoin de le décompresser."
         },
         "gmailOne": {
           "title": "Gmail : un seul e-mail",

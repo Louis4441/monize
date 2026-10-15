@@ -7,15 +7,21 @@ import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useNumberFormat } from "@/hooks/useNumberFormat";
-import { emailReceiptsApi } from "@/lib/email-receipts-api";
+import { buildUploadPlan, type PlanNote } from "@/lib/email-import/build-plan";
+import {
+  runImport,
+  withPlanNotes,
+  type ImportRunOutcome,
+} from "@/lib/email-import/run-import";
+import {
+  SELECTION_MAX_BYTES,
+  selectionExceedsLimit,
+} from "@/lib/email-import/upload-plan";
 import { getErrorMessage } from "@/lib/errors";
-import type { EmailReceiptImportResult } from "@/types/email-receipts";
+import { MailboxImportResultView } from "./MailboxImportResultView";
 
-/** The server's per-request limits (`mailbox/import`); checked here so a refusal costs no upload. */
-export const MAX_IMPORT_FILES = 20;
-export const MAX_IMPORT_FILE_BYTES = 25 * 1024 * 1024;
-/** The whole request is refused above 100 MB; 1 MB of it is left for the multipart framing. */
-export const MAX_IMPORT_TOTAL_BYTES = 99 * 1024 * 1024;
+type Phase = "idle" | "preparing" | "sending";
+type Outcome = Omit<ImportRunOutcome, "error"> & { notes: PlanNote[] };
 
 /**
  * No `accept` list can be a gate: a file with no extension (the `mbox` file Apple
@@ -36,7 +42,9 @@ function Steps({ items }: { items: string[] }) {
 
 /**
  * Upload of exported `.eml`, `.mbox`, `.msg` and `.zip` files into the person's mailbox, the
- * per-file result, and a guide to exporting from the common providers. Rendered
+ * per-file result, and a guide to exporting from the common providers. A large
+ * `.mbox` or `.zip` is cut into parts in the browser and sent in several requests
+ * (`lib/email-import`). Rendered
  * only when a mailbox exists: the server answers 404 without one.
  */
 export function MailboxImportCard() {
@@ -46,8 +54,11 @@ export function MailboxImportCard() {
   const guideId = useId();
 
   const [files, setFiles] = useState<File[]>([]);
-  const [isImporting, setIsImporting] = useState(false);
-  const [result, setResult] = useState<EmailReceiptImportResult | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const isImporting = phase !== "idle";
   const [problem, setProblem] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
 
@@ -55,31 +66,10 @@ export function MailboxImportCard() {
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files ?? []);
-    setResult(null);
-    if (picked.length > MAX_IMPORT_FILES) {
+    setOutcome(null);
+    if (selectionExceedsLimit(picked)) {
       setFiles([]);
-      setProblem(t("tooMany", { max: count(MAX_IMPORT_FILES) }));
-      event.target.value = "";
-      return;
-    }
-    const oversized = picked.find((file) => file.size > MAX_IMPORT_FILE_BYTES);
-    if (oversized) {
-      setFiles([]);
-      setProblem(
-        t("tooLarge", {
-          name: oversized.name,
-          max: formatBytes(MAX_IMPORT_FILE_BYTES),
-        }),
-      );
-      event.target.value = "";
-      return;
-    }
-    const total = picked.reduce((sum, file) => sum + file.size, 0);
-    if (total > MAX_IMPORT_TOTAL_BYTES) {
-      setFiles([]);
-      setProblem(
-        t("tooLargeTotal", { max: formatBytes(MAX_IMPORT_TOTAL_BYTES) }),
-      );
+      setProblem(t("tooLargeTotal", { max: formatBytes(SELECTION_MAX_BYTES) }));
       event.target.value = "";
       return;
     }
@@ -89,19 +79,42 @@ export function MailboxImportCard() {
 
   const handleImport = async () => {
     if (files.length === 0) return;
-    setIsImporting(true);
-    setResult(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setPhase("preparing");
+    setOutcome(null);
     setProblem(null);
     try {
-      setResult(await emailReceiptsApi.mailbox.import(files));
-      setFiles([]);
-      if (inputRef.current) inputRef.current.value = "";
+      const plan = await buildUploadPlan(files);
+      setProgress({ done: 0, total: plan.requests.length });
+      setPhase("sending");
+      const run = await runImport(plan.requests, {
+        signal: controller.signal,
+        onProgress: (done, total) => setProgress({ done, total }),
+      });
+      const { error, ...rest } = run;
+      if (run.status === "failed") {
+        const message = getErrorMessage(error, t("failed"));
+        setProblem(message);
+        toast.error(message);
+      } else {
+        setFiles([]);
+        if (inputRef.current) inputRef.current.value = "";
+      }
+      if (run.status !== "failed" || run.completed > 0) {
+        setOutcome({
+          ...rest,
+          result: withPlanNotes(run.result, plan.notes),
+          notes: plan.notes,
+        });
+      }
     } catch (error) {
       const message = getErrorMessage(error, t("failed"));
       setProblem(message);
       toast.error(message);
     } finally {
-      setIsImporting(false);
+      abortRef.current = null;
+      setPhase("idle");
     }
   };
 
@@ -156,14 +169,36 @@ export function MailboxImportCard() {
           </div>
         </div>
 
-        <Button
-          variant="primary"
-          isLoading={isImporting}
-          disabled={files.length === 0}
-          onClick={() => void handleImport()}
-        >
-          {t("button")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="primary"
+            isLoading={isImporting}
+            disabled={files.length === 0}
+            onClick={() => void handleImport()}
+          >
+            {t("button")}
+          </Button>
+          {phase === "sending" && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => abortRef.current?.abort()}
+            >
+              {t("cancel")}
+            </Button>
+          )}
+        </div>
+
+        {phase !== "idle" && (
+          <p role="status" className="text-sm text-gray-600 dark:text-gray-400">
+            {phase === "preparing"
+              ? t("preparing")
+              : t("sending", {
+                  current: count(Math.min(progress.done + 1, progress.total)),
+                  total: count(progress.total),
+                })}
+          </p>
+        )}
 
         {problem && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
@@ -171,54 +206,14 @@ export function MailboxImportCard() {
           </p>
         )}
 
-        {result && (
-          <div role="status" className="space-y-2 text-sm">
-            <h4 className="font-medium text-gray-900 dark:text-gray-100">
-              {t("result.heading")}
-            </h4>
-            <ul className="space-y-1">
-              {result.files.map((file, index) => (
-                <li
-                  key={`${file.name}-${index}`}
-                  className={
-                    file.error
-                      ? "text-red-700 dark:text-red-400"
-                      : "text-gray-700 dark:text-gray-300"
-                  }
-                >
-                  {file.error
-                    ? t(`result.errors.${file.error}`, { name: file.name })
-                    : t("result.file", {
-                        name: file.name,
-                        stored: count(file.stored),
-                        duplicates: count(file.duplicates),
-                        skipped: count(file.skipped),
-                      })}
-                  {file.ignoredEntries > 0 && (
-                    <span className="block text-gray-600 dark:text-gray-400">
-                      {t("result.ignored", {
-                        name: file.name,
-                        count: count(file.ignoredEntries),
-                      })}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {result.truncated > 0 && (
-              <p className="text-amber-700 dark:text-amber-400">
-                {t("result.truncated", { count: count(result.truncated) })}
-              </p>
-            )}
-            <p className="text-gray-700 dark:text-gray-300">
-              {t("result.summary", { processed: count(result.processed) })}
-            </p>
-            {result.busy && (
-              <p className="text-amber-700 dark:text-amber-400">
-                {t("result.busy")}
-              </p>
-            )}
-          </div>
+        {outcome && (
+          <MailboxImportResultView
+            result={outcome.result}
+            notes={outcome.notes}
+            status={outcome.status}
+            completed={outcome.completed}
+            total={outcome.total}
+          />
         )}
 
         <div className="border-t border-gray-200 pt-3 dark:border-gray-700">

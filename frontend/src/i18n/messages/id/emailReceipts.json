@@ -123,20 +123,24 @@
       "noFileChosen": "Belum ada file yang dipilih",
       "selected": "Dipilih: {count}",
       "button": "Impor",
-      "tooLarge": "{name} lebih besar dari {max}. Bagi ekspor menjadi file yang lebih kecil.",
+      "preparing": "Menyiapkan file...",
+      "sending": "Mengirim bagian {current} dari {total}",
+      "cancel": "Batal",
       "tooLargeTotal": "File yang dipilih bersama-sama lebih besar dari {max}. Impor dalam kelompok yang lebih kecil.",
-      "tooMany": "Pilih paling banyak {max} file per impor.",
       "failed": "Impor gagal",
       "result": {
         "heading": "Hasil impor",
         "file": "{name}: {stored} disimpan, {duplicates} duplikat, {skipped} dilewati",
         "summary": "{processed} email diproses.",
         "truncated": "{count} pesan tidak dibaca karena satu impor memiliki batas. Impor lagi dalam proses kedua.",
+        "oversized": "{name}: {count} pesan yang lebih besar dari {max} tidak dikirim.",
+        "stopped": "Impor berhenti setelah {done} dari {total} bagian. Email yang sudah diimpor tetap tersimpan. Impor file yang sama lagi untuk melanjutkan. Email yang sudah diimpor tidak disimpan dua kali.",
+        "cancelled": "Impor dibatalkan setelah {done} dari {total} bagian. Email yang sudah diimpor tetap tersimpan.",
         "busy": "Kotak surat sedang dibaca sekarang. Email yang diimpor akan diproses pada pembacaan berikutnya.",
         "errors": {
           "unsupported_format": "{name}: format ini tidak didukung. Format yang didukung adalah .eml, .mbox, .msg, dan .zip.",
           "invalid_archive": "{name}: file ZIP rusak atau tidak dapat dibaca.",
-          "archive_too_large": "{name}: file ZIP berukuran lebih dari 100 MB setelah diekstrak. Bagi file tersebut, atau unggah file .mbox di dalamnya.",
+          "archive_too_large": "{name}: file ZIP melebihi batas impor setelah diekstrak. Ekstrak file tersebut dan unggah file .mbox di dalamnya.",
           "empty": "{name}: file tidak berisi email."
         },
         "ignored": "{name}: {count} file lain di arsip dilewati."
@@ -148,7 +152,7 @@
           "step1": "Buka takeout.google.com dan pilih \"Deselect all\".",
           "step2": "Pilih \"Mail\" dan pilih \"All Mail data included\".",
           "step3": "Pilih hanya label Anda dan buat ekspor.",
-          "step4": "Unggah file .zip yang diunduh apa adanya. Anda tidak perlu mengekstraknya."
+          "step4": "Unggah file .zip yang diunduh apa adanya, seberapa pun besarnya. Anda tidak perlu mengekstraknya."
         },
         "gmailOne": {
           "title": "Gmail: satu email",

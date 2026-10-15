@@ -123,20 +123,24 @@
       "noFileChosen": "[XX-No files chosen-XX]",
       "selected": "[XX-Selected: {count}-XX]",
       "button": "[XX-Import-XX]",
-      "tooLarge": "[XX-{name} is larger than {max}. Split the export into smaller files.-XX]",
+      "preparing": "[XX-Preparing files...-XX]",
+      "sending": "[XX-Sending part {current} of {total}-XX]",
+      "cancel": "[XX-Cancel-XX]",
       "tooLargeTotal": "[XX-The selected files together are larger than {max}. Import them in smaller groups.-XX]",
-      "tooMany": "[XX-Select at most {max} files per import.-XX]",
       "failed": "[XX-The import failed-XX]",
       "result": {
         "heading": "[XX-Import result-XX]",
         "file": "[XX-{name}: {stored} stored, {duplicates} duplicates, {skipped} skipped-XX]",
         "summary": "[XX-{processed} emails processed.-XX]",
         "truncated": "[XX-{count} messages were not read because one import has a limit. Import them again in a second run.-XX]",
+        "oversized": "[XX-{name}: {count} messages larger than {max} were not sent.-XX]",
+        "stopped": "[XX-The import stopped after {done} of {total} parts. The emails already imported are kept. Import the same files again to continue. Emails already imported are not stored twice.-XX]",
+        "cancelled": "[XX-The import was cancelled after {done} of {total} parts. The emails already imported are kept.-XX]",
         "busy": "[XX-The mailbox is being read right now. The imported emails will be processed at the next read.-XX]",
         "errors": {
           "unsupported_format": "[XX-{name}: this format is not supported. Supported formats are .eml, .mbox, .msg and .zip.-XX]",
           "invalid_archive": "[XX-{name}: the ZIP file is damaged or cannot be read.-XX]",
-          "archive_too_large": "[XX-{name}: the ZIP file expands to more than 100 MB. Split it, or upload the .mbox file inside.-XX]",
+          "archive_too_large": "[XX-{name}: the ZIP file expands to more than the import limit. Unpack it and upload the .mbox file inside.-XX]",
           "empty": "[XX-{name}: the file holds no emails.-XX]"
         },
         "ignored": "[XX-{name}: {count} other files in the archive were skipped.-XX]"
@@ -148,7 +152,7 @@
           "step1": "[XX-Open takeout.google.com and choose Deselect all.-XX]",
           "step2": "[XX-Select Mail and choose All Mail data included.-XX]",
           "step3": "[XX-Choose only your label and create the export.-XX]",
-          "step4": "[XX-Upload the downloaded .zip file as it is. You do not need to unpack it.-XX]"
+          "step4": "[XX-Upload the downloaded .zip file as it is, however large. You do not need to unpack it.-XX]"
         },
         "gmailOne": {
           "title": "[XX-Gmail: one email-XX]",

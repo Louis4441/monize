@@ -123,20 +123,24 @@
       "noFileChosen": "No files chosen",
       "selected": "Selected: {count}",
       "button": "Import",
-      "tooLarge": "{name} is larger than {max}. Split the export into smaller files.",
+      "preparing": "Preparing files...",
+      "sending": "Sending part {current} of {total}",
+      "cancel": "Cancel",
       "tooLargeTotal": "The selected files together are larger than {max}. Import them in smaller groups.",
-      "tooMany": "Select at most {max} files per import.",
       "failed": "The import failed",
       "result": {
         "heading": "Import result",
         "file": "{name}: {stored} stored, {duplicates} duplicates, {skipped} skipped",
         "summary": "{processed} emails processed.",
         "truncated": "{count} messages were not read because one import has a limit. Import them again in a second run.",
+        "oversized": "{name}: {count} messages larger than {max} were not sent.",
+        "stopped": "The import stopped after {done} of {total} parts. The emails already imported are kept. Import the same files again to continue. Emails already imported are not stored twice.",
+        "cancelled": "The import was cancelled after {done} of {total} parts. The emails already imported are kept.",
         "busy": "The mailbox is being read right now. The imported emails will be processed at the next read.",
         "errors": {
           "unsupported_format": "{name}: this format is not supported. Supported formats are .eml, .mbox, .msg and .zip.",
           "invalid_archive": "{name}: the ZIP file is damaged or cannot be read.",
-          "archive_too_large": "{name}: the ZIP file expands to more than 100 MB. Split it, or upload the .mbox file inside.",
+          "archive_too_large": "{name}: the ZIP file expands to more than the import limit. Unpack it and upload the .mbox file inside.",
           "empty": "{name}: the file holds no emails."
         },
         "ignored": "{name}: {count} other files in the archive were skipped."
@@ -148,7 +152,7 @@
           "step1": "Open takeout.google.com and choose Deselect all.",
           "step2": "Select Mail and choose All Mail data included.",
           "step3": "Choose only your label and create the export.",
-          "step4": "Upload the downloaded .zip file as it is. You do not need to unpack it."
+          "step4": "Upload the downloaded .zip file as it is, however large. You do not need to unpack it."
         },
         "gmailOne": {
           "title": "Gmail: one email",

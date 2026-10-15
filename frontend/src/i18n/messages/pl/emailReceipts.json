@@ -123,20 +123,24 @@
       "noFileChosen": "Nie wybrano plików",
       "selected": "Wybrano: {count}",
       "button": "Importuj",
-      "tooLarge": "Plik {name} jest większy niż {max}. Podziel eksport na mniejsze pliki.",
+      "preparing": "Przygotowanie plików...",
+      "sending": "Wysyłanie części {current} z {total}",
+      "cancel": "Anuluj",
       "tooLargeTotal": "Wybrane pliki razem są większe niż {max}. Importuj je w mniejszych grupach.",
-      "tooMany": "Wybierz najwyżej {max} plików na jeden import.",
       "failed": "Import nie powiódł się",
       "result": {
         "heading": "Wynik importu",
         "file": "{name}: zapisano {stored}, duplikaty {duplicates}, pominięto {skipped}",
         "summary": "Przetworzono wiadomości: {processed}.",
         "truncated": "Nie odczytano wiadomości: {count}, ponieważ jeden import ma limit. Importuj je ponownie w drugim przebiegu.",
+        "oversized": "{name}: nie wysłano wiadomości większych niż {max}: {count}.",
+        "stopped": "Import zatrzymał się po {done} z {total} części. Zaimportowane już e-maile zostają zachowane. Aby kontynuować, zaimportuj te same pliki jeszcze raz. E-maile zaimportowane wcześniej nie są zapisywane drugi raz.",
+        "cancelled": "Import został anulowany po {done} z {total} części. Zaimportowane już e-maile zostają zachowane.",
         "busy": "Skrzynka jest teraz odczytywana. Zaimportowane wiadomości zostaną przetworzone przy następnym odczycie.",
         "errors": {
           "unsupported_format": "{name}: ten format nie jest obsługiwany. Obsługiwane formaty to .eml, .mbox, .msg i .zip.",
           "invalid_archive": "{name}: plik ZIP jest uszkodzony lub nie można go odczytać.",
-          "archive_too_large": "{name}: plik ZIP po rozpakowaniu ma ponad 100 MB. Podziel go lub wyślij plik .mbox z jego wnętrza.",
+          "archive_too_large": "{name}: plik ZIP po rozpakowaniu przekracza limit importu. Rozpakuj go i prześlij plik .mbox ze środka.",
           "empty": "{name}: plik nie zawiera wiadomości."
         },
         "ignored": "{name}: pominięto inne pliki w archiwum: {count}."
@@ -148,7 +152,7 @@
           "step1": "Otwórz takeout.google.com i wybierz „Deselect all”.",
           "step2": "Zaznacz „Mail” i wybierz „All Mail data included”.",
           "step3": "Wybierz tylko swoją etykietę i utwórz eksport.",
-          "step4": "Wyślij pobrany plik .zip bez zmian. Nie musisz go rozpakowywać."
+          "step4": "Wyślij pobrany plik .zip bez zmian, niezależnie od jego rozmiaru. Nie musisz go rozpakowywać."
         },
         "gmailOne": {
           "title": "Gmail: jedna wiadomość",

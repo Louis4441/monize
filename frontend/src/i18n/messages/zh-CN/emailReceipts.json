@@ -123,20 +123,24 @@
       "noFileChosen": "未选择文件",
       "selected": "已选择：{count}",
       "button": "导入",
-      "tooLarge": "{name} 超过 {max}。请将导出内容拆分成较小的文件。",
+      "preparing": "正在准备文件...",
+      "sending": "正在发送第 {current} 部分，共 {total} 部分",
+      "cancel": "取消",
       "tooLargeTotal": "所选文件合计超过 {max}。请分成较小的批次导入。",
-      "tooMany": "每次导入最多选择 {max} 个文件。",
       "failed": "导入失败",
       "result": {
         "heading": "导入结果",
         "file": "{name}：已存储 {stored} 封，重复 {duplicates} 封，已跳过 {skipped} 封",
         "summary": "已处理 {processed} 封邮件。",
         "truncated": "由于单次导入有上限，有 {count} 封邮件未被读取。请在第二次运行中再次导入。",
+        "oversized": "{name}：有 {count} 封大于 {max} 的邮件未发送。",
+        "stopped": "导入在完成 {done} 个部分（共 {total} 个）后停止。已导入的邮件会保留。如要继续，请再次导入相同的文件。已导入的邮件不会被重复存储。",
+        "cancelled": "导入在完成 {done} 个部分（共 {total} 个）后被取消。已导入的邮件会保留。",
         "busy": "邮箱正在读取中。已导入的邮件将在下次读取时处理。",
         "errors": {
           "unsupported_format": "{name}：不支持此格式。支持的格式为 .eml、.mbox、.msg 和 .zip。",
           "invalid_archive": "{name}：ZIP 文件已损坏或无法读取。",
-          "archive_too_large": "{name}：ZIP 文件解压后超过 100 MB。请拆分文件，或上传其中的 .mbox 文件。",
+          "archive_too_large": "{name}：ZIP 文件解压后超过导入上限。请先解压，再上传其中的 .mbox 文件。",
           "empty": "{name}：文件中没有邮件。"
         },
         "ignored": "{name}：压缩包中另有 {count} 个文件已跳过。"
@@ -148,7 +152,7 @@
           "step1": "打开 takeout.google.com，然后选择“全部取消选择”。",
           "step2": "选择“邮件”，然后选择“包含所有邮件数据”。",
           "step3": "只选择您的标签，然后创建导出。",
-          "step4": "按原样上传下载的 .zip 文件。无需解压。"
+          "step4": "请原样上传下载的 .zip 文件，无论它多大。无需解压。"
         },
         "gmailOne": {
           "title": "Gmail：一封邮件",

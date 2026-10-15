@@ -123,20 +123,24 @@
       "noFileChosen": "未選擇檔案",
       "selected": "已選取：{count}",
       "button": "匯入",
-      "tooLarge": "{name} 超過 {max}。請將匯出內容拆分成較小的檔案。",
+      "preparing": "正在準備檔案...",
+      "sending": "正在傳送第 {current} 部分，共 {total} 部分",
+      "cancel": "取消",
       "tooLargeTotal": "所選檔案合計超過 {max}。請分成較小的批次匯入。",
-      "tooMany": "每次匯入最多選取 {max} 個檔案。",
       "failed": "匯入失敗",
       "result": {
         "heading": "匯入結果",
         "file": "{name}：已儲存 {stored} 封，重複 {duplicates} 封，已略過 {skipped} 封",
         "summary": "已處理 {processed} 封郵件。",
         "truncated": "由於單次匯入有上限，有 {count} 封郵件未被讀取。請在第二次執行中再次匯入。",
+        "oversized": "{name}：有 {count} 封大於 {max} 的郵件未傳送。",
+        "stopped": "匯入在完成 {done} 個部分（共 {total} 個）後停止。已匯入的郵件會保留。如要繼續，請再次匯入相同的檔案。已匯入的郵件不會重複儲存。",
+        "cancelled": "匯入在完成 {done} 個部分（共 {total} 個）後被取消。已匯入的郵件會保留。",
         "busy": "信箱正在讀取中。已匯入的郵件將在下次讀取時處理。",
         "errors": {
           "unsupported_format": "{name}：不支援此格式。支援的格式為 .eml、.mbox、.msg 和 .zip。",
           "invalid_archive": "{name}：ZIP 檔案已損毀或無法讀取。",
-          "archive_too_large": "{name}：ZIP 檔案解壓縮後超過 100 MB。請拆分檔案，或上傳其中的 .mbox 檔案。",
+          "archive_too_large": "{name}：ZIP 檔案解壓縮後超過匯入上限。請先解壓縮，再上傳其中的 .mbox 檔案。",
           "empty": "{name}：檔案中沒有郵件。"
         },
         "ignored": "{name}：壓縮檔中另有 {count} 個檔案已略過。"
@@ -148,7 +152,7 @@
           "step1": "開啟 takeout.google.com，然後選擇「全部取消選取」。",
           "step2": "選取「郵件」，然後選擇「包含所有郵件資料」。",
           "step3": "只選取您的標籤，然後建立匯出。",
-          "step4": "依原樣上傳下載的 .zip 檔案。無需解壓縮。"
+          "step4": "請原樣上傳下載的 .zip 檔案，無論它多大。不需要解壓縮。"
         },
         "gmailOne": {
           "title": "Gmail：一封郵件",

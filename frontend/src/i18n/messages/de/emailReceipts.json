@@ -123,20 +123,24 @@
       "noFileChosen": "Keine Dateien ausgewählt",
       "selected": "Ausgewählt: {count}",
       "button": "Importieren",
-      "tooLarge": "{name} ist größer als {max}. Teilen Sie den Export in kleinere Dateien auf.",
+      "preparing": "Dateien werden vorbereitet...",
+      "sending": "Teil {current} von {total} wird gesendet",
+      "cancel": "Abbrechen",
       "tooLargeTotal": "Die ausgewählten Dateien zusammen sind größer als {max}. Importieren Sie sie in kleineren Gruppen.",
-      "tooMany": "Wählen Sie höchstens {max} Dateien pro Import aus.",
       "failed": "Der Import ist fehlgeschlagen",
       "result": {
         "heading": "Importergebnis",
         "file": "{name}: {stored} gespeichert, {duplicates} Duplikate, {skipped} übersprungen",
         "summary": "{processed} E-Mails verarbeitet.",
         "truncated": "{count} Nachrichten wurden nicht gelesen, weil ein Import ein Limit hat. Importieren Sie sie in einem zweiten Durchgang erneut.",
+        "oversized": "{name}: {count} Nachrichten, die größer als {max} sind, wurden nicht gesendet.",
+        "stopped": "Der Import wurde nach {done} von {total} Teilen beendet. Bereits importierte E-Mails bleiben erhalten. Importieren Sie dieselben Dateien erneut, um fortzufahren. Bereits importierte E-Mails werden nicht doppelt gespeichert.",
+        "cancelled": "Der Import wurde nach {done} von {total} Teilen abgebrochen. Bereits importierte E-Mails bleiben erhalten.",
         "busy": "Das Postfach wird gerade gelesen. Die importierten E-Mails werden beim nächsten Lesen verarbeitet.",
         "errors": {
           "unsupported_format": "{name}: Dieses Format wird nicht unterstützt. Unterstützte Formate sind .eml, .mbox, .msg und .zip.",
           "invalid_archive": "{name}: Die ZIP-Datei ist beschädigt oder kann nicht gelesen werden.",
-          "archive_too_large": "{name}: Die ZIP-Datei wird auf mehr als 100 MB entpackt. Teilen Sie sie auf oder laden Sie die darin enthaltene .mbox-Datei hoch.",
+          "archive_too_large": "{name}: Die ZIP-Datei ist entpackt größer als das Importlimit. Entpacken Sie sie und laden Sie die enthaltene .mbox-Datei hoch.",
           "empty": "{name}: Die Datei enthält keine E-Mails."
         },
         "ignored": "{name}: {count} andere Dateien im Archiv wurden übersprungen."
@@ -148,7 +152,7 @@
           "step1": "Öffnen Sie takeout.google.com und wählen Sie „Alle Auswahlen aufheben“.",
           "step2": "Wählen Sie „E-Mail“ und dann „Alle E-Mail-Daten enthalten“.",
           "step3": "Wählen Sie nur Ihr Label und erstellen Sie den Export.",
-          "step4": "Laden Sie die heruntergeladene .zip-Datei unverändert hoch. Sie müssen sie nicht entpacken."
+          "step4": "Laden Sie die heruntergeladene .zip-Datei unverändert hoch, egal wie groß sie ist. Sie müssen sie nicht entpacken."
         },
         "gmailOne": {
           "title": "Gmail: eine E-Mail",

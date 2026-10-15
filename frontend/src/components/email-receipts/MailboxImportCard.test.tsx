@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import toast from "react-hot-toast";
 import { render, screen, fireEvent, act } from "@/test/render";
+import { MailboxImportCard } from "./MailboxImportCard";
 import {
-  MailboxImportCard,
-  MAX_IMPORT_FILES,
-  MAX_IMPORT_FILE_BYTES,
-  MAX_IMPORT_TOTAL_BYTES,
-} from "./MailboxImportCard";
-import type { EmailReceiptImportResult } from "@/types/email-receipts";
+  PART_MAX_BYTES,
+  SELECTION_MAX_BYTES,
+} from "@/lib/email-import/upload-plan";
+import type {
+  EmailReceiptImportFileResult,
+  EmailReceiptImportResult,
+} from "@/types/email-receipts";
 
 const api = vi.hoisted(() => ({ importFiles: vi.fn() }));
 vi.mock("@/lib/email-receipts-api", () => ({
@@ -41,6 +43,23 @@ function result(
     truncated: 0,
     processed: 3,
     busy: false,
+    ...overrides,
+  };
+}
+
+function entry(
+  name: string,
+  overrides: Partial<EmailReceiptImportFileResult> = {},
+): EmailReceiptImportFileResult {
+  return {
+    name,
+    format: "eml",
+    messages: 1,
+    stored: 1,
+    duplicates: 0,
+    skipped: 0,
+    ignoredEntries: 0,
+    error: null,
     ...overrides,
   };
 }
@@ -150,7 +169,7 @@ describe("MailboxImportCard", () => {
     ["invalid_archive", "x.zip: the ZIP file is damaged or cannot be read."],
     [
       "archive_too_large",
-      "x.zip: the ZIP file expands to more than 100 MB. Split it, or upload the .mbox file inside.",
+      "x.zip: the ZIP file expands to more than the import limit. Unpack it and upload the .mbox file inside.",
     ],
     [
       "unsupported_format",
@@ -241,57 +260,129 @@ describe("MailboxImportCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("refuses more than the file limit without a request", async () => {
+  it("accepts more than 20 files and sends them in several requests", async () => {
+    api.importFiles.mockImplementation(async (sent: File[]) =>
+      result({
+        files: sent.map((f) => entry(f.name)),
+        processed: sent.length,
+      }),
+    );
     render(<MailboxImportCard />);
-    await pick(
-      Array.from({ length: MAX_IMPORT_FILES + 1 }, (_, i) => file(`m${i}.eml`)),
-    );
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Select at most 20 files per import.",
-    );
-    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
-    expect(api.importFiles).not.toHaveBeenCalled();
+    await pick(Array.from({ length: 21 }, (_, i) => file(`m${i}.eml`)));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("Selected: 21")).toBeInTheDocument();
+    await importNow();
+    expect(api.importFiles).toHaveBeenCalledTimes(2);
+    expect(api.importFiles.mock.calls.map((c) => c[0].length)).toEqual([20, 1]);
+    expect(screen.getByText("21 emails processed.")).toBeInTheDocument();
+    expect(screen.getByText(/^m20\.eml: /)).toBeInTheDocument();
   });
 
-  it("accepts exactly the file limit, the size limit and the total limit", async () => {
+  it("accepts exactly the total limit and refuses one byte more, without a request", async () => {
     render(<MailboxImportCard />);
-    const rest = MAX_IMPORT_TOTAL_BYTES - 3 * MAX_IMPORT_FILE_BYTES;
-    await pick([
-      ...Array.from({ length: 3 }, (_, i) =>
-        file(`big${i}.mbox`, MAX_IMPORT_FILE_BYTES),
-      ),
-      file("rest.mbox", rest),
-      ...Array.from({ length: MAX_IMPORT_FILES - 4 }, (_, i) =>
-        file(`m${i}.eml`, 0),
-      ),
-    ]);
+    await pick([file("a.mbox", SELECTION_MAX_BYTES)]);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Import" })).toBeEnabled();
+    await pick([file("a.mbox", SELECTION_MAX_BYTES), file("b.eml", 1)]);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The selected files together are larger than 1.0 GB.",
+    );
+    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
+    expect(api.importFiles).not.toHaveBeenCalled();
   });
 
-  it("refuses files that together pass the total limit, without a request", async () => {
+  it("splits a large mbox in the browser and sums the parts under the file name", async () => {
+    const msg = (n: number) =>
+      `From s${n}@x Mon\nSubject: ${n}\n\n${"b".repeat(9 * 1024 * 1024)}\n\n`;
+    const big = new File([msg(1), msg(2), msg(3), msg(4)], "monize.mbox");
+    expect(big.size).toBeGreaterThan(PART_MAX_BYTES);
+    api.importFiles.mockImplementation(async (sent: File[]) =>
+      result({
+        files: sent.map((f) =>
+          entry(f.name, { messages: 2, stored: 2, duplicates: 0, skipped: 0 }),
+        ),
+        processed: sent.length * 2,
+      }),
+    );
     render(<MailboxImportCard />);
-    await pick([
-      ...Array.from({ length: 3 }, (_, i) =>
-        file(`big${i}.mbox`, MAX_IMPORT_FILE_BYTES),
+    await pick([big]);
+    await importNow();
+    expect(api.importFiles).toHaveBeenCalledTimes(1);
+    const sent = api.importFiles.mock.calls[0][0] as File[];
+    expect(sent.map((f) => f.name)).toEqual(["monize-1.mbox", "monize-2.mbox"]);
+    expect(sent.every((f) => f.size <= PART_MAX_BYTES)).toBe(true);
+    expect(
+      screen.getByText("monize.mbox: 4 stored, 0 duplicates, 0 skipped"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/were not sent/)).not.toBeInTheDocument();
+  });
+
+  it("says how many messages above 24 MB were not sent", async () => {
+    const huge = new File(
+      ["From a@b\n\n", "x".repeat(PART_MAX_BYTES + 10)],
+      "huge.mbox",
+    );
+    render(<MailboxImportCard />);
+    await pick([huge]);
+    await importNow();
+    expect(api.importFiles).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "huge.mbox: 1 messages larger than 24.0 MB were not sent.",
       ),
-      file("rest.mbox", MAX_IMPORT_TOTAL_BYTES - 3 * MAX_IMPORT_FILE_BYTES + 1),
-    ]);
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      /together are larger than/,
-    );
-    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
-    expect(api.importFiles).not.toHaveBeenCalled();
+    ).toBeInTheDocument();
+    expect(screen.getByText("0 emails processed.")).toBeInTheDocument();
   });
 
-  it("refuses a file over the size limit and names it", async () => {
-    render(<MailboxImportCard />);
-    await pick([file("ok.eml"), file("big.mbox", MAX_IMPORT_FILE_BYTES + 1)]);
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      /big\.mbox is larger than/,
+  it("shows the preparing and sending progress and cancels between requests", async () => {
+    let finishFirst: (value: EmailReceiptImportResult) => void = () => {};
+    api.importFiles.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFirst = resolve)),
     );
-    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
-    expect(api.importFiles).not.toHaveBeenCalled();
+    render(<MailboxImportCard />);
+    await pick(Array.from({ length: 21 }, (_, i) => file(`m${i}.eml`)));
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    });
+    expect(screen.getByText("Preparing files...")).toBeInTheDocument();
+    await act(async () => {});
+    expect(screen.getByText("Sending part 1 of 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await act(async () => {
+      finishFirst(result({ files: [entry("m0.eml")], processed: 20 }));
+    });
+    await act(async () => {});
+    expect(api.importFiles).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByText(
+        "The import was cancelled after 1 of 2 parts. The emails already imported are kept.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^m0\.eml: /)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps what was imported when a later request fails, and says it stopped", async () => {
+    api.importFiles
+      .mockResolvedValueOnce(
+        result({ files: [entry("m0.eml")], processed: 20 }),
+      )
+      .mockRejectedValueOnce({
+        response: { status: 500, data: { message: "Server broke" } },
+      });
+    render(<MailboxImportCard />);
+    await pick(Array.from({ length: 21 }, (_, i) => file(`m${i}.eml`)));
+    await importNow();
+    expect(screen.getByRole("alert")).toHaveTextContent("Server broke");
+    expect(toast.error).toHaveBeenCalledWith("Server broke");
+    expect(
+      screen.getByText(/^The import stopped after 1 of 2 parts\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^m0\.eml: /)).toBeInTheDocument();
+    expect(screen.getByText("20 emails processed.")).toBeInTheDocument();
+    expect(screen.getByText("Selected: 21")).toBeInTheDocument();
   });
 
   it("shows the server message and a toast when the request fails", async () => {
