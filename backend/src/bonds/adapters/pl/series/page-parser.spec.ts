@@ -123,6 +123,14 @@ describe("pageText", () => {
     ).toBe("a b c & d!");
   });
 
+  it("drops a script or style whose end tag carries junk before its >", () => {
+    expect(
+      pageText(
+        "a<script>var x = 'Seria: HACK';</script\t\n bar>b<STYLE>.a{}</style foo>c<script>y</SCRIPT >d",
+      ),
+    ).toBe("a b c d");
+  });
+
   it("leaves an entity it does not know and a bad code point alone", () => {
     expect(pageText("&unknown; &#99999999;")).toBe("&unknown;");
   });

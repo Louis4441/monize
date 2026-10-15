@@ -49,12 +49,16 @@ function decodeEntities(text: string): string {
   );
 }
 
-/** The page's visible text: scripts, styles and comments dropped, tags to spaces, one space between words. */
+/**
+ * The page's visible text: scripts, styles and comments dropped, tags to spaces, one space between words.
+ * An end tag may carry whitespace and junk before its `>` (`</script foo>`), which a browser still
+ * reads as the end of the block, so the block patterns accept it too.
+ */
 export function pageText(html: string): string {
   const withoutCode = html
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, " ")
-    .replace(/<style\b[\s\S]*?<\/style\s*>/gi, " ");
+    .replace(/<script\b[\s\S]*?<\/script(?:\s+[^>]*)?\s*>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style(?:\s+[^>]*)?\s*>/gi, " ");
   return decodeEntities(withoutCode.replace(/<[^>]*>/g, " "))
     .normalize("NFC")
     .replace(/\s+/g, " ")
