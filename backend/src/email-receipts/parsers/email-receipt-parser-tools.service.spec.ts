@@ -73,6 +73,7 @@ function setup() {
   const parserRepo = {
     count: jest.fn().mockResolvedValue(0),
     findOne: jest.fn(),
+    find: jest.fn().mockResolvedValue([]),
     findOneByOrFail: jest.fn(),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
     create: jest.fn((v: Partial<EmailReceiptParser>) =>
@@ -90,7 +91,10 @@ function setup() {
     ]),
     count: jest.fn(async ({ where }) => (where.id._value as string[]).length),
   };
-  const payeeRepo = { count: jest.fn().mockResolvedValue(1) };
+  const payeeRepo = {
+    count: jest.fn().mockResolvedValue(1),
+    findOne: jest.fn().mockResolvedValue(null),
+  };
   // The open brokerage accounts a trade profile may name (`usableTradeAccountIds`).
   const accountRepo = {
     find: jest.fn(async ({ where }) =>
@@ -218,6 +222,151 @@ describe("EmailReceiptParserToolsService.listCategories", () => {
 
     expect(result.guide).toBe(EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE);
     expect(result.guide).toContain("joinWrapped");
+  });
+});
+
+describe("EmailReceiptParserToolsService.listParsers and getParser", () => {
+  const PARSER_ID = "50000000-0000-4000-8000-000000000001";
+  const stored = (over: Partial<EmailReceiptParser> = {}) =>
+    Object.assign(new EmailReceiptParser(), {
+      id: PARSER_ID,
+      userId: USER,
+      name: "Example Shop",
+      payeeId: null,
+      fromDomains: ["shop.example.com"],
+      subjectContains: ["order"],
+      definition: { ...DEFINITION, match: undefined },
+      status: "approved",
+      source: "manual",
+      approvedAt: new Date("2026-09-02T10:00:00Z"),
+      revision: 3,
+      createdAt: new Date("2026-09-01T10:00:00Z"),
+      updatedAt: new Date("2026-09-03T10:00:00Z"),
+      ...over,
+    });
+
+  it("lists the user's parsers, newest change first, bounded, as summaries without the definition", async () => {
+    const { service, parserRepo } = setup();
+    parserRepo.find.mockResolvedValue([
+      stored(),
+      stored({ id: "p-2", status: "draft", source: "ai", definition: {} }),
+    ]);
+
+    const result = await service.listParsers(USER);
+
+    expect(parserRepo.find).toHaveBeenCalledWith({
+      where: { userId: USER },
+      order: { updatedAt: "DESC", id: "DESC" },
+      take: MAX_PARSERS_PER_USER,
+    });
+    expect(result).toEqual([
+      {
+        id: PARSER_ID,
+        name: "Example Shop",
+        fromDomains: ["shop.example.com"],
+        subjectContains: ["order"],
+        status: "approved",
+        source: "manual",
+        revision: 3,
+        definitionValid: true,
+        updatedAt: "2026-09-03T10:00:00.000Z",
+      },
+      expect.objectContaining({
+        id: "p-2",
+        status: "draft",
+        source: "ai",
+        definitionValid: false,
+      }),
+    ]);
+    expect(result[0]).not.toHaveProperty("definition");
+  });
+
+  it.each(["approved", "draft"] as const)(
+    "reads one %s parser in full with category names and the payee's name",
+    async (status) => {
+      const { service, parserRepo, payeeRepo } = setup();
+      parserRepo.findOne.mockResolvedValue(
+        stored({ status, payeeId: "payee-1" }),
+      );
+      payeeRepo.findOne.mockResolvedValue({ name: "Example Shop Ltd" });
+
+      const result = await service.getParser(USER, PARSER_ID);
+
+      expect(parserRepo.findOne).toHaveBeenCalledWith({
+        where: { id: PARSER_ID, userId: USER },
+      });
+      expect(payeeRepo.findOne).toHaveBeenCalledWith({
+        where: { id: "payee-1", userId: USER },
+        select: { name: true },
+      });
+      expect(result).toMatchObject({
+        id: PARSER_ID,
+        status,
+        revision: 3,
+        payeeId: "payee-1",
+        payeeName: "Example Shop Ltd",
+        definitionValid: true,
+      });
+      expect(result).not.toHaveProperty("reprocessableCount");
+      expect(result.definition).toMatchObject({
+        defaultCategory: "Books",
+        shippingCategory: "Shipping",
+      });
+      expect(result.definition).not.toHaveProperty("defaultCategoryId");
+    },
+  );
+
+  it("gives a null payeeName for a parser with no payee, without reading payees", async () => {
+    const { service, parserRepo, payeeRepo } = setup();
+    parserRepo.findOne.mockResolvedValue(stored());
+
+    await expect(service.getParser(USER, PARSER_ID)).resolves.toMatchObject({
+      payeeName: null,
+    });
+    expect(payeeRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it("refuses a parser that is missing or not the user's with a 404", async () => {
+    const { service, parserRepo } = setup();
+    parserRepo.findOne.mockResolvedValue(null);
+
+    await expect(service.getParser(USER, PARSER_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(parserRepo.findOne).toHaveBeenCalledWith({
+      where: { id: PARSER_ID, userId: USER },
+    });
+  });
+
+  it("refuses a malformed id as not found, without a query", async () => {
+    const { service, parserRepo } = setup();
+
+    await expect(service.getParser(USER, "nope")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(parserRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it("returns a definition that passes testDefinition and saveDraft unchanged, as a new draft", async () => {
+    const { service, parserRepo } = setup();
+    parserRepo.findOne.mockResolvedValue(stored());
+    const { definition } = await service.getParser(USER, PARSER_ID);
+
+    const tested = await service.testDefinition(USER, {
+      definition,
+      receiptIds: [R1],
+    });
+    expect(tested).toMatchObject({ valid: true, unknownCategoryIds: [] });
+
+    parserRepo.findOne.mockClear();
+    const saved = await service.saveDraft(USER, CALLER, {
+      name: "Example Shop v2",
+      fromDomains: ["shop.example.com"],
+      definition,
+    });
+    expect(saved).toMatchObject({ parserId: "p-new", status: "draft" });
+    expect(parserRepo.save).toHaveBeenCalledTimes(1);
+    expect(parserRepo.update).not.toHaveBeenCalled();
   });
 });
 

@@ -84,6 +84,13 @@ import { McpServerService } from "./mcp-server.service";
 // `enter_bond_series_manually` (1,685 bytes: the per-series values of a template).
 // Total 62,040 -> 63,050 (63,046 measured, a 4-byte margin); no existing cap moved.
 // Approved by the owner on 2026-10-11 (WMP/monize#24).
+//
+// Raised, as a reviewed decision (owner-approved): `email_receipt_parsers`
+// gained the read-only `get` operation (the saved parsers, or one in full with
+// `parserId`) so an agent revising a profile reads the previous version instead
+// of the 200-character excerpt a queued instruction carries. Now 2,730
+// bytes measured; cap 2,620 -> 2,740 and total 63,050 -> 63,170 (63,158
+// measured); no other cap moved.
 const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_accounts: 2500,
   list_transactions: 3550,
@@ -104,7 +111,7 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   get_budget_status: 2550,
   manage_transaction_rules: 4910,
   ai_review_requests: 3050,
-  email_receipt_parsers: 2620,
+  email_receipt_parsers: 2740,
   fetch_bond_series: 1000,
   enter_bond_series_manually: 1690,
   get_next_prompt: 1400,
@@ -112,7 +119,7 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   report_progress: 1250,
 };
 
-const TOTAL_BYTE_BUDGET = 63_050;
+const TOTAL_BYTE_BUDGET = 63_170;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**

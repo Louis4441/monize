@@ -11,6 +11,8 @@ const DEFINITION = { version: 2, total: ["Order total: {amount}"] };
 describe("email_receipt_parsers schema", () => {
   it.each([
     [{ operation: "categories" }],
+    [{ operation: "get" }],
+    [{ operation: "get", parserId: REQ }],
     [{ operation: "test", definition: DEFINITION, receiptIds: [R1] }],
     [
       {
@@ -62,6 +64,7 @@ describe("email_receipt_parsers schema", () => {
 
   it.each([
     ["an unknown operation", { operation: "approve" }],
+    ["get with a non-uuid parserId", { operation: "get", parserId: "nope" }],
     ["test with no definition", { operation: "test", receiptIds: [R1] }],
     ["test with no emails", { operation: "test", definition: DEFINITION }],
     [

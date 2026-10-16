@@ -47,6 +47,13 @@ describe("ToolExecutorService email_receipt_parsers", () => {
       }),
       testDefinition: jest.fn(),
       saveDraft: jest.fn(),
+      listParsers: jest.fn().mockResolvedValue([{ id: R1, name: "Shop" }]),
+      getParser: jest.fn().mockResolvedValue({
+        id: R1,
+        name: "Shop",
+        status: "approved",
+        revision: 4,
+      }),
     };
     const unused = [
       AccountsService,
@@ -101,6 +108,29 @@ describe("ToolExecutorService email_receipt_parsers", () => {
     expect(tools.listCategories).toHaveBeenCalledWith(USER);
     expect(result.isError).toBeUndefined();
     expect(result.data).toMatchObject({ totalCount: 1 });
+  });
+
+  it("lists the saved parsers", async () => {
+    const result = await service.execute(USER, "email_receipt_parsers", {
+      operation: "get",
+    });
+
+    expect(tools.listParsers).toHaveBeenCalledWith(USER);
+    expect(tools.getParser).not.toHaveBeenCalled();
+    expect(result.data).toEqual({ parsers: [{ id: R1, name: "Shop" }] });
+    expect(result.summary).toBe("Found 1 parser.");
+  });
+
+  it("reads one parser in full", async () => {
+    const result = await service.execute(USER, "email_receipt_parsers", {
+      operation: "get",
+      parserId: R1,
+    });
+
+    expect(tools.getParser).toHaveBeenCalledWith(USER, R1);
+    expect(tools.saveDraft).not.toHaveBeenCalled();
+    expect(result.data).toMatchObject({ id: R1, revision: 4 });
+    expect(result.summary).toContain('approved parser "Shop"');
   });
 
   it("tests a definition on the named emails and writes nothing", async () => {

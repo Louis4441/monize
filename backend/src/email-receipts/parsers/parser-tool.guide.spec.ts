@@ -59,12 +59,20 @@ describe("the email_receipt_parsers guide", () => {
       "test",
       "save_draft",
       "categories",
+      "get",
     ]);
     for (const operation of EMAIL_RECEIPT_PARSER_OPERATIONS) {
       expect(text).toContain(operation);
     }
     expect(text).toMatch(/Test every email/);
     expect(text).toMatch(/fix until complete/);
+  });
+
+  it("tells a model that get reads a saved parser to start a new draft from", () => {
+    expect(text).toMatch(/get: saved parsers; parserId: one in full/);
+    expect(EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE).toMatch(
+      /get: .*WITHOUT parserId.*NEW draft/,
+    );
   });
 
   it("names every top-level key of the language and the captures each field allows", () => {

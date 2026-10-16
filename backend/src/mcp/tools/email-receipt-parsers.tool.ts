@@ -33,8 +33,8 @@ const SAVED =
  * ledger or anything that reads mail. A draft reads no email until the user
  * approves it in the settings screen (INV-RECEIPT-003), and that approval is
  * the confirmation; a dialog in the agent's client for a parser the person has
- * not yet seen would ask the wrong person at the wrong time. `test` and
- * `categories` need the `read` scope, `save_draft` the `write` scope.
+ * not yet seen would ask the wrong person at the wrong time. `test`,
+ * `categories` and `get` need the `read` scope, `save_draft` the `write` scope.
  */
 @Injectable()
 export class McpEmailReceiptParserTools {
@@ -54,6 +54,7 @@ export class McpEmailReceiptParserTools {
             .max(EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS)
             .optional()
             .describe("test: stored emails."),
+          parserId: z.string().max(36).optional(),
           requestId: uuidString()
             .optional()
             .describe("save_draft: the claimed request."),
@@ -73,6 +74,14 @@ export class McpEmailReceiptParserTools {
         try {
           if (operation === "categories") {
             return toolResult(await this.parsers.listCategories(user.userId));
+          }
+
+          if (operation === "get") {
+            return toolResult(
+              args.parserId
+                ? await this.parsers.getParser(user.userId, args.parserId)
+                : { parsers: await this.parsers.listParsers(user.userId) },
+            );
           }
 
           if (operation === "test") {
