@@ -749,11 +749,22 @@
     "selection": {
       "label": "Seçilen e-postalar",
       "select": "{subject} e-postasını seç",
-      "selectAll": "Bu listedeki tüm e-postaları seçin (en fazla {max})",
-      "count": "{count, plural, one {# e-posta seçildi} other {# e-posta seçildi}} (en fazla {max})",
+      "selectAll": "Bu listedeki tüm e-postaları seç",
+      "count": "{count, plural, one {# e-posta seçildi} other {# e-posta seçildi}}",
       "draftButton": "Yapay zekâ ile ayrıştırıcı taslağı oluştur ({count})",
       "clear": "Seçimi temizle",
-      "differentSenders": "Seçilen e-postalar farklı göndericilerden geliyor ({domains}). Bir ayrıştırıcı tek bir göndericinin e-postalarını okur, bu yüzden tek bir göndericinin e-postalarını seçin."
+      "deleteButton": "Sil ({count})",
+      "ignoreButton": "Yoksay ({count})",
+      "pageSelected": "Bu sayfadaki {count} e-postanın tümü seçildi.",
+      "selectAllMatching": "Bu filtreye uyan {total} e-postanın tümünü seç.",
+      "allMatchingSelected": "Bu filtreye uyan {total} e-postanın tümü seçildi.",
+      "draftBlocked": {
+        "tooMany": "Bir ayrıştırıcı en çok {max} e-postadan hazırlanabilir. En fazla {max} e-posta seçin.",
+        "differentSenders": "Seçilen e-postalar farklı göndericilerden geliyor ({domains}). Bir ayrıştırıcı tek bir göndericinin e-postalarını okur, bu yüzden tek bir göndericinin e-postalarını seçin.",
+        "skipped": "Okunamayan bir e-postanın ayrıştırıcı için metni yoktur. Onu seçimden çıkarın.",
+        "allMatching": "Ayrıştırıcı, kendi seçtiğiniz e-postalardan hazırlanır; en çok {max} e-posta. Bu seçimi temizleyin ve en fazla {max} e-posta seçin.",
+        "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin."
+      }
     },
     "draft": {
       "failed": "Ayrıştırıcı taslağı oluşturma başlatılamadı",
@@ -765,7 +776,31 @@
       "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin.",
       "chatPromptTrade": "{domain} alan adından gelen {count, plural, one {bu işlem onayı e-postası} other {bu # işlem onayı e-postası}} için bir işlem profili oluştur. {requestId} numaralı yapay zekâ inceleme isteğini üstlen, profilini ekli her e-postada email_receipt_parsers aracıyla dene, her birinden eksiksiz bir işlem okunana kadar düzelt, sonra {requestId} isteği için taslak olarak kaydet."
     },
-    "tradeBadge": "İşlem"
+    "tradeBadge": "İşlem",
+    "bulkDialog": {
+      "delete": {
+        "title": "E-postalar silinsin mi?",
+        "message": "{scope, select, both {{domain} alanından gelen, {status} durumundaki } domain {{domain} alanından gelen } status {{status} durumundaki } other {}}{count, plural, one {# e-posta} other {# e-posta}} silinsin mi? Bu işlem geri alınamaz. E-postaları tutmak ve bir şey önermelerini engellemek için bunun yerine “Yoksay” seçin. Bir işlemle bağlantılı e-postalar korunur."
+      },
+      "ignore": {
+        "title": "E-postalar yoksayılsın mı?",
+        "message": "{scope, select, both {{domain} alanından gelen, {status} durumundaki } domain {{domain} alanından gelen } status {{status} durumundaki } other {}}{count, plural, one {# e-posta} other {# e-posta}} yoksayılsın mı? Hiçbir şey önermezler ve açık inceleme istekleri kapatılır. Bir işlemle bağlantılı e-postalar olduğu gibi kalır.",
+        "confirm": "Yoksay"
+      },
+      "countChanged": "Uyan e-posta sayısı şimdi {count}. Hiçbir şey değiştirilmedi. Sayıyı kontrol edin ve yeniden onaylayın."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# e-posta silindi.} other {# e-posta silindi.}}",
+        "ignored": "{count, plural, one {# e-posta yoksayıldı.} other {# e-posta yoksayıldı.}}",
+        "unchanged": "{count, plural, one {# e-posta zaten yoksayılmıştı.} other {# e-posta zaten yoksayılmıştı.}}",
+        "notIgnorable": "{count, plural, one {# e-posta yoksayılamadı: okunamadı veya önerisi zaten uygulanmıştı.} other {# e-posta yoksayılamadı: okunamadılar veya önerileri zaten uygulanmıştı.}}",
+        "skippedLinked": "{count, plural, one {Bir işlemle bağlantılı # e-posta korundu.} other {Bir işlemle bağlantılı # e-posta korundu.}}"
+      },
+      "deleteFailed": "E-postalar silinemedi",
+      "ignoreFailed": "E-postalar yoksayılamadı",
+      "noneLeft": "Artık uyan e-posta yok. Hiçbir şey değiştirilmedi."
+    }
   },
   "detail": {
     "title": "E-posta makbuzu",

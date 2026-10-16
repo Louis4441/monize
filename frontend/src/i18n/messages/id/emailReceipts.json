@@ -749,11 +749,22 @@
     "selection": {
       "label": "Surel yang dipilih",
       "select": "Pilih {subject}",
-      "selectAll": "Pilih semua surel dalam daftar ini (paling banyak {max})",
-      "count": "{count, plural, one {# surel dipilih} other {# surel dipilih}} (maksimal {max})",
+      "selectAll": "Pilih semua surel dalam daftar ini",
+      "count": "{count, plural, one {# surel dipilih} other {# surel dipilih}}",
       "draftButton": "Siapkan profil dengan AI ({count})",
       "clear": "Hapus pilihan",
-      "differentSenders": "Surel terpilih berasal dari pengirim yang berbeda ({domains}). Profil membaca surel dari satu pengirim, jadi pilih surel dari satu pengirim saja."
+      "deleteButton": "Hapus ({count})",
+      "ignoreButton": "Kecualikan ({count})",
+      "pageSelected": "Semua {count} surel di halaman ini dipilih.",
+      "selectAllMatching": "Pilih semua {total} surel yang cocok dengan filter ini.",
+      "allMatchingSelected": "Semua {total} surel yang cocok dengan filter ini dipilih.",
+      "draftBlocked": {
+        "tooMany": "Profil dapat disiapkan dari paling banyak {max} surel. Pilih {max} surel atau kurang.",
+        "differentSenders": "Surel terpilih berasal dari pengirim yang berbeda ({domains}). Profil membaca surel dari satu pengirim, jadi pilih surel dari satu pengirim saja.",
+        "skipped": "Surel yang tidak dapat dibaca tidak punya teks untuk menyiapkan profil. Hapus dari pilihan.",
+        "allMatching": "Profil disiapkan dari surel yang Anda pilih sendiri, paling banyak {max}. Hapus pilihan ini lalu pilih paling banyak {max} surel.",
+        "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan."
+      }
     },
     "draft": {
       "failed": "Tidak dapat memulai pembuatan draf profil",
@@ -765,7 +776,31 @@
       "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan.",
       "chatPromptTrade": "Buat profil perdagangan untuk {count, plural, one {surel konfirmasi perdagangan ini} other {# surel konfirmasi perdagangan ini}} dari {domain}. Ambil permintaan peninjauan AI {requestId}, uji profil Anda pada setiap surel terlampir dengan alat email_receipt_parsers, perbaiki sampai setiap surel terbaca sebagai perdagangan lengkap, lalu simpan sebagai draf untuk permintaan {requestId}."
     },
-    "tradeBadge": "Perdagangan"
+    "tradeBadge": "Perdagangan",
+    "bulkDialog": {
+      "delete": {
+        "title": "Hapus surel?",
+        "message": "Hapus {count, plural, one {# surel} other {# surel}}{scope, select, both { dari {domain} dengan status {status}} domain { dari {domain}} status { dengan status {status}} other {}}? Tindakan ini tidak dapat dibatalkan. Untuk menyimpan surel dan mencegahnya mengusulkan apa pun, pilih “Kecualikan”. Surel yang terhubung ke transaksi tetap disimpan."
+      },
+      "ignore": {
+        "title": "Kecualikan surel?",
+        "message": "Kecualikan {count, plural, one {# surel} other {# surel}}{scope, select, both { dari {domain} dengan status {status}} domain { dari {domain}} status { dengan status {status}} other {}}? Surel tidak akan mengusulkan apa pun, dan permintaan tinjauan yang terbuka akan ditutup. Surel yang terhubung ke transaksi tidak diubah.",
+        "confirm": "Kecualikan"
+      },
+      "countChanged": "Jumlah surel yang cocok sekarang {count}. Tidak ada yang diubah. Periksa jumlahnya dan konfirmasi lagi."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# surel dihapus.} other {# surel dihapus.}}",
+        "ignored": "{count, plural, one {# surel dikecualikan.} other {# surel dikecualikan.}}",
+        "unchanged": "{count, plural, one {# surel sudah dikecualikan sebelumnya.} other {# surel sudah dikecualikan sebelumnya.}}",
+        "notIgnorable": "{count, plural, one {# surel tidak dapat dikecualikan: tidak dapat dibaca, atau usulannya sudah diterapkan.} other {# surel tidak dapat dikecualikan: tidak dapat dibaca, atau usulannya sudah diterapkan.}}",
+        "skippedLinked": "{count, plural, one {# surel yang terhubung ke transaksi tetap disimpan.} other {# surel yang terhubung ke transaksi tetap disimpan.}}"
+      },
+      "deleteFailed": "Surel tidak dapat dihapus",
+      "ignoreFailed": "Surel tidak dapat dikecualikan",
+      "noneLeft": "Tidak ada lagi surel yang cocok. Tidak ada yang diubah."
+    }
   },
   "detail": {
     "title": "Struk surel",

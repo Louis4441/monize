@@ -1003,11 +1003,11 @@ section 3a.
   lists the user's domains with counts, at most 200, declared before `:id`; a
   list belongs to the pair of filters that asked for it, and the counts are read
   again after every command), the receipts table with state
-  badges and actions (a checkbox column selects up to five emails; the selection
-  bar offers "Draft parser with AI (N)" and warns, without blocking, when the
-  selected emails have different sender domains; the row's own "Draft parser with
-  AI" is the inline action of an email no parser read and "Create parser" is in
-  the menu); a detail dialog with the email (HTML in the sandboxed frame by
+  badges and actions (a checkbox column selects any number of emails; the selection
+  bar offers Delete, Ignore and "Prepare a profile with AI (N)", which is on only
+  for one to five emails of one sender and says beside it why it is off, see "Bulk
+  actions" below; the row's own "Draft parser with AI" is the inline action of an
+  email no parser read and "Create parser" is in the menu); a detail dialog with the email (HTML in the sandboxed frame by
   default, an HTML / Text / Lines toggle, the note "Remote images are not
   loaded.", who forwarded it and the shop's date), the parsed result, a
   "Structured data (schema.org)" section (found, with the order and its lines, or
@@ -1019,6 +1019,27 @@ section 3a.
   transaction picker's From and To dates are editable (they start as the window
   around the purchase date; the server accepts any linkable transaction of the
   user whatever its date) and its empty message says the dates can be widened.
+- **Bulk actions** on the Emails list: `POST /email-receipts/bulk`
+  `{ action: 'delete' | 'ignore', ids | filter, expectedCount }` answers
+  `{ affected, skippedLinked, unchanged, notIgnorable }`. Exactly one of `ids`
+  (1 to 500 UUIDs) and `filter` (`{ status?, domain? }`, read by the same predicate as
+  the list, so a domain includes its sub-domains) names the emails; a filter acts on
+  at most 20,000 emails (more is a 400 asking to narrow it). The header checkbox
+  selects every row of the page; when more emails match the filter, "Select all N
+  matching this filter" (N from `GET /email-receipts/status-counts`, the number the
+  state buttons read) sends the filter instead of ids. A confirmation states the count
+  and the filter ("Delete 1,234 emails from gmail.com? This cannot be undone.") and
+  points to Ignore, which keeps the emails. The server locks the matching rows
+  (`FOR UPDATE`, ascending id) in ONE transaction and compares their number with
+  `expectedCount` before it writes anything: a different number is a 409 with
+  `currentCount`, the dialog shows the new number and asks again, and nothing was
+  changed. Only then are the open review requests of those emails dismissed and one
+  `DELETE` or `UPDATE ... WHERE id = ANY(...) AND user_id = ...` written. An email
+  linked to a transaction is never deleted or ignored in bulk (`skippedLinked`).
+  Ignore follows the single `ignore()` rules: an already ignored email is `unchanged`;
+  a `skipped` email or one whose proposal was applied is `notIgnorable`. The route is
+  owner-only like the others and throttled to 10 a minute. "Prepare a profile with AI"
+  stays limited to one to five emails of one sender and never works on a filter.
 - `/ai-reviews`: an `email_receipt` row shows the sender and subject instead of
   the rule name, and a `pending` one says it waits for an AI agent (with a link
   to the AI settings). An `email_parser_draft` row reads "Parser draft from N

@@ -749,11 +749,22 @@
     "selection": {
       "label": "已選取的郵件",
       "select": "選取 {subject}",
-      "selectAll": "選取此清單中的所有電子郵件(最多 {max} 個)",
-      "count": "{count, plural, one {已選取 # 封郵件} other {已選取 # 封郵件}}（最多 {max} 封）",
+      "selectAll": "選取此清單中的所有郵件",
+      "count": "{count, plural, one {已選取 # 封郵件} other {已選取 # 封郵件}}",
       "draftButton": "用 AI 起草解析器（{count}）",
       "clear": "清除選取",
-      "differentSenders": "所選郵件來自不同的寄件者（{domains}）。解析器只讀取一個寄件者的郵件，請選取同一寄件者的郵件。"
+      "deleteButton": "刪除（{count}）",
+      "ignoreButton": "忽略（{count}）",
+      "pageSelected": "此頁面上的 {count} 封郵件已全部選取。",
+      "selectAllMatching": "選取符合此篩選條件的全部 {total} 封郵件。",
+      "allMatchingSelected": "符合此篩選條件的全部 {total} 封郵件已選取。",
+      "draftBlocked": {
+        "tooMany": "最多可用 {max} 封郵件準備解析器。請選取不超過 {max} 封郵件。",
+        "differentSenders": "所選郵件來自不同的寄件者（{domains}）。解析器只讀取一個寄件者的郵件，請選取同一寄件者的郵件。",
+        "skipped": "無法讀取的郵件沒有可用於準備解析器的文字。請將其從選取中移除。",
+        "allMatching": "解析器需用您自己選取的郵件準備，最多 {max} 封。請清除目前的選取，再選取不超過 {max} 封郵件。",
+        "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。"
+      }
     },
     "draft": {
       "failed": "無法開始起草解析器",
@@ -765,7 +776,31 @@
       "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。",
       "chatPromptTrade": "請為來自 {domain} 的{count, plural, one {這封交易確認郵件} other {這 # 封交易確認郵件}}建立一個交易設定檔。請認領 AI 審核請求 {requestId}，用 email_receipt_parsers 工具在每封所附郵件上測試你的設定檔，修改到每封都能讀取出完整的交易，然後將其儲存為請求 {requestId} 的草稿。"
     },
-    "tradeBadge": "交易"
+    "tradeBadge": "交易",
+    "bulkDialog": {
+      "delete": {
+        "title": "刪除這些郵件？",
+        "message": "要刪除{scope, select, both {來自 {domain}、狀態為「{status}」的} domain {來自 {domain} 的} status {狀態為「{status}」的} other {}}{count, plural, one {# 封郵件} other {# 封郵件}}嗎？此操作無法復原。若要保留郵件並避免它們提出任何建議，請改選「忽略」。與交易關聯的郵件會保留。"
+      },
+      "ignore": {
+        "title": "忽略這些郵件？",
+        "message": "要忽略{scope, select, both {來自 {domain}、狀態為「{status}」的} domain {來自 {domain} 的} status {狀態為「{status}」的} other {}}{count, plural, one {# 封郵件} other {# 封郵件}}嗎？它們將不再提出任何建議，其未處理的審查請求將被關閉。與交易關聯的郵件維持不變。",
+        "confirm": "忽略"
+      },
+      "countChanged": "符合條件的郵件現在有 {count} 封。未做任何變更。請核對數量後再次確認。"
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {已刪除 # 封郵件。} other {已刪除 # 封郵件。}}",
+        "ignored": "{count, plural, one {已忽略 # 封郵件。} other {已忽略 # 封郵件。}}",
+        "unchanged": "{count, plural, one {# 封郵件先前已被忽略。} other {# 封郵件先前已被忽略。}}",
+        "notIgnorable": "{count, plural, one {# 封郵件無法忽略：無法讀取，或其建議已被套用。} other {# 封郵件無法忽略：無法讀取，或其建議已被套用。}}",
+        "skippedLinked": "{count, plural, one {已保留 # 封與交易關聯的郵件。} other {已保留 # 封與交易關聯的郵件。}}"
+      },
+      "deleteFailed": "無法刪除郵件",
+      "ignoreFailed": "無法忽略郵件",
+      "noneLeft": "已沒有符合條件的郵件。未做任何變更。"
+    }
   },
   "detail": {
     "title": "郵件收據",

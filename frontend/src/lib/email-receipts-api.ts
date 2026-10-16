@@ -1,6 +1,8 @@
 import apiClient from './api';
 import { clearAllCache } from './apiCache';
 import type {
+  EmailReceiptBulkPayload,
+  EmailReceiptBulkResult,
   EmailReceiptDomainCount,
   CreateEmailReceiptParserPayload,
   EmailReceiptAskAiResult,
@@ -171,6 +173,31 @@ export const emailReceiptsApi = {
         byStatus: EmailReceiptStatusCounts;
       }>(`${RECEIPTS}/status-counts`);
       return response.data.byStatus;
+    },
+
+    /**
+     * How many stored emails match a filter (state and sender domain, as the
+     * list reads them): the same `status-counts` answer the state buttons print,
+     * so a bulk command's number and the page's number come from one place.
+     * Without `status` it is every state.
+     */
+    countMatching: async (status?: EmailReceiptStatus, domain?: string): Promise<number> => {
+      const response = await apiClient.get<{
+        total: number;
+        byStatus: EmailReceiptStatusCounts;
+      }>(`${RECEIPTS}/status-counts`, { params: domain ? { domain } : undefined });
+      return status ? (response.data.byStatus[status] ?? 0) : response.data.total;
+    },
+
+    /**
+     * Delete or ignore many emails, by id or by the list's filter, in one
+     * transaction. `expectedCount` is what the person was told: a different
+     * number answers 409 with `currentCount` and changes nothing. Emails linked
+     * to a transaction are skipped and counted.
+     */
+    bulk: async (payload: EmailReceiptBulkPayload): Promise<EmailReceiptBulkResult> => {
+      const response = await apiClient.post<EmailReceiptBulkResult>(`${RECEIPTS}/bulk`, payload);
+      return response.data;
     },
 
     /**

@@ -749,11 +749,22 @@
     "selection": {
       "label": "Email đã chọn",
       "select": "Chọn {subject}",
-      "selectAll": "Chọn tất cả email trong danh sách này (tối đa {max})",
-      "count": "{count, plural, one {Đã chọn # email} other {Đã chọn # email}} (tối đa {max})",
+      "selectAll": "Chọn tất cả email trong danh sách này",
+      "count": "{count, plural, one {Đã chọn # email} other {Đã chọn # email}}",
       "draftButton": "Nhờ AI soạn trình phân tích ({count})",
       "clear": "Bỏ chọn",
-      "differentSenders": "Các email đã chọn đến từ những người gửi khác nhau ({domains}). Một trình phân tích đọc email của một người gửi, vì vậy hãy chọn email từ cùng một người gửi."
+      "deleteButton": "Xóa ({count})",
+      "ignoreButton": "Phớt lờ ({count})",
+      "pageSelected": "Tất cả {count} email trên trang này đã được chọn.",
+      "selectAllMatching": "Chọn tất cả {total} email khớp với bộ lọc này.",
+      "allMatchingSelected": "Tất cả {total} email khớp với bộ lọc này đã được chọn.",
+      "draftBlocked": {
+        "tooMany": "Trình phân tích chỉ có thể được soạn từ tối đa {max} email. Hãy chọn {max} email trở xuống.",
+        "differentSenders": "Các email đã chọn đến từ những người gửi khác nhau ({domains}). Một trình phân tích đọc email của một người gửi, vì vậy hãy chọn email từ cùng một người gửi.",
+        "skipped": "Email không đọc được thì không có văn bản để soạn trình phân tích. Hãy bỏ nó khỏi lựa chọn.",
+        "allMatching": "Trình phân tích được soạn từ các email bạn tự chọn, tối đa {max}. Hãy bỏ lựa chọn này rồi chọn tối đa {max} email.",
+        "mixedKinds": "Các email đã chọn trộn lẫn xác nhận giao dịch và email đơn hàng. Một hồ sơ chỉ đọc một loại, vì vậy hãy chỉ chọn xác nhận giao dịch hoặc chỉ chọn email đơn hàng."
+      }
     },
     "draft": {
       "failed": "Không thể bắt đầu soạn trình phân tích",
@@ -765,7 +776,31 @@
       "mixedKinds": "Các email đã chọn trộn lẫn xác nhận giao dịch và email đơn hàng. Một hồ sơ chỉ đọc một loại, vì vậy hãy chỉ chọn xác nhận giao dịch hoặc chỉ chọn email đơn hàng.",
       "chatPromptTrade": "Hãy tạo một hồ sơ giao dịch cho {count, plural, one {email xác nhận giao dịch này} other {# email xác nhận giao dịch này}} từ {domain}. Hãy nhận yêu cầu xem xét AI {requestId}, thử hồ sơ của bạn trên mọi email đính kèm bằng công cụ email_receipt_parsers, sửa cho đến khi từ mỗi email đọc được một giao dịch đầy đủ, rồi lưu nó dưới dạng bản nháp cho yêu cầu {requestId}."
     },
-    "tradeBadge": "Giao dịch"
+    "tradeBadge": "Giao dịch",
+    "bulkDialog": {
+      "delete": {
+        "title": "Xóa email?",
+        "message": "Xóa {count, plural, one {# email} other {# email}}{scope, select, both { từ {domain} ở trạng thái {status}} domain { từ {domain}} status { ở trạng thái {status}} other {}}? Không thể hoàn tác thao tác này. Để giữ lại email và không cho chúng đề xuất gì, hãy chọn “Phớt lờ”. Email liên kết với giao dịch sẽ được giữ lại."
+      },
+      "ignore": {
+        "title": "Phớt lờ email?",
+        "message": "Phớt lờ {count, plural, one {# email} other {# email}}{scope, select, both { từ {domain} ở trạng thái {status}} domain { từ {domain}} status { ở trạng thái {status}} other {}}? Chúng sẽ không đề xuất gì và các yêu cầu xem xét đang mở sẽ bị đóng. Email liên kết với giao dịch được giữ nguyên.",
+        "confirm": "Phớt lờ"
+      },
+      "countChanged": "Số email khớp bây giờ là {count}. Chưa có gì bị thay đổi. Hãy kiểm tra số lượng và xác nhận lại."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {Đã xóa # email.} other {Đã xóa # email.}}",
+        "ignored": "{count, plural, one {Đã phớt lờ # email.} other {Đã phớt lờ # email.}}",
+        "unchanged": "{count, plural, one {# email đã được phớt lờ từ trước.} other {# email đã được phớt lờ từ trước.}}",
+        "notIgnorable": "{count, plural, one {Không thể phớt lờ # email: không đọc được, hoặc đề xuất của email đã được áp dụng.} other {Không thể phớt lờ # email: không đọc được, hoặc đề xuất của chúng đã được áp dụng.}}",
+        "skippedLinked": "{count, plural, one {Đã giữ lại # email liên kết với giao dịch.} other {Đã giữ lại # email liên kết với giao dịch.}}"
+      },
+      "deleteFailed": "Không thể xóa email",
+      "ignoreFailed": "Không thể phớt lờ email",
+      "noneLeft": "Không còn email nào khớp. Chưa có gì bị thay đổi."
+    }
   },
   "detail": {
     "title": "Hóa đơn qua email",

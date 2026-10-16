@@ -749,11 +749,22 @@
     "selection": {
       "label": "선택한 이메일",
       "select": "{subject} 선택",
-      "selectAll": "이 목록의 모든 메일 선택 (최대 {max}개)",
-      "count": "{count, plural, one {이메일 #개 선택됨} other {이메일 #개 선택됨}} (최대 {max}개)",
+      "selectAll": "이 목록의 모든 메일 선택",
+      "count": "{count, plural, one {이메일 #개 선택됨} other {이메일 #개 선택됨}}",
       "draftButton": "AI로 프로필 준비 ({count})",
       "clear": "선택 해제",
-      "differentSenders": "선택한 메일이 서로 다른 발신자({domains})에게서 온 것입니다. 프로필은 한 발신자의 메일을 읽으므로, 한 발신자의 메일만 선택하세요."
+      "deleteButton": "삭제 ({count})",
+      "ignoreButton": "제외 ({count})",
+      "pageSelected": "이 페이지의 메일 {count}개가 모두 선택되었습니다.",
+      "selectAllMatching": "이 필터와 일치하는 메일 {total}개 모두 선택",
+      "allMatchingSelected": "이 필터와 일치하는 메일 {total}개가 모두 선택되었습니다.",
+      "draftBlocked": {
+        "tooMany": "프로필은 최대 {max}개의 메일로 준비할 수 있습니다. 메일을 {max}개 이하로 선택하세요.",
+        "differentSenders": "선택한 메일이 서로 다른 발신자({domains})에게서 온 것입니다. 프로필은 한 발신자의 메일을 읽으므로, 한 발신자의 메일만 선택하세요.",
+        "skipped": "읽을 수 없는 메일에는 프로필을 준비할 텍스트가 없습니다. 선택에서 제외하세요.",
+        "allMatching": "프로필은 직접 선택한 메일(최대 {max}개)로 준비합니다. 이 선택을 해제하고 메일을 {max}개 이하로 선택하세요.",
+        "mixedKinds": "선택한 메일에 거래 확인 메일과 주문 메일이 섞여 있습니다. 프로필 하나는 한 종류만 읽으므로 거래 확인 메일만 또는 주문 메일만 선택하세요."
+      }
     },
     "draft": {
       "failed": "프로필 초안 작성을 시작하지 못했습니다",
@@ -765,7 +776,31 @@
       "mixedKinds": "선택한 메일에 거래 확인 메일과 주문 메일이 섞여 있습니다. 프로필 하나는 한 종류만 읽으므로 거래 확인 메일만 또는 주문 메일만 선택하세요.",
       "chatPromptTrade": "{domain}에서 온 {count, plural, one {거래 확인 이메일 #통} other {거래 확인 이메일 #통}}으로 거래 프로필을 만들어 주세요. AI 검토 요청 {requestId}을(를) 맡아서, email_receipt_parsers 도구로 첨부한 모든 이메일에서 프로필을 테스트하고, 각 이메일에서 완전한 거래가 읽힐 때까지 고친 다음, 요청 {requestId}의 초안으로 저장해 주세요."
     },
-    "tradeBadge": "거래"
+    "tradeBadge": "거래",
+    "bulkDialog": {
+      "delete": {
+        "title": "메일을 삭제할까요?",
+        "message": "{scope, select, both {{domain}에서 온 상태가 {status}인 } domain {{domain}에서 온 } status {상태가 {status}인 } other {}}{count, plural, one {메일 #개} other {메일 #개}}를 삭제할까요? 이 작업은 되돌릴 수 없습니다. 메일을 보관하고 제안하지 않게 하려면 대신 “제외”를 선택하세요. 거래에 연결된 메일은 보관됩니다."
+      },
+      "ignore": {
+        "title": "메일을 제외할까요?",
+        "message": "{scope, select, both {{domain}에서 온 상태가 {status}인 } domain {{domain}에서 온 } status {상태가 {status}인 } other {}}{count, plural, one {메일 #개} other {메일 #개}}를 제외할까요? 더 이상 제안하지 않으며 열려 있는 검토 요청은 닫힙니다. 거래에 연결된 메일은 그대로 유지됩니다.",
+        "confirm": "제외"
+      },
+      "countChanged": "일치하는 메일이 이제 {count}개입니다. 아무것도 변경되지 않았습니다. 개수를 확인하고 다시 확인하세요."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {메일 #개를 삭제했습니다.} other {메일 #개를 삭제했습니다.}}",
+        "ignored": "{count, plural, one {메일 #개를 제외했습니다.} other {메일 #개를 제외했습니다.}}",
+        "unchanged": "{count, plural, one {메일 #개는 이미 제외되어 있었습니다.} other {메일 #개는 이미 제외되어 있었습니다.}}",
+        "notIgnorable": "{count, plural, one {메일 #개를 제외할 수 없었습니다. 읽을 수 없거나 제안이 이미 적용되었습니다.} other {메일 #개를 제외할 수 없었습니다. 읽을 수 없거나 제안이 이미 적용되었습니다.}}",
+        "skippedLinked": "{count, plural, one {거래에 연결된 메일 #개는 보관했습니다.} other {거래에 연결된 메일 #개는 보관했습니다.}}"
+      },
+      "deleteFailed": "메일을 삭제할 수 없습니다",
+      "ignoreFailed": "메일을 제외할 수 없습니다",
+      "noneLeft": "일치하는 메일이 더 이상 없습니다. 아무것도 변경되지 않았습니다."
+    }
   },
   "detail": {
     "title": "이메일 영수증",

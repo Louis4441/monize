@@ -749,11 +749,22 @@
     "selection": {
       "label": "[XX-Selected emails-XX]",
       "select": "[XX-Select {subject}-XX]",
-      "selectAll": "[XX-Select all emails on this list (at most {max})-XX]",
-      "count": "[XX-{count, plural, one {# email selected} other {# emails selected}} (at most {max})-XX]",
+      "selectAll": "[XX-Select all emails on this list-XX]",
+      "count": "[XX-{count, plural, one {# email selected} other {# emails selected}}-XX]",
       "draftButton": "[XX-Prepare a profile with AI ({count})-XX]",
       "clear": "[XX-Clear selection-XX]",
-      "differentSenders": "[XX-The selected emails come from different senders ({domains}). A profile reads one sender's emails, so select emails from one sender.-XX]"
+      "deleteButton": "[XX-Delete ({count})-XX]",
+      "ignoreButton": "[XX-Ignore ({count})-XX]",
+      "pageSelected": "[XX-All {count} on this page are selected.-XX]",
+      "selectAllMatching": "[XX-Select all {total} matching this filter.-XX]",
+      "allMatchingSelected": "[XX-All {total} emails matching this filter are selected.-XX]",
+      "draftBlocked": {
+        "tooMany": "[XX-A profile can be prepared from at most {max} emails. Select {max} or fewer emails to use it.-XX]",
+        "differentSenders": "[XX-The selected emails come from different senders ({domains}). A profile reads one sender's emails, so select emails from one sender.-XX]",
+        "skipped": "[XX-An email that could not be read has no text to prepare a profile from. Remove it from the selection to use this.-XX]",
+        "allMatching": "[XX-A profile is prepared from emails you select yourself, at most {max}. Clear this selection and select up to {max} emails.-XX]",
+        "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]"
+      }
     },
     "draft": {
       "failed": "[XX-Could not start drafting a profile-XX]",
@@ -765,7 +776,31 @@
       "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]",
       "chatPromptTrade": "[XX-Build a trade profile for {count, plural, one {this trade confirmation email} other {these # trade confirmation emails}} from {domain}. Claim AI review request {requestId}, test your profile on every attached email with the email_receipt_parsers tool, fix it until each one reads a complete trade, then save it as a draft for request {requestId}.-XX]"
     },
-    "tradeBadge": "[XX-Trade-XX]"
+    "tradeBadge": "[XX-Trade-XX]",
+    "bulkDialog": {
+      "delete": {
+        "title": "[XX-Delete emails?-XX]",
+        "message": "[XX-{count, plural, one {Delete # email} other {Delete # emails}}{scope, select, both { from {domain} in the state {status}} domain { from {domain}} status { in the state {status}} other {}}? This cannot be undone. To keep the emails and stop them proposing anything, choose Ignore instead. Emails linked to a transaction are kept.-XX]"
+      },
+      "ignore": {
+        "title": "[XX-Ignore emails?-XX]",
+        "message": "[XX-{count, plural, one {Ignore # email} other {Ignore # emails}}{scope, select, both { from {domain} in the state {status}} domain { from {domain}} status { in the state {status}} other {}}? They will propose nothing, and their open review requests will be dismissed. Emails linked to a transaction are kept as they are.-XX]",
+        "confirm": "[XX-Ignore-XX]"
+      },
+      "countChanged": "[XX-The number of matching emails is now {count}. Nothing was changed. Check the number and confirm again.-XX]"
+    },
+    "bulk": {
+      "result": {
+        "deleted": "[XX-{count, plural, one {# email deleted.} other {# emails deleted.}}-XX]",
+        "ignored": "[XX-{count, plural, one {# email ignored.} other {# emails ignored.}}-XX]",
+        "unchanged": "[XX-{count, plural, one {# email was already ignored.} other {# emails were already ignored.}}-XX]",
+        "notIgnorable": "[XX-{count, plural, one {# email could not be ignored: it could not be read, or its proposal was already applied.} other {# emails could not be ignored: they could not be read, or their proposals were already applied.}}-XX]",
+        "skippedLinked": "[XX-{count, plural, one {# email linked to a transaction was kept.} other {# emails linked to a transaction were kept.}}-XX]"
+      },
+      "deleteFailed": "[XX-Could not delete the emails-XX]",
+      "ignoreFailed": "[XX-Could not ignore the emails-XX]",
+      "noneLeft": "[XX-No emails match any more. Nothing was changed.-XX]"
+    }
   },
   "detail": {
     "title": "[XX-Email receipt-XX]",

@@ -2,17 +2,21 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
   IsISO8601,
+  IsObject,
   IsOptional,
   IsUUID,
   Max,
   Min,
+  registerDecorator,
   ValidateIf,
+  ValidateNested,
 } from "class-validator";
 import {
   IsReceiptDomain,
@@ -172,4 +176,98 @@ export class ProcessBatchEmailReceiptsDto {
   @IsOptional()
   @IsISO8601({ strict: true })
   since?: string;
+}
+
+export const EMAIL_RECEIPT_BULK_ACTIONS = ["delete", "ignore"] as const;
+export type EmailReceiptBulkAction =
+  (typeof EMAIL_RECEIPT_BULK_ACTIONS)[number];
+/** Most emails one bulk request may name by id. */
+export const EMAIL_RECEIPTS_BULK_MAX_IDS = 500;
+/** Most emails one bulk request may act on when it names a filter. */
+export const EMAIL_RECEIPTS_BULK_MAX_MATCHES = 20000;
+
+/** The state and sender domain of the list, as one bulk request names them. */
+export class BulkEmailReceiptFilterDto {
+  @ApiPropertyOptional({ enum: EMAIL_RECEIPT_STATUSES })
+  @IsOptional()
+  @IsIn(EMAIL_RECEIPT_STATUSES)
+  status?: EmailReceiptStatus;
+
+  @ApiPropertyOptional({
+    description:
+      "A sender domain: emails from exactly this domain or one of its sub-domains, as the list reads it. Lower-cased and trimmed.",
+    example: "gmail.com",
+  })
+  @IsOptional()
+  @Transform(({ value }) => normalizeReceiptDomain(value))
+  @IsReceiptDomain()
+  domain?: string;
+}
+
+/** The property must be absent when `other` is present: a request names ids or a filter, never both. */
+function IsAbsentWhen(other: string) {
+  return function decorate(object: object, propertyName: string): void {
+    registerDecorator({
+      name: "isAbsentWhen",
+      target: object.constructor,
+      propertyName,
+      validator: {
+        validate: (value: unknown, args) =>
+          value === undefined ||
+          (args?.object as Record<string, unknown>)[other] === undefined,
+        defaultMessage: () =>
+          `send either ids or filter, not both (${propertyName} and ${other})`,
+      },
+    });
+  };
+}
+
+/**
+ * Body of `POST /email-receipts/bulk`: delete or ignore many stored emails.
+ * Exactly one of `ids` and `filter` names them; `expectedCount` is how many the
+ * person was told, and a different number refuses the whole request.
+ */
+export class BulkEmailReceiptsDto {
+  @ApiProperty({ enum: EMAIL_RECEIPT_BULK_ACTIONS })
+  @IsIn(EMAIL_RECEIPT_BULK_ACTIONS)
+  action: EmailReceiptBulkAction;
+
+  @ApiPropertyOptional({
+    description: "The emails to act on, by id. Send this or `filter`.",
+    maxItems: EMAIL_RECEIPTS_BULK_MAX_IDS,
+  })
+  @ValidateIf(
+    (o: BulkEmailReceiptsDto) => o.ids !== undefined || o.filter === undefined,
+  )
+  @IsAbsentWhen("filter")
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(EMAIL_RECEIPTS_BULK_MAX_IDS)
+  @ArrayUnique()
+  @IsUUID("all", { each: true })
+  ids?: string[];
+
+  @ApiPropertyOptional({
+    type: BulkEmailReceiptFilterDto,
+    description:
+      "Every email matching this state and sender domain, as the list reads them. Send this or `ids`.",
+  })
+  @ValidateIf(
+    (o: BulkEmailReceiptsDto) => o.filter !== undefined || o.ids === undefined,
+  )
+  @IsObject()
+  @ValidateNested()
+  @Type(() => BulkEmailReceiptFilterDto)
+  filter?: BulkEmailReceiptFilterDto;
+
+  @ApiProperty({
+    minimum: 1,
+    maximum: EMAIL_RECEIPTS_BULK_MAX_MATCHES,
+    description:
+      "How many emails the request matches, as the person was told. A different count refuses the request with 409 and writes nothing.",
+  })
+  @IsInt()
+  @Min(1)
+  @Max(EMAIL_RECEIPTS_BULK_MAX_MATCHES)
+  expectedCount: number;
 }

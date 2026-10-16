@@ -749,11 +749,22 @@
     "selection": {
       "label": "已选邮件",
       "select": "选择 {subject}",
-      "selectAll": "选择此列表中的所有电子邮件(最多 {max} 个)",
-      "count": "{count, plural, one {已选择 # 封邮件} other {已选择 # 封邮件}}（最多 {max} 封）",
+      "selectAll": "选择此列表中的所有邮件",
+      "count": "{count, plural, one {已选择 # 封邮件} other {已选择 # 封邮件}}",
       "draftButton": "用 AI 起草解析器（{count}）",
       "clear": "清除选择",
-      "differentSenders": "所选邮件来自不同的发件人（{domains}）。解析器只读取一个发件人的邮件，请选择同一发件人的邮件。"
+      "deleteButton": "删除（{count}）",
+      "ignoreButton": "忽略（{count}）",
+      "pageSelected": "此页面上的 {count} 封邮件已全部选中。",
+      "selectAllMatching": "选择符合此筛选条件的全部 {total} 封邮件。",
+      "allMatchingSelected": "符合此筛选条件的全部 {total} 封邮件已选中。",
+      "draftBlocked": {
+        "tooMany": "最多可用 {max} 封邮件准备解析器。请选择不超过 {max} 封邮件。",
+        "differentSenders": "所选邮件来自不同的发件人（{domains}）。解析器只读取一个发件人的邮件，请选择同一发件人的邮件。",
+        "skipped": "无法读取的邮件没有可用于准备解析器的文本。请将其从选择中移除。",
+        "allMatching": "解析器需用你自己选择的邮件准备，最多 {max} 封。请清除当前选择，再选择不超过 {max} 封邮件。",
+        "mixedKinds": "所选邮件中混有交易确认邮件和订单邮件。一个配置文件只读取一种邮件，请只选择交易确认邮件或只选择订单邮件。"
+      }
     },
     "draft": {
       "failed": "无法开始起草解析器",
@@ -765,7 +776,31 @@
       "mixedKinds": "所选邮件中混有交易确认邮件和订单邮件。一个配置文件只读取一种邮件，请只选择交易确认邮件或只选择订单邮件。",
       "chatPromptTrade": "请为来自 {domain} 的{count, plural, one {这封交易确认邮件} other {这 # 封交易确认邮件}}构建一个交易配置文件。请认领 AI 审核请求 {requestId}，用 email_receipt_parsers 工具在每封所附邮件上测试你的配置文件，修改到每封都能读取出完整的交易，然后将其保存为请求 {requestId} 的草稿。"
     },
-    "tradeBadge": "交易"
+    "tradeBadge": "交易",
+    "bulkDialog": {
+      "delete": {
+        "title": "删除这些邮件？",
+        "message": "要删除{scope, select, both {来自 {domain}、状态为“{status}”的} domain {来自 {domain} 的} status {状态为“{status}”的} other {}}{count, plural, one {# 封邮件} other {# 封邮件}}吗？此操作无法撤销。若要保留邮件并阻止它们提出任何建议，请改选“忽略”。与交易关联的邮件会保留。"
+      },
+      "ignore": {
+        "title": "忽略这些邮件？",
+        "message": "要忽略{scope, select, both {来自 {domain}、状态为“{status}”的} domain {来自 {domain} 的} status {状态为“{status}”的} other {}}{count, plural, one {# 封邮件} other {# 封邮件}}吗？它们将不再提出任何建议，其未处理的审核请求将被关闭。与交易关联的邮件保持不变。",
+        "confirm": "忽略"
+      },
+      "countChanged": "符合条件的邮件现在有 {count} 封。未做任何更改。请核对数量后再次确认。"
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {已删除 # 封邮件。} other {已删除 # 封邮件。}}",
+        "ignored": "{count, plural, one {已忽略 # 封邮件。} other {已忽略 # 封邮件。}}",
+        "unchanged": "{count, plural, one {# 封邮件之前已被忽略。} other {# 封邮件之前已被忽略。}}",
+        "notIgnorable": "{count, plural, one {# 封邮件无法忽略：无法读取，或其建议已被应用。} other {# 封邮件无法忽略：无法读取，或其建议已被应用。}}",
+        "skippedLinked": "{count, plural, one {已保留 # 封与交易关联的邮件。} other {已保留 # 封与交易关联的邮件。}}"
+      },
+      "deleteFailed": "无法删除邮件",
+      "ignoreFailed": "无法忽略邮件",
+      "noneLeft": "已没有符合条件的邮件。未做任何更改。"
+    }
   },
   "detail": {
     "title": "邮件收据",

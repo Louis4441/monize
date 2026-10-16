@@ -749,11 +749,22 @@
     "selection": {
       "label": "Geselecteerde e-mails",
       "select": "{subject} selecteren",
-      "selectAll": "Alle e-mails in deze lijst selecteren (maximaal {max})",
-      "count": "{count, plural, one {# e-mail geselecteerd} other {# e-mails geselecteerd}} (maximaal {max})",
+      "selectAll": "Alle e-mails in deze lijst selecteren",
+      "count": "{count, plural, one {# e-mail geselecteerd} other {# e-mails geselecteerd}}",
       "draftButton": "Profiel laten opstellen door AI ({count})",
       "clear": "Selectie wissen",
-      "differentSenders": "De geselecteerde e-mails komen van verschillende afzenders ({domains}). Een profiel leest de e-mails van één afzender, dus selecteer e-mails van één afzender."
+      "deleteButton": "Verwijderen ({count})",
+      "ignoreButton": "Negeren ({count})",
+      "pageSelected": "Alle {count} e-mails op deze pagina zijn geselecteerd.",
+      "selectAllMatching": "Selecteer alle {total} e-mails die bij dit filter passen.",
+      "allMatchingSelected": "Alle {total} e-mails die bij dit filter passen, zijn geselecteerd.",
+      "draftBlocked": {
+        "tooMany": "Een profiel wordt voorbereid met maximaal {max} e-mails. Selecteer {max} e-mails of minder.",
+        "differentSenders": "De geselecteerde e-mails komen van verschillende afzenders ({domains}). Een profiel leest de e-mails van één afzender, dus selecteer e-mails van één afzender.",
+        "skipped": "Een e-mail die niet gelezen kon worden, heeft geen tekst voor een profiel. Haal hem uit de selectie.",
+        "allMatching": "Een profiel wordt voorbereid met e-mails die je zelf selecteert, maximaal {max}. Wis deze selectie en selecteer maximaal {max} e-mails.",
+        "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails."
+      }
     },
     "draft": {
       "failed": "Het opstellen van een profiel kon niet worden gestart",
@@ -765,7 +776,31 @@
       "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails.",
       "chatPromptTrade": "Maak een transactieprofiel voor {count, plural, one {deze transactiebevestiging} other {deze # transactiebevestigingen}} van {domain}. Claim AI-beoordelingsverzoek {requestId}, test je profiel op elke bijgevoegde e-mail met de tool email_receipt_parsers, verbeter het totdat uit elke e-mail een volledige transactie wordt gelezen en sla het daarna op als concept voor verzoek {requestId}."
     },
-    "tradeBadge": "Transactie"
+    "tradeBadge": "Transactie",
+    "bulkDialog": {
+      "delete": {
+        "title": "E-mails verwijderen?",
+        "message": "{count, plural, one {# e-mail verwijderen} other {# e-mails verwijderen}}{scope, select, both { van {domain} met de status {status}} domain { van {domain}} status { met de status {status}} other {}}? Dit kan niet ongedaan worden gemaakt. Kies in plaats daarvan “Negeren” om de e-mails te bewaren en te voorkomen dat ze iets voorstellen. E-mails die aan een transactie zijn gekoppeld, blijven bewaard."
+      },
+      "ignore": {
+        "title": "E-mails negeren?",
+        "message": "{count, plural, one {# e-mail negeren} other {# e-mails negeren}}{scope, select, both { van {domain} met de status {status}} domain { van {domain}} status { met de status {status}} other {}}? Ze stellen dan niets meer voor en hun openstaande beoordelingsverzoeken worden afgewezen. E-mails die aan een transactie zijn gekoppeld, blijven ongewijzigd.",
+        "confirm": "Negeren"
+      },
+      "countChanged": "Het aantal passende e-mails is nu {count}. Er is niets gewijzigd. Controleer het aantal en bevestig opnieuw."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# e-mail verwijderd.} other {# e-mails verwijderd.}}",
+        "ignored": "{count, plural, one {# e-mail genegeerd.} other {# e-mails genegeerd.}}",
+        "unchanged": "{count, plural, one {# e-mail was al genegeerd.} other {# e-mails waren al genegeerd.}}",
+        "notIgnorable": "{count, plural, one {# e-mail kon niet worden genegeerd: hij kon niet worden gelezen, of zijn voorstel is al toegepast.} other {# e-mails konden niet worden genegeerd: ze konden niet worden gelezen, of hun voorstellen zijn al toegepast.}}",
+        "skippedLinked": "{count, plural, one {# e-mail die aan een transactie is gekoppeld, is bewaard.} other {# e-mails die aan een transactie zijn gekoppeld, zijn bewaard.}}"
+      },
+      "deleteFailed": "De e-mails konden niet worden verwijderd",
+      "ignoreFailed": "De e-mails konden niet worden genegeerd",
+      "noneLeft": "Er zijn geen passende e-mails meer. Er is niets gewijzigd."
+    }
   },
   "detail": {
     "title": "E-mailbon",

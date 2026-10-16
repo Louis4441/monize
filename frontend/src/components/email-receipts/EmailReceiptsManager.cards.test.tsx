@@ -63,7 +63,7 @@ const inlineActions = (subject: string) =>
     .getAllByRole('button')
     .map((b) => b.getAttribute('aria-label') ?? b.textContent ?? '')
     .filter((name) => name !== 'More actions');
-const selectAll = () => screen.getByRole('checkbox', { name: 'Select all emails on this list (at most 5)' }) as HTMLInputElement;
+const selectAll = () => screen.getByRole('checkbox', { name: 'Select all emails on this list' }) as HTMLInputElement;
 
 describe('EmailReceiptsManager: the cards', () => {
   beforeEach(() => {
@@ -112,15 +112,14 @@ describe('EmailReceiptsManager: the cards', () => {
   });
 
   describe('the select-all checkbox in the header', () => {
-    it('has an accessible name, and ticks the first five selectable emails (the draft limit)', async () => {
+    it('has an accessible name, and ticks every email on the page, not only the first five', async () => {
       await renderManager();
       expect(selectAll()).not.toBeChecked();
       await click(selectAll());
-      for (const n of [1, 2, 3, 4, 5]) expect(screen.getByRole('checkbox', { name: `Select Order ${n}` })).toBeChecked();
-      expect(screen.getByRole('checkbox', { name: 'Select Order 6' })).not.toBeChecked();
+      for (const n of [1, 2, 3, 4, 5, 6, 7]) expect(screen.getByRole('checkbox', { name: `Select Order ${n}` })).toBeChecked();
       expect(selectAll()).toBeChecked();
       expect(selectAll().indeterminate).toBe(false);
-      expect(screen.getByRole('region', { name: 'Selected emails' })).toHaveTextContent('5 emails selected');
+      expect(screen.getByRole('region', { name: 'Selected emails' })).toHaveTextContent('7 emails selected');
     });
 
     it('clears the selection when everything it covers is already ticked', async () => {
@@ -142,19 +141,19 @@ describe('EmailReceiptsManager: the cards', () => {
       expect(selectAll()).toBeChecked();
     });
 
-    it('leaves a skipped email out, which has no text to write a profile from', async () => {
+    it('ticks a skipped email too: it can be deleted, and ignoring it is reported as not possible', async () => {
       api.list.mockResolvedValue([shop(1), shop(2, { status: 'skipped' })]);
       await renderManager();
       await click(selectAll());
       expect(screen.getByRole('checkbox', { name: 'Select Order 1' })).toBeChecked();
-      expect(screen.getByRole('checkbox', { name: 'Select Order 2' })).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Select Order 2' })).toBeChecked();
       expect(selectAll()).toBeChecked();
     });
 
-    it('is off when no email on the list can be selected', async () => {
+    it('is on for a list of unreadable emails alone', async () => {
       api.list.mockResolvedValue([shop(1, { status: 'skipped' })]);
       await renderManager();
-      expect(selectAll()).toBeDisabled();
+      expect(selectAll()).toBeEnabled();
     });
   });
 

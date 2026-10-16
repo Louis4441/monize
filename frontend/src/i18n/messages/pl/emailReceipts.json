@@ -749,11 +749,22 @@
     "selection": {
       "label": "Zaznaczone wiadomości",
       "select": "Zaznacz: {subject}",
-      "selectAll": "Zaznacz wszystkie wiadomości na tej liście (maksymalnie {max})",
-      "count": "{count, plural, one {Zaznaczono # wiadomość} few {Zaznaczono # wiadomości} many {Zaznaczono # wiadomości} other {Zaznaczono # wiadomości}} (maksymalnie {max})",
+      "selectAll": "Zaznacz wszystkie wiadomości na tej liście",
+      "count": "{count, plural, one {Zaznaczono # wiadomość} few {Zaznaczono # wiadomości} many {Zaznaczono # wiadomości} other {Zaznaczono # wiadomości}}",
       "draftButton": "Przygotuj parser z AI ({count})",
       "clear": "Wyczyść zaznaczenie",
-      "differentSenders": "Zaznaczone wiadomości pochodzą od różnych nadawców ({domains}). Parser odczytuje wiadomości jednego nadawcy, więc zaznacz wiadomości od jednego nadawcy."
+      "deleteButton": "Usuń ({count})",
+      "ignoreButton": "Zignoruj ({count})",
+      "pageSelected": "Zaznaczono wszystkie wiadomości na tej stronie: {count}.",
+      "selectAllMatching": "Zaznacz wszystkie wiadomości pasujące do filtra: {total}.",
+      "allMatchingSelected": "Zaznaczono wszystkie wiadomości pasujące do filtra: {total}.",
+      "draftBlocked": {
+        "tooMany": "Parser można przygotować z maksymalnie {max} wiadomości. Zaznacz {max} wiadomości lub mniej.",
+        "differentSenders": "Zaznaczone wiadomości pochodzą od różnych nadawców ({domains}). Parser odczytuje wiadomości jednego nadawcy, więc zaznacz wiadomości od jednego nadawcy.",
+        "skipped": "Nie można odczytać tej wiadomości, więc nie ma tekstu do przygotowania parsera. Usuń ją z zaznaczenia.",
+        "allMatching": "Parser przygotowuje się z wiadomości, które zaznaczasz sam. Maksymalnie {max}. Wyczyść to zaznaczenie i zaznacz do {max} wiadomości.",
+        "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami."
+      }
     },
     "draft": {
       "failed": "Nie udało się rozpocząć przygotowywania parsera",
@@ -765,7 +776,31 @@
       "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami.",
       "chatPromptTrade": "Zbuduj profil transakcji dla {count, plural, one {tego potwierdzenia transakcji} few {tych # potwierdzeń transakcji} many {tych # potwierdzeń transakcji} other {tych # potwierdzeń transakcji}} od {domain}. Przejmij prośbę o przegląd AI {requestId}, przetestuj profil na każdej dołączonej wiadomości za pomocą narzędzia email_receipt_parsers, poprawiaj go, aż z każdej wiadomości zostanie odczytana pełna transakcja, a następnie zapisz go jako szkic dla prośby {requestId}."
     },
-    "tradeBadge": "Transakcja"
+    "tradeBadge": "Transakcja",
+    "bulkDialog": {
+      "delete": {
+        "title": "Usunąć wiadomości?",
+        "message": "{count, plural, one {Usunąć # wiadomość} few {Usunąć # wiadomości} many {Usunąć # wiadomości} other {Usunąć # wiadomości}}{scope, select, both { od {domain} ze statusem {status}} domain { od {domain}} status { ze statusem {status}} other {}}? Tej operacji nie można cofnąć. Aby zachować wiadomości i zabronić im proponowania zmian, wybierz zamiast tego „Zignoruj”. Wiadomości powiązane z transakcją zostają zachowane."
+      },
+      "ignore": {
+        "title": "Zignorować wiadomości?",
+        "message": "{count, plural, one {Zignorować # wiadomość} few {Zignorować # wiadomości} many {Zignorować # wiadomości} other {Zignorować # wiadomości}}{scope, select, both { od {domain} ze statusem {status}} domain { od {domain}} status { ze statusem {status}} other {}}? Wiadomości nie będą niczego proponować. Ich otwarte żądania przeglądu zostaną odrzucone. Wiadomości powiązane z transakcją pozostają bez zmian.",
+        "confirm": "Zignoruj"
+      },
+      "countChanged": "Liczba pasujących wiadomości wynosi teraz {count}. Nic nie zmieniono. Sprawdź liczbę i potwierdź ponownie."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {Usunięto # wiadomość.} few {Usunięto # wiadomości.} many {Usunięto # wiadomości.} other {Usunięto # wiadomości.}}",
+        "ignored": "{count, plural, one {Zignorowano # wiadomość.} few {Zignorowano # wiadomości.} many {Zignorowano # wiadomości.} other {Zignorowano # wiadomości.}}",
+        "unchanged": "{count, plural, one {# wiadomość była już zignorowana.} few {# wiadomości były już zignorowane.} many {# wiadomości było już zignorowanych.} other {# wiadomości było już zignorowanych.}}",
+        "notIgnorable": "{count, plural, one {Nie można zignorować # wiadomości: nie można jej odczytać albo jej propozycja jest już zastosowana.} few {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.} many {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.} other {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.}}",
+        "skippedLinked": "{count, plural, one {Zachowano # wiadomość powiązaną z transakcją.} few {Zachowano # wiadomości powiązane z transakcją.} many {Zachowano # wiadomości powiązanych z transakcją.} other {Zachowano # wiadomości powiązanych z transakcją.}}"
+      },
+      "deleteFailed": "Nie można usunąć wiadomości",
+      "ignoreFailed": "Nie można zignorować wiadomości",
+      "noneLeft": "Żadna wiadomość już nie pasuje. Nic nie zmieniono."
+    }
   },
   "detail": {
     "title": "Paragon z e-maila",

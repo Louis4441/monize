@@ -7,6 +7,7 @@ import { validate } from "class-validator";
 import { ALLOW_DELEGATE_KEY } from "../../delegation/decorators/delegate-access.decorator";
 import {
   AskAiEmailReceiptDto,
+  BulkEmailReceiptsDto,
   EmailReceiptStatusCountsDto,
   ListEmailReceiptDomainsDto,
   ListEmailReceiptsDto,
@@ -23,6 +24,7 @@ describe("EmailReceiptsController", () => {
     overview: jest.fn(),
     statusCounts: jest.fn(),
     processBatch: jest.fn(),
+    bulk: jest.fn(),
     get: jest.fn(),
     reprocess: jest.fn(),
     link: jest.fn(),
@@ -370,6 +372,183 @@ describe("EmailReceiptsController", () => {
     });
   });
 
+  describe("the bulk route", () => {
+    const UUID_A = "0b9c6b1e-0f3a-4a55-9d57-0c5d3d9f1a11";
+    const UUID_B = "1b9c6b1e-0f3a-4a55-9d57-0c5d3d9f1a12";
+
+    const check = async (body: object) => {
+      const dto = plainToInstance(BulkEmailReceiptsDto, body);
+      const errors = await validate(dto, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      return { dto, errors };
+    };
+
+    it("is a POST declared before :id, throttled to 10 a minute, answering 200", () => {
+      const names = Object.getOwnPropertyNames(
+        EmailReceiptsController.prototype,
+      );
+      expect(names.indexOf("bulk")).toBeLessThan(names.indexOf("get"));
+      expect(Reflect.getMetadata("path", proto.bulk)).toBe("bulk");
+      expect(Reflect.getMetadata("method", proto.bulk)).toBe(1); // POST
+      expect(Reflect.getMetadata("THROTTLER:LIMITdefault", proto.bulk)).toBe(
+        10,
+      );
+      expect(Reflect.getMetadata("__httpCode__", proto.bulk)).toBe(200);
+    });
+
+    it("sends ids to the service for the JWT user only", async () => {
+      receipts.bulk.mockResolvedValue({ affected: 2 });
+      const out = await controller.bulk(req, {
+        action: "delete",
+        ids: [UUID_A, UUID_B],
+        expectedCount: 2,
+        userId: "someone-else",
+      } as never);
+      expect(out).toEqual({ affected: 2 });
+      expect(receipts.bulk).toHaveBeenCalledWith(
+        "user-1",
+        "delete",
+        { ids: [UUID_A, UUID_B] },
+        2,
+      );
+    });
+
+    it("sends a filter to the service", async () => {
+      receipts.bulk.mockResolvedValue({ affected: 9 });
+      await controller.bulk(req, {
+        action: "ignore",
+        filter: { status: "no_parser", domain: "gmail.com" },
+        expectedCount: 9,
+      } as never);
+      expect(receipts.bulk).toHaveBeenCalledWith(
+        "user-1",
+        "ignore",
+        { filter: { status: "no_parser", domain: "gmail.com" } },
+        9,
+      );
+    });
+
+    it.each([
+      { action: "delete", ids: [UUID_A], expectedCount: 1 },
+      { action: "ignore", ids: [UUID_A, UUID_B], expectedCount: 2 },
+      { action: "delete", filter: {}, expectedCount: 20000 },
+      {
+        action: "ignore",
+        filter: { status: "unmatched", domain: " Gmail.com " },
+        expectedCount: 3,
+      },
+    ])("accepts %j", async (body) => {
+      expect((await check(body)).errors).toHaveLength(0);
+    });
+
+    it("normalises the filter domain like the list does", async () => {
+      const { dto } = await check({
+        action: "delete",
+        filter: { domain: " @Gmail.COM. " },
+        expectedCount: 1,
+      });
+      expect(dto.filter?.domain).toBe("gmail.com");
+    });
+
+    it.each([
+      ["neither ids nor filter", { action: "delete", expectedCount: 1 }],
+      [
+        "both ids and filter",
+        {
+          action: "delete",
+          ids: [UUID_A],
+          filter: { domain: "gmail.com" },
+          expectedCount: 1,
+        },
+      ],
+      ["an empty ids list", { action: "delete", ids: [], expectedCount: 1 }],
+      [
+        "a null ids list with no filter",
+        { action: "delete", ids: null, expectedCount: 1 },
+      ],
+      ["a non-UUID id", { action: "delete", ids: ["nope"], expectedCount: 1 }],
+      [
+        "a repeated id",
+        { action: "delete", ids: [UUID_A, UUID_A], expectedCount: 2 },
+      ],
+      [
+        "501 ids",
+        {
+          action: "delete",
+          ids: Array.from(
+            { length: 501 },
+            (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+          ),
+          expectedCount: 501,
+        },
+      ],
+      [
+        "an unknown action",
+        { action: "archive", ids: [UUID_A], expectedCount: 1 },
+      ],
+      ["no action", { ids: [UUID_A], expectedCount: 1 }],
+      ["no expectedCount", { action: "delete", ids: [UUID_A] }],
+      [
+        "a zero expectedCount",
+        { action: "delete", ids: [UUID_A], expectedCount: 0 },
+      ],
+      [
+        "an expectedCount above 20000",
+        { action: "delete", filter: {}, expectedCount: 20001 },
+      ],
+      [
+        "a fractional expectedCount",
+        { action: "delete", ids: [UUID_A], expectedCount: 1.5 },
+      ],
+      [
+        "an unknown status in the filter",
+        {
+          action: "delete",
+          filter: { status: "bogus" },
+          expectedCount: 1,
+        },
+      ],
+      [
+        "a bad domain in the filter",
+        {
+          action: "delete",
+          filter: { domain: "not a domain" },
+          expectedCount: 1,
+        },
+      ],
+      [
+        "an unknown field in the filter",
+        {
+          action: "delete",
+          filter: { userId: "x" },
+          expectedCount: 1,
+        },
+      ],
+      [
+        "an unknown field in the body",
+        { action: "delete", ids: [UUID_A], expectedCount: 1, userId: "x" },
+      ],
+      [
+        "a filter that is not an object",
+        { action: "delete", filter: "gmail.com", expectedCount: 1 },
+      ],
+    ])("refuses %s", async (_name, body) => {
+      expect((await check(body as object)).errors).not.toHaveLength(0);
+    });
+
+    it("accepts exactly 500 ids", async () => {
+      const ids = Array.from(
+        { length: 500 },
+        (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      );
+      expect(
+        (await check({ action: "delete", ids, expectedCount: 500 })).errors,
+      ).toHaveLength(0);
+    });
+  });
+
   it("is under the JWT guard and refuses a delegate session on every route", () => {
     expect(
       Reflect.getMetadata(GUARDS_METADATA, EmailReceiptsController),
@@ -400,6 +579,7 @@ describe("EmailReceiptsController", () => {
           "overview",
           "statusCounts",
           "processBatch",
+          "bulk",
         ].includes(name),
     );
     expect(routes).toHaveLength(6);

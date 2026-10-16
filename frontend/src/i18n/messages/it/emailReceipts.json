@@ -749,11 +749,22 @@
     "selection": {
       "label": "Email selezionate",
       "select": "Seleziona {subject}",
-      "selectAll": "Seleziona tutte le email di questo elenco (al massimo {max})",
-      "count": "{count, plural, one {# email selezionata} other {# email selezionate}} (al massimo {max})",
+      "selectAll": "Seleziona tutte le email di questo elenco",
+      "count": "{count, plural, one {# email selezionata} other {# email selezionate}}",
       "draftButton": "Prepara un profilo con l'IA ({count})",
       "clear": "Cancella selezione",
-      "differentSenders": "Le email selezionate provengono da mittenti diversi ({domains}). Un profilo legge le email di un solo mittente, quindi seleziona email di un solo mittente."
+      "deleteButton": "Elimina ({count})",
+      "ignoreButton": "Ignora ({count})",
+      "pageSelected": "Tutte le {count} email di questa pagina sono selezionate.",
+      "selectAllMatching": "Seleziona tutte le {total} email che corrispondono a questo filtro.",
+      "allMatchingSelected": "Tutte le {total} email che corrispondono a questo filtro sono selezionate.",
+      "draftBlocked": {
+        "tooMany": "Un profilo si prepara con al massimo {max} email. Seleziona {max} email o meno.",
+        "differentSenders": "Le email selezionate provengono da mittenti diversi ({domains}). Un profilo legge le email di un solo mittente, quindi seleziona email di un solo mittente.",
+        "skipped": "Un'email che non è stato possibile leggere non ha testo per preparare un profilo. Toglila dalla selezione.",
+        "allMatching": "Un profilo si prepara con email che selezioni tu, al massimo {max}. Cancella questa selezione e seleziona fino a {max} email.",
+        "mixedKinds": "Le email selezionate mescolano conferme di operazioni ed email di ordini. Un profilo legge un solo tipo, quindi seleziona solo conferme di operazioni o solo email di ordini."
+      }
     },
     "draft": {
       "failed": "Impossibile avviare la preparazione di un profilo",
@@ -765,7 +776,31 @@
       "mixedKinds": "Le email selezionate mescolano conferme di operazioni ed email di ordini. Un profilo legge un solo tipo, quindi seleziona solo conferme di operazioni o solo email di ordini.",
       "chatPromptTrade": "Crea un profilo operazioni per {count, plural, one {questa conferma di operazione} other {queste # conferme di operazione}} di {domain}. Prendi in carico la richiesta di revisione IA {requestId}, prova il tuo profilo su ogni email allegata con lo strumento email_receipt_parsers, correggilo finché da ciascuna si legge un'operazione completa, poi salvalo come bozza per la richiesta {requestId}."
     },
-    "tradeBadge": "Operazione"
+    "tradeBadge": "Operazione",
+    "bulkDialog": {
+      "delete": {
+        "title": "Eliminare le email?",
+        "message": "{count, plural, one {Eliminare # email} other {Eliminare # email}}{scope, select, both { da {domain} nello stato {status}} domain { da {domain}} status { nello stato {status}} other {}}? L'operazione non può essere annullata. Per conservare le email e impedire che propongano qualcosa, scegli invece «Ignora». Le email collegate a una transazione vengono conservate."
+      },
+      "ignore": {
+        "title": "Ignorare le email?",
+        "message": "{count, plural, one {Ignorare # email} other {Ignorare # email}}{scope, select, both { da {domain} nello stato {status}} domain { da {domain}} status { nello stato {status}} other {}}? Non proporranno nulla e le loro richieste di revisione aperte verranno chiuse. Le email collegate a una transazione restano invariate.",
+        "confirm": "Ignora"
+      },
+      "countChanged": "Il numero di email corrispondenti è ora {count}. Non è stato modificato nulla. Controlla il numero e conferma di nuovo."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# email eliminata.} other {# email eliminate.}}",
+        "ignored": "{count, plural, one {# email ignorata.} other {# email ignorate.}}",
+        "unchanged": "{count, plural, one {# email era già ignorata.} other {# email erano già ignorate.}}",
+        "notIgnorable": "{count, plural, one {# email non è stato possibile ignorarla: non era leggibile oppure la sua proposta era già stata applicata.} other {# email non è stato possibile ignorarle: non erano leggibili oppure le loro proposte erano già state applicate.}}",
+        "skippedLinked": "{count, plural, one {# email collegata a una transazione è stata conservata.} other {# email collegate a una transazione sono state conservate.}}"
+      },
+      "deleteFailed": "Impossibile eliminare le email",
+      "ignoreFailed": "Impossibile ignorare le email",
+      "noneLeft": "Nessuna email corrisponde più. Non è stato modificato nulla."
+    }
   },
   "detail": {
     "title": "Ricevuta via email",

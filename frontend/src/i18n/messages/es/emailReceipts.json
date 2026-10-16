@@ -749,11 +749,22 @@
     "selection": {
       "label": "Correos seleccionados",
       "select": "Seleccionar {subject}",
-      "selectAll": "Seleccionar todos los correos de esta lista (como máximo {max})",
-      "count": "{count, plural, one {# correo seleccionado} other {# correos seleccionados}} (como máximo {max})",
+      "selectAll": "Seleccionar todos los correos de esta lista",
+      "count": "{count, plural, one {# correo seleccionado} other {# correos seleccionados}}",
       "draftButton": "Preparar un perfil con IA ({count})",
       "clear": "Borrar selección",
-      "differentSenders": "Los correos seleccionados vienen de remitentes distintos ({domains}). Un perfil lee los correos de un solo remitente, así que selecciona correos de uno solo."
+      "deleteButton": "Eliminar ({count})",
+      "ignoreButton": "Ignorar ({count})",
+      "pageSelected": "Los {count} correos de esta página están seleccionados.",
+      "selectAllMatching": "Seleccionar los {total} correos que coinciden con este filtro.",
+      "allMatchingSelected": "Los {total} correos que coinciden con este filtro están seleccionados.",
+      "draftBlocked": {
+        "tooMany": "Un perfil se prepara con {max} correos como máximo. Selecciona {max} correos o menos.",
+        "differentSenders": "Los correos seleccionados vienen de remitentes distintos ({domains}). Un perfil lee los correos de un solo remitente, así que selecciona correos de uno solo.",
+        "skipped": "Un correo que no se pudo leer no tiene texto para preparar un perfil. Quítalo de la selección.",
+        "allMatching": "Un perfil se prepara con correos que seleccionas tú, como máximo {max}. Borra esta selección y selecciona hasta {max} correos.",
+        "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos."
+      }
     },
     "draft": {
       "failed": "No se pudo iniciar la redacción de un perfil",
@@ -765,7 +776,31 @@
       "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos.",
       "chatPromptTrade": "Crea un perfil de operaciones para {count, plural, one {esta confirmación de operación} other {estas # confirmaciones de operación}} de {domain}. Reclama la solicitud de revisión de IA {requestId}, prueba tu perfil con cada correo adjunto mediante la herramienta email_receipt_parsers, corrígelo hasta que de cada uno se lea una operación completa y guárdalo después como borrador para la solicitud {requestId}."
     },
-    "tradeBadge": "Operación"
+    "tradeBadge": "Operación",
+    "bulkDialog": {
+      "delete": {
+        "title": "¿Eliminar correos?",
+        "message": "¿{count, plural, one {Eliminar # correo} other {Eliminar # correos}}{scope, select, both { de {domain} en el estado {status}} domain { de {domain}} status { en el estado {status}} other {}}? No se puede deshacer. Para conservar los correos y evitar que propongan nada, elige «Ignorar». Los correos vinculados a una transacción se conservan."
+      },
+      "ignore": {
+        "title": "¿Ignorar correos?",
+        "message": "¿{count, plural, one {Ignorar # correo} other {Ignorar # correos}}{scope, select, both { de {domain} en el estado {status}} domain { de {domain}} status { en el estado {status}} other {}}? No propondrán nada y se descartarán sus solicitudes de revisión abiertas. Los correos vinculados a una transacción se dejan como están.",
+        "confirm": "Ignorar"
+      },
+      "countChanged": "El número de correos coincidentes es ahora {count}. No se cambió nada. Revisa el número y confirma de nuevo."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# correo eliminado.} other {# correos eliminados.}}",
+        "ignored": "{count, plural, one {# correo ignorado.} other {# correos ignorados.}}",
+        "unchanged": "{count, plural, one {# correo ya estaba ignorado.} other {# correos ya estaban ignorados.}}",
+        "notIgnorable": "{count, plural, one {# correo no se pudo ignorar: no se pudo leer o su propuesta ya se aplicó.} other {# correos no se pudieron ignorar: no se pudieron leer o sus propuestas ya se aplicaron.}}",
+        "skippedLinked": "{count, plural, one {Se conservó # correo vinculado a una transacción.} other {Se conservaron # correos vinculados a una transacción.}}"
+      },
+      "deleteFailed": "No se pudieron eliminar los correos",
+      "ignoreFailed": "No se pudieron ignorar los correos",
+      "noneLeft": "Ya no coincide ningún correo. No se cambió nada."
+    }
   },
   "detail": {
     "title": "Recibo por correo",

@@ -6,7 +6,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { EnvelopeIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { BulkConfirmDialog } from '@/components/email-receipts/BulkConfirmDialog';
 import { EmailReceiptDetailDialog } from '@/components/email-receipts/EmailReceiptDetailDialog';
+import { ReceiptBulkBar } from '@/components/email-receipts/ReceiptBulkBar';
 import { RetryFailedEmailsButton } from '@/components/email-receipts/RetryFailedEmailsButton';
 import { SelectAllCheckbox } from '@/components/email-receipts/SelectAllCheckbox';
 import { SenderDomainCloud } from '@/components/email-receipts/SenderDomainCloud';
@@ -15,6 +17,7 @@ import { RecognizeWithAiDialog } from '@/components/email-receipts/RecognizeWith
 import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge';
 import { useParserDraftWithAi } from '@/components/email-receipts/useParserDraftWithAi';
 import { Badge } from '@/components/ui/Badge';
+import { useReceiptBulkActions } from '@/components/email-receipts/useReceiptBulkActions';
 import { Button, buttonClassName } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -33,6 +36,7 @@ import {
   canRecognizeWithAi,
   canReprocessReceipt,
   distinctSenderDomains,
+  draftBlock,
   isReceiptActionable,
   normalizeDomainFilter,
   parserDraftKind,
@@ -66,6 +70,13 @@ interface LoadedList {
   items: EmailReceiptListItem[] | null;
 }
 
+/** How many emails match one pair of filters, as the server counts them (the same answer the state buttons read). */
+interface MatchingCount {
+  filter: ReceiptFilter;
+  domain: string;
+  total: number;
+}
+
 /** Whether the user has a mailbox, as far as it is known: `none` is a loaded answer of "no mailbox". */
 type MailboxState = { status: 'loading' } | { status: 'failed' } | { status: 'none' } | { status: 'ready' };
 
@@ -96,8 +107,12 @@ interface Notice {
  * "Draft parser with AI" and "Recognize with AI" are the person's own request to
  * the assistant, offered whatever the mailbox's AI mode: the request is queued and
  * the chat is opened (or the request waits in the review inbox) rather than a
- * provider being called from here. Up to five emails can be selected and drafted
- * from together.
+ * provider being called from here.
+ *
+ * Any number of rows can be selected. A selection of every row on the page can be
+ * widened to every email matching the filter, which the server counts (`matching`);
+ * a bulk delete or ignore then names the filter, not ids. A profile is drafted from
+ * one to five emails of one sender only (`draftBlock` says why it is off).
  */
 export function EmailReceiptsManager() {
   const t = useTranslations('emailReceipts.receipts');
@@ -122,9 +137,12 @@ export function EmailReceiptsManager() {
   const [counts, setCounts] = useState<EmailReceiptStatusCounts | null>(null);
   const [loaded, setLoaded] = useState<LoadedList | null>(null);
   const [mailbox, setMailbox] = useState<MailboxState>({ status: 'loading' });
-  // The emails ticked for "Draft parser with AI", by id. Only ids of the list on
-  // screen count (`selected` below), and a change of filter clears the set.
+  // The emails ticked, by id. Only ids of the list on screen count (`selected`
+  // below), and a change of filter clears the set.
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // How many emails match the filter (null while unknown or failed), and whether the selection is all of them (the count it was chosen with) rather than the ticked rows.
+  const [matching, setMatching] = useState<MatchingCount | null>(null);
+  const [allMatching, setAllMatching] = useState<number | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -140,6 +158,7 @@ export function EmailReceiptsManager() {
   const latestDomains = useRef(0);
   const latestCloud = useRef(0);
   const latestCounts = useRef(0);
+  const latestMatching = useRef(0);
   const currentFilters = useRef({ filter, domain });
   useEffect(() => {
     currentFilters.current = { filter, domain };
@@ -205,17 +224,36 @@ export function EmailReceiptsManager() {
     }
   }, []);
 
+  /** How many emails match the filter; a failed read leaves it unknown, so no "select all N" is offered. */
+  const loadMatching = useCallback(async (forFilter: ReceiptFilter, forDomain: string) => {
+    const request = ++latestMatching.current;
+    try {
+      const total = await emailReceiptsApi.receipts.countMatching(
+        forFilter === 'all' ? undefined : forFilter,
+        forDomain === '' ? undefined : forDomain,
+      );
+      if (request !== latestMatching.current) return;
+      setMatching({ filter: forFilter, domain: forDomain, total });
+    } catch (error) {
+      if (request !== latestMatching.current) return;
+      logger.error(error);
+      setMatching(null);
+    }
+  }, []);
+
   // After a command or a change the list, the state counts and the domain counts are read again.
   const reload = useCallback(async () => {
     void loadDomains();
     void loadCounts();
+    void loadMatching(currentFilters.current.filter, currentFilters.current.domain);
     void loadCloud(currentFilters.current.filter);
     await load(currentFilters.current.filter, currentFilters.current.domain);
-  }, [load, loadDomains, loadCounts, loadCloud]);
+  }, [load, loadDomains, loadCounts, loadCloud, loadMatching]);
 
   useEffect(() => {
     void load(filter, domain);
-  }, [filter, domain, load]);
+    void loadMatching(filter, domain);
+  }, [filter, domain, load, loadMatching]);
 
   useEffect(() => {
     void loadDomains();
@@ -226,9 +264,16 @@ export function EmailReceiptsManager() {
     void loadCloud(filter);
   }, [filter, loadCloud]);
 
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setAllMatching(null);
+  }, []);
+
+  const bulk = useReceiptBulkActions({ reload, onDone: clearSelection });
+
   const changeDomain = (next: string) => {
     setDomain(next);
-    setSelectedIds(new Set());
+    clearSelection();
     const params = new URLSearchParams(searchParams.toString());
     // Without a domain a legacy `/email-receipts?domain=` link would fall back to the Overview, so the tab is named.
     params.set('tab', 'emails');
@@ -302,15 +347,15 @@ export function EmailReceiptsManager() {
       const outcome = await startParserDraft(receipts);
       if (outcome.kind === 'failed') {
         setNotice({ tone: 'error', text: outcome.message });
-      } else if (outcome.kind === 'queued') {
-        setNotice({
-          tone: 'success',
-          text: outcome.handoffFailed ? t('draft.handoffFailed') : t('draft.queued'),
-          link: { href: '/ai-reviews', label: t('draft.inboxLink') },
-        });
-        setSelectedIds(new Set());
       } else {
-        setSelectedIds(new Set());
+        if (outcome.kind === 'queued') {
+          setNotice({
+            tone: 'success',
+            text: outcome.handoffFailed ? t('draft.handoffFailed') : t('draft.queued'),
+            link: { href: '/ai-reviews', label: t('draft.inboxLink') },
+          });
+        }
+        clearSelection();
       }
     } finally {
       setDrafting(false);
@@ -337,13 +382,14 @@ export function EmailReceiptsManager() {
     );
   };
 
-  const toggleSelected = (receipt: EmailReceiptListItem) =>
-    setSelectedIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(receipt.id)) next.delete(receipt.id);
-      else if (next.size < PARSER_DRAFT_MAX_RECEIPTS) next.add(receipt.id);
-      return next;
-    });
+  // Ticking or unticking a row leaves "every email matching the filter": what is selected is then the rows.
+  const toggleSelected = (receipt: EmailReceiptListItem) => {
+    const next = new Set(allMatching !== null ? pageItems.map((row) => row.id) : selectedIds);
+    if (next.has(receipt.id)) next.delete(receipt.id);
+    else next.add(receipt.id);
+    setAllMatching(null);
+    setSelectedIds(next);
+  };
 
   const handleConfirm = async () => {
     const target = confirmation;
@@ -482,21 +528,32 @@ export function EmailReceiptsManager() {
   };
 
   const current = loaded !== null && loaded.filter === filter && loaded.domain === domain ? loaded : null;
+  const pageItems = current?.items ?? [];
   // What is ticked AND still on screen: an email a reload dropped is not selected.
-  const selected = (current?.items ?? []).filter((receipt) => selectedIds.has(receipt.id));
+  const selected = pageItems.filter((receipt) => selectedIds.has(receipt.id));
   const selectedDomains = distinctSenderDomains(selected);
-  // One profile reads one kind of email: trade confirmations and order emails are never drafted together.
-  const selectedMixed = parserDraftKind(selected) === 'mixed';
+  const matchingTotal = matching !== null && matching.filter === filter && matching.domain === domain ? matching.total : null;
+  const allMatchingCount = allMatching !== null ? (matchingTotal ?? allMatching) : null;
 
   // The tag cloud counts within the state on screen; "All" reads the unfiltered list.
   const cloudDomains = filter === 'all' ? domains : cloud !== null && cloud.filter === filter ? cloud.items : null;
 
-  // Which emails the header checkbox covers: the selectable ones, as many as a draft may hold.
-  const selectable = (current?.items ?? []).filter((receipt) => receipt.status !== 'skipped').slice(0, PARSER_DRAFT_MAX_RECEIPTS);
-  const allSelected = selectable.length > 0 && selectable.every((receipt) => selectedIds.has(receipt.id));
-  const someSelected = selected.length > 0 && !allSelected;
+  // The header checkbox covers every row of the page.
+  const isChecked = (receipt: EmailReceiptListItem) => allMatching !== null || selectedIds.has(receipt.id);
+  const allSelected = pageItems.length > 0 && pageItems.every(isChecked);
+  const someSelected = (allMatching !== null || selected.length > 0) && !allSelected;
+  // Gmail style: a full page, and more emails matching the filter than the page holds.
+  const canSelectAllMatching = allMatching === null && allSelected && matchingTotal !== null && matchingTotal > pageItems.length;
 
-  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(selectable.map((receipt) => receipt.id)));
+  const toggleAll = () => {
+    clearSelection();
+    if (!allSelected) setSelectedIds(new Set(pageItems.map((receipt) => receipt.id)));
+  };
+
+  const askBulk = (action: 'delete' | 'ignore') =>
+    allMatchingCount !== null
+      ? bulk.ask(action, { filter: { ...(filter === 'all' ? {} : { status: filter }), ...(domain === '' ? {} : { domain }) } }, allMatchingCount)
+      : bulk.ask(action, { ids: selected.map((receipt) => receipt.id) }, selected.length);
 
   /** The label of a state's button: its name with how many emails are in it, when that is known. */
   const filterLabel = (option: ReceiptFilter) => {
@@ -553,8 +610,8 @@ export function EmailReceiptsManager() {
                 <SelectAllCheckbox
                   checked={allSelected}
                   indeterminate={someSelected}
-                  disabled={drafting || selectable.length === 0}
-                  label={t('selection.selectAll', { max: PARSER_DRAFT_MAX_RECEIPTS })}
+                  disabled={drafting || bulk.running}
+                  label={t('selection.selectAll')}
                   onChange={toggleAll}
                 />
               </Th>
@@ -596,14 +653,8 @@ export function EmailReceiptsManager() {
                   <Td className="px-2 align-top sm:px-4">
                     <input
                       type="checkbox"
-                      checked={selectedIds.has(receipt.id)}
-                      // A skipped email has no text to write a parser from, and at
-                      // most five are drafted from together.
-                      disabled={
-                        drafting ||
-                        receipt.status === 'skipped' ||
-                        (!selectedIds.has(receipt.id) && selected.length >= PARSER_DRAFT_MAX_RECEIPTS)
-                      }
+                      checked={isChecked(receipt)}
+                      disabled={drafting || bulk.running}
                       onChange={() => toggleSelected(receipt)}
                       aria-label={t('selection.select', { subject: receipt.subject })}
                       className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600"
@@ -673,7 +724,7 @@ export function EmailReceiptsManager() {
               aria-pressed={filter === option}
               onClick={() => {
                 setFilter(option);
-                setSelectedIds(new Set());
+                clearSelection();
               }}
               className={segmentClass(filter === option)}
             >
@@ -717,37 +768,23 @@ export function EmailReceiptsManager() {
         </div>
       )}
 
-      {selected.length > 0 && (
-        <div
-          role="region"
-          aria-label={t('selection.label')}
-          className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-900/60 dark:bg-blue-900/20 dark:text-blue-100"
-        >
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span>{t('selection.count', { count: selected.length, max: PARSER_DRAFT_MAX_RECEIPTS })}</span>
-            <Button
-              isLoading={drafting}
-              disabled={drafting || selectedMixed}
-              aria-describedby={selectedMixed ? 'receipts-selection-mixed' : undefined}
-              onClick={() => void handleDraftParser(selected)}
-            >
-              {t('selection.draftButton', { count: selected.length })}
-            </Button>
-            <Button variant="outline" disabled={drafting} onClick={() => setSelectedIds(new Set())}>
-              {t('selection.clear')}
-            </Button>
-          </div>
-          {selectedMixed && (
-            <p id="receipts-selection-mixed" role="alert" className="text-amber-800 dark:text-amber-200">
-              {t('draft.mixedKinds')}
-            </p>
-          )}
-          {selectedDomains.length > 1 && (
-            <p role="alert" className="text-amber-800 dark:text-amber-200">
-              {t('selection.differentSenders', { domains: selectedDomains.join(', ') })}
-            </p>
-          )}
-        </div>
+      {(allMatching !== null || selected.length > 0) && (
+        <ReceiptBulkBar
+          count={allMatchingCount ?? selected.length}
+          allMatching={allMatching !== null}
+          pageCount={pageItems.length}
+          matchingTotal={matchingTotal}
+          canSelectAllMatching={canSelectAllMatching}
+          draftBlock={draftBlock(selected, PARSER_DRAFT_MAX_RECEIPTS, allMatching !== null)}
+          senderDomains={selectedDomains}
+          busy={bulk.running}
+          drafting={drafting}
+          onSelectAllMatching={() => setAllMatching(matchingTotal)}
+          onDelete={() => askBulk('delete')}
+          onIgnore={() => askBulk('ignore')}
+          onDraft={() => void handleDraftParser(selected)}
+          onClear={clearSelection}
+        />
       )}
 
       <Card className="overflow-hidden">{body}</Card>
@@ -792,6 +829,13 @@ export function EmailReceiptsManager() {
           onChanged={() => void reload()}
         />
       )}
+
+      <BulkConfirmDialog
+        request={bulk.request}
+        running={bulk.running}
+        onConfirm={() => void bulk.confirm()}
+        onCancel={bulk.cancel}
+      />
 
       <ConfirmDialog
         isOpen={confirmation !== null}

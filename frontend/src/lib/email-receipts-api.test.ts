@@ -108,6 +108,29 @@ describe('emailReceiptsApi', () => {
       expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts');
     });
 
+    it('counts the emails matching a state and domain from status-counts, the same answer the state buttons read', async () => {
+      client.get.mockResolvedValue({ data: { total: 1234, byStatus: { no_parser: 1000, review: 234 } } });
+      expect(await emailReceiptsApi.receipts.countMatching(undefined, 'gmail.com')).toBe(1234);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts', { params: { domain: 'gmail.com' } });
+      expect(await emailReceiptsApi.receipts.countMatching('no_parser')).toBe(1000);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts', { params: undefined });
+      // A state with no email is absent from byStatus: zero.
+      expect(await emailReceiptsApi.receipts.countMatching('ignored', 'gmail.com')).toBe(0);
+    });
+
+    it('posts a bulk command with ids or a filter and answers the four counts', async () => {
+      const result = { affected: 2, skippedLinked: 1, unchanged: 0, notIgnorable: 0 };
+      client.post.mockResolvedValue({ data: result });
+      expect(await emailReceiptsApi.receipts.bulk({ action: 'delete', ids: ['a', 'b'], expectedCount: 2 })).toEqual(result);
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/bulk', { action: 'delete', ids: ['a', 'b'], expectedCount: 2 });
+      await emailReceiptsApi.receipts.bulk({ action: 'ignore', filter: { status: 'no_parser', domain: 'gmail.com' }, expectedCount: 9 });
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/bulk', {
+        action: 'ignore',
+        filter: { status: 'no_parser', domain: 'gmail.com' },
+        expectedCount: 9,
+      });
+    });
+
     it('approves a proposal by the review inbox batch route and throws on a refusal', async () => {
       client.post.mockResolvedValue({ data: { results: [{ id: 'rq-1', ok: true }] } });
       await emailReceiptsApi.receipts.approveProposal('rq-1');

@@ -749,11 +749,22 @@
     "selection": {
       "label": "E-mails sélectionnés",
       "select": "Sélectionner {subject}",
-      "selectAll": "Sélectionner tous les e-mails de cette liste (au maximum {max})",
-      "count": "{count, plural, one {# e-mail sélectionné} other {# e-mails sélectionnés}} (au plus {max})",
+      "selectAll": "Sélectionner tous les e-mails de cette liste",
+      "count": "{count, plural, one {# e-mail sélectionné} other {# e-mails sélectionnés}}",
       "draftButton": "Préparer un profil avec l'IA ({count})",
       "clear": "Effacer la sélection",
-      "differentSenders": "Les e-mails sélectionnés viennent d'expéditeurs différents ({domains}). Un profil lit les e-mails d'un seul expéditeur : sélectionnez des e-mails d'un seul expéditeur."
+      "deleteButton": "Supprimer ({count})",
+      "ignoreButton": "Ignorer ({count})",
+      "pageSelected": "Les {count} e-mails de cette page sont sélectionnés.",
+      "selectAllMatching": "Sélectionner les {total} e-mails correspondant à ce filtre.",
+      "allMatchingSelected": "Les {total} e-mails correspondant à ce filtre sont sélectionnés.",
+      "draftBlocked": {
+        "tooMany": "Un profil se prépare avec {max} e-mails au maximum. Sélectionnez {max} e-mails ou moins.",
+        "differentSenders": "Les e-mails sélectionnés viennent d'expéditeurs différents ({domains}). Un profil lit les e-mails d'un seul expéditeur : sélectionnez des e-mails d'un seul expéditeur.",
+        "skipped": "Un e-mail illisible n'a pas de texte pour préparer un profil. Retirez-le de la sélection.",
+        "allMatching": "Un profil se prépare avec des e-mails que vous sélectionnez vous-même, {max} au maximum. Effacez cette sélection et sélectionnez jusqu'à {max} e-mails.",
+        "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande."
+      }
     },
     "draft": {
       "failed": "Impossible de démarrer la rédaction d'un profil",
@@ -765,7 +776,31 @@
       "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande.",
       "chatPromptTrade": "Crée un profil d'opérations pour {count, plural, one {cette confirmation d'opération} other {ces # confirmations d'opération}} de {domain}. Prends en charge la demande de revue IA {requestId}, teste ton profil sur chaque e-mail joint avec l'outil email_receipt_parsers, corrige-le jusqu'à ce que chacun donne une opération complète, puis enregistre-le comme brouillon pour la demande {requestId}."
     },
-    "tradeBadge": "Opération"
+    "tradeBadge": "Opération",
+    "bulkDialog": {
+      "delete": {
+        "title": "Supprimer des e-mails ?",
+        "message": "{count, plural, one {Supprimer # e-mail} other {Supprimer # e-mails}}{scope, select, both { de {domain} à l'état {status}} domain { de {domain}} status { à l'état {status}} other {}} ? Cette action est irréversible. Pour garder les e-mails et les empêcher de proposer quoi que ce soit, choisissez plutôt « Ignorer ». Les e-mails liés à une transaction sont conservés."
+      },
+      "ignore": {
+        "title": "Ignorer des e-mails ?",
+        "message": "{count, plural, one {Ignorer # e-mail} other {Ignorer # e-mails}}{scope, select, both { de {domain} à l'état {status}} domain { de {domain}} status { à l'état {status}} other {}} ? Ils ne proposeront rien et leurs demandes de révision ouvertes seront rejetées. Les e-mails liés à une transaction restent inchangés.",
+        "confirm": "Ignorer"
+      },
+      "countChanged": "Le nombre d'e-mails correspondants est maintenant {count}. Rien n'a été modifié. Vérifiez le nombre et confirmez à nouveau."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# e-mail supprimé.} other {# e-mails supprimés.}}",
+        "ignored": "{count, plural, one {# e-mail ignoré.} other {# e-mails ignorés.}}",
+        "unchanged": "{count, plural, one {# e-mail était déjà ignoré.} other {# e-mails étaient déjà ignorés.}}",
+        "notIgnorable": "{count, plural, one {# e-mail n'a pas pu être ignoré : il était illisible, ou sa proposition a déjà été appliquée.} other {# e-mails n'ont pas pu être ignorés : ils étaient illisibles, ou leurs propositions ont déjà été appliquées.}}",
+        "skippedLinked": "{count, plural, one {# e-mail lié à une transaction a été conservé.} other {# e-mails liés à une transaction ont été conservés.}}"
+      },
+      "deleteFailed": "Impossible de supprimer les e-mails",
+      "ignoreFailed": "Impossible d'ignorer les e-mails",
+      "noneLeft": "Aucun e-mail ne correspond plus. Rien n'a été modifié."
+    }
   },
   "detail": {
     "title": "Reçu par e-mail",

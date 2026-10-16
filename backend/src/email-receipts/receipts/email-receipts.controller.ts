@@ -19,6 +19,7 @@ import { OwnerOnly } from "../../delegation/decorators/delegate-access.decorator
 import { EmailReceiptAiService } from "../ai/email-receipt-ai.service";
 import {
   AskAiEmailReceiptDto,
+  BulkEmailReceiptsDto,
   EmailReceiptStatusCountsDto,
   ListEmailReceiptDomainsDto,
   LinkEmailReceiptDto,
@@ -125,6 +126,33 @@ export class EmailReceiptsController {
       limit: dto.limit,
       since: dto.since,
     });
+  }
+
+  // Declared before `:id`, so the literal segment is matched first.
+  @Post("bulk")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({
+    summary:
+      "Delete or ignore many stored emails, by id or by the list's filter; refuses with 409 and writes nothing when the number of matching emails differs from `expectedCount`. Emails linked to a transaction are skipped",
+  })
+  bulk(
+    @Request() req: { user: { id: string } },
+    @Body() dto: BulkEmailReceiptsDto,
+  ) {
+    return this.receipts.bulk(
+      req.user.id,
+      dto.action,
+      dto.ids !== undefined
+        ? { ids: dto.ids }
+        : {
+            filter: {
+              status: dto.filter?.status,
+              domain: dto.filter?.domain,
+            },
+          },
+      dto.expectedCount,
+    );
   }
 
   @Get(":id")
