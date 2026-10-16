@@ -758,6 +758,34 @@
       "pageSelected": "Les {count} e-mails de cette page sont sélectionnés.",
       "selectAllMatching": "Sélectionner les {total} e-mails correspondant à ce filtre.",
       "allMatchingSelected": "Les {total} e-mails correspondant à ce filtre sont sélectionnés.",
+      "reprocessButton": "Retraiter ({count})",
+      "restoreButton": "Restaurer les ignorés ({count})",
+      "restoreButtonAll": "Restaurer les ignorés",
+      "approveButton": "Approuver les propositions ({count})",
+      "approveButtonAll": "Approuver les propositions",
+      "progress": "Traités : {processed}, restants : {remaining}",
+      "progressStarting": "Démarrage",
+      "stop": "Arrêter",
+      "narrowedSelected": "{total} e-mails sont sélectionnés : tous ceux qui correspondent à ce filtre, sauf ceux exclus ci-dessous.",
+      "deselect": {
+        "label": "Désélectionner par",
+        "state": "État : {state}",
+        "sender": "Expéditeur : {domain}",
+        "before": "Reçus avant un jour",
+        "after": "Reçus après un jour",
+        "beforeLabel": "Désélectionner les e-mails reçus avant le",
+        "afterLabel": "Désélectionner les e-mails reçus après le",
+        "apply": "Désélectionner",
+        "cancel": "Annuler"
+      },
+      "exclusion": {
+        "label": "Exclus de la sélection",
+        "state": "Pas à l'état {state}",
+        "sender": "Pas de {domain}",
+        "from": "Reçus le {date} ou après",
+        "to": "Reçus le {date} ou avant",
+        "remove": "Remettre : {label}"
+      },
       "draftBlocked": {
         "tooMany": "Un profil se prépare avec {max} e-mails au maximum. Sélectionnez {max} e-mails ou moins.",
         "differentSenders": "Les e-mails sélectionnés viennent d'expéditeurs différents ({domains}). Un profil lit les e-mails d'un seul expéditeur : sélectionnez des e-mails d'un seul expéditeur.",
@@ -792,7 +820,14 @@
         "message": "{count, plural, one {Ignorer # e-mail} other {Ignorer # e-mails}}{scope, select, both { de {domain} à l'état {status}} domain { de {domain}} status { à l'état {status}} other {}} ? Ils ne proposeront rien et leurs demandes de révision ouvertes seront rejetées. Les e-mails liés à une transaction restent inchangés.",
         "confirm": "Ignorer"
       },
-      "countChanged": "Le nombre d'e-mails correspondants est maintenant {count}. Rien n'a été modifié. Vérifiez le nombre et confirmez à nouveau."
+      "countChanged": "Le nombre d'e-mails correspondants est maintenant {count}. Rien n'a été modifié. Vérifiez le nombre et confirmez à nouveau.",
+      "approve": {
+        "title": "Approuver les propositions ?",
+        "message": "{count, plural, one {Approuver # proposition} other {Approuver # propositions}} ? Chacune est appliquée comme le fait le bouton Confirmer de la boîte de revue IA.",
+        "trades": "{count, plural, one {# e-mail d'opération est laissé de côté. Approuvez-le sur sa carte dans la boîte de revue IA.} other {# e-mails d'opérations sont laissés de côté. Approuvez-les sur leurs cartes dans la boîte de revue IA.}}",
+        "confirm": "Approuver"
+      },
+      "narrowedNote": "Les e-mails exclus de la sélection ne sont pas modifiés."
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {# e-mail ignoré.} other {# e-mails ignorés.}}",
         "unchanged": "{count, plural, one {# e-mail était déjà ignoré.} other {# e-mails étaient déjà ignorés.}}",
         "notIgnorable": "{count, plural, one {# e-mail n'a pas pu être ignoré : il était illisible, ou sa proposition a déjà été appliquée.} other {# e-mails n'ont pas pu être ignorés : ils étaient illisibles, ou leurs propositions ont déjà été appliquées.}}",
-        "skippedLinked": "{count, plural, one {# e-mail lié à une transaction a été conservé.} other {# e-mails liés à une transaction ont été conservés.}}"
+        "skippedLinked": "{count, plural, one {# e-mail lié à une transaction a été conservé.} other {# e-mails liés à une transaction ont été conservés.}}",
+        "reprocessed": "{count, plural, one {# e-mail retraité.} other {# e-mails retraités.}}",
+        "restored": "{count, plural, one {# e-mail ignoré relu.} other {# e-mails ignorés relus.}}",
+        "reprocessFailed": "{count, plural, one {# e-mail a échoué.} other {# e-mails ont échoué.}}",
+        "stopped": "{count, plural, one {Arrêté. # e-mail n'a pas été traité.} other {Arrêté. # e-mails n'ont pas été traités.}}",
+        "approved": "{count, plural, one {# proposition approuvée.} other {# propositions approuvées.}}",
+        "approveFailed": "{count, plural, one {# proposition n'a pas pu être approuvée.} other {# propositions n'ont pas pu être approuvées.}}"
       },
       "deleteFailed": "Impossible de supprimer les e-mails",
       "ignoreFailed": "Impossible d'ignorer les e-mails",
-      "noneLeft": "Aucun e-mail ne correspond plus. Rien n'a été modifié."
+      "noneLeft": "Aucun e-mail ne correspond plus. Rien n'a été modifié.",
+      "reprocessFailed": "Impossible de retraiter les e-mails",
+      "approveFailed": "Impossible d'approuver les propositions",
+      "noApprovable": "Aucune proposition de cette sélection ne peut être approuvée.",
+      "narrowFailed": "Impossible de compter les e-mails. La modification n'a pas été appliquée."
     }
   },
   "detail": {

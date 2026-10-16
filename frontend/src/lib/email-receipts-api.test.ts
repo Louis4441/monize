@@ -139,6 +139,40 @@ describe('emailReceiptsApi', () => {
       await expect(emailReceiptsApi.receipts.approveProposal('rq-1')).rejects.toThrow('refused');
     });
 
+    it('counts a narrowed filter, reprocesses and lists the approvable proposals through the bulk routes', async () => {
+      client.post.mockResolvedValueOnce({ data: { count: 7 } });
+      expect(await emailReceiptsApi.receipts.bulkCount({ excludeStatuses: ['ignored'] })).toBe(7);
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/bulk/count', { filter: { excludeStatuses: ['ignored'] } });
+
+      const step = { processed: 10, failed: 0, byOutcome: {}, remaining: 4, since: 'S' };
+      client.post.mockResolvedValueOnce({ data: step });
+      expect(await emailReceiptsApi.receipts.bulkReprocess({ ids: ['a'], onlyStatuses: ['ignored'], since: 'S' })).toEqual(step);
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/bulk/reprocess', {
+        ids: ['a'],
+        onlyStatuses: ['ignored'],
+        since: 'S',
+      });
+
+      client.post.mockResolvedValueOnce({ data: { requestIds: ['rq'], trades: 1 } });
+      expect(await emailReceiptsApi.receipts.bulkApprovable({ filter: { status: 'review' } })).toEqual({ requestIds: ['rq'], trades: 1 });
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/bulk/approvable', { filter: { status: 'review' } });
+    });
+
+    it('approves requests 100 to a call, counts the refused and a failed call, and drops the cache', async () => {
+      const ids = Array.from({ length: 250 }, (_, n) => `rq-${n}`);
+      client.post
+        .mockResolvedValueOnce({ data: { results: ids.slice(0, 100).map((id) => ({ id, ok: true })) } })
+        .mockRejectedValueOnce(new Error('down'))
+        .mockResolvedValueOnce({
+          data: { results: ids.slice(200).map((id, n) => ({ id, ok: n !== 0, error: n === 0 ? 'refused' : undefined })) },
+        });
+      expect(await emailReceiptsApi.receipts.approveRequests(ids)).toEqual({ approved: 149, failed: 101 });
+      expect(client.post).toHaveBeenCalledTimes(3);
+      expect(client.post).toHaveBeenNthCalledWith(1, '/ai-review-requests/approve-batch', { ids: ids.slice(0, 100) });
+      expect(client.post).toHaveBeenNthCalledWith(2, '/ai-review-requests/approve-batch', { ids: ids.slice(100, 200) });
+      expect(client.post).toHaveBeenNthCalledWith(3, '/ai-review-requests/approve-batch', { ids: ids.slice(200) });
+    });
+
     it('lists with an optional status and limit, sending no params when there are none', async () => {
       client.get.mockResolvedValue({ data: [] });
       await emailReceiptsApi.receipts.list();

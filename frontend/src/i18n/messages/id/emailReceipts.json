@@ -758,6 +758,34 @@
       "pageSelected": "Semua {count} surel di halaman ini dipilih.",
       "selectAllMatching": "Pilih semua {total} surel yang cocok dengan filter ini.",
       "allMatchingSelected": "Semua {total} surel yang cocok dengan filter ini dipilih.",
+      "reprocessButton": "Proses ulang ({count})",
+      "restoreButton": "Pulihkan yang diabaikan ({count})",
+      "restoreButtonAll": "Pulihkan yang diabaikan",
+      "approveButton": "Setujui usulan ({count})",
+      "approveButtonAll": "Setujui usulan",
+      "progress": "Diproses: {processed}, tersisa: {remaining}",
+      "progressStarting": "Memulai",
+      "stop": "Berhenti",
+      "narrowedSelected": "{total} email dipilih: semua email yang cocok dengan filter ini, kecuali yang dikeluarkan di bawah.",
+      "deselect": {
+        "label": "Batalkan pilihan menurut",
+        "state": "Status: {state}",
+        "sender": "Pengirim: {domain}",
+        "before": "Diterima sebelum suatu hari",
+        "after": "Diterima setelah suatu hari",
+        "beforeLabel": "Batalkan pilihan email yang diterima sebelum",
+        "afterLabel": "Batalkan pilihan email yang diterima setelah",
+        "apply": "Batalkan pilihan",
+        "cancel": "Batal"
+      },
+      "exclusion": {
+        "label": "Dikeluarkan dari pilihan",
+        "state": "Bukan berstatus {state}",
+        "sender": "Bukan dari {domain}",
+        "from": "Diterima pada {date} atau sesudahnya",
+        "to": "Diterima pada {date} atau sebelumnya",
+        "remove": "Masukkan kembali: {label}"
+      },
       "draftBlocked": {
         "tooMany": "Profil dapat disiapkan dari paling banyak {max} surel. Pilih {max} surel atau kurang.",
         "differentSenders": "Surel terpilih berasal dari pengirim yang berbeda ({domains}). Profil membaca surel dari satu pengirim, jadi pilih surel dari satu pengirim saja.",
@@ -792,7 +820,14 @@
         "message": "Kecualikan {count, plural, one {# surel} other {# surel}}{scope, select, both { dari {domain} dengan status {status}} domain { dari {domain}} status { dengan status {status}} other {}}? Surel tidak akan mengusulkan apa pun, dan permintaan tinjauan yang terbuka akan ditutup. Surel yang terhubung ke transaksi tidak diubah.",
         "confirm": "Kecualikan"
       },
-      "countChanged": "Jumlah surel yang cocok sekarang {count}. Tidak ada yang diubah. Periksa jumlahnya dan konfirmasi lagi."
+      "countChanged": "Jumlah surel yang cocok sekarang {count}. Tidak ada yang diubah. Periksa jumlahnya dan konfirmasi lagi.",
+      "approve": {
+        "title": "Setujui usulan?",
+        "message": "{count, plural, one {Setujui # usulan} other {Setujui # usulan}}? Setiap usulan diterapkan seperti tombol Konfirmasi di kotak masuk tinjauan AI.",
+        "trades": "{count, plural, one {# email transaksi dilewati. Setujui di kartunya di kotak masuk tinjauan AI.} other {# email transaksi dilewati. Setujui di kartunya di kotak masuk tinjauan AI.}}",
+        "confirm": "Setujui"
+      },
+      "narrowedNote": "Email yang dikeluarkan dari pilihan tidak diubah."
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {# surel dikecualikan.} other {# surel dikecualikan.}}",
         "unchanged": "{count, plural, one {# surel sudah dikecualikan sebelumnya.} other {# surel sudah dikecualikan sebelumnya.}}",
         "notIgnorable": "{count, plural, one {# surel tidak dapat dikecualikan: tidak dapat dibaca, atau usulannya sudah diterapkan.} other {# surel tidak dapat dikecualikan: tidak dapat dibaca, atau usulannya sudah diterapkan.}}",
-        "skippedLinked": "{count, plural, one {# surel yang terhubung ke transaksi tetap disimpan.} other {# surel yang terhubung ke transaksi tetap disimpan.}}"
+        "skippedLinked": "{count, plural, one {# surel yang terhubung ke transaksi tetap disimpan.} other {# surel yang terhubung ke transaksi tetap disimpan.}}",
+        "reprocessed": "{count, plural, one {# email diproses ulang.} other {# email diproses ulang.}}",
+        "restored": "{count, plural, one {# email yang diabaikan dibaca ulang.} other {# email yang diabaikan dibaca ulang.}}",
+        "reprocessFailed": "{count, plural, one {# email gagal.} other {# email gagal.}}",
+        "stopped": "{count, plural, one {Dihentikan. # email belum diproses.} other {Dihentikan. # email belum diproses.}}",
+        "approved": "{count, plural, one {# usulan disetujui.} other {# usulan disetujui.}}",
+        "approveFailed": "{count, plural, one {# usulan tidak dapat disetujui.} other {# usulan tidak dapat disetujui.}}"
       },
       "deleteFailed": "Surel tidak dapat dihapus",
       "ignoreFailed": "Surel tidak dapat dikecualikan",
-      "noneLeft": "Tidak ada lagi surel yang cocok. Tidak ada yang diubah."
+      "noneLeft": "Tidak ada lagi surel yang cocok. Tidak ada yang diubah.",
+      "reprocessFailed": "Email tidak dapat diproses ulang",
+      "approveFailed": "Usulan tidak dapat disetujui",
+      "noApprovable": "Tidak ada usulan dalam pilihan ini yang dapat disetujui.",
+      "narrowFailed": "Email tidak dapat dihitung. Perubahan tidak diterapkan."
     }
   },
   "detail": {

@@ -39,6 +39,11 @@ export function BulkConfirmDialog({ request, running, onConfirm, onCancel }: Bul
   const action = request?.action ?? 'delete';
   const domain = request?.filter?.domain;
   const status = request?.filter?.status;
+  const narrowed =
+    (request?.filter?.excludeStatuses?.length ?? 0) > 0 ||
+    (request?.filter?.excludeDomains?.length ?? 0) > 0 ||
+    request?.filter?.receivedFrom !== undefined ||
+    request?.filter?.receivedTo !== undefined;
   const scope = domain && status ? 'both' : domain ? 'domain' : status ? 'status' : 'other';
 
   return (
@@ -82,6 +87,7 @@ export function BulkConfirmDialog({ request, running, onConfirm, onCancel }: Bul
               status: status ? tf(`filter.${status}`) : '',
             })}
           </p>
+          {narrowed && <p>{t('narrowedNote')}</p>}
         </div>
       )}
     </Modal>

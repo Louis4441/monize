@@ -758,6 +758,34 @@
       "pageSelected": "Tất cả {count} email trên trang này đã được chọn.",
       "selectAllMatching": "Chọn tất cả {total} email khớp với bộ lọc này.",
       "allMatchingSelected": "Tất cả {total} email khớp với bộ lọc này đã được chọn.",
+      "reprocessButton": "Xử lý lại ({count})",
+      "restoreButton": "Khôi phục email bị bỏ qua ({count})",
+      "restoreButtonAll": "Khôi phục email bị bỏ qua",
+      "approveButton": "Duyệt đề xuất ({count})",
+      "approveButtonAll": "Duyệt đề xuất",
+      "progress": "Đã xử lý: {processed}, còn lại: {remaining}",
+      "progressStarting": "Đang bắt đầu",
+      "stop": "Dừng",
+      "narrowedSelected": "Đã chọn {total} email: tất cả email khớp bộ lọc này, trừ những email đã loại bên dưới.",
+      "deselect": {
+        "label": "Bỏ chọn theo",
+        "state": "Trạng thái: {state}",
+        "sender": "Người gửi: {domain}",
+        "before": "Nhận trước một ngày",
+        "after": "Nhận sau một ngày",
+        "beforeLabel": "Bỏ chọn email nhận trước ngày",
+        "afterLabel": "Bỏ chọn email nhận sau ngày",
+        "apply": "Bỏ chọn",
+        "cancel": "Hủy"
+      },
+      "exclusion": {
+        "label": "Đã loại khỏi lựa chọn",
+        "state": "Không ở trạng thái {state}",
+        "sender": "Không từ {domain}",
+        "from": "Nhận vào {date} hoặc sau đó",
+        "to": "Nhận vào {date} hoặc trước đó",
+        "remove": "Thêm lại: {label}"
+      },
       "draftBlocked": {
         "tooMany": "Trình phân tích chỉ có thể được soạn từ tối đa {max} email. Hãy chọn {max} email trở xuống.",
         "differentSenders": "Các email đã chọn đến từ những người gửi khác nhau ({domains}). Một trình phân tích đọc email của một người gửi, vì vậy hãy chọn email từ cùng một người gửi.",
@@ -792,7 +820,14 @@
         "message": "Phớt lờ {count, plural, one {# email} other {# email}}{scope, select, both { từ {domain} ở trạng thái {status}} domain { từ {domain}} status { ở trạng thái {status}} other {}}? Chúng sẽ không đề xuất gì và các yêu cầu xem xét đang mở sẽ bị đóng. Email liên kết với giao dịch được giữ nguyên.",
         "confirm": "Phớt lờ"
       },
-      "countChanged": "Số email khớp bây giờ là {count}. Chưa có gì bị thay đổi. Hãy kiểm tra số lượng và xác nhận lại."
+      "countChanged": "Số email khớp bây giờ là {count}. Chưa có gì bị thay đổi. Hãy kiểm tra số lượng và xác nhận lại.",
+      "approve": {
+        "title": "Duyệt các đề xuất?",
+        "message": "{count, plural, one {Duyệt # đề xuất} other {Duyệt # đề xuất}}? Mỗi đề xuất được áp dụng giống như nút Xác nhận trong hộp thư xem xét AI.",
+        "trades": "{count, plural, one {# email giao dịch được bỏ qua. Hãy duyệt trên thẻ của email trong hộp thư xem xét AI.} other {# email giao dịch được bỏ qua. Hãy duyệt trên thẻ của từng email trong hộp thư xem xét AI.}}",
+        "confirm": "Duyệt"
+      },
+      "narrowedNote": "Email đã loại khỏi lựa chọn không bị thay đổi."
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {Đã phớt lờ # email.} other {Đã phớt lờ # email.}}",
         "unchanged": "{count, plural, one {# email đã được phớt lờ từ trước.} other {# email đã được phớt lờ từ trước.}}",
         "notIgnorable": "{count, plural, one {Không thể phớt lờ # email: không đọc được, hoặc đề xuất của email đã được áp dụng.} other {Không thể phớt lờ # email: không đọc được, hoặc đề xuất của chúng đã được áp dụng.}}",
-        "skippedLinked": "{count, plural, one {Đã giữ lại # email liên kết với giao dịch.} other {Đã giữ lại # email liên kết với giao dịch.}}"
+        "skippedLinked": "{count, plural, one {Đã giữ lại # email liên kết với giao dịch.} other {Đã giữ lại # email liên kết với giao dịch.}}",
+        "reprocessed": "{count, plural, one {Đã xử lý lại # email.} other {Đã xử lý lại # email.}}",
+        "restored": "{count, plural, one {Đã đọc lại # email bị bỏ qua.} other {Đã đọc lại # email bị bỏ qua.}}",
+        "reprocessFailed": "{count, plural, one {# email thất bại.} other {# email thất bại.}}",
+        "stopped": "{count, plural, one {Đã dừng. # email chưa được xử lý.} other {Đã dừng. # email chưa được xử lý.}}",
+        "approved": "{count, plural, one {Đã duyệt # đề xuất.} other {Đã duyệt # đề xuất.}}",
+        "approveFailed": "{count, plural, one {Không thể duyệt # đề xuất.} other {Không thể duyệt # đề xuất.}}"
       },
       "deleteFailed": "Không thể xóa email",
       "ignoreFailed": "Không thể phớt lờ email",
-      "noneLeft": "Không còn email nào khớp. Chưa có gì bị thay đổi."
+      "noneLeft": "Không còn email nào khớp. Chưa có gì bị thay đổi.",
+      "reprocessFailed": "Không thể xử lý lại các email",
+      "approveFailed": "Không thể duyệt các đề xuất",
+      "noApprovable": "Không có đề xuất nào trong lựa chọn này có thể duyệt.",
+      "narrowFailed": "Không thể đếm các email. Thay đổi chưa được áp dụng."
     }
   },
   "detail": {

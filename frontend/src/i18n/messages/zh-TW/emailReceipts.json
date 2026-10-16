@@ -758,6 +758,34 @@
       "pageSelected": "此頁面上的 {count} 封郵件已全部選取。",
       "selectAllMatching": "選取符合此篩選條件的全部 {total} 封郵件。",
       "allMatchingSelected": "符合此篩選條件的全部 {total} 封郵件已選取。",
+      "reprocessButton": "重新處理({count})",
+      "restoreButton": "還原已忽略({count})",
+      "restoreButtonAll": "還原已忽略",
+      "approveButton": "核准提案({count})",
+      "approveButtonAll": "核准提案",
+      "progress": "已處理:{processed},剩餘:{remaining}",
+      "progressStarting": "正在開始",
+      "stop": "停止",
+      "narrowedSelected": "已選取 {total} 封郵件:所有符合此篩選條件的郵件,不包括下方排除的郵件。",
+      "deselect": {
+        "label": "依下列條件取消選取",
+        "state": "狀態:{state}",
+        "sender": "寄件者:{domain}",
+        "before": "在某天之前收到",
+        "after": "在某天之後收到",
+        "beforeLabel": "取消選取在此日期之前收到的郵件",
+        "afterLabel": "取消選取在此日期之後收到的郵件",
+        "apply": "取消選取",
+        "cancel": "取消"
+      },
+      "exclusion": {
+        "label": "已從選取中排除",
+        "state": "狀態不是{state}",
+        "sender": "不是來自 {domain}",
+        "from": "收到時間在 {date} 或之後",
+        "to": "收到時間在 {date} 或之前",
+        "remove": "還原:{label}"
+      },
       "draftBlocked": {
         "tooMany": "最多可用 {max} 封郵件準備解析器。請選取不超過 {max} 封郵件。",
         "differentSenders": "所選郵件來自不同的寄件者（{domains}）。解析器只讀取一個寄件者的郵件，請選取同一寄件者的郵件。",
@@ -792,7 +820,14 @@
         "message": "要忽略{scope, select, both {來自 {domain}、狀態為「{status}」的} domain {來自 {domain} 的} status {狀態為「{status}」的} other {}}{count, plural, one {# 封郵件} other {# 封郵件}}嗎？它們將不再提出任何建議，其未處理的審查請求將被關閉。與交易關聯的郵件維持不變。",
         "confirm": "忽略"
       },
-      "countChanged": "符合條件的郵件現在有 {count} 封。未做任何變更。請核對數量後再次確認。"
+      "countChanged": "符合條件的郵件現在有 {count} 封。未做任何變更。請核對數量後再次確認。",
+      "approve": {
+        "title": "核准提案?",
+        "message": "{count, plural, one {核准 # 項提案} other {核准 # 項提案}}?每項提案的套用方式與 AI 審核收件匣中的「確認」按鈕相同。",
+        "trades": "{count, plural, one {已略過 # 封交易郵件。請在 AI 審核收件匣中對應的卡片上核准。} other {已略過 # 封交易郵件。請在 AI 審核收件匣中對應的卡片上核准。}}",
+        "confirm": "核准"
+      },
+      "narrowedNote": "從選取中排除的郵件不會被變更。"
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {已忽略 # 封郵件。} other {已忽略 # 封郵件。}}",
         "unchanged": "{count, plural, one {# 封郵件先前已被忽略。} other {# 封郵件先前已被忽略。}}",
         "notIgnorable": "{count, plural, one {# 封郵件無法忽略：無法讀取，或其建議已被套用。} other {# 封郵件無法忽略：無法讀取，或其建議已被套用。}}",
-        "skippedLinked": "{count, plural, one {已保留 # 封與交易關聯的郵件。} other {已保留 # 封與交易關聯的郵件。}}"
+        "skippedLinked": "{count, plural, one {已保留 # 封與交易關聯的郵件。} other {已保留 # 封與交易關聯的郵件。}}",
+        "reprocessed": "{count, plural, one {已重新處理 # 封郵件。} other {已重新處理 # 封郵件。}}",
+        "restored": "{count, plural, one {已重新讀取 # 封已忽略的郵件。} other {已重新讀取 # 封已忽略的郵件。}}",
+        "reprocessFailed": "{count, plural, one {# 封郵件失敗。} other {# 封郵件失敗。}}",
+        "stopped": "{count, plural, one {已停止。有 # 封郵件未處理。} other {已停止。有 # 封郵件未處理。}}",
+        "approved": "{count, plural, one {已核准 # 項提案。} other {已核准 # 項提案。}}",
+        "approveFailed": "{count, plural, one {# 項提案無法核准。} other {# 項提案無法核准。}}"
       },
       "deleteFailed": "無法刪除郵件",
       "ignoreFailed": "無法忽略郵件",
-      "noneLeft": "已沒有符合條件的郵件。未做任何變更。"
+      "noneLeft": "已沒有符合條件的郵件。未做任何變更。",
+      "reprocessFailed": "無法重新處理這些郵件",
+      "approveFailed": "無法核准這些提案",
+      "noApprovable": "此選取中沒有可核准的提案。",
+      "narrowFailed": "無法計算郵件數量。變更未套用。"
     }
   },
   "detail": {
