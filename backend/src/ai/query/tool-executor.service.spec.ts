@@ -3007,6 +3007,60 @@ describe("ToolExecutorService", () => {
     });
   });
 
+  describe("manage_securities list", () => {
+    it("lists the securities held in the resolved account", async () => {
+      accounts.resolveBrokerageByNameOrId = jest.fn().mockResolvedValue({
+        match: { id: "acc-3", name: "Brokerage", currencyCode: "USD" },
+        candidates: [],
+      });
+      const held = { symbol: "AAPL", quantity: 5 };
+      securities.listSecuritiesInAccount = jest.fn().mockResolvedValue([held]);
+
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "list",
+        accountName: "Brokerage",
+      });
+
+      expect(securities.listSecuritiesInAccount).toHaveBeenCalledWith(
+        userId,
+        "acc-3",
+      );
+      expect(result.isError).toBeUndefined();
+      expect(result.pendingAction).toBeUndefined();
+      expect(result.data).toMatchObject({
+        operation: "list",
+        account: "Brokerage",
+        count: 1,
+        securities: [held],
+      });
+    });
+
+    it("errors without an accountName", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "list",
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it("errors on an unknown account", async () => {
+      accounts.resolveBrokerageByNameOrId = jest
+        .fn()
+        .mockResolvedValue({ match: undefined, candidates: [] });
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "list",
+        accountName: "Nope",
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it("rejects a write operation with no items", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "create",
+      });
+      expect(result.isError).toBe(true);
+    });
+  });
+
   describe("manage_securities (human-in-the-loop)", () => {
     it("create looks the security up and returns a signed pending action", async () => {
       const result = await service.execute(userId, "manage_securities", {

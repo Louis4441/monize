@@ -12,6 +12,8 @@ import { tr } from "../i18n/translate";
 import { DataSource, EntityManager, In } from "typeorm";
 import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
+import { returnedRows } from "../common/db/query-result";
+import { findTradeListings } from "./trade-listings";
 import { Security } from "./entities/security.entity";
 import { SecurityTag } from "./entities/security-tag.entity";
 import { Holding } from "./entities/holding.entity";
@@ -161,6 +163,18 @@ export interface LlmSecurityLookup {
   query: string;
   count: number;
   candidates: LlmSecurityLookupCandidate[];
+}
+
+/** One security held in an account, as listed by `manage_securities`. */
+export interface LlmAccountSecurity {
+  symbol: string;
+  name: string;
+  securityType: string | null;
+  exchange: string | null;
+  currencyCode: string;
+  isFavourite: boolean;
+  quantity: number;
+  averageCost: number | null;
 }
 
 @Injectable()
@@ -1355,6 +1369,40 @@ export class SecuritiesService {
     return results.map((r) => r.securityId);
   }
 
+  /**
+   * The securities with a non-zero holding in one account, ordered by symbol.
+   * Backs the `list` operation of `manage_securities` on both tool surfaces.
+   * The caller resolves the account (and so its ownership); the user filter on
+   * the security keeps the query tenant-safe regardless.
+   */
+  async listSecuritiesInAccount(
+    userId: string,
+    accountId: string,
+  ): Promise<LlmAccountSecurity[]> {
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Holding)
+        .createQueryBuilder("h")
+        .innerJoinAndSelect("h.security", "s")
+        .where("h.accountId = :accountId", { accountId })
+        .andWhere("s.userId = :userId", { userId })
+        .andWhere("h.quantity <> 0")
+        .orderBy("s.symbol", "ASC")
+        .getMany(),
+    );
+
+    return holdings.map((h) => ({
+      symbol: h.security.symbol,
+      name: h.security.name,
+      securityType: h.security.securityType ?? null,
+      exchange: h.security.exchange ?? null,
+      currencyCode: h.security.currencyCode,
+      isFavourite: h.security.isFavourite,
+      quantity: Number(h.quantity),
+      averageCost: h.averageCost == null ? null : Number(h.averageCost),
+    }));
+  }
+
   async search(userId: string, query: string): Promise<Security[]> {
     return withScopedDb(this.dataSource, (m) =>
       m
@@ -1445,6 +1493,70 @@ export class SecuritiesService {
       return { match: partial[0], candidates: [] };
     }
     return { match: null, candidates: partial };
+  }
+
+  /**
+   * Resolve the ticker a broker's trade confirmation prints to the user's
+   * active security, strictly: the symbol itself (any case) or the symbol with
+   * an exchange suffix (`XCNS` finds `XCNS.TO`), never a name or a fragment.
+   *
+   * One candidate is the match. An exact symbol wins over suffixed ones only
+   * while they all trade in its currency (the same instrument on several
+   * venues); `AAPL` in USD beside `AAPL.TO` in CAD is two instruments the email
+   * cannot tell apart, so the one this account already trades decides, and
+   * otherwise they are `candidates`, never a guess. A `currency` the email
+   * names narrows the listings first (`SHOP` in USD beside `SHOP.TO` in CAD
+   * is the USD one for an email in US$). A trade written to the
+   * wrong security is a wrong ledger, so the loose matching
+   * `resolveBySymbolOrName` does for a person typing in chat is not used here.
+   */
+  async resolveByTradeSymbol(
+    userId: string,
+    ticker: string,
+    accountId?: string,
+    currency?: string | null,
+  ): Promise<SecurityMatchResult> {
+    const symbol = (ticker ?? "").trim();
+    if (!symbol) return { match: null, candidates: [] };
+    return withScopedDb(this.dataSource, async (m) => {
+      const listed = await findTradeListings(m, userId, symbol);
+      const inCurrency = currency
+        ? listed.filter(
+            (row) => row.currencyCode.toUpperCase() === currency.toUpperCase(),
+          )
+        : [];
+      // A currency no listing trades in narrows nothing: the card then
+      // refuses the mismatch by name rather than reporting no security.
+      const rows = inCurrency.length > 0 ? inCurrency : listed;
+      if (rows.length === 1) return { match: rows[0], candidates: [] };
+      const exact = rows.filter(
+        (row) => row.symbol.toLowerCase() === symbol.toLowerCase(),
+      );
+      if (
+        exact.length === 1 &&
+        rows.every((row) => row.currencyCode === exact[0].currencyCode)
+      ) {
+        return { match: exact[0], candidates: [] };
+      }
+      if (accountId && rows.length > 1) {
+        const traded = returnedRows<{ security_id: string }>(
+          await m.query(
+            `SELECT DISTINCT it.security_id
+               FROM investment_transactions it
+              WHERE it.user_id = $1
+                AND it.account_id = $2
+                AND it.status != 'VOID'
+                AND it.security_id = ANY($3::uuid[])`,
+            [userId, accountId, rows.map((row) => row.id)],
+          ),
+        );
+        if (traded.length === 1) {
+          const held = rows.find((row) => row.id === traded[0].security_id);
+          if (held) return { match: held, candidates: [] };
+        }
+      }
+      return { match: null, candidates: rows };
+    });
   }
 
   /**

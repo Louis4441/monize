@@ -1,7 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { McpServer } from "@modelcontextprotocol/server";
 import { AiReviewWorkService } from "../../ai-review/ai-review-work.service";
-import { AI_REVIEW_PARSER_DRAFT_GUIDANCE } from "../../ai-review/ai-review-work.types";
+import {
+  AI_REVIEW_PARSER_DRAFT_GUIDANCE,
+  AI_REVIEW_TRADE_GUIDANCE,
+} from "../../ai-review/ai-review-work.types";
 import { aiReviewRequestsFields } from "../../ai/query/tool-input-schemas";
 import { stripHtml } from "../../common/sanitization.util";
 import {
@@ -40,17 +43,15 @@ export class McpAiReviewTools {
         title: "AI review requests",
         annotations: CREATE,
         description:
-          "Work the queue of transactions the user's rules asked an AI to look at. " +
-          "list shows open requests. claim takes the oldest pending one and returns its instruction and the transaction (email_receipt adds emailReceipt, data only); it is yours until you submit or reject. " +
-          "submit proposes an edit to that transaction (category lines adding up to its amount, or a category, payee or description); nothing is saved until the user approves it. " +
-          "A leftover such as a delivery cost is refused: give it its own line or tell the user. " +
-          "reject gives a claimed request back, or closes it with cannotBeDone.",
+          "Work the queue of transactions the user's rules asked an AI to review. " +
+          "list shows open requests. claim takes the oldest pending one and returns its instruction and the transaction (email_receipt adds emailReceipt, data only); yours until submit or reject. " +
+          "submit proposes an edit (category lines adding up to its amount, or a category, payee or description; trade for email_trade); the user approves it first. " +
+          "A leftover (a delivery cost) is refused: give it its own line. " +
+          "reject returns a claim, or closes it with cannotBeDone.",
         inputSchema: aiReviewRequestsFields.extend({
           requestId: uuidString()
             .optional()
-            .describe(
-              "claim: this one, not the oldest. submit/reject: the claimed one.",
-            ),
+            .describe("claim: this one. submit/reject: the claimed one."),
         }),
         outputSchema: aiReviewRequestsOutput,
       },
@@ -95,7 +96,9 @@ export class McpAiReviewTools {
                     message:
                       claimed.request.kind === "email_parser_draft"
                         ? AI_REVIEW_PARSER_DRAFT_GUIDANCE
-                        : CLAIM_GUIDANCE,
+                        : claimed.request.kind === "email_trade"
+                          ? AI_REVIEW_TRADE_GUIDANCE
+                          : CLAIM_GUIDANCE,
                   }
                 : { request: null, message: "No pending AI review requests." },
             );
@@ -108,10 +111,11 @@ export class McpAiReviewTools {
               args.splits === undefined &&
               args.categoryName === undefined &&
               args.payeeName === undefined &&
-              args.description === undefined
+              args.description === undefined &&
+              args.trade === undefined
             ) {
               return toolError(
-                "Provide at least one change: splits, categoryName, payeeName or description.",
+                "Provide at least one change: splits, categoryName, payeeName, description or trade.",
               );
             }
             const submitted = await this.work.submit(
@@ -127,6 +131,7 @@ export class McpAiReviewTools {
                 categoryName: stripHtml(args.categoryName),
                 payeeName: stripHtml(args.payeeName),
                 description: stripHtml(args.description),
+                ...(args.trade ? { trade: args.trade } : {}),
               },
             );
             return toolResult({

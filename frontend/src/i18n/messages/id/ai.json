@@ -112,6 +112,7 @@
     "total": "Total",
     "cashImpact": "Dampak kas",
     "bondSeries": "Seri",
+    "marksPaid": "Menandai sebagai lunas",
     "accruedInterest": "Bunga berjalan",
     "redemptionSplit": "Pemecahan penebusan",
     "redemptionSplitValue": "Pokok {principal} + bunga {interest} = pembayaran {payout}",
@@ -230,7 +231,11 @@
       "category": "Atur kategori ke {name}",
       "payee": "Atur penerima ke {name}",
       "aiReview": "{count, plural, other {Antrekan # permintaan peninjauan AI}}"
-    }
+    },
+    "aiCategory": "disarankan AI",
+    "tags": "Tag",
+    "newTag": "(tag baru)",
+    "marksPaidDue": "{name} (jatuh tempo {date})"
   },
   "table": {
     "downloadTitle": "Unduh tabel sebagai CSV",

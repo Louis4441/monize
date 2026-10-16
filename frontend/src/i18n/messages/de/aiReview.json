@@ -38,11 +38,14 @@
     "transactionMissing": "Diese Buchung existiert nicht mehr",
     "rule": "Regel: {name}",
     "manualRequest": "Manuell angefordert",
+    "trade": "{action, select, BUY {Kauf von {quantity} Anteilen {symbol}} other {Verkauf von {quantity} Anteilen {symbol}}}",
     "receiptInstruction": {
       "automatic": "Diese Buchung anhand der angehängten Bestell-E-Mail ergänzen: nach Positionen mit je einer Kategorie aufteilen oder die Beschreibung setzen.",
       "chat": "Sie haben die Erkennung der angehängten Bestell-E-Mail angefordert: diese Buchung nach Produkten mit je einer Kategorie aufteilen oder die Beschreibung setzen.",
       "categorize": "Jeder Position der angehängten Bestell-E-Mail, die keine Regel kategorisiert hat, eine Kategorie zuweisen und dann die Aufteilung dieser Buchung vorschlagen oder die Beschreibung setzen.",
-      "parsed": "Ein gespeicherter Parser hat die Bestell-E-Mail gelesen und schlägt diese Kategoriezeilen und diese Beschreibung für die Buchung vor."
+      "parsed": "Ein gespeicherter Parser hat die Bestell-E-Mail gelesen und schlägt diese Kategoriezeilen und diese Beschreibung für die Buchung vor.",
+      "trade": "Eine von einem gespeicherten Profil gelesene Handelsbestätigung schlägt diese Wertpapiertransaktion vor. Prüfe vor der Freigabe Konto, Wertpapier, Anteile und Summe bei deinem Broker.",
+      "tradeChat": "Du hast darum gebeten, die angehängte Handelsbestätigung zu erkennen: schlage die Wertpapiertransaktion vor, die sie meldet."
     },
     "emailReceipt": "E-Mail-Beleg: {subject} von {sender}",
     "emailReceiptMissing": "E-Mail-Beleg (die E-Mail wurde gelöscht)",
@@ -52,7 +55,9 @@
     "dates": "Erstellt {created}, läuft ab {expires}",
     "viewTransaction": "Buchung anzeigen",
     "waitingForAgent": "Wartet auf einen KI-Agenten. <link>Verbinde in den Einstellungen einen KI-Anbieter</link> oder lass einen MCP-Client die Anfrage übernehmen.",
-    "parserDraftReady": "Profil-Entwurf bereit. <link>Teste und gib ihn in den Profil-Einstellungen frei</link>."
+    "parserDraftReady": "Profil-Entwurf bereit. <link>Teste und gib ihn in den Profil-Einstellungen frei</link>.",
+    "tradePending": "Ein Trade aus einer E-Mail, noch nicht gelesen",
+    "tradeEmail": "E-Mail mit Handelsbestätigung"
   },
   "actions": {
     "dismiss": "Verwerfen"

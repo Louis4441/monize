@@ -42,14 +42,17 @@ export interface EmailReceiptParserView {
 /**
  * The definition a client sees: the matching the profile EFFECTIVELY has (every
  * default filled in, so the form and the AI show what the matcher will do) and
- * the categories by name. An invalid definition is shown as stored.
+ * the categories by name. An invalid definition is shown as stored. A trade
+ * profile is shown as stored too: it matches no bank transaction, and a `match`
+ * beside its `trade` section is a key the validator refuses (`trade_conflict`),
+ * so the editor would open it as JSON and saving it back would fail.
  */
 function viewDefinition(
   stored: Record<string, unknown>,
   valid: boolean,
   categoryNames: ReadonlyMap<string, string>,
 ): Record<string, unknown> {
-  if (!valid) return stored;
+  if (!valid || stored.trade !== undefined) return stored;
   return nameParserCategories(
     {
       ...stored,

@@ -454,7 +454,9 @@ export const lookupSecuritiesSchema = z.object({
 });
 
 export const manageSecuritiesSchema = z.object({
-  operation: z.enum(["create", "update", "delete"]),
+  operation: z.enum(["list", "create", "update", "delete"]),
+  // list only: the account whose held securities to list.
+  accountName: z.string().max(100).optional(),
   items: z
     .array(
       z.object({
@@ -494,8 +496,8 @@ export const manageSecuritiesSchema = z.object({
           .optional(),
       }),
     )
-    .min(1)
-    .max(MAX_BULK_ACTION_ROWS),
+    .max(MAX_BULK_ACTION_ROWS)
+    .optional(),
   approvalMode: z.enum(["bulk", "individual"]).optional(),
 });
 
@@ -882,16 +884,14 @@ export const aiReviewRequestsFields = z.object({
     .uuid()
     .optional()
     .describe(
-      "claim: this pending request, not the oldest. submit/reject: the claimed one.",
+      "claim: this one, not the oldest. submit/reject: the claimed one.",
     ),
   splits: z
     .array(reviewSplitLineSchema)
     .min(2)
     .max(MAX_SPLIT_LINES)
     .optional()
-    .describe(
-      "submit: two or more category lines with signed amounts that add up to the transaction amount, replacing its category.",
-    ),
+    .describe("submit: 2+ signed category lines adding up to the amount."),
   categoryName: z
     .string()
     .max(100)
@@ -903,6 +903,10 @@ export const aiReviewRequestsFields = z.object({
     .max(TRANSACTION_NOTE_MAX_LENGTH)
     .optional()
     .describe("submit: the description or memo."),
+  trade: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("submit: the answer to an email_trade request."),
   reason: z
     .string()
     .max(500)
@@ -910,9 +914,7 @@ export const aiReviewRequestsFields = z.object({
     .describe("reject: why, for the next reader."),
   cannotBeDone: booleanArg()
     .optional()
-    .describe(
-      "reject: true closes the request; default false returns it to the queue.",
-    ),
+    .describe("reject: true closes it; default returns it to the queue."),
   limit: numberArg(z.number().int().min(1).max(MAX_AI_REVIEW_TOOL_LIST_LIMIT))
     .optional()
     .describe("list: default 20."),
@@ -931,11 +933,12 @@ export const aiReviewRequestsSchema = aiReviewRequestsFields.superRefine(
         value.splits === undefined &&
         value.categoryName === undefined &&
         value.payeeName === undefined &&
-        value.description === undefined
+        value.description === undefined &&
+        value.trade === undefined
       ) {
         need(
           "splits",
-          "Provide at least one change: splits, categoryName, payeeName or description.",
+          "Provide at least one change: splits, categoryName, payeeName, description or trade.",
         );
       }
       if (value.splits !== undefined && value.categoryName !== undefined) {

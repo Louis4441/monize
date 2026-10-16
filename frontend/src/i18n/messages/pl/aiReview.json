@@ -38,11 +38,14 @@
     "transactionMissing": "Ta transakcja już nie istnieje",
     "rule": "Reguła: {name}",
     "manualRequest": "Zgłoszono ręcznie",
+    "trade": "{action, select, BUY {Zakup {quantity} jedn. {symbol}} other {Sprzedaż {quantity} jedn. {symbol}}}",
     "receiptInstruction": {
       "automatic": "Uzupełnij tę transakcję na podstawie załączonego e-maila z zamówieniem: podziel ją na pozycje, każdą z kategorią, albo ustaw opis.",
       "chat": "Poproszono o rozpoznanie załączonego e-maila z zamówieniem: podziel tę transakcję na produkty, każdy z kategorią, albo ustaw opis.",
       "categorize": "Przypisz kategorię każdej pozycji załączonego e-maila z zamówieniem, której nie skategoryzowała żadna reguła. Następnie zaproponuj podział tej transakcji albo ustaw opis.",
-      "parsed": "Zapisany parser odczytał e-mail z zamówieniem i proponuje dla transakcji te pozycje kategorii oraz ten opis."
+      "parsed": "Zapisany parser odczytał e-mail z zamówieniem i proponuje dla transakcji te pozycje kategorii oraz ten opis.",
+      "trade": "Wiadomość z potwierdzeniem transakcji odczytana przez zapisany parser proponuje tę transakcję inwestycyjną. Przed zatwierdzeniem sprawdź konto, papier wartościowy, liczbę jednostek i sumę u swojego brokera.",
+      "tradeChat": "Poprosiłeś o rozpoznanie załączonego potwierdzenia transakcji: zaproponuj zgłaszaną w nim transakcję inwestycyjną."
     },
     "emailReceipt": "Paragon z e-maila: {subject}, nadawca: {sender}",
     "emailReceiptMissing": "Paragon z e-maila (wiadomość została usunięta)",
@@ -52,7 +55,9 @@
     "dates": "Utworzono {created}, wygasa {expires}",
     "viewTransaction": "Zobacz transakcję",
     "waitingForAgent": "Oczekiwanie na agenta AI. <link>Połącz dostawcę AI w Ustawieniach</link> lub pozwól klientowi MCP ją przejąć.",
-    "parserDraftReady": "Szkic profilu gotowy. <link>Przetestuj i zatwierdź go w ustawieniach profili</link>."
+    "parserDraftReady": "Szkic profilu gotowy. <link>Przetestuj i zatwierdź go w ustawieniach profili</link>.",
+    "tradePending": "Transakcja z e-maila, jeszcze nieodczytana",
+    "tradeEmail": "Wiadomość z potwierdzeniem transakcji"
   },
   "actions": {
     "dismiss": "Odrzuć"

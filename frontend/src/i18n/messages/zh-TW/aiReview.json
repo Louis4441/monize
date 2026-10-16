@@ -38,11 +38,14 @@
     "transactionMissing": "此交易已不存在",
     "rule": "規則：{name}",
     "manualRequest": "手動請求",
+    "trade": "{action, select, BUY {買入 {quantity} 份 {symbol}} other {賣出 {quantity} 份 {symbol}}}",
     "receiptInstruction": {
       "automatic": "根據附加的訂單郵件完善此交易：依商品行拆分並為每行指定類別，或設定描述。",
       "chat": "你要求辨識附加的訂單郵件：依產品拆分此交易並為每項指定類別，或設定描述。",
       "categorize": "為附加訂單郵件中沒有被任何規則分類的每個商品指定類別，然後提議此交易的拆分或設定描述。",
-      "parsed": "已儲存的解析器讀取了訂單郵件，並為此交易提議這些類別行和此描述。"
+      "parsed": "已儲存的解析器讀取了訂單郵件，並為此交易提議這些類別行和此描述。",
+      "trade": "已儲存的解析器讀取的交易確認郵件提出了這筆投資交易。核准前，請與你的券商核對帳戶、證券、數量和合計。",
+      "tradeChat": "你要求辨識所附的交易確認：請提出它所回報的投資交易。"
     },
     "emailReceipt": "郵件收據：來自 {sender} 的 {subject}",
     "emailReceiptMissing": "郵件收據（該郵件已被刪除）",
@@ -52,7 +55,9 @@
     "dates": "建立於 {created}，到期於 {expires}",
     "viewTransaction": "檢視交易",
     "waitingForAgent": "正在等待 AI 代理。請<link>在設定中連接 AI 提供者</link>，或讓 MCP 用戶端來認領。",
-    "parserDraftReady": "設定檔草稿已準備好。<link>在設定檔設定中測試並核准它</link>。"
+    "parserDraftReady": "設定檔草稿已準備好。<link>在設定檔設定中測試並核准它</link>。",
+    "tradePending": "來自郵件的交易，尚未讀取",
+    "tradeEmail": "交易確認郵件"
   },
   "actions": {
     "dismiss": "忽略"

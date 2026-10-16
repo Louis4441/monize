@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeReviewItem, PROPOSED_ACTION } from '@/components/ai-review/ai-review-fixtures';
+import { makeReviewItem, makeTradeItem, PROPOSED_ACTION, TRADE_ACTION } from '@/components/ai-review/ai-review-fixtures';
 import { isApprovable, parseKindFilter, reviewItemLabel } from './ai-review';
 
 describe('parseKindFilter', () => {
@@ -53,5 +53,16 @@ describe('reviewItemLabel', () => {
 
   it('is null when nothing names it', () => {
     expect(reviewItemLabel(makeReviewItem({ ...none }))).toBeNull();
+  });
+});
+
+describe('a trade confirmation', () => {
+  it('is named by its ticker', () => {
+    expect(reviewItemLabel(makeTradeItem())).toBe('XCNS');
+  });
+
+  it('is approvable once proposed with a card, though it has no transaction', () => {
+    expect(isApprovable(makeTradeItem({ proposal: { action: TRADE_ACTION } }))).toBe(true);
+    expect(isApprovable(makeTradeItem())).toBe(false);
   });
 });

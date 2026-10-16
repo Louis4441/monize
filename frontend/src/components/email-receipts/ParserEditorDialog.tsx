@@ -11,6 +11,7 @@ import { ParserPatternFields, PatternArea } from '@/components/email-receipts/Pa
 import { ParserProposalFields } from '@/components/email-receipts/ParserProposalFields';
 import { ParserProblems } from '@/components/email-receipts/ParserProblems';
 import { ParserTestPanel } from '@/components/email-receipts/ParserTestPanel';
+import { ParserTradeFields } from '@/components/email-receipts/ParserTradeFields';
 import { Button } from '@/components/ui/Button';
 import { Combobox } from '@/components/ui/Combobox';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -28,15 +29,19 @@ import {
   emptyParserForm,
   formatDefinitionJson,
   formCanRepresent,
+  isTradeDefinition,
   parseDefinitionJson,
   parseValidationProblems,
   parserToForm,
   type ParserFormChange,
   type ParserFormState,
+  type ParserKind,
 } from '@/lib/receipt-parser-form';
 import { RECEIPT_PARSER_LIMITS, type EmailReceiptParser, type ReceiptParserDefinition } from '@/types/email-receipts';
 
 type EditorMode = 'form' | 'json';
+
+const PARSER_KINDS: readonly ParserKind[] = ['receipt', 'trade'];
 
 interface ParserEditorDialogProps {
   /** The parser being edited; null writes a new one. */
@@ -160,6 +165,8 @@ function ParserEditorForm({
     if (mode === 'form') return buildParserDefinition(form);
     return json.ok ? (json.definition as unknown as ReceiptParserDefinition) : null;
   }, [mode, form, json]);
+  // A trade profile in either mode: the JSON says so by its `trade` section.
+  const isTrade = definition !== null ? isTradeDefinition(definition) : form.kind === 'trade';
   // The form can be shown only for JSON that parses into something it can hold.
   const formAvailable = mode === 'form' || (json.ok && formCanRepresent(json.definition));
   const modeNote = formAvailable ? null : json.ok ? t('mode.formUnavailable') : t('mode.jsonInvalid');
@@ -238,6 +245,26 @@ function ParserEditorForm({
         )}
       </div>
 
+      {/* What a new profile reads; a stored one keeps the kind its definition has. */}
+      {parser === null && mode === 'form' && (
+        <div className="space-y-1">
+          <div role="group" aria-label={t('kind.label')} className={SEGMENTED_GROUP_CLASS}>
+            {PARSER_KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                aria-pressed={form.kind === kind}
+                onClick={() => change({ kind })}
+                className={segmentClass(form.kind === kind)}
+              >
+                {t(`kind.${kind}`)}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{t(`kind.${form.kind}Help`)}</p>
+        </div>
+      )}
+
       {parser?.status === 'draft' && (
         <p
           role="note"
@@ -256,17 +283,20 @@ function ParserEditorForm({
             maxLength={RECEIPT_PARSER_LIMITS.maxNameLength}
             onChange={(e) => change({ name: e.target.value })}
           />
-          <Combobox
-            label={t('payeeLabel')}
-            aria-label={t('payeeLabel')}
-            placeholder={t('payeePlaceholder')}
-            options={payees}
-            value={form.payeeId}
-            onChange={(value) => change({ payeeId: value })}
-            valueIsId
-            usePortal
-            openOnFocus={false}
-          />
+          {/* A trade books an investment transaction, which has no payee. */}
+          {!isTrade && (
+            <Combobox
+              label={t('payeeLabel')}
+              aria-label={t('payeeLabel')}
+              placeholder={t('payeePlaceholder')}
+              options={payees}
+              value={form.payeeId}
+              onChange={(value) => change({ payeeId: value })}
+              valueIsId
+              usePortal
+              openOnFocus={false}
+            />
+          )}
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <PatternArea
@@ -289,7 +319,14 @@ function ParserEditorForm({
         </div>
       </section>
 
-      {mode === 'form' ? (
+      {mode === 'form' && form.kind === 'trade' ? (
+        <ParserTradeFields
+          form={form}
+          accounts={lookups.accounts}
+          currencyCodes={lookups.currencyCodes}
+          onChange={change}
+        />
+      ) : mode === 'form' ? (
         <>
           <ParserPatternFields form={form} onChange={change} />
           <ParserCategoryFields form={form} categories={lookups.categories} onChange={change} />
@@ -316,9 +353,10 @@ function ParserEditorForm({
 
       <ParserTestPanel
         definition={definition}
-        payeeId={form.payeeId}
+        payeeId={isTrade ? '' : form.payeeId}
         initialReceiptId={initialReceiptId}
         categoryLabels={categoryLabels}
+        accounts={lookups.accounts}
       />
 
       {saveError &&

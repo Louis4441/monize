@@ -2076,6 +2076,93 @@ describe("SecuritiesService", () => {
     });
   });
 
+  describe("listSecuritiesInAccount", () => {
+    it("returns the non-zero holdings of the account as numbers, filtered by account and user", async () => {
+      const where = jest.fn().mockReturnThis();
+      const andWhere = jest.fn().mockReturnThis();
+      const orderBy = jest.fn().mockReturnThis();
+      holdingsRepository.createQueryBuilder.mockReturnValue({
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where,
+        andWhere,
+        orderBy,
+        getMany: jest.fn().mockResolvedValue([
+          {
+            quantity: "12.5",
+            averageCost: "10.25",
+            security: {
+              symbol: "AAPL",
+              name: "Apple Inc.",
+              securityType: "STOCK",
+              exchange: "NASDAQ",
+              currencyCode: "USD",
+              isFavourite: true,
+            },
+          },
+          {
+            quantity: "3",
+            averageCost: null,
+            security: {
+              symbol: "XYZ",
+              name: "Xyz",
+              securityType: undefined,
+              exchange: undefined,
+              currencyCode: "CAD",
+              isFavourite: false,
+            },
+          },
+        ]),
+      });
+
+      const result = await service.listSecuritiesInAccount("user-1", "acc-1");
+
+      expect(where).toHaveBeenCalledWith("h.accountId = :accountId", {
+        accountId: "acc-1",
+      });
+      expect(andWhere).toHaveBeenCalledWith("s.userId = :userId", {
+        userId: "user-1",
+      });
+      expect(andWhere).toHaveBeenCalledWith("h.quantity <> 0");
+      expect(orderBy).toHaveBeenCalledWith("s.symbol", "ASC");
+      expect(result).toEqual([
+        {
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          securityType: "STOCK",
+          exchange: "NASDAQ",
+          currencyCode: "USD",
+          isFavourite: true,
+          quantity: 12.5,
+          averageCost: 10.25,
+        },
+        {
+          symbol: "XYZ",
+          name: "Xyz",
+          securityType: null,
+          exchange: null,
+          currencyCode: "CAD",
+          isFavourite: false,
+          quantity: 3,
+          averageCost: null,
+        },
+      ]);
+    });
+
+    it("returns an empty list when the account holds nothing", async () => {
+      holdingsRepository.createQueryBuilder.mockReturnValue({
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+
+      expect(await service.listSecuritiesInAccount("user-1", "acc-1")).toEqual(
+        [],
+      );
+    });
+  });
+
   describe("search", () => {
     it("searches by symbol and name using query builder", async () => {
       const getMany = jest.fn().mockResolvedValue([mockSecurity]);
@@ -2317,6 +2404,143 @@ describe("SecuritiesService", () => {
     it("rejects a blank name without touching the database", async () => {
       await expect(runDelete("   ")).rejects.toThrow(BadRequestException);
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("resolveByTradeSymbol", () => {
+    const exact = { ...mockSecurity, id: "sec-a", symbol: "XCNS" };
+    const suffixed = { ...mockSecurity, id: "sec-b", symbol: "XCNS.TO" };
+    const other = { ...mockSecurity, id: "sec-c", symbol: "XCNS.V" };
+
+    function qb(rows: unknown[]) {
+      const builder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      securitiesRepository.createQueryBuilder.mockReturnValueOnce(builder);
+      return builder;
+    }
+
+    it("returns no match for a blank ticker without hitting the database", async () => {
+      expect(await service.resolveByTradeSymbol("user-1", " ")).toEqual({
+        match: null,
+        candidates: [],
+      });
+      expect(securitiesRepository.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it("looks only at symbols (the ticker or the ticker with an exchange suffix), never names, and escapes LIKE metacharacters", async () => {
+      const builder = qb([suffixed]);
+      await service.resolveByTradeSymbol("user-1", "X_NS");
+      const [clause, params] = builder.andWhere.mock.calls.find(([text]) =>
+        String(text).includes(":symbol"),
+      ) as [string, unknown];
+      expect(clause).toMatch(/symbol\) = LOWER\(:symbol\)/);
+      expect(clause).not.toMatch(/name/);
+      expect(params).toEqual({ symbol: "X_NS", suffixed: "X\\_NS.%" });
+      // An inactive security is never the one a new trade is for.
+      expect(builder.andWhere).toHaveBeenCalledWith("security.isActive = true");
+    });
+
+    it("matches the ticker the broker prints to the user's exchange-suffixed symbol", async () => {
+      qb([suffixed]);
+      const result = await service.resolveByTradeSymbol("user-1", "xcns");
+      expect(result).toEqual({ match: suffixed, candidates: [] });
+    });
+
+    it("prefers the exact symbol over suffixed ones", async () => {
+      qb([exact, suffixed]);
+      const result = await service.resolveByTradeSymbol("user-1", "XCNS");
+      expect(result.match).toBe(exact);
+    });
+
+    it("does not let an exact symbol win over a listing in another currency: the account's own trades decide", async () => {
+      const usd = {
+        ...mockSecurity,
+        id: "sec-us",
+        symbol: "AAPL",
+        currencyCode: "USD",
+      };
+      const cad = {
+        ...mockSecurity,
+        id: "sec-to",
+        symbol: "AAPL.TO",
+        currencyCode: "CAD",
+      };
+      qb([usd, cad]);
+      expect(await service.resolveByTradeSymbol("user-1", "AAPL")).toEqual({
+        match: null,
+        candidates: [usd, cad],
+      });
+
+      qb([usd, cad]);
+      scopedManager.query.mockImplementationOnce(
+        async (sql: string, params: unknown[]) => {
+          expect(String(sql)).toContain("it.status != 'VOID'");
+          expect(params.slice(0, 2)).toEqual(["user-1", "acc-1"]);
+          return [{ security_id: "sec-to" }];
+        },
+      );
+      expect(
+        await service.resolveByTradeSymbol("user-1", "AAPL", "acc-1"),
+      ).toEqual({ match: cad, candidates: [] });
+    });
+
+    it("narrows the listings to the currency the email names, and ignores a currency none trades in", async () => {
+      const usd = {
+        ...mockSecurity,
+        id: "sec-us",
+        symbol: "SHOP",
+        currencyCode: "USD",
+      };
+      const cad = {
+        ...mockSecurity,
+        id: "sec-to",
+        symbol: "SHOP.TO",
+        currencyCode: "CAD",
+      };
+      qb([usd, cad]);
+      expect(
+        await service.resolveByTradeSymbol("user-1", "SHOP", undefined, "cad"),
+      ).toEqual({ match: cad, candidates: [] });
+      qb([usd, cad]);
+      expect(
+        await service.resolveByTradeSymbol("user-1", "SHOP", undefined, "EUR"),
+      ).toEqual({ match: null, candidates: [usd, cad] });
+    });
+
+    it("lets an exact symbol win over listings in its own currency", async () => {
+      const a = {
+        ...mockSecurity,
+        id: "sec-a",
+        symbol: "XCNS",
+        currencyCode: "CAD",
+      };
+      const b = {
+        ...mockSecurity,
+        id: "sec-b",
+        symbol: "XCNS.TO",
+        currencyCode: "CAD",
+      };
+      qb([a, b]);
+      expect((await service.resolveByTradeSymbol("user-1", "XCNS")).match).toBe(
+        a,
+      );
+    });
+
+    it("never guesses between several suffixed securities", async () => {
+      qb([suffixed, other]);
+      const result = await service.resolveByTradeSymbol("user-1", "XCNS");
+      expect(result).toEqual({ match: null, candidates: [suffixed, other] });
+    });
+
+    it("finds nothing for an unknown ticker", async () => {
+      qb([]);
+      const result = await service.resolveByTradeSymbol("user-1", "NOPE");
+      expect(result).toEqual({ match: null, candidates: [] });
     });
   });
 

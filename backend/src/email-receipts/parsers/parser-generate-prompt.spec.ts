@@ -139,3 +139,38 @@ describe("buildGeneratePrompt", () => {
     expect(prompt).toContain("=== Sample 2 ===");
   });
 });
+
+describe("buildGeneratePrompt of a trade profile", () => {
+  const prompt = (revision = null as never) =>
+    buildGeneratePrompt({
+      domain: "wealthsimple.com",
+      samples: [sample({ transaction: null, lines: ["Symbol: XCNS"] })],
+      revision,
+      kind: "trade",
+    });
+
+  it("teaches the trade loop with the email ids to test and no transaction", () => {
+    const text = prompt();
+    expect(text).toContain("trade section");
+    expect(text).toContain("operation categories");
+    expect(text).toContain("investmentAccounts");
+    expect(text).toContain(`receiptIds = ["${R1}"]`);
+    expect(text).toContain("1: Symbol: XCNS");
+    expect(text).toContain("never say it was applied");
+    expect(text).not.toContain("transactionId");
+    expect(text).not.toContain("It paid for this transaction");
+  });
+
+  it("revises the named draft in place", () => {
+    const text = prompt({
+      parserId: P1,
+      revision: 4,
+      name: "Wealthsimple",
+      definition: { version: 2 },
+      feedback: "also read the commission",
+    } as never);
+    expect(text).toContain(`parserId "${P1}"`);
+    expect(text).toContain("expectedRevision 4");
+    expect(text).toContain("also read the commission");
+  });
+});

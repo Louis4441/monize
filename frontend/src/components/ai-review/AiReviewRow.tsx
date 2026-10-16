@@ -62,14 +62,18 @@ export function AiReviewRow({
 }: AiReviewRowProps) {
   const t = useTranslations('aiReview');
   const { formatDate } = useDateFormat();
-  const { formatCurrency } = useNumberFormat();
-  const { transaction, proposal, parserDraft } = item;
+  const { formatCurrency, formatNumber, formatShareQuantity } = useNumberFormat();
+  const { transaction, proposal, parserDraft, trade } = item;
 
   const action = proposal && 'action' in proposal ? proposal.action : null;
   const proposalError = proposal && 'error' in proposal ? proposal.error : null;
   const showCard = action !== null && (item.status === 'proposed' || card?.status === 'confirmed');
   const rowName = reviewItemLabel(item) ?? t('row.noPayee');
   const canDismiss = DISMISSIBLE.includes(item.status) && !showCard && proposalError === null;
+  // A trade request an agent has not answered yet holds no trade and no
+  // transaction: it is about an email, not a missing transaction.
+  const tradeRequest = item.kind === 'email_trade';
+  const tradeCurrency = action?.preview.securityCurrency ?? trade?.currency ?? null;
 
   return (
     <>
@@ -88,12 +92,27 @@ export function AiReviewRow({
           </Td>
         )}
         <Td className={`${CELL} whitespace-nowrap`}>
-          {transaction ? formatDate(transaction.date) : parserDraft ? formatDate(new Date(item.createdAt)) : ''}
+          {transaction
+            ? formatDate(transaction.date)
+            : trade
+              ? formatDate(trade.date)
+              : parserDraft || tradeRequest
+                ? formatDate(new Date(item.createdAt))
+                : ''}
         </Td>
         <Td className={`${CELL} min-w-0 break-words`}>
           <div className="font-medium">
             {parserDraft ? (
               t('row.parserDraft', { count: parserDraft.emailCount, domain: parserDraft.domain })
+            ) : trade ? (
+              t('row.trade', { action: trade.action, quantity: formatShareQuantity(trade.quantity), symbol: trade.symbol })
+            ) : tradeRequest ? (
+              // "Not read yet" only while an agent may still answer it; a closed one never will.
+              item.status === 'pending' || item.status === 'claimed' ? (
+                t('row.tradePending')
+              ) : (
+                t('row.tradeEmail')
+              )
             ) : transaction ? (
               (transaction.payeeName ?? <span className="text-gray-500 dark:text-gray-400">{t('row.noPayee')}</span>)
             ) : (
@@ -105,7 +124,7 @@ export function AiReviewRow({
               <Link href="/email-receipts?tab=emails" className="text-blue-600 hover:underline dark:text-blue-400">
                 {t('row.viewEmailReceipts')}
               </Link>
-            ) : item.kind === 'email_receipt' ? (
+            ) : item.kind === 'email_receipt' || item.kind === 'email_trade' ? (
               <>
                 {item.emailReceipt
                   ? t('row.emailReceipt', { subject: item.emailReceipt.subject, sender: item.emailReceipt.fromAddress })
@@ -127,7 +146,7 @@ export function AiReviewRow({
               {item.instructionKey ? t(`row.receiptInstruction.${item.instructionKey}`) : item.instruction}
             </p>
           )}
-          {(item.kind === 'email_receipt' || parserDraft) && item.status === 'pending' && (
+          {(item.kind === 'email_receipt' || tradeRequest || parserDraft) && item.status === 'pending' && (
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               {t.rich('row.waitingForAgent', {
                 link: (chunks) => (
@@ -174,7 +193,13 @@ export function AiReviewRow({
           </div>
         </Td>
         <Td align="right" className={`${CELL} whitespace-nowrap`}>
-          {transaction ? formatCurrency(transaction.amount, transaction.currencyCode) : ''}
+          {transaction
+            ? formatCurrency(transaction.amount, transaction.currencyCode)
+            : trade
+              ? tradeCurrency
+                ? formatCurrency(trade.totalAmount, tradeCurrency)
+                : formatNumber(trade.totalAmount, 2)
+              : ''}
         </Td>
         <Td className={CELL}>
           <Badge variant={STATUS_VARIANT[item.status]}>{t(`status.${item.status}`)}</Badge>

@@ -159,6 +159,8 @@ describe('emailReceiptsApi', () => {
       expect(client.post).toHaveBeenLastCalledWith('/email-receipts/r-1/ask-ai', {});
       await emailReceiptsApi.receipts.askAi('r-1', 'tx-9');
       expect(client.post).toHaveBeenLastCalledWith('/email-receipts/r-1/ask-ai', { transactionId: 'tx-9' });
+      await emailReceiptsApi.receipts.askAi('r-1', undefined, { asTrade: true });
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/r-1/ask-ai', { asTrade: true });
       // The synchronous draft route is gone: parsers are drafted through the chat.
       expect((emailReceiptsApi.receipts as Record<string, unknown>).draftParser).toBeUndefined();
 
@@ -173,6 +175,12 @@ describe('emailReceiptsApi', () => {
       client.post.mockResolvedValue({ data: { ok: true, requestId: 'req-1' } });
       await expect(emailReceiptsApi.parsers.draftWithAi(['r-1', 'r-2'])).resolves.toEqual({ ok: true, requestId: 'req-1' });
       expect(client.post).toHaveBeenLastCalledWith('/email-receipt-parsers/draft-with-ai', { receiptIds: ['r-1', 'r-2'] });
+    });
+
+    it('asks for a trade profile when the emails are trade confirmations', async () => {
+      client.post.mockResolvedValue({ data: { ok: true, requestId: 'req-2' } });
+      await emailReceiptsApi.parsers.draftWithAi(['r-1'], 'trade');
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipt-parsers/draft-with-ai', { receiptIds: ['r-1'], kind: 'trade' });
     });
 
     const definition = { version: 2 as const, total: ['Total {amount}'] };

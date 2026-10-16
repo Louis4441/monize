@@ -31,10 +31,13 @@ import {
 import {
   RECEIPT_PARSER_VERSION,
   type ParsedReceipt,
+  type ParsedTrade,
   type ReceiptParserDefinition,
   type ReceiptTrace,
+  type ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
 import {
+  collectParserAccountIds,
   collectParserCategoryIds,
   validateReceiptParserDefinition,
   type ReceiptParserValidationError,
@@ -46,6 +49,7 @@ import {
 import { MAX_PARSERS_PER_USER } from "./email-receipt-parsers.service";
 import {
   assertParserReferencesOwned,
+  usableTradeAccountIds,
   invalidDefinitionError,
 } from "./parser-references.util";
 
@@ -98,6 +102,29 @@ export interface LlmParsedReceipt {
 }
 
 /**
+ * What a trade profile read from one tested email, in the units a model reads:
+ * shares, decimal money. `consistent` null means the email states no price to
+ * check against the total.
+ */
+export interface LlmParsedTrade {
+  action: "BUY" | "SELL" | null;
+  symbol: string | null;
+  quantity: number | null;
+  total: number | null;
+  price: number | null;
+  commission: number | null;
+  /** The trade's currency ("USD"): its amounts', else a marker's, else the security's; null when none says. */
+  currency: string | null;
+  currencySource: "amount" | "marker" | "security" | null;
+  date: string | null;
+  accountText: string | null;
+  accountId: string | null;
+  complete: boolean;
+  consistent: boolean | null;
+  reason: string | null;
+}
+
+/**
  * What the profile's matching would do with one tested email, compactly: the
  * strategy that decided, the transaction it matched, how many candidates each
  * strategy kept (spec 3a). Reads only.
@@ -129,6 +156,8 @@ export interface ParserToolTestEmail {
   trace: ReceiptTrace;
   /** What the definition's `match` section would do with this email (design 5.5). */
   match: ParserToolMatch;
+  /** For a trade profile: what it read and which line read each value. Such a profile has no bank match, and `parsed` is empty. */
+  trade?: { parsed: LlmParsedTrade; trace: ReceiptTradeTrace };
   /**
    * The transaction the caller says this email paid for and whether the parsed
    * date and total agree with it; null when the sample named none.
@@ -158,6 +187,8 @@ export interface ParserToolTestResult {
   errors: ReceiptParserValidationError[];
   /** Category ids the definition names that are not the user's. */
   unknownCategoryIds: string[];
+  /** Account ids a trade profile names that are not an open brokerage account of the user's. */
+  unknownAccountIds: string[];
   emails: ParserToolTestEmail[];
   /** True only when the definition is valid and every email reads complete. */
   allComplete: boolean;
@@ -172,6 +203,8 @@ export interface ParserToolCategories {
   categories: Array<{ id: string; name: string }>;
   totalCount: number;
   truncated: boolean;
+  /** The user's investment accounts (id, name and currency), for a trade profile's `accountRules` and `defaultAccountId`. */
+  investmentAccounts: Array<{ id: string; name: string; currencyCode: string }>;
   /** The whole parser language, which the tool's description has no room for. */
   guide: string;
 }
@@ -203,8 +236,8 @@ export interface ParserToolSaveResult {
   fromDomains: string[];
   /** The payee the name resolved to, or null when none did (nothing is created). */
   payee: { id: string; name: string } | null;
-  /** The matching the saved profile effectively has (defaults filled in). */
-  match: ReturnType<typeof effectiveMatchDefinition>;
+  /** The matching the saved profile effectively has (defaults filled in); null for a trade profile, which matches no bank transaction. */
+  match: ReturnType<typeof effectiveMatchDefinition> | null;
   /** True when the request named by `requestId` is now `proposed`. */
   requestProposed: boolean;
 }
@@ -250,6 +283,25 @@ function toLlmParsed(
   };
 }
 
+function toLlmTrade(trade: ParsedTrade): LlmParsedTrade {
+  return {
+    action: trade.action,
+    symbol: trade.symbol,
+    quantity: trade.quantity,
+    total: units(trade.total),
+    price: units(trade.price),
+    commission: units(trade.commission),
+    currency: trade.currency ?? null,
+    currencySource: trade.currencySource ?? null,
+    date: trade.date,
+    accountText: trade.accountText,
+    accountId: trade.accountId,
+    complete: trade.complete,
+    consistent: trade.consistent,
+    reason: trade.reason,
+  };
+}
+
 @Injectable()
 export class EmailReceiptParserToolsService {
   constructor(
@@ -268,7 +320,23 @@ export class EmailReceiptParserToolsService {
       loadQualifiedCategoryNames(m, userId),
     );
     const all = [...names.entries()];
+    const accounts = await withScopedDb(this.dataSource, async (m) =>
+      returnedRows<{ id: string; name: string; currencyCode: string }>(
+        await m.query(
+          `SELECT id, name, currency_code AS "currencyCode"
+             FROM accounts
+            WHERE user_id = $1
+              AND account_type = 'INVESTMENT'
+              AND account_sub_type IS DISTINCT FROM 'INVESTMENT_CASH'
+              AND is_closed = false
+            ORDER BY name ASC
+            LIMIT 50`,
+          [userId],
+        ),
+      ),
+    );
     return {
+      investmentAccounts: accounts,
       categories: all
         .slice(0, PARSER_TOOL_MAX_CATEGORIES)
         .map(([id, name]) => ({ id, name })),
@@ -294,8 +362,9 @@ export class EmailReceiptParserToolsService {
    * An invalid definition is a RESULT (`valid: false` and every error with its
    * path), not an exception, so the agent can fix it and test again. Reads only:
    * nothing is written and no email changes. A category id the definition names
-   * that is not the user's is listed in `unknownCategoryIds`: the draft would be
-   * refused on save.
+   * that is not the user's is listed in `unknownCategoryIds`, and an account id
+   * that is not an open brokerage account of theirs in `unknownAccountIds`: the
+   * draft would be refused on save.
    */
   async testDefinition(
     userId: string,
@@ -326,6 +395,7 @@ export class EmailReceiptParserToolsService {
         valid: false,
         errors: validation.errors,
         unknownCategoryIds: [],
+        unknownAccountIds: [],
         emails: [],
         allComplete: false,
         allAgree: null,
@@ -379,6 +449,14 @@ export class EmailReceiptParserToolsService {
           receiptId: receipt.id,
           subject: receipt.subject,
           effectiveDate: run.effectiveDate.toISOString(),
+          ...(run.trade
+            ? {
+                trade: {
+                  parsed: toLlmTrade(run.trade.parsed),
+                  trace: run.trade.trace,
+                },
+              }
+            : {}),
           parsed: toLlmParsed(parsed, categoryNames),
           outcome,
           trace: { ...trace, items: trace.items.slice(0, TRACE_MAX_ITEMS) },
@@ -421,14 +499,23 @@ export class EmailReceiptParserToolsService {
       const unknownCategoryIds = collectParserCategoryIds(definition).filter(
         (id) => !categoryNames.has(id),
       );
+      const accountIds = collectParserAccountIds(definition);
+      const usableAccounts = await usableTradeAccountIds(m, userId, accountIds);
+      const unknownAccountIds = accountIds.filter(
+        (id) => !usableAccounts.has(id),
+      );
       return {
         valid: true,
         errors: [],
         unknownCategoryIds,
+        unknownAccountIds,
         emails,
         allComplete:
           unknownCategoryIds.length === 0 &&
-          emails.every((email) => email.parsed.complete),
+          unknownAccountIds.length === 0 &&
+          emails.every((email) =>
+            email.trade ? email.trade.parsed.complete : email.parsed.complete,
+          ),
         allAgree: emails.some((email) => email.agreement !== null)
           ? emails.every((email) => email.agreement?.agrees !== false)
           : null,
@@ -527,6 +614,7 @@ export class EmailReceiptParserToolsService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: payee?.id ?? null,
         categoryIds: collectParserCategoryIds(definition),
+        accountIds: collectParserAccountIds(definition),
       });
       let saved: EmailReceiptParser;
       if (existing) {
@@ -578,7 +666,10 @@ export class EmailReceiptParserToolsService {
         revision: saved.revision,
         fromDomains: saved.fromDomains,
         payee: payee ? { id: payee.id, name: payee.name } : null,
-        match: effectiveMatchDefinition(definition),
+        match:
+          definition.trade === undefined
+            ? effectiveMatchDefinition(definition)
+            : null,
         requestProposed,
       };
     });

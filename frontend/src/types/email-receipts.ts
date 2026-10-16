@@ -80,6 +80,25 @@ export const PARSED_RECEIPT_REASONS = [
 ] as const;
 export type ParsedReceiptReason = (typeof PARSED_RECEIPT_REASONS)[number];
 
+/** Why a trade reading is not complete (`ParsedTrade.reason`): the first thing missing. */
+export const PARSED_TRADE_REASONS = [
+  'trade_no_action',
+  'trade_no_symbol',
+  'trade_no_quantity',
+  'trade_no_amount',
+  'trade_no_account',
+  'trade_no_currency',
+] as const;
+export type ParsedTradeReason = (typeof PARSED_TRADE_REASONS)[number];
+
+/**
+ * Where a trade's currency came from: the amount text named it (`US$`, `CAD`),
+ * a currency marker of the profile matched a line, or the user's security for
+ * the ticker has it. Tried in that order; the first that yields wins.
+ */
+export const TRADE_CURRENCY_SOURCES = ['amount', 'marker', 'security'] as const;
+export type TradeCurrencySource = (typeof TRADE_CURRENCY_SOURCES)[number];
+
 // ---------------------------------------------------------------- mailbox
 
 /** The user's mailbox. The password is never here: `passwordSet` says whether one is stored. */
@@ -181,6 +200,38 @@ export interface EmailReceiptTransactionSummary {
 
 export interface EmailReceiptCandidateSummary extends EmailReceiptTransactionSummary {
   description: string | null;
+  /** A trade email's candidate (an investment transaction): its share count; absent for a bank transaction. */
+  quantity?: number;
+}
+
+/** The investment transaction a trade email accounts for: the one its approval booked, a person linked, or already in the ledger. */
+export interface EmailReceiptInvestmentSummary {
+  id: string;
+  /** YYYY-MM-DD. */
+  date: string;
+  action: string;
+  symbol: string;
+  quantity: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
+}
+
+/** The investment transaction an email's open `email_trade` request proposes: the review card's own preview. */
+export interface EmailReceiptTradeProposal {
+  accountName: string;
+  /** YYYY-MM-DD. */
+  date: string;
+  action: 'BUY' | 'SELL';
+  symbol: string;
+  securityName: string | null;
+  quantity: number;
+  /** Per share, in the security's currency. */
+  price: number;
+  commission: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
 }
 
 /** One stored email in the list: never its text. */
@@ -208,10 +259,20 @@ export interface EmailReceiptListItem {
   parserId: string | null;
   parserName: string | null;
   aiReviewRequestId: string | null;
+  /** A brokerage trade confirmation (`tradeSource` says who reads it): it proposes an investment transaction to create, so the bank-transaction actions do not apply. */
+  isTrade: boolean;
+  /**
+   * Who reads the trade: `profile` (its reading is the detail's `trade`), `ai`
+   * (handed to the AI as a trade, with no profile reading), null for no trade.
+   * Absent from a server that predates it.
+   */
+  tradeSource?: 'profile' | 'ai' | null;
   displayState: EmailReceiptDisplayState | null;
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
   transaction: EmailReceiptTransactionSummary | null;
+  /** A trade email's ledger row; null for every other email and for a trade email that accounts for none yet. Absent from a server that predates it. */
+  investmentTransaction?: EmailReceiptInvestmentSummary | null;
   createdAt: string;
 }
 
@@ -330,7 +391,90 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
   structuredOrder: SchemaOrgOrder | null;
   /** The stored `ParsedReceipt`; read it through `readParsedReceipt`. */
   parsed: Record<string, unknown> | null;
+  /** What a profile with a `trade` section read (`ParsedTrade`); read it through `readParsedTrade`. Null for every other email. */
+  trade: Record<string, unknown> | null;
+  /** What the email's `email_trade` request proposes while it waits for approval; null otherwise. Absent from a server that predates it. */
+  tradeProposal?: EmailReceiptTradeProposal | null;
+  /** Who answers the email's `email_trade` request: its trade profile, or the AI ("Recognize as a trade"); null when it has none. Absent from a server that predates it. */
+  tradeRequestSource?: 'profile' | 'ai' | null;
   candidates: EmailReceiptCandidateSummary[];
+}
+
+/**
+ * What a profile with a `trade` section read from a brokerage trade confirmation
+ * (`ParsedTrade` in `backend/src/email-receipts/parsing/receipt-parser.types.ts`).
+ * `quantity` is a share count; `total`, `price` and `commission` are in 1/10000
+ * units (convert once with `fromReceiptUnits`); `date` is `YYYY-MM-DD`. A value
+ * the email did not state is `null`.
+ */
+export interface ParsedTrade {
+  action: 'BUY' | 'SELL' | null;
+  symbol: string | null;
+  quantity: number | null;
+  total: number | null;
+  price: number | null;
+  commission: number | null;
+  /**
+   * The trade's currency ("USD"): the one the amounts name, else a currency
+   * marker's, else (only when an account rule needs it) the security's; null
+   * when none of them says, or from a server that predates it.
+   */
+  currency: string | null;
+  /** Which of the three decided `currency`; null with it. Absent from a server that predates it. */
+  currencySource?: TradeCurrencySource | null;
+  date: string | null;
+  accountText: string | null;
+  accountId: string | null;
+  complete: boolean;
+  /** Whether shares times price agrees with the total; null when the email states no price to check. */
+  consistent: boolean | null;
+  reason: string | null;
+}
+
+const isNullableNumber = (value: unknown): value is number | null => value === null || typeof value === 'number';
+const isNullableString = (value: unknown): value is string | null => value === null || typeof value === 'string';
+
+/** The stored trade as a typed object, or null when it is absent or not the shape this client reads. */
+export function readParsedTrade(value: Record<string, unknown> | null | undefined): ParsedTrade | null {
+  if (!value) return null;
+  const { action, symbol, quantity, total, price, commission, date, accountText, accountId, complete, consistent, reason } =
+    value;
+  const currency = value.currency ?? null;
+  // A source this client does not know is no source, not a reason to drop the reading.
+  const currencySource = TRADE_CURRENCY_SOURCES.find((source) => source === value.currencySource) ?? null;
+  if (
+    (action !== 'BUY' && action !== 'SELL' && action !== null) ||
+    !isNullableString(symbol) ||
+    !isNullableNumber(quantity) ||
+    !isNullableNumber(total) ||
+    !isNullableNumber(price) ||
+    !isNullableNumber(commission) ||
+    !isNullableString(date) ||
+    !isNullableString(accountText) ||
+    !isNullableString(accountId) ||
+    typeof complete !== 'boolean' ||
+    (consistent !== null && typeof consistent !== 'boolean') ||
+    !isNullableString(reason) ||
+    !isNullableString(currency)
+  ) {
+    return null;
+  }
+  return {
+    action,
+    symbol,
+    quantity,
+    total,
+    price,
+    commission,
+    currency,
+    currencySource,
+    date,
+    accountText,
+    accountId,
+    complete,
+    consistent,
+    reason,
+  };
 }
 
 /**
@@ -341,7 +485,8 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
 export interface EmailReceiptAskAiResult {
   ok: true;
   requestId: string;
-  transactionId: string;
+  /** The transaction the request is about; null for a trade, which creates one. */
+  transactionId: string | null;
 }
 
 /**
@@ -380,6 +525,9 @@ export const RECEIPT_PARSER_LIMITS = {
   maxDaysAfter: 90,
   /** The largest amount tolerance, in whole currency units (`"5.00"`). */
   maxAmountTolerance: 5,
+  /** A trade section's account rules (`MAX_TRADE_ACCOUNT_RULES`) and its currency markers. */
+  maxTradeAccountRules: 20,
+  maxTradeCurrencyMarkers: 20,
 } as const;
 
 /** The days of the window and the amount tolerance a profile that says nothing uses. */
@@ -457,6 +605,48 @@ export interface ReceiptMatchDefinition {
 export const RECEIPT_LINES_SOURCES = ['text', 'html'] as const;
 export type ReceiptLinesSource = (typeof RECEIPT_LINES_SOURCES)[number];
 
+/**
+ * Which brokerage account a trade email is for. Rules are tried in order
+ * against the account text the `account` entries read (the empty text when the
+ * email prints none, so only a `*` rule matches it). A rule with no `currency`
+ * wins when its glob matches; one with a `currency` wins only when the trade's
+ * currency is that one, is skipped when it is another, and fails the reading
+ * (`trade_no_currency`) when the currency cannot be told: it never guesses.
+ */
+export interface ReceiptTradeAccountRule {
+  match: string;
+  /** An open INVESTMENT account of the user's that is not the cash sleeve. */
+  accountId: string;
+  /** A 3-letter uppercase code; absent applies to any currency. */
+  currency?: string;
+}
+
+/** A glob tested against every line of the email (no captures): the first that matches names the trade's currency. */
+export interface ReceiptTradeCurrencyMarker {
+  match: string;
+  currency: string;
+}
+
+/**
+ * The `trade` section of a profile: the email is read as one investment
+ * transaction to create. Each field is a list of entries read like a receipt
+ * field; the capture each takes is `{action}`, `{symbol}`, `{quantity}`,
+ * `{amount}` (total, price, commission), `{date}` and `{account}`.
+ */
+export interface ReceiptTradeDefinition {
+  action: ReceiptFieldEntry[];
+  symbol: ReceiptFieldEntry[];
+  quantity: ReceiptFieldEntry[];
+  total?: ReceiptFieldEntry[];
+  price?: ReceiptFieldEntry[];
+  commission?: ReceiptFieldEntry[];
+  date?: ReceiptFieldEntry[];
+  account?: ReceiptFieldEntry[];
+  accountRules?: ReceiptTradeAccountRule[];
+  defaultAccountId?: string;
+  currencyMarkers?: ReceiptTradeCurrencyMarker[];
+}
+
 /** A parser definition, version 2 (`definition` of an `email_receipt_parsers` row). */
 export interface ReceiptParserDefinition {
   version: 2;
@@ -486,6 +676,12 @@ export interface ReceiptParserDefinition {
   defaultCategory?: string;
   shippingCategory?: string;
   feesCategory?: string;
+  /**
+   * A brokerage trade confirmation. A profile with this section holds no
+   * receipt field, item, category or match section (`trade_conflict`): only
+   * `source` and the three line guards beside it.
+   */
+  trade?: ReceiptTradeDefinition;
   requireLine?: string[];
   skipIfLine?: string[];
   waitIfLine?: string[];
@@ -646,10 +842,35 @@ export type ReceiptTraceField = (typeof RECEIPT_TRACE_FIELDS)[number];
 
 export type ReceiptTrace = Record<ReceiptTraceField, ReceiptTraceHit | null> & { items: ReceiptTraceItem[] };
 
+/** The fields a trade trace names, in the order the panel lists them. */
+export const RECEIPT_TRADE_TRACE_FIELDS = [
+  'action',
+  'symbol',
+  'quantity',
+  'total',
+  'price',
+  'commission',
+  'date',
+  'account',
+  'currency',
+] as const;
+export type ReceiptTradeTraceField = (typeof RECEIPT_TRADE_TRACE_FIELDS)[number];
+/** `currency` is the currency marker that named the currency (`entry` is its index in `currencyMarkers`); absent from a server that predates it. */
+export type ReceiptTradeTrace = Record<Exclude<ReceiptTradeTraceField, 'currency'>, ReceiptTraceHit | null> & {
+  currency?: ReceiptTraceHit | null;
+};
+
 /** What the pipeline would do with the email under this parser (`no_html`: it reads the HTML part and the email has none). */
 export type ReceiptOutcome = 'read' | 'not_applicable' | 'skip_line' | 'wait_line' | 'no_html';
 
 export interface EmailReceiptParserTestResult {
+  /**
+   * For a profile with a `trade` section: what it read, and which entry and
+   * line read each value (`trace`, absent from a server that predates it).
+   * Such a profile is not matched to a bank transaction, so `parsed` and
+   * `match` are then empty.
+   */
+  trade?: { parsed: ParsedTrade; trace?: ReceiptTradeTrace };
   parsed: ParsedReceipt;
   /** Which entry and which line read each value. Absent from a server that predates it. */
   trace?: ReceiptTrace;
@@ -684,7 +905,12 @@ export interface ParserSamplePair {
 /** `POST /email-receipt-parsers/generate-with-ai`: 1 to 5 samples; `parserId` and `feedback` revise an existing draft. */
 export interface GenerateParserWithAiPayload {
   domain: string;
-  samples: ParserSamplePair[];
+  /** What the profile reads: an order email (default) or a brokerage trade confirmation. */
+  kind?: 'receipt' | 'trade';
+  /** kind receipt: each email with the transaction it paid for. */
+  samples?: ParserSamplePair[];
+  /** kind trade: the confirmation emails (a trade pays no bank transaction). */
+  tradeReceiptIds?: string[];
   parserId?: string;
   feedback?: string;
 }
@@ -726,6 +952,8 @@ export const PARSER_PREVIEW_OUTCOMES = [
   'skip_line',
   'wait_line',
   'no_html',
+  'trade',
+  'trade_exists',
 ] as const;
 export type ParserPreviewOutcome = (typeof PARSER_PREVIEW_OUTCOMES)[number];
 
@@ -738,6 +966,18 @@ export interface ParserPreviewItem {
   /** How the draft would read the email; the server's `ParserPreviewOutcome`. */
   outcome: ParserPreviewOutcome;
   statusReason: string | null;
+  /** For a trade profile: what it read (shares, ticker, direction); null for a receipt or when a guard stopped the read. */
+  trade: {
+    action: 'BUY' | 'SELL' | null;
+    symbol: string | null;
+    quantity: number | null;
+    consistent: boolean | null;
+    /** The account the reading books to; null when none was found. Absent from a server that predates it. */
+    accountId?: string | null;
+    /** The trade's currency (as `parsed.currency`); null when it could not be told. Absent from a server that predates it. */
+    currency?: string | null;
+  } | null;
+  /** For a trade item, `currency` is the trade's currency. */
   parsed: { date: string | null; total: number | null; currency: string | null; lineCount: number } | null;
   match: ParserPreviewTransaction | null;
   expected: ParserPreviewTransaction | null;

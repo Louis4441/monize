@@ -48,7 +48,17 @@ describe("EmailReceiptParsersController", () => {
       receiptIds: [ID],
       userId: "someone-else",
     } as never);
-    expect(parsers.requestAiDraft).toHaveBeenCalledWith("user-1", [ID]);
+    expect(parsers.requestAiDraft).toHaveBeenCalledWith(
+      "user-1",
+      [ID],
+      "receipt",
+    );
+    await controller.draftWithAi(req, { receiptIds: [ID], kind: "trade" });
+    expect(parsers.requestAiDraft).toHaveBeenLastCalledWith(
+      "user-1",
+      [ID],
+      "trade",
+    );
     expect(parsers.list).toHaveBeenCalledWith("user-1");
     expect(parsers.get).toHaveBeenCalledWith("user-1", ID);
     expect(parsers.create).toHaveBeenCalledWith("user-1", body);

@@ -811,6 +811,9 @@ CREATE TABLE email_receipts (
     status_reason VARCHAR(40),
     parser_id UUID REFERENCES email_receipt_parsers(id) ON DELETE SET NULL,
     parsed JSONB,
+    trade JSONB,
+    -- The ledger row a trade email accounts for (FK added after investment_transactions below).
+    investment_transaction_id UUID,
     transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
     candidate_transaction_ids UUID[] NOT NULL DEFAULT '{}'::uuid[],
     match_kind VARCHAR(20),
@@ -842,6 +845,8 @@ CREATE INDEX idx_email_receipts_transaction
     ON email_receipts(transaction_id) WHERE transaction_id IS NOT NULL;
 CREATE INDEX idx_email_receipts_parser
     ON email_receipts(parser_id) WHERE parser_id IS NOT NULL;
+CREATE INDEX idx_email_receipts_investment_transaction
+    ON email_receipts(investment_transaction_id) WHERE investment_transaction_id IS NOT NULL;
 CREATE INDEX idx_email_receipt_parsers_user
     ON email_receipt_parsers(user_id);
 CREATE INDEX idx_email_receipt_parsers_payee
@@ -880,11 +885,13 @@ CREATE TABLE ai_review_requests (
     email_receipt_ids UUID[],
     parser_domain VARCHAR(255),
     CONSTRAINT ck_ai_review_requests_kind
-      CHECK (kind IN ('transaction_review', 'email_receipt', 'email_parser_draft')),
+      CHECK (kind IN ('transaction_review', 'email_receipt', 'email_parser_draft', 'email_trade')),
     CONSTRAINT ck_ai_review_requests_email_receipt_ids
       CHECK (email_receipt_ids IS NULL OR cardinality(email_receipt_ids) <= 5),
     CONSTRAINT ck_ai_review_requests_transaction_required
-      CHECK (kind = 'email_parser_draft' OR transaction_id IS NOT NULL),
+      CHECK (kind IN ('email_parser_draft', 'email_trade') OR transaction_id IS NOT NULL),
+    CONSTRAINT ck_ai_review_requests_trade_shape
+      CHECK (kind <> 'email_trade' OR transaction_id IS NULL),
     CONSTRAINT ck_ai_review_requests_parser_draft_shape
       CHECK (
         (kind = 'email_parser_draft'
@@ -919,6 +926,9 @@ CREATE INDEX idx_ai_review_requests_email_receipt
 CREATE UNIQUE INDEX uq_ai_review_requests_parser_draft_open
     ON ai_review_requests(user_id, parser_domain)
     WHERE kind = 'email_parser_draft' AND status IN ('pending', 'claimed', 'proposed');
+CREATE UNIQUE INDEX uq_ai_review_requests_trade_open
+    ON ai_review_requests(email_receipt_id)
+    WHERE kind = 'email_trade' AND status IN ('pending', 'claimed', 'proposed');
 
 -- Securities (stocks, bonds, mutual funds, ETFs)
 -- Defined before scheduled_transactions because that table (and others below)
@@ -1497,6 +1507,8 @@ CREATE INDEX idx_investment_transactions_transaction ON investment_transactions(
 CREATE INDEX idx_investment_transactions_split_id ON investment_transactions(transaction_split_id);
 CREATE INDEX idx_investment_transactions_linked ON investment_transactions(linked_transaction_id);
 CREATE INDEX idx_investment_transactions_bond_instrument ON investment_transactions(bond_instrument_id) WHERE bond_instrument_id IS NOT NULL;
+ALTER TABLE email_receipts ADD CONSTRAINT fk_email_receipts_investment_transaction
+    FOREIGN KEY (investment_transaction_id) REFERENCES investment_transactions(id) ON DELETE SET NULL;
 -- A share-moving row's series (bond-program-securities.md 2.3); RESTRICT keeps a
 -- series from being deleted from under a row that names it.
 ALTER TABLE investment_transactions

@@ -192,6 +192,61 @@ describe("ToolExecutorService ai_review_requests", () => {
     );
   });
 
+  it("hands the assistant the trade guidance with a claimed trade request", async () => {
+    work.claim.mockResolvedValue({
+      request: request({ kind: "email_trade", transactionId: null }),
+      emailReceipt: {
+        fromAddress: "notifications@broker.example.com",
+        subject: "Your order has been filled",
+        receivedAt: "2026-10-15T16:10:19.000Z",
+        text: "Symbol: XCNS",
+      },
+    });
+
+    const result = await service.execute(USER, "ai_review_requests", {
+      operation: "claim",
+      requestId: REQ,
+    });
+
+    const { message } = result.data as { message: string };
+    expect(message).toContain("trade field");
+    expect(message).toContain("commission");
+    expect(message).toContain("currency");
+  });
+
+  it("submits a trade answer and returns the investment card for confirmation", async () => {
+    const trade = {
+      accountName: "RRSP",
+      action: "BUY",
+      symbol: "XCNS",
+      quantity: 75.9878,
+      totalAmount: 2000,
+      description: "XCNS buy",
+    };
+    const card = {
+      type: "create_investment_transaction",
+      preview: { symbol: "XCNS" },
+    };
+    work.submit.mockResolvedValue({
+      request: request({ kind: "email_trade", status: "proposed" }),
+      action: card,
+    });
+
+    const result = await service.execute(USER, "ai_review_requests", {
+      operation: "submit",
+      requestId: REQ,
+      trade,
+    });
+
+    expect(work.submit).toHaveBeenCalledWith(
+      USER,
+      ASSISTANT_CLAIM_KEY,
+      REQ,
+      expect.objectContaining({ trade }),
+    );
+    expect(result.pendingAction).toBe(card);
+  });
+
   it("documents the parser draft kind in the tool definition", () => {
     const definition = FINANCIAL_TOOLS.find(
       (tool) => tool.name === "ai_review_requests",

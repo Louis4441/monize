@@ -112,6 +112,7 @@
     "total": "Total",
     "cashImpact": "Impacto en efectivo",
     "bondSeries": "Serie",
+    "marksPaid": "Marca como pagado",
     "accruedInterest": "Intereses devengados",
     "redemptionSplit": "Desglose de la amortización",
     "redemptionSplitValue": "Principal {principal} + intereses {interest} = pago {payout}",
@@ -230,7 +231,11 @@
       "category": "Establecer la categoría en {name}",
       "payee": "Establecer el beneficiario en {name}",
       "aiReview": "{count, plural, one {Poner en cola # solicitud de revisión de IA} other {Poner en cola # solicitudes de revisión de IA}}"
-    }
+    },
+    "aiCategory": "sugerida por la IA",
+    "tags": "Etiquetas",
+    "newTag": "(nueva etiqueta)",
+    "marksPaidDue": "{name} (vence el {date})"
   },
   "table": {
     "downloadTitle": "Descargar tabla como CSV",

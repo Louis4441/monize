@@ -4,6 +4,11 @@ import { Payee } from "../../payees/entities/payee.entity";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import {
+  WEALTHSIMPLE_BUY_BODY,
+  WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+  WEALTHSIMPLE_TRADE_DEFINITION,
+} from "../parsing/fixtures/wealthsimple-trade";
+import {
   EmailReceiptParserPreviewService,
   PARSER_PREVIEW_MAX_OTHERS,
 } from "./email-receipt-parser-preview.service";
@@ -337,5 +342,135 @@ describe("EmailReceiptParserPreviewService.preview", () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(parserRepo.findOne).not.toHaveBeenCalled();
+  });
+});
+
+describe("EmailReceiptParserPreviewService.preview of a trade profile", () => {
+  const tradeParser = () =>
+    parserRow({
+      fromDomains: ["wealthsimple.com"],
+      definition: WEALTHSIMPLE_TRADE_DEFINITION as never,
+    });
+  const filled = (id: string, over: Record<string, unknown> = {}) =>
+    mail(id, { body_text: WEALTHSIMPLE_BUY_BODY, ...over });
+
+  it("shows which of two accounts printed alike a sample books to, by its currency", async () => {
+    const RRSP_USD = "33333333-3333-4333-8333-333333333333";
+    const { service } = setup({
+      parser: parserRow({
+        fromDomains: ["wealthsimple.com"],
+        definition: {
+          ...WEALTHSIMPLE_TRADE_DEFINITION,
+          trade: {
+            ...WEALTHSIMPLE_TRADE_DEFINITION.trade,
+            accountRules: [
+              { match: "RRSP", currency: "USD", accountId: RRSP_USD },
+              {
+                match: "RRSP",
+                currency: "CAD",
+                accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+              },
+            ],
+          },
+        } as never,
+      }),
+      selected: [
+        filled(R1, {
+          body_text: WEALTHSIMPLE_BUY_BODY.replace(
+            "Total cost: $2,000.00",
+            "Total cost: US$2,000.00",
+          ),
+        }),
+      ],
+    });
+
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      outcome: "trade",
+      parsed: { total: 2000, currency: "USD" },
+      trade: { accountId: RRSP_USD, currency: "USD" },
+    });
+  });
+
+  it("reports a complete trade as `trade`, with what it read, and looks up no bank transaction", async () => {
+    const { service, manager } = setup({
+      parser: tradeParser(),
+      selected: [filled(R1)],
+      others: [
+        filled(R2, {
+          body_text: WEALTHSIMPLE_BUY_BODY.replace("Symbol:", "Ticker:"),
+        }),
+        filled(R3, { body_text: "Hello\nWorld" }),
+      ],
+    });
+
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      outcome: "trade",
+      statusReason: null,
+      parsed: { date: "2026-10-15", total: 2000 },
+      trade: {
+        action: "BUY",
+        symbol: "XCNS",
+        quantity: 75.9878,
+        consistent: true,
+        accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+        currency: null,
+      },
+      match: null,
+    });
+    expect(
+      result.others.map((o) => [o.receiptId, o.outcome, o.statusReason]),
+    ).toEqual([
+      [R2, "parse_failed", "trade_no_symbol"],
+      [R3, "not_applicable", null],
+    ]);
+    expect(result.others[0].trade).toMatchObject({ symbol: null });
+    expect(result.others[1].trade).toBeNull();
+    const sqls = manager.query.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((q) => q.includes("JOIN accounts"))).toBe(false);
+  });
+
+  it("says `trade_exists` for a trade the ledger already holds, as the pipeline would ignore it", async () => {
+    const { service, manager } = setup({
+      parser: tradeParser(),
+      selected: [filled(R1)],
+      others: [],
+    });
+    const fallback = manager.query.getMockImplementation();
+    manager.query.mockImplementation(async (sql: string, params: unknown[]) =>
+      String(sql).includes("FROM investment_transactions it")
+        ? [{ id: "it-1", claimed: false }]
+        : fallback?.(sql, params),
+    );
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+    expect(result.selected[0].outcome).toBe("trade_exists");
+  });
+
+  it("shows the total a price-only trade proposes, as the pipeline computes it", async () => {
+    const priceOnly = parserRow({
+      fromDomains: ["wealthsimple.com"],
+      definition: {
+        ...WEALTHSIMPLE_TRADE_DEFINITION,
+        trade: { ...WEALTHSIMPLE_TRADE_DEFINITION.trade, total: undefined },
+      } as never,
+    });
+    const { service } = setup({
+      parser: priceOnly,
+      selected: [filled(R1)],
+      others: [],
+    });
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+    expect(result.selected[0].parsed?.total).toBe(1999.9989);
   });
 });

@@ -112,6 +112,7 @@
     "total": "合計",
     "cashImpact": "現金への影響",
     "bondSeries": "シリーズ",
+    "marksPaid": "支払い済みにします",
     "accruedInterest": "経過利子",
     "redemptionSplit": "償還の内訳",
     "redemptionSplitValue": "元本 {principal} + 利子 {interest} = 支払額 {payout}",
@@ -230,7 +231,11 @@
       "category": "カテゴリを {name} に設定",
       "payee": "支払先を {name} に設定",
       "aiReview": "{count, plural, other {AIレビューの依頼 # 件をキューに追加}}"
-    }
+    },
+    "aiCategory": "AIの提案",
+    "tags": "タグ",
+    "newTag": "(新しいタグ)",
+    "marksPaidDue": "{name}（期日 {date}）"
   },
   "table": {
     "downloadTitle": "テーブルを CSV でダウンロード",

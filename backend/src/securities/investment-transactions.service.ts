@@ -1133,7 +1133,22 @@ export class InvestmentTransactionsService {
   async create(
     userId: string,
     createDto: CreateInvestmentTransactionDto,
-    options: { deferBondRecompute?: boolean } = {},
+    options: {
+      deferBondRecompute?: boolean;
+      /**
+       * Runs first in the write's transaction, after the holdings lock and
+       * before anything is written; a throw rolls the whole creation back.
+       * How a confirmed AI review request is marked applied together with the
+       * row it proposed.
+       */
+      beforeWrite?: (manager: EntityManager) => Promise<void>;
+      /**
+       * Runs last in the write's transaction, with the row's id; a throw rolls
+       * the whole creation back. How a trade email records the row its
+       * approval booked.
+       */
+      afterWrite?: (manager: EntityManager, id: string) => Promise<void>;
+    } = {},
   ): Promise<InvestmentTransaction> {
     const account = await this.accountsService.findOne(
       userId,
@@ -1214,6 +1229,8 @@ export class InvestmentTransactionsService {
       // xact lock is re-entrant, so taking it here costs nothing and is what
       // keeps this path in the one order every holdings writer uses.
       await lockHoldingScope(manager, [createDto.accountId]);
+
+      await options.beforeWrite?.(manager);
 
       // A removal the account cannot cover (OVER_REMOVAL,
       // REMOVAL_EXCEEDS_SERIES) is refused after the mutation, in this
@@ -1299,6 +1316,8 @@ export class InvestmentTransactionsService {
       }
 
       await bondGuard.verify([saved.id]);
+
+      await options.afterWrite?.(manager, saved.id);
 
       return saved.id;
     });

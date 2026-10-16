@@ -151,6 +151,16 @@ describe("McpAiReviewTools", () => {
       expect(work.claim).toHaveBeenCalledWith("u1", "s1", REQ);
     });
 
+    it("hands the trade guidance with a claimed trade request", async () => {
+      work.claim.mockResolvedValue({
+        request: request({ kind: "email_trade", transactionId: null }),
+        transaction: null,
+      });
+      const result = await call({ operation: "claim", requestId: REQ });
+      expect(result.structuredContent.message).toMatch(/trade field/);
+      expect(result.structuredContent.message).toMatch(/commission/);
+    });
+
     it("says so when nothing is pending", async () => {
       work.claim.mockResolvedValue({ request: null });
       const result = await call({ operation: "claim" });
@@ -198,6 +208,41 @@ describe("McpAiReviewTools", () => {
       expect(out.proposal.splits).toEqual(lines);
       // The signed descriptor never reaches the model.
       expect(JSON.stringify(out)).not.toContain("signature");
+    });
+
+    it("passes a trade answer on untouched and returns the investment card's preview", async () => {
+      const trade = {
+        accountName: "RRSP",
+        action: "BUY",
+        symbol: "XCNS",
+        quantity: 75.9878,
+        totalAmount: 2000,
+        currency: "CAD",
+      };
+      work.submit.mockResolvedValue({
+        request: request({ kind: "email_trade", status: "proposed" }),
+        action: {
+          type: "create_investment_transaction",
+          preview: { symbol: "XCNS", totalAmount: 2000 },
+          descriptor: { signature: "no" },
+        },
+      });
+
+      const result = await call({ operation: "submit", requestId: REQ, trade });
+
+      expect(work.submit).toHaveBeenCalledWith(
+        "u1",
+        "s1",
+        REQ,
+        expect.objectContaining({ trade }),
+      );
+      expect(result.structuredContent.proposal).toEqual({
+        symbol: "XCNS",
+        totalAmount: 2000,
+      });
+      expect(JSON.stringify(result.structuredContent)).not.toContain(
+        "signature",
+      );
     });
 
     it("needs a requestId and at least one change", async () => {

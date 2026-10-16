@@ -2471,6 +2471,124 @@ describe("ScheduledTransactionsService", () => {
   });
 
   // ==================== post ====================
+  describe("findInvestmentOccurrenceForTrade", () => {
+    const trade = {
+      accountId: "acc-1",
+      securityId: "sec-1",
+      action: "BUY" as never,
+      date: "2026-10-15",
+      commission: 0,
+    };
+    const finderQb = (rows: unknown[]) => {
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      scheduledRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+      return qb;
+    };
+
+    it("finds the one active scheduled investment of the same account, security and direction due near the trade", async () => {
+      const qb = finderQb([
+        {
+          id: "st-1",
+          name: "Monthly XCNS",
+          nextDueDate: "2026-10-16",
+          frequency: "MONTHLY",
+          investmentFundingAccountId: "chequing-1",
+        },
+      ]);
+      await expect(
+        service.findInvestmentOccurrenceForTrade(userId, trade),
+      ).resolves.toEqual({
+        id: "st-1",
+        name: "Monthly XCNS",
+        dueDate: "2026-10-16",
+        // A BUY settles through the schedule's funding account: the card shows it.
+        fundingAccountId: "chequing-1",
+      });
+      const clauses = qb.andWhere.mock.calls
+        .map((c) => String(c[0]))
+        .join("\n");
+      // A parameter named like its own cast (`:date::date`) is mangled by TypeORM.
+      expect(clauses).not.toMatch(/:(\w+)::\1\b/);
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining(":tradeDate::date"),
+        expect.objectContaining({ tradeDate: "2026-10-15" }),
+      );
+      expect(clauses).toContain("st.isInvestment = true");
+      expect(clauses).toContain("st.isActive = true");
+      expect(clauses).toContain("st.accountId = :accountId");
+      expect(clauses).toContain("st.investmentSecurityId = :securityId");
+      expect(clauses).toContain("st.nextDueDate BETWEEN");
+      expect(qb.where).toHaveBeenCalledWith("st.userId = :userId", { userId });
+    });
+
+    it("never takes the occurrence after the one a trade paid: a weekly buy posted on the 15th is next due on the 22nd", async () => {
+      finderQb([
+        {
+          id: "st-1",
+          name: "Weekly XCNS",
+          nextDueDate: "2026-10-22",
+          frequency: "WEEKLY",
+        },
+      ]);
+      await expect(
+        service.findInvestmentOccurrenceForTrade(userId, trade),
+      ).resolves.toBeNull();
+    });
+
+    it.each([
+      ["DAILY", "2026-10-15", true],
+      ["DAILY", "2026-10-16", false],
+      ["WEEKLY", "2026-10-18", true],
+      ["WEEKLY", "2026-10-19", false],
+      ["BIWEEKLY", "2026-10-21", true],
+      ["MONTHLY", "2026-10-22", true],
+      ["MONTHLY", "2026-10-23", false],
+      ["ONCE", "2026-10-22", true],
+    ])(
+      "a %s schedule due %s is %s the trade's occurrence",
+      async (frequency, nextDueDate, found) => {
+        finderQb([{ id: "st-1", name: "X", nextDueDate, frequency }]);
+        const result = await service.findInvestmentOccurrenceForTrade(
+          userId,
+          trade,
+        );
+        expect(result !== null).toBe(found);
+      },
+    );
+
+    it("refuses to guess between two schedules", async () => {
+      finderQb([
+        {
+          id: "st-1",
+          name: "A",
+          nextDueDate: "2026-10-16",
+          frequency: "MONTHLY",
+        },
+        {
+          id: "st-2",
+          name: "B",
+          nextDueDate: "2026-10-14",
+          frequency: "MONTHLY",
+        },
+      ]);
+      await expect(
+        service.findInvestmentOccurrenceForTrade(userId, trade),
+      ).resolves.toBeNull();
+    });
+
+    it("finds none when nothing is scheduled", async () => {
+      finderQb([]);
+      await expect(
+        service.findInvestmentOccurrenceForTrade(userId, trade),
+      ).resolves.toBeNull();
+    });
+  });
+
   describe("post", () => {
     it("should create a regular transaction from base values", async () => {
       const scheduled = makeScheduled();
@@ -2491,6 +2609,39 @@ describe("ScheduledTransactionsService", () => {
         }),
         { fromScheduledPosting: true },
       );
+    });
+
+    it("runs the caller's beforeWrite inside the posting transaction, before the money is written", async () => {
+      stubFindOne(makeScheduled());
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+      const beforeWrite = jest.fn().mockResolvedValue(undefined);
+
+      await service.post(userId, stId, undefined, { beforeWrite });
+
+      expect(beforeWrite).toHaveBeenCalledTimes(1);
+      expect(beforeWrite.mock.invocationCallOrder[0]).toBeLessThan(
+        transactionsService.create.mock.invocationCallOrder[0],
+      );
+    });
+
+    it("writes nothing when the beforeWrite hook refuses", async () => {
+      stubFindOne(makeScheduled());
+      const overrideQb = mockQueryBuilder(null);
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      accountsRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.post(userId, stId, undefined, {
+          beforeWrite: async () => {
+            throw new Error("no longer open");
+          },
+        }),
+      ).rejects.toThrow("no longer open");
+      expect(transactionsService.create).not.toHaveBeenCalled();
     });
 
     it("forwards actorIsNotOwner to the create so an acting delegate's post skips the owner's structural rules", async () => {
@@ -3550,6 +3701,69 @@ describe("ScheduledTransactionsService", () => {
       expect(dto.price).toBe(500);
       expect(transactionsService.create).not.toHaveBeenCalled();
       expect(transactionsService.prepareTransfer).not.toHaveBeenCalled();
+    });
+
+    it("post() with recordOnly claims the occurrence and writes no money (the payment is already in the ledger)", async () => {
+      const scheduled = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-voo",
+        investmentQuantity: 1,
+        investmentPrice: 500,
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      await service.post(userId, stId, undefined, { recordOnly: true });
+
+      expect(investmentTransactionsService.create).not.toHaveBeenCalled();
+      expect(transactionsService.create).not.toHaveBeenCalled();
+      expect(transactionsService.prepareTransfer).not.toHaveBeenCalled();
+      // The occurrence is still claimed, so it cannot be posted again.
+      const claim = mockQueryRunner.manager.query.mock.calls.find(
+        (c: unknown[]) =>
+          String(c[0]).includes("INSERT INTO scheduled_transaction_postings"),
+      );
+      expect(claim).toBeDefined();
+    });
+
+    it("post() of a trade email's card writes the card's executed total and rate, and reports the row it created", async () => {
+      const scheduled = makeScheduled({
+        isInvestment: true,
+        investmentAction: "BUY" as any,
+        investmentSecurityId: "sec-voo",
+        investmentQuantity: 1,
+        investmentPrice: 500,
+        investmentCommission: 0,
+        investmentExchangeRate: 1.3,
+      });
+      stubFindOne(scheduled);
+      const overrideQb = mockQueryBuilder();
+      overrideQb.getOne.mockResolvedValue(null);
+      overridesRepo.createQueryBuilder.mockReturnValue(overrideQb);
+      investmentTransactionsService.create.mockResolvedValueOnce({
+        id: "it-new",
+      });
+      const afterInvestmentWrite = jest.fn().mockResolvedValue(undefined);
+
+      await service.post(
+        userId,
+        stId,
+        { investmentQuantity: 75.9878, investmentPrice: 26.3200087 } as never,
+        {
+          investmentFigures: { totalAmount: 2000, exchangeRate: 1.37 },
+          afterInvestmentWrite,
+        },
+      );
+
+      const dto = investmentTransactionsService.create.mock.calls[0][1];
+      expect(dto.totalAmount).toBe(2000);
+      expect(dto.exchangeRate).toBe(1.37);
+      expect(afterInvestmentWrite).toHaveBeenCalledWith(
+        expect.anything(),
+        "it-new",
+      );
     });
 
     it("post() forwards funding account for contribution+buy", async () => {

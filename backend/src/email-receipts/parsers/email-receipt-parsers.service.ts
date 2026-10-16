@@ -23,15 +23,21 @@ import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "../receipts/dto/email-receip
 import { dryRunReceipt } from "./receipt-dry-run";
 import type {
   ParsedReceipt,
+  ParsedTrade,
   ReceiptParserDefinition,
   ReceiptTrace,
+  ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
 import {
+  collectParserAccountIds,
   collectParserCategoryIds,
   validateReceiptParserDefinition,
 } from "../parsing/receipt-parser.validation";
 import { isReceiptDomain } from "./dto/receipt-domain.validator";
-import { RECEIPT_PARSER_DRAFT_INSTRUCTION } from "./parser-draft-instruction";
+import {
+  RECEIPT_PARSER_DRAFT_INSTRUCTION,
+  RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION,
+} from "./parser-draft-instruction";
 import {
   ApproveEmailReceiptParserDto,
   CreateEmailReceiptParserDto,
@@ -100,6 +106,12 @@ export interface EmailReceiptParserTestResult {
     amount: number;
     payeeName: string | null;
   } | null;
+  /**
+   * For a profile with a `trade` section: what it read and which line read each
+   * value. Such a profile is not matched to a bank transaction, so `parsed`,
+   * `trace`, `match` and `transaction` are then empty. Absent for a receipt.
+   */
+  trade?: { parsed: ParsedTrade; trace: ReceiptTradeTrace };
 }
 
 /**
@@ -171,6 +183,7 @@ export class EmailReceiptParsersService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: dto.payeeId ?? null,
         categoryIds: collectParserCategoryIds(definition),
+        accountIds: collectParserAccountIds(definition),
       });
       const saved = await repo.save(
         repo.create({
@@ -218,6 +231,7 @@ export class EmailReceiptParsersService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: payeeId !== existing.payeeId ? payeeId : null,
         categoryIds: definition ? collectParserCategoryIds(definition) : [],
+        accountIds: definition ? collectParserAccountIds(definition) : [],
       });
       await repo.update(
         { id, userId },
@@ -273,6 +287,7 @@ export class EmailReceiptParsersService {
   async requestAiDraft(
     userId: string,
     receiptIds: readonly string[],
+    kind: "receipt" | "trade" = "receipt",
   ): Promise<ParserDraftRequestResult> {
     return withScopedDb(this.dataSource, async (m) => {
       const rows = await m.getRepository(EmailReceipt).find({
@@ -305,7 +320,10 @@ export class EmailReceiptParsersService {
       const request = await this.requests.enqueueParserDraft(m, userId, {
         emailReceiptIds: receiptIds,
         parserDomain: domain,
-        instruction: RECEIPT_PARSER_DRAFT_INSTRUCTION,
+        instruction:
+          kind === "trade"
+            ? RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION
+            : RECEIPT_PARSER_DRAFT_INSTRUCTION,
       });
       return { ok: true as const, requestId: request.id };
     });
@@ -340,6 +358,7 @@ export class EmailReceiptParsersService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: existing.payeeId,
         categoryIds: collectParserCategoryIds(definition),
+        accountIds: collectParserAccountIds(definition),
       });
       await repo.update(
         { id, userId },
@@ -401,6 +420,7 @@ export class EmailReceiptParsersService {
       const run = await dryRunReceipt(m, userId, definition, receipt, payee);
       const { parsed, trace, outcome, match, candidates, hit } = run;
       return {
+        ...(run.trade ? { trade: run.trade } : {}),
         parsed,
         trace,
         outcome,

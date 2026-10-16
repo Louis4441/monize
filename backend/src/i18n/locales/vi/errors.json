@@ -157,9 +157,19 @@
     "splitDifference": "Các dòng chia cộng lại là {{ sum }} nhưng giao dịch là {{ amount }}: {{ difference }} chưa được phân bổ. Hãy làm cho các dòng cộng lại bằng giao dịch; phần dư như phí giao hàng cần một dòng riêng hoặc được nêu cho người dùng thay vì phân bổ.",
     "noTransaction": "Yêu cầu xem xét AI này không liên quan đến một giao dịch.",
     "parserDraftNotSubmittable": "Yêu cầu soạn trình phân tích được trả lời bằng công cụ email_receipt_parsers (thử trước, rồi save_draft với requestId này), không phải bằng một đề xuất giao dịch.",
+    "tradeNotSubmittable": "Yêu cầu giao dịch được trả lời bằng trường trade (tài khoản, hành động, mã, số lượng, tổng và ngày), không phải bằng một đề xuất giao dịch.",
+    "notATradeRequest": "Yêu cầu xem xét bằng AI này không phải là yêu cầu giao dịch.",
+    "tradeOnTradeRequest": "Trường trade chỉ trả lời một yêu cầu giao dịch.",
+    "tradeDateRequired": "Giao dịch cần có ngày (YYYY-MM-DD): email đã không còn, nên không có ngày dự phòng.",
+    "tradeInvalid": "Giao dịch cần accountName, action (BUY hoặc SELL), symbol, quantity, totalAmount và, tùy chọn, commission và date (YYYY-MM-DD).",
+    "tradeSecurityAmbiguous": "\"{{ symbol }}\" khớp với nhiều chứng khoán của bạn ({{ list }}). Hãy đổi tên một mã để mã chứng khoán là duy nhất.",
+    "tradeSecurityUnknown": "Bạn không có chứng khoán nào có mã \"{{ symbol }}\". Hãy thêm chứng khoán rồi xử lý lại email.",
     "tagNamesInvalid": "Một đề xuất có thể thêm tối đa {{ max }} thẻ, mỗi thẻ dài từ 1 đến {{ length }} ký tự và không chứa ký tự điều khiển.",
     "noApprovableProposal": "Yêu cầu này không có đề xuất nào để phê duyệt tại đây.",
-    "approveFailed": "Không thể phê duyệt đề xuất này. Hãy thử riêng đề xuất này."
+    "approveFailed": "Không thể phê duyệt đề xuất này. Hãy thử riêng đề xuất này.",
+    "tradeAlreadyBooked": "Sổ cái của bạn đã có giao dịch này. Hãy liên kết email với giao dịch đó thay vì ghi lại lần nữa.",
+    "tradeScheduleMoved": "Giao dịch định kỳ mà giao dịch này dự định thanh toán đã được ghi hoặc thay đổi kể từ khi đề xuất. Hãy liên kết email với giao dịch đó, hoặc bỏ qua nó.",
+    "tradeCurrencyMismatch": "Số tiền trong email là {{ currency }}, nhưng chứng khoán {{ symbol }} của bạn giao dịch bằng {{ securityCurrency }}. Hãy kiểm tra mã niêm yết nào đã được mua, rồi tự nhập giao dịch."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Quá nhiều lần xác minh thất bại. Vui lòng đăng nhập lại.",
@@ -384,6 +394,7 @@
     "parserCategoryNotFound": "Không tìm thấy danh mục được nêu trong trình phân tích này.",
     "parserDefinitionInvalid": "Định nghĩa trình phân tích không hợp lệ: {{ codes }}",
     "receiptSkipped": "Không thể đọc email này (quá lớn hoặc không thể giải mã) nên không có gì để xử lý.",
+    "notATradeEmail": "Email này không được đọc như một xác nhận giao dịch.",
     "receiptIgnored": "Email này đã bị bỏ qua. Hãy xử lý lại trước khi liên kết với một giao dịch.",
     "transactionNotFound": "Không tìm thấy giao dịch đó.",
     "linkTransfer": "Không thể liên kết một giao dịch chuyển khoản với email.",
@@ -409,7 +420,12 @@
     "previewExpectedNotSelected": "Đã nêu một giao dịch dự kiến cho một email không nằm trong số email được chọn.",
     "previewReceiptOutsideDomain": "Một email không đến từ miền người gửi nào của trình phân tích này.",
     "parserCategoryNameUnknown": "Không tìm thấy danh mục \"{{ name }}\". Sử dụng tên của một trong các danh mục của bạn.",
-    "parserCategoryNameAmbiguous": "Danh mục \"{{ name }}\" khớp với nhiều danh mục ({{ candidates }}). Sử dụng tên đầy đủ, ví dụ \"Cha mẹ: Con\"."
+    "parserCategoryNameAmbiguous": "Danh mục \"{{ name }}\" khớp với nhiều danh mục ({{ candidates }}). Sử dụng tên đầy đủ, ví dụ \"Cha mẹ: Con\".",
+    "tradeNotBankLinkable": "Email này được đọc là xác nhận giao dịch. Hãy liên kết nó với một giao dịch đầu tư.",
+    "tradeAccountedFor": "Email này đã tương ứng với một giao dịch đầu tư, nên không được đọc lại.",
+    "tradeLinkedElsewhere": "Một email khác đã tương ứng với giao dịch đó.",
+    "parserAccountNotFound": "Một tài khoản được nêu trong hồ sơ giao dịch này không phải là tài khoản môi giới đang mở của bạn.",
+    "generateSamplesForKind": "Hồ sơ biên lai được tạo từ samples (mỗi email kèm giao dịch nó đã thanh toán); hồ sơ giao dịch được tạo từ tradeReceiptIds. Hãy gửi trường phù hợp với loại, không gửi trường còn lại."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "Email chưa được cấu hình. Không thể bật truy cập khẩn cấp cho đến khi SMTP được thiết lập.",

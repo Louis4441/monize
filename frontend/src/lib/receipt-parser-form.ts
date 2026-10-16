@@ -14,6 +14,9 @@ import {
   type ReceiptMatchTextField,
   type ReceiptParserDefinition,
   type ReceiptParserValidationError,
+  type ReceiptTradeAccountRule,
+  type ReceiptTradeCurrencyMarker,
+  type ReceiptTradeDefinition,
 } from '@/types/email-receipts';
 
 /**
@@ -27,7 +30,46 @@ import {
 /** The only definition version the server reads; the form always writes it. */
 export const PARSER_DEFINITION_VERSION = 2;
 
+/** What a profile reads: an order confirmation (matched to a bank transaction) or a brokerage trade confirmation. */
+export type ParserKind = 'receipt' | 'trade';
+
+/** One account rule of a trade profile as the form edits it; `id` keys the row and is never sent. */
+export interface TradeAccountRuleRow {
+  id: string;
+  match: string;
+  /** A 3-letter code, `''` for any currency. */
+  currency: string;
+  /** `''` until an account is picked. */
+  accountId: string;
+}
+
+/** One currency marker of a trade profile as the form edits it; `id` keys the row and is never sent. */
+export interface TradeCurrencyMarkerRow {
+  id: string;
+  match: string;
+  /** `''` until a currency is picked. */
+  currency: string;
+}
+
+/** The trade section's pattern lists, each with the form field holding it (one pattern per line). */
+export const TRADE_PATTERN_FIELDS = [
+  ['action', 'tradeAction'],
+  ['symbol', 'tradeSymbol'],
+  ['quantity', 'tradeQuantity'],
+  ['total', 'tradeTotal'],
+  ['price', 'tradePrice'],
+  ['commission', 'tradeCommission'],
+  ['date', 'tradeDate'],
+  ['account', 'tradeAccount'],
+] as const;
+export type TradePatternFormField = (typeof TRADE_PATTERN_FIELDS)[number][1];
+
+/** The line guards, one pattern per line. The form edits them on a trade profile only. */
+export const GUARD_FIELDS = ['requireLine', 'skipIfLine', 'waitIfLine'] as const;
+
 export interface ParserFormState {
+  /** Set by the definition (a `trade` section); a new profile picks it. */
+  kind: ParserKind;
   name: string;
   payeeId: string;
   /** Comma, semicolon, space or line separated. */
@@ -67,6 +109,25 @@ export interface ParserFormState {
   tagName: string;
   /** Ask the user's AI for the category of an item no rule matched. */
   aiCategories: boolean;
+  /** The line guards (trade profile): one pattern per line. */
+  requireLine: string;
+  skipIfLine: string;
+  waitIfLine: string;
+  /** The trade section's pattern lists (trade profile): one pattern per line. */
+  tradeAction: string;
+  tradeSymbol: string;
+  tradeQuantity: string;
+  tradeTotal: string;
+  tradePrice: string;
+  tradeCommission: string;
+  tradeDate: string;
+  tradeAccount: string;
+  /** Tried in order; the first that applies decides the account. */
+  tradeAccountRules: TradeAccountRuleRow[];
+  /** The account when no rule applies; `''` for none. */
+  tradeDefaultAccountId: string;
+  /** Tried in order; the first whose glob matches a line names the currency. */
+  tradeCurrencyMarkers: TradeCurrencyMarkerRow[];
 }
 
 /**
@@ -80,6 +141,7 @@ export type ParserFormChange = (
 ) => void;
 
 export const emptyParserForm = (overrides: Partial<ParserFormState> = {}): ParserFormState => ({
+  kind: 'receipt',
   name: '',
   payeeId: '',
   fromDomains: '',
@@ -105,8 +167,50 @@ export const emptyParserForm = (overrides: Partial<ParserFormState> = {}): Parse
   tagEnabled: false,
   tagName: '',
   aiCategories: false,
+  requireLine: '',
+  skipIfLine: '',
+  waitIfLine: '',
+  tradeAction: '',
+  tradeSymbol: '',
+  tradeQuantity: '',
+  tradeTotal: '',
+  tradePrice: '',
+  tradeCommission: '',
+  tradeDate: '',
+  tradeAccount: '',
+  tradeAccountRules: [],
+  tradeDefaultAccountId: '',
+  tradeCurrencyMarkers: [],
   ...overrides,
 });
+
+/** A new, empty account rule row (any currency, no account yet). */
+export const newTradeAccountRule = (): TradeAccountRuleRow => ({
+  id: crypto.randomUUID(),
+  match: '',
+  currency: '',
+  accountId: '',
+});
+
+/** A new, empty currency marker row. */
+export const newTradeCurrencyMarker = (): TradeCurrencyMarkerRow => ({ id: crypto.randomUUID(), match: '', currency: '' });
+
+/**
+ * The currencies a trade profile's pickers offer, in order: the user's base
+ * currency, their other active currencies A-Z, then any code the profile already
+ * holds that is neither (an inactive currency, a hand-written code), so a stored
+ * value is shown as it is rather than as blank.
+ */
+export function tradeCurrencyChoices(
+  baseCurrency: string,
+  activeCodes: readonly string[],
+  heldCodes: readonly string[],
+): string[] {
+  const others = [...new Set(activeCodes)].filter((code) => code !== baseCurrency).sort();
+  const listed = [baseCurrency, ...others];
+  const held = [...new Set(heldCodes)].filter((code) => code !== '' && !listed.includes(code));
+  return [...listed, ...held];
+}
 
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((value, index) => value === b[index]);
@@ -208,6 +312,7 @@ export function splitDomains(text: string): string[] {
  * `items.patterns: empty` instead of being dropped without a word.
  */
 export function buildParserDefinition(form: ParserFormState): ReceiptParserDefinition {
+  if (form.kind === 'trade') return buildTradeDefinition(form);
   const definition: ReceiptParserDefinition = { version: PARSER_DEFINITION_VERSION };
   // The text source is the default, so it is left out (reading it back gives the same form).
   if (form.source === 'html') definition.source = 'html';
@@ -250,6 +355,56 @@ export function buildParserDefinition(form: ParserFormState): ReceiptParserDefin
   return definition;
 }
 
+const isBlankRule = (rule: TradeAccountRuleRow): boolean =>
+  rule.match.trim() === '' && rule.currency === '' && rule.accountId === '';
+const isBlankMarker = (marker: TradeCurrencyMarkerRow): boolean => marker.match.trim() === '' && marker.currency === '';
+
+/**
+ * A trade profile's definition: the `trade` section, the lines source and the
+ * line guards, nothing else (the server refuses any receipt key beside `trade`).
+ * The section is always sent, so an empty required list is reported by the
+ * server (`trade.action: empty`) rather than the profile turning into a receipt
+ * one. A row left wholly blank is dropped; a row half filled is sent as it is,
+ * so the server names what is missing.
+ */
+function buildTradeDefinition(form: ParserFormState): ReceiptParserDefinition {
+  const definition: ReceiptParserDefinition = { version: PARSER_DEFINITION_VERSION };
+  if (form.source === 'html') definition.source = 'html';
+
+  const trade: Partial<ReceiptTradeDefinition> = {};
+  for (const [key, field] of TRADE_PATTERN_FIELDS) {
+    const patterns = splitLines(form[field]);
+    if (patterns.length > 0) trade[key] = patterns;
+  }
+  const rules = form.tradeAccountRules
+    .filter((rule) => !isBlankRule(rule))
+    .map(
+      (rule): ReceiptTradeAccountRule => ({
+        match: rule.match.trim(),
+        accountId: rule.accountId,
+        ...(rule.currency !== '' ? { currency: rule.currency } : {}),
+      }),
+    );
+  if (rules.length > 0) trade.accountRules = rules;
+  if (form.tradeDefaultAccountId !== '') trade.defaultAccountId = form.tradeDefaultAccountId;
+  const markers = form.tradeCurrencyMarkers
+    .filter((marker) => !isBlankMarker(marker))
+    .map((marker): ReceiptTradeCurrencyMarker => ({ match: marker.match.trim(), currency: marker.currency }));
+  if (markers.length > 0) trade.currencyMarkers = markers;
+  definition.trade = trade as ReceiptTradeDefinition;
+
+  for (const field of GUARD_FIELDS) {
+    const patterns = splitLines(form[field]);
+    if (patterns.length > 0) definition[field] = patterns;
+  }
+  return definition;
+}
+
+/** Does this stored definition read brokerage trade confirmations (it has a `trade` section)? */
+export function isTradeDefinition(value: unknown): boolean {
+  return isRecord(value) && value.trade !== undefined;
+}
+
 /**
  * The create payload; update sends the same fields plus the revision it was
  * read at. The definition is the form's unless the JSON editor supplies one.
@@ -260,7 +415,8 @@ export function buildParserPayload(
 ): CreateEmailReceiptParserPayload {
   return {
     name: form.name.trim(),
-    payeeId: form.payeeId === '' ? null : form.payeeId,
+    // A trade creates an investment transaction, which has no payee: the editor shows no payee picker for it.
+    payeeId: form.payeeId === '' || definition.trade !== undefined ? null : form.payeeId,
     fromDomains: splitDomains(form.fromDomains),
     subjectContains: splitWords(form.subjectContains),
     definition,
@@ -277,6 +433,7 @@ const text = (value: unknown): string => (typeof value === 'string' ? value : ''
 
 type DefinitionFields = Pick<
   ParserFormState,
+  | 'kind'
   | 'source'
   | 'orderId'
   | 'total'
@@ -298,6 +455,11 @@ type DefinitionFields = Pick<
   | 'tagEnabled'
   | 'tagName'
   | 'aiCategories'
+  | (typeof GUARD_FIELDS)[number]
+  | TradePatternFormField
+  | 'tradeAccountRules'
+  | 'tradeDefaultAccountId'
+  | 'tradeCurrencyMarkers'
 >;
 
 const choiceList = <T extends string>(value: unknown, allowed: readonly T[], fallback: readonly T[]): T[] => {
@@ -321,7 +483,9 @@ export function definitionToFormFields(value: unknown): DefinitionFields {
   const items = isRecord(definition.items) ? definition.items : {};
   const match = isRecord(definition.match) ? definition.match : {};
   const reference = stringList(definition.reference);
+  const trade = isRecord(definition.trade) ? definition.trade : {};
   return {
+    kind: definition.trade !== undefined ? 'trade' : 'receipt',
     source: definition.source === 'html' ? 'html' : 'text',
     orderId: stringList(definition.orderId).join('\n'),
     total: stringList(definition.total).join('\n'),
@@ -343,8 +507,31 @@ export function definitionToFormFields(value: unknown): DefinitionFields {
     tagEnabled: text(definition.tag).trim() !== '',
     tagName: text(definition.tag).trim(),
     aiCategories: definition.aiCategories === true,
+    requireLine: stringList(definition.requireLine).join('\n'),
+    skipIfLine: stringList(definition.skipIfLine).join('\n'),
+    waitIfLine: stringList(definition.waitIfLine).join('\n'),
+    ...tradePatternFields(trade),
+    tradeAccountRules: records(trade.accountRules).map((rule) => ({
+      id: crypto.randomUUID(),
+      match: text(rule.match),
+      currency: text(rule.currency),
+      accountId: text(rule.accountId),
+    })),
+    tradeDefaultAccountId: text(trade.defaultAccountId),
+    tradeCurrencyMarkers: records(trade.currencyMarkers).map((marker) => ({
+      id: crypto.randomUUID(),
+      match: text(marker.match),
+      currency: text(marker.currency),
+    })),
   };
 }
+
+const records = (value: unknown): Record<string, unknown>[] => (Array.isArray(value) ? value.filter(isRecord) : []);
+
+const tradePatternFields = (trade: Record<string, unknown>): Record<TradePatternFormField, string> =>
+  Object.fromEntries(
+    TRADE_PATTERN_FIELDS.map(([key, field]) => [field, stringList(trade[key]).join('\n')]),
+  ) as Record<TradePatternFormField, string>;
 
 /** A stored parser as form state. */
 export function parserToForm(parser: EmailReceiptParser): ParserFormState {
@@ -375,6 +562,10 @@ const FORM_TOP_LEVEL_KEYS = [
   'aiCategories',
 ];
 const FORM_ITEMS_KEYS = ['startAfter', 'stopAt', 'patterns'];
+const FORM_TRADE_TOP_LEVEL_KEYS = ['version', 'source', 'trade', ...GUARD_FIELDS];
+const FORM_TRADE_KEYS = [...TRADE_PATTERN_FIELDS.map(([key]) => key), 'accountRules', 'defaultAccountId', 'currencyMarkers'];
+const FORM_TRADE_RULE_KEYS = ['match', 'accountId', 'currency'];
+const FORM_TRADE_MARKER_KEYS = ['match', 'currency'];
 const FORM_MATCH_KEYS = ['by', 'referenceIn', 'daysBefore', 'daysAfter', 'amountTolerance'];
 
 /** A list of distinct values from a closed set, as the form's checkboxes hold them. */
@@ -423,6 +614,7 @@ const onlyKeys = (value: Record<string, unknown>, allowed: readonly string[]): b
  */
 export function formCanRepresent(value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (value.trade !== undefined) return formCanRepresentTrade(value);
   if (!onlyKeys(value, FORM_TOP_LEVEL_KEYS)) return false;
   if (value.source !== undefined && !RECEIPT_LINES_SOURCES.includes(value.source as ReceiptLinesSource)) return false;
   for (const field of ['orderId', 'total', 'shipping', 'discount', 'fees', 'reference']) {
@@ -443,6 +635,44 @@ export function formCanRepresent(value: unknown): boolean {
     if (name !== undefined && typeof name !== 'string') return false;
   }
   return true;
+}
+
+/** A list of objects with only these keys, each a string, as the rows of the form hold them. */
+const rowsOf = (value: unknown, keys: readonly string[], required: readonly string[]): boolean =>
+  value === undefined ||
+  (Array.isArray(value) &&
+    value.every(
+      (row) =>
+        isRecord(row) &&
+        onlyKeys(row, keys) &&
+        required.every((key) => typeof row[key] === 'string') &&
+        // An optional key the form writes only when filled: an empty one would be dropped.
+        keys.every((key) => required.includes(key) || row[key] === undefined || (typeof row[key] === 'string' && row[key] !== '')),
+    ));
+
+/**
+ * Can the form show this trade profile without losing any of it? The same
+ * rule as a receipt profile: plain line patterns only (a labelled entry is
+ * edited as JSON), no key the form has no field for, and no receipt key beside
+ * the `trade` section (the server refuses that mix, so the JSON shows it as it is).
+ */
+function formCanRepresentTrade(value: Record<string, unknown>): boolean {
+  if (!onlyKeys(value, FORM_TRADE_TOP_LEVEL_KEYS)) return false;
+  if (value.source !== undefined && !RECEIPT_LINES_SOURCES.includes(value.source as ReceiptLinesSource)) return false;
+  if (!GUARD_FIELDS.every((field) => onlyStrings(value[field]))) return false;
+  const trade = value.trade;
+  if (!isRecord(trade) || !onlyKeys(trade, FORM_TRADE_KEYS)) return false;
+  if (!TRADE_PATTERN_FIELDS.every(([key]) => onlyStrings(trade[key]))) return false;
+  if (!rowsOf(trade.accountRules, FORM_TRADE_RULE_KEYS, ['match', 'accountId'])) return false;
+  if (!rowsOf(trade.currencyMarkers, FORM_TRADE_MARKER_KEYS, ['match', 'currency'])) return false;
+  // A row the form would drop as blank is something the form cannot hold.
+  if (records(trade.accountRules).some((rule) => rule.match === '' && rule.accountId === '' && rule.currency === undefined)) {
+    return false;
+  }
+  if (records(trade.currencyMarkers).some((marker) => marker.match === '' && marker.currency === '')) return false;
+  return (
+    trade.defaultAccountId === undefined || (typeof trade.defaultAccountId === 'string' && trade.defaultAccountId !== '')
+  );
 }
 
 /** The definition as the JSON editor shows it: indented, so a person can read and edit it. */
@@ -493,6 +723,10 @@ export const PARSER_VALIDATION_CODES = [
   'invalid_value',
   'duplicate_entry',
   'reference_field_missing',
+  'trade_conflict',
+  'trade_amount_missing',
+  'trade_account_missing',
+  'invalid_currency',
 ] as const;
 
 const PROBLEM = new RegExp(

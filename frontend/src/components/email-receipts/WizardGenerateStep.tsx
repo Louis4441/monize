@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AxiosError } from 'axios';
 import { useTranslations } from 'next-intl';
-import type { ChosenTransaction, WizardDraft } from '@/components/email-receipts/profile-wizard-types';
+import type { ChosenTransaction, WizardDraft, WizardKind } from '@/components/email-receipts/profile-wizard-types';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
@@ -19,12 +19,16 @@ const FEEDBACK_MAX = 2000;
 
 export interface WizardSample {
   receiptId: string;
-  chosen: ChosenTransaction;
+  /** The transaction the email paid for; null for a trade confirmation, which pays none. */
+  chosen: ChosenTransaction | null;
+  /** The email's subject, shown for a sample with no transaction. */
+  subject: string;
 }
 
 interface WizardGenerateStepProps {
   domain: string;
   samples: readonly WizardSample[];
+  kind: WizardKind;
   /** The draft being revised; null for the first run. */
   draft: WizardDraft | null;
   onGenerated: (draft: WizardDraft, answer: string) => void;
@@ -56,7 +60,7 @@ function readRefusal(error: unknown): { answer: string | null; message: string |
  * shows what the assistant answered, and the person can send it again. With a draft
  * already (the "Back to AI" path) a note to the assistant is required.
  */
-export function WizardGenerateStep({ domain, samples, draft, onGenerated, onQueued, onBack }: WizardGenerateStepProps) {
+export function WizardGenerateStep({ domain, samples, kind, draft, onGenerated, onQueued, onBack }: WizardGenerateStepProps) {
   const t = useTranslations('emailReceipts.profileWizard.generate');
   const [phase, setPhase] = useState<Phase>({ status: 'idle' });
   const [feedback, setFeedback] = useState('');
@@ -66,14 +70,15 @@ export function WizardGenerateStep({ domain, samples, draft, onGenerated, onQueu
 
   const send = async () => {
     setPhase({ status: 'running' });
-    const pairs: ParserSamplePair[] = samples.map((sample) => ({
-      receiptId: sample.receiptId,
-      transactionId: sample.chosen.transactionId,
-    }));
+    const pairs: ParserSamplePair[] = samples.flatMap((sample) =>
+      sample.chosen ? [{ receiptId: sample.receiptId, transactionId: sample.chosen.transactionId }] : [],
+    );
     try {
       const result = await emailReceiptsApi.parsers.generateWithAi({
         domain,
-        samples: pairs,
+        ...(kind === 'trade'
+          ? { kind: 'trade' as const, tradeReceiptIds: samples.map((sample) => sample.receiptId) }
+          : { samples: pairs }),
         ...(draft ? { parserId: draft.parserId } : {}),
         ...(draft && note !== '' ? { feedback: note } : {}),
       });
@@ -96,12 +101,12 @@ export function WizardGenerateStep({ domain, samples, draft, onGenerated, onQueu
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-600 dark:text-gray-400">{revising ? t('reviseHelp') : t('help', { domain })}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{revising ? t('reviseHelp') : kind === 'trade' ? t('tradeHelp', { domain }) : t('help', { domain })}</p>
       <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 text-sm dark:divide-gray-700 dark:border-gray-700">
         {samples.map((sample) => (
           <li key={sample.receiptId} className="p-3">
-            <div className="font-medium text-gray-900 dark:text-gray-100">{sample.chosen.subject}</div>
-            <div className="text-gray-600 dark:text-gray-400">{sample.chosen.summary}</div>
+            <div className="font-medium text-gray-900 dark:text-gray-100">{sample.chosen?.subject ?? sample.subject}</div>
+            <div className="text-gray-600 dark:text-gray-400">{sample.chosen ? sample.chosen.summary : t('tradeSample')}</div>
           </li>
         ))}
       </ul>

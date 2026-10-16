@@ -93,7 +93,7 @@
         "automatic": "检查邮箱时，对于已匹配但已批准的解析器无法完整读取的收据，会询问 AI；对于没有解析器的发件人，会起草解析器。"
       },
       "autoApplyLabel": "自动应用提议",
-      "autoApplyHelp": "默认关闭。仅当以下条件全部满足时，提议才会不经询问直接应用：已批准的配置文件读取了整封邮件；通过订单号或参考号，或通过完全一致的金额和收款人找到了交易，且只有一个候选；提议的合计精确到最小货币单位。其他情况都会等待您的批准。",
+      "autoApplyHelp": "默认关闭。仅当以下条件全部满足时，提议才会不经询问直接应用：已批准的配置文件读取了整封邮件；通过订单号或参考号，或通过完全一致的金额和收款人找到了交易，且只有一个候选；提议的合计精确到最小货币单位。仅当交易配置文件已批准、读取了完整的交易、价格与份数和合计相符，且您的账户中尚无相同的交易时，交易确认邮件才会不经询问直接记账。其他情况都会等待您的批准。",
       "profileLimitLabel": "将配置文件的提议计入每日 AI 上限",
       "profileLimitHelp": "默认开启：配置文件根据邮件提出的修改，与其他 AI 提议一样，计入 AI 提议更改的每日上限。如果大批已保存的邮件会耗尽该上限，请将其关闭。只有来自配置文件的提议可免计；每条提议仍需等待您的批准。"
     },
@@ -177,14 +177,15 @@
       "confirm": "立即处理",
       "later": "暂不处理"
     },
-    "reparse": "重新解析邮件（{count}）"
+    "reparse": "重新解析邮件（{count}）",
+    "kindTrade": "证券交易"
   },
   "editor": {
     "createTitle": "新建解析器",
     "editTitle": "编辑解析器",
-    "loading": "正在加载收款人和类别",
+    "loading": "正在加载收款方、类别、账户和货币",
     "lookupsError": {
-      "title": "无法加载收款人和类别",
+      "title": "无法加载收款方、类别、账户或货币",
       "body": "选择器需要它们，因此编辑器暂时无法打开。请重试。",
       "retry": "重试"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "标签名称",
       "aiCategoriesLabel": "让 AI 为没有规则匹配的商品选择类别",
       "aiCategoriesHelp": "当商品不匹配任何类别规则且没有默认类别时，会请 AI 从您的类别列表中为其选择类别。提议中会将该选择标记为 AI 所选。关闭后，永远不会询问 AI。"
+    },
+    "kind": {
+      "label": "配置文件类型",
+      "receipt": "订单收据",
+      "trade": "证券交易",
+      "receiptHelp": "读取订单确认邮件，并找到为其付款的银行交易。",
+      "tradeHelp": "读取券商的成交确认邮件，并提议其中报告的投资交易，即一笔买入或卖出。"
+    },
+    "trade": {
+      "guardsHeading": "读取发件人的哪些邮件",
+      "guardsHelp": "可选。每个模式与邮件的一整行匹配，每行一个模式。",
+      "guards": {
+        "requireLine": "必需的行",
+        "requireLineHint": "仅当邮件包含其中一行时才读取；否则尝试该发件人的下一个配置文件。",
+        "skipIfLine": "使邮件被跳过的行",
+        "skipIfLineHint": "包含其中一行的邮件会被搁置，例如已取消的委托。",
+        "waitIfLine": "使邮件暂缓处理的行",
+        "waitIfLineHint": "包含其中一行的邮件会被暂缓，稍后再读取，例如部分成交。"
+      },
+      "fieldsHeading": "交易",
+      "fieldsHelp": "买入或卖出、代码和股数为必填，另需合计或价格。每个字段每行一个模式，按顺序尝试。",
+      "fields": {
+        "tradeAction": "买入或卖出模式",
+        "tradeSymbol": "代码模式",
+        "tradeQuantity": "股数模式",
+        "tradeTotal": "交易合计模式",
+        "tradePrice": "每股价格模式",
+        "tradeCommission": "佣金模式",
+        "tradeDate": "交易日期模式",
+        "tradeAccount": "账户模式"
+      },
+      "fieldHint": "必须捕获 {capture}。示例：{example}",
+      "amountsHelp": "合计是成交金额，买入时含佣金。价格用于核对，邮件未写合计时由价格得出合计。注明货币的金额（US$、C$、USD、€）也决定交易的货币。",
+      "rulesHeading": "账户规则",
+      "rulesHelp": "交易记入哪个账户。规则按顺序与账户模式读取的账户文本匹配，第一个适用的规则生效；{star} 表示任意文本。带货币的规则只适用于该货币的交易，因此券商写法相同的两个账户，例如都显示为 RRSP 的 CAD RRSP 和 USD RRSP，就是文本相同、货币不同的两条规则。邮件未写账户文本时，只有文本为 {star} 的规则可以适用。其余的由默认账户处理。",
+      "currencyOrder": "交易的货币按以下顺序确定：金额本身注明货币时取该货币（US$、C$、USD、€），其次是下方第一个与邮件某行匹配的货币标记，再次是您该代码证券的货币。带货币的规则从不猜测：三者都无法说明货币时，邮件会等待您处理，而不会记入任何一个账户。",
+      "ruleMatchLabel": "规则 {rule} 的账户文本",
+      "ruleMatchPlaceholder": "账户文本，例如 RRSP",
+      "ruleCurrencyLabel": "规则 {rule} 的货币",
+      "ruleAccountLabel": "规则 {rule} 的账户",
+      "ruleMoveUp": "上移规则 {rule}",
+      "ruleMoveDown": "下移规则 {rule}",
+      "ruleRemove": "删除规则 {rule}",
+      "ruleAdd": "添加账户规则",
+      "rulesMax": "最多 {max} 条规则。",
+      "rulesWithoutAccountText": "没有账户模式，因此规则与空文本匹配：只有文本为 {star} 的规则可以适用。",
+      "anyCurrency": "任意货币",
+      "baseCurrency": "{code}（您的基础货币）",
+      "currencyPlaceholder": "选择货币",
+      "accountPlaceholder": "选择账户",
+      "accountOption": "{name}（{currency}）",
+      "accountNotTradableOption": "{name}（不是开放的证券账户）",
+      "accountUnknownOption": "不在您列表中的账户",
+      "accountNotTradable": "无法将交易记入此账户：它已关闭、是现金账户或不是投资账户。",
+      "accountUnknown": "此账户不在您的列表中：可能已被删除。请选择其他账户。",
+      "defaultAccountLabel": "默认账户",
+      "defaultAccountNone": "无默认账户",
+      "defaultAccountHint": "没有规则适用时使用的账户。没有默认账户时，没有规则适用的邮件会等待您处理。",
+      "markersHeading": "货币标记",
+      "markersHelp": "在金额未注明货币时说明交易货币的文本，例如在单独的 $ 旁边写明金额以美元计的一行。每个标记与邮件的每一行匹配（{star} 表示任意文本），按顺序第一个匹配的标记决定货币。仅当金额未注明货币时才使用标记。",
+      "markerMatchLabel": "标记 {marker} 的文本",
+      "markerMatchPlaceholder": "例如 *U.S. dollars*",
+      "markerCurrencyLabel": "标记 {marker} 的货币",
+      "markerMoveUp": "上移标记 {marker}",
+      "markerMoveDown": "下移标记 {marker}",
+      "markerRemove": "删除标记 {marker}",
+      "markerAdd": "添加货币标记",
+      "markersMax": "最多 {max} 个标记。"
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "要跳过的行 {line}",
       "recordStep": "记录步骤 {step}",
       "recordStepPart": "记录步骤 {step}，{part}",
-      "recordAlternative": "记录步骤 {step}，备选项 {alternative}"
+      "recordAlternative": "记录步骤 {step}，备选项 {alternative}",
+      "accountRule": "账户规则 {rule}",
+      "accountRulePart": "账户规则 {rule}，{part}",
+      "currencyMarker": "货币标记 {marker}",
+      "currencyMarkerPart": "货币标记 {marker}，{part}"
     },
     "fields": {
       "orderId": "订单号模式",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "购买后的天数",
       "matchTolerance": "金额容差",
       "tag": "标签",
-      "aiCategories": "AI 类别"
+      "aiCategories": "AI 类别",
+      "trade": "交易部分",
+      "tradeAction": "买入或卖出模式",
+      "tradeSymbol": "代码模式",
+      "tradeQuantity": "股数模式",
+      "tradeTotal": "交易合计模式",
+      "tradePrice": "每股价格模式",
+      "tradeCommission": "佣金模式",
+      "tradeDate": "交易日期模式",
+      "tradeAccount": "账户模式",
+      "accountRules": "账户规则",
+      "currencyMarkers": "货币标记",
+      "defaultAccount": "默认账户",
+      "ruleAccount": "账户",
+      "ruleCurrency": "货币"
     },
     "codes": {
       "not_object": "不是有效的定义",
@@ -376,7 +463,12 @@
       "duplicate_entry": "重复列出了同一条目",
       "reference_field_missing": "需要参考号模式（参考号策略已开启）",
       "out_of_range_days": "必须是 0 到 {max} 之间的整数",
-      "out_of_range_tolerance": "必须是 0.00 到 {max} 之间的金额"
+      "out_of_range_tolerance": "必须是 0.00 到 {max} 之间的金额",
+      "trade_conflict": "不能出现在只读取交易的证券交易配置文件中",
+      "trade_amount_missing": "需要合计或价格模式（至少其一）",
+      "trade_account_missing": "需要默认账户或账户规则",
+      "invalid_currency": "不是 3 个字母的货币代码，例如 USD",
+      "invalid_uuid_account": "不是有效的账户"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "必需的行",
         "skipIfLine": "跳过行",
         "waitIfLine": "暂缓行",
-        "reference": "参考号"
+        "reference": "参考号",
+        "action": "买入或卖出",
+        "symbol": "代码",
+        "quantity": "股数",
+        "price": "价格",
+        "commission": "佣金",
+        "date": "日期",
+        "account": "账户",
+        "currency": "货币标记"
       },
       "entryLine": "条目 {entry}（{pattern}），第 {line} 行：{text}",
       "entrySubject": "条目 {entry}（{pattern}），主题：{text}",
@@ -553,10 +653,12 @@
       "reprocess": "重新处理",
       "link": "选择交易",
       "recognizeAi": "用 AI 识别",
+      "recognizeTradeAi": "用 AI 识别为交易",
       "approve": "批准",
       "draftParser": "使用 AI 准备配置文件",
       "createParser": "创建配置文件",
-      "ignore": "忽略"
+      "ignore": "忽略",
+      "reviewTrade": "在收件箱中审核"
     },
     "toasts": {
       "approved": "提议已批准",
@@ -592,8 +694,11 @@
       "handoffFailed": "请求已排队，但无法在聊天中打开这些邮件。它会在 AI 审核收件箱中等待代理处理。",
       "inboxLink": "打开 AI 审核收件箱",
       "opened": "已打开聊天并附上这些邮件。请阅读消息并点击“发送”。",
-      "chatPrompt": "请为来自 {domain} 的{count, plural, one {这封订单邮件} other {这 # 封订单邮件}}构建一个邮件收据解析器。请认领 AI 审核请求 {requestId}，用 email_receipt_parsers 工具在每封所附邮件上测试你的解析器，修改到每封都能完整读取，然后将其保存为请求 {requestId} 的草稿。"
-    }
+      "chatPrompt": "请为来自 {domain} 的{count, plural, one {这封订单邮件} other {这 # 封订单邮件}}构建一个邮件收据解析器。请认领 AI 审核请求 {requestId}，用 email_receipt_parsers 工具在每封所附邮件上测试你的解析器，修改到每封都能完整读取，然后将其保存为请求 {requestId} 的草稿。",
+      "mixedKinds": "所选邮件中混有交易确认邮件和订单邮件。一个配置文件只读取一种邮件，请只选择交易确认邮件或只选择订单邮件。",
+      "chatPromptTrade": "请为来自 {domain} 的{count, plural, one {这封交易确认邮件} other {这 # 封交易确认邮件}}构建一个交易配置文件。请认领 AI 审核请求 {requestId}，用 email_receipt_parsers 工具在每封所附邮件上测试你的配置文件，修改到每封都能读取出完整的交易，然后将其保存为请求 {requestId} 的草稿。"
+    },
+    "tradeBadge": "交易"
   },
   "detail": {
     "title": "邮件收据",
@@ -644,11 +749,22 @@
       "wait_line": "有一行表明订单尚未最终确定，因此稍后会再次读取该邮件。",
       "no_html": "此解析器读取邮件的 HTML 部分，而这封邮件没有 HTML。",
       "schema_org": "无需解析器：订单是从邮件中的结构化数据（schema.org）读取的。",
-      "item_amount_missing": "某个明细没有金额，而邮件中也没有可分配给它的单一合计。"
+      "item_amount_missing": "某个明细没有金额，而邮件中也没有可分配给它的单一合计。",
+      "trade_no_action": "解析器在这封邮件中没有找到买入或卖出。",
+      "trade_no_symbol": "解析器在这封邮件中没有找到股票代码。",
+      "trade_no_quantity": "解析器在这封邮件中没有找到份数。",
+      "trade_no_amount": "解析器在这封邮件中既没有找到合计，也没有找到价格。",
+      "trade_no_account": "解析器无法判断这笔交易属于哪个账户。",
+      "trade_exists": "你的账户中已有这笔交易，因此没有提出任何建议。",
+      "trade_linked": "已关联到它所报告的交易，因此没有提出任何建议。",
+      "trade_no_currency": "配置文件无法判断这笔交易的币种，因此无法选择其账户。"
     },
     "reasonUnknown": "原因：{reason}",
     "requestNote": "审核请求（{state}）：{note}",
     "parsedHeading": "解析器读取的内容",
+    "tradeHeading": "从邮件中读取的交易",
+    "tradeCandidatesHeading": "可能是这笔交易的现有交易",
+    "tradeCandidatesHelp": "这些投资交易可能就是这封邮件报告的交易。请关联正确的一笔：不会创建新交易，它所支付的计划账单或存款会被标记为已付款。",
     "notParsed": "尚未从这封邮件中读取到任何内容。",
     "candidatesHeading": "匹配的交易",
     "candidatesHelp": "有多笔交易与这封邮件同样匹配。请选择它所支付的那一笔。",
@@ -688,7 +804,15 @@
       "capped": "仅读取前 {max} 行。",
       "empty": "没有行。",
       "listLabel": "邮件的编号行"
-    }
+    },
+    "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {买入} other {卖出}} {quantity} 股 {symbol}。",
+    "noTradeTransaction": "暂无：批准提议后会记账这笔交易，或将其关联到账本中已有的交易。",
+    "candidateShares": "{quantity} 股",
+    "tradeNoCandidates": "在交易日前后一周内，没有此账户、方向和代码的可关联投资交易。如果您自己录入过这笔交易，请检查其账户和日期；否则请在审核收件箱中批准提议。",
+    "aiTradeHeading": "AI 代理提议的交易",
+    "aiTradeReader": "无：AI 代理将其作为交易读取",
+    "noAiTradeTransaction": "暂无：批准 AI 代理的提议后会记账这笔交易。",
+    "tradeProposalHeading": "其提议将记入的内容"
   },
   "picker": {
     "heading": "选择交易",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "用 AI 识别",
+    "tradeTitle": "用 AI 识别为交易",
+    "tradeMessage": "AI 会把这封邮件当作券商的交易确认来读取，并提出它所报告的投资交易（账户、买入或卖出、股票代码、份数和合计）。在你批准之前不会保存任何内容。",
+    "tradeConfirm": "识别为交易",
     "transactionSummary": "{date}，{amount}，{payee}",
     "noPayee": "无收款人",
     "confirmMessage": "此邮件已关联到交易 {summary}。AI 将读取邮件，并提议如何按商品拆分这笔交易。要使用这笔交易继续吗？",
@@ -765,7 +892,9 @@
     "handoffFailed": "请求已排队，但无法在聊天中打开该邮件。它会在 AI 审核收件箱中等待代理（例如通过 MCP）处理。",
     "inboxLink": "打开 AI 审核收件箱",
     "opened": "已打开聊天并附上该邮件。请阅读消息并点击“发送”。",
-    "chatPrompt": "请识别所附订单邮件中的商品、数量和价格，并将我 {date} 的交易（{payee}，{amount}）按商品拆分，并为每项指定类别。请认领 AI 审核请求 {requestId}，并为它提交你的提议。"
+    "chatPrompt": "请识别所附订单邮件中的商品、数量和价格，并将我 {date} 的交易（{payee}，{amount}）按商品拆分，并为每项指定类别。请认领 AI 审核请求 {requestId}，并为它提交你的提议。",
+    "tradeChatPrompt": "识别所附券商确认邮件中的交易：账户、是买入还是卖出、股票代码、份数、成交合计和日期。领取 AI 审核请求 {requestId} 并为它提交这笔交易。",
+    "tradeDetachesTransaction": "按交易读取后，此邮件不再对应 {summary}：该交易会创建自己的投资交易。"
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "没有任何已保存的邮件的发件人位于 {domain}。"
       },
       "help": "点击邮件进行阅读，并选择它所支付的交易。然后勾选最多 {max} 封邮件，用来编写配置文件；邮件只有在有了交易之后才能勾选。",
+      "tradeToggle": "这些邮件是券商的交易确认（它们会创建投资交易，因此不配对银行交易）",
+      "tradeHelp": "点击邮件阅读，然后勾选最多 {max} 封交易确认来编写解析器。无需选择交易。",
       "columns": {
         "select": "使用",
         "date": "日期",
@@ -913,6 +1044,7 @@
       "needsTransaction": "请先为这封邮件选择交易。",
       "limitReached": "最多 {max} 个样本。取消勾选一个后才能选择其他的。",
       "noTransaction": "未选择",
+      "tradeNoTransaction": "交易确认不需要",
       "selectedCount": "已勾选 {count}/{max} 个样本",
       "continue": "继续前往助手",
       "emailLoading": "正在加载邮件",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "助手会阅读这些邮件及其所支付的交易，并为 {domain} 编写配置文件草稿。目前尚未批准任何内容。",
       "reviseHelp": "告诉助手需要更改什么。它会根据这些邮件和交易更新同一份草稿。",
+      "tradeHelp": "助手会读取这些交易确认，并为 {domain} 编写一个解析器草稿，提出每封邮件所报告的投资交易。目前还没有批准任何内容。",
+      "tradeSample": "交易确认",
       "feedbackLabel": "需要更改什么",
       "feedbackPlaceholder": "例如：合计是标有“实付金额”的那一行，而不是小计。",
       "send": "发送给 AI",
@@ -969,6 +1103,8 @@
       "parsedDate": "日期：{date}",
       "parsedTotal": "合计：{total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
+      "parsedTrade": "{action, select, BUY {买入} other {卖出}} {quantity} 份 {symbol}",
+      "tradeInconsistent": "价格与合计不符，因此不会自动应用",
       "noExpectation": "无",
       "noMatch": "无交易",
       "agreesYes": "是",
@@ -991,8 +1127,37 @@
         "not_applicable": "此配置文件未读取",
         "skip_line": "已跳过（发现跳过行）",
         "wait_line": "已搁置（订单未最终确定）",
-        "no_html": "没有 HTML 部分"
-      }
+        "no_html": "没有 HTML 部分",
+        "trade": "提出一笔交易",
+        "trade_exists": "已在账本中"
+      },
+      "parsedTradeAccount": "账户：{account}",
+      "accountWithCurrency": "{name}（{currency}）",
+      "accountUnknown": "未知",
+      "parsedTradeNoAccount": "未找到这笔交易的账户",
+      "parsedTradeCurrency": "币种：{currency}"
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {买入} other {卖出}}：{quantity} 份 {symbol}，金额 {total}，日期 {date}。",
+    "account": "邮件中注明的账户：{account}",
+    "priceMismatch": "平均价格与份数和合计不符，因此这笔交易不会自动应用。",
+    "incomplete": "解析器无法从这封邮件中读取完整的交易。",
+    "totalFromPrice": "由价格推算出的合计",
+    "dateUnknown": "邮件到达的当天",
+    "price": "邮件中的平均价格：每股 {price}",
+    "proposalSecurity": "证券：{name}",
+    "proposalAccount": "账户：{account}",
+    "proposalPrice": "价格：每股 {price}",
+    "proposalCommission": "佣金：{commission}",
+    "proposalReview": "在你批准之前不会记账。",
+    "proposalReviewLink": "在收件箱中审阅",
+    "aiWaiting": "AI 代理尚未提议这笔交易。提议会显示在这里和审阅收件箱中。",
+    "aiBooked": "已根据 AI 代理的提议记账：请查看上方的交易。",
+    "aiNoProposal": "此邮件没有等待处理的 AI 代理提议。",
+    "currencyFrom": "货币：{currency}，{source, select, amount {由金额注明} marker {来自配置文件的货币标记} other {来自您该代码的证券}}",
+    "bookTo": "记入：{account}",
+    "bookToNotTradable": "记入 {account}，但它不是开放的证券账户，因此交易无法记入该账户。",
+    "bookToUnknown": "记入不在您列表中的账户，因此交易无法记入该账户。"
   }
 }

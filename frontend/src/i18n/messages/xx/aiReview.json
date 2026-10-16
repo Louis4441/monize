@@ -38,11 +38,14 @@
     "transactionMissing": "[XX-This transaction no longer exists-XX]",
     "rule": "[XX-Rule: {name}-XX]",
     "manualRequest": "[XX-Requested manually-XX]",
+    "trade": "[XX-{action, select, BUY {Buy {quantity} shares of {symbol}} other {Sell {quantity} shares of {symbol}}}-XX]",
     "receiptInstruction": {
       "automatic": "[XX-Enrich this transaction from the attached order email: split it by line items with a category each, or set the description.-XX]",
       "chat": "[XX-You asked for the attached order email to be recognized: split this transaction by product with a category each, or set the description.-XX]",
       "categorize": "[XX-Assign a category to each item of the attached order email that no rule categorized, then propose the split of this transaction or set the description.-XX]",
-      "parsed": "[XX-A saved parser read the order email and proposes these category lines and this description for the transaction.-XX]"
+      "parsed": "[XX-A saved parser read the order email and proposes these category lines and this description for the transaction.-XX]",
+      "trade": "[XX-A trade confirmation email read by a saved profile proposes this investment transaction. Check the account, the security, the shares and the total against your brokerage before approving.-XX]",
+      "tradeChat": "[XX-You asked for the attached trade confirmation to be recognized: propose the investment transaction it reports.-XX]"
     },
     "emailReceipt": "[XX-Email receipt: {subject} from {sender}-XX]",
     "emailReceiptMissing": "[XX-Email receipt (the email was deleted)-XX]",
@@ -52,7 +55,9 @@
     "dates": "[XX-Created {created}, expires {expires}-XX]",
     "viewTransaction": "[XX-View transaction-XX]",
     "waitingForAgent": "[XX-Waiting for an AI agent. <link>Connect an AI provider in Settings</link>, or let an MCP client claim it.-XX]",
-    "parserDraftReady": "[XX-Draft profile ready. <link>Test and approve it in the profile settings</link>.-XX]"
+    "parserDraftReady": "[XX-Draft profile ready. <link>Test and approve it in the profile settings</link>.-XX]",
+    "tradePending": "[XX-A trade from an email, not read yet-XX]",
+    "tradeEmail": "[XX-Trade confirmation email-XX]"
   },
   "actions": {
     "dismiss": "[XX-Dismiss-XX]"

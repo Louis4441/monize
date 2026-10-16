@@ -209,11 +209,11 @@ export const emailReceiptsApi = {
      * one named. No provider is called: the request waits, pending, for the
      * assistant in the chat (or an MCP agent) to claim it by id.
      */
-    askAi: async (id: string, transactionId?: string): Promise<EmailReceiptAskAiResult> => {
-      const response = await apiClient.post<EmailReceiptAskAiResult>(
-        `${RECEIPTS}/${id}/ask-ai`,
-        transactionId === undefined ? {} : { transactionId },
-      );
+    askAi: async (id: string, transactionId?: string, options: { asTrade?: boolean } = {}): Promise<EmailReceiptAskAiResult> => {
+      const response = await apiClient.post<EmailReceiptAskAiResult>(`${RECEIPTS}/${id}/ask-ai`, {
+        ...(transactionId === undefined ? {} : { transactionId }),
+        ...(options.asTrade ? { asTrade: true } : {}),
+      });
       return response.data;
     },
   },
@@ -257,10 +257,15 @@ export const emailReceiptsApi = {
      * Queue a request for the assistant (or an MCP agent) to write a parser from
      * 1 to 5 stored emails. No provider is called: the request waits, pending,
      * for whoever claims it by id; the draft it produces reads nothing until approved.
+     * `kind: 'trade'` asks for a trade profile (trade confirmations); left out, a receipt profile.
      */
-    draftWithAi: async (receiptIds: readonly string[]): Promise<EmailReceiptParserDraftRequestResult> => {
+    draftWithAi: async (
+      receiptIds: readonly string[],
+      kind: 'receipt' | 'trade' = 'receipt',
+    ): Promise<EmailReceiptParserDraftRequestResult> => {
       const response = await apiClient.post<EmailReceiptParserDraftRequestResult>(`${PARSERS}/draft-with-ai`, {
         receiptIds,
+        ...(kind === 'trade' ? { kind } : {}),
       });
       return response.data;
     },

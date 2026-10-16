@@ -354,6 +354,21 @@ describe("AiActionBuilderService", () => {
       investmentAction: InvestmentAction.BUY,
       totalAmount: 2001,
     });
+    expect(action.preview).not.toHaveProperty("scheduledName");
+
+    // A trade that pays a scheduled occurrence names it, and the due date the
+    // card was built for, on the card as well as in the signed descriptor.
+    const paying = builder.buildCreateInvestmentTransaction("u1", preview, {
+      scheduled: { id: "sch-1", name: "Monthly VTI", dueDate: "2025-03-04" },
+    });
+    expect(paying.descriptor).toMatchObject({
+      scheduledTransactionId: "sch-1",
+      scheduledDueDate: "2025-03-04",
+    });
+    expect(paying.preview).toMatchObject({
+      scheduledName: "Monthly VTI",
+      scheduledDueDate: "2025-03-04",
+    });
   });
 
   it("builds a bulk create_transactions action: signed rows are the valid ones, preview rows include flagged", () => {

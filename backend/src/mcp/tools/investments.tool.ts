@@ -75,7 +75,7 @@ import {
 import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 
 type ManageInvOperation = "create" | "update" | "delete";
-type ManageSecOperation = "create" | "update" | "delete";
+type ManageSecOperation = "create" | "update" | "delete" | "list";
 
 interface ManageInvItem {
   // create
@@ -370,85 +370,92 @@ export class McpInvestmentsTools {
         title: "Manage securities",
         annotations: WRITE,
         description:
-          "Create, edit or delete securities. A create is validated against " +
-          "the user's price provider, which supplies the official symbol, " +
-          "name, exchange, type and currency -- do not invent them; pass " +
-          "`exchange` only to disambiguate a symbol trading in more than one " +
-          "place. An update identifies the security by symbol or name. " +
-          "A delete fails while the security still has holdings or " +
+          "List, create, edit or delete securities. list takes accountName " +
+          "(name or id) and returns what it holds, with no items. A create " +
+          "is validated against the price provider, which supplies the " +
+          "official symbol, name, exchange, type and currency -- do not " +
+          "invent them; pass `exchange` only to disambiguate a symbol listed " +
+          "in more than one place. An update identifies the security by " +
+          "symbol or name. A delete fails while it has holdings or " +
           "transactions.",
         inputSchema: z.object({
-          operation: manageOperation(),
-          items: itemsArray(
-            z.object({
-              query: z
-                .string()
-                .min(1)
-                .max(100)
-                .optional()
-                .describe("create: ticker or name to look up and validate."),
-              symbol: z
-                .string()
-                .min(1)
-                .max(100)
-                .optional()
-                .describe("update/delete: the security's ticker or name."),
-              exchange: z
-                .enum(SECURITY_EXCHANGES)
-                .optional()
-                .describe(
-                  "create: disambiguates the lookup. update: the new exchange.",
-                ),
-              securityType: z
-                .enum(SECURITY_TYPES)
-                .optional()
-                .describe("The security type."),
-              isFavourite: booleanArg()
-                .optional()
-                .describe("Pin it to the dashboard's favourites widget."),
-              currencyCode: z
-                .string()
-                .regex(/^[A-Za-z]{3}$/)
-                .optional()
-                .describe("ISO 4217 currency code."),
-              countryWeightings: z
-                .array(
-                  z.object({
-                    name: z
-                      .string()
-                      .min(1)
-                      .max(100)
-                      .describe("Country name, canonical where possible."),
-                    weight: numberArg(z.number().min(0).max(100)).describe(
-                      "Percentage 0-100.",
-                    ),
-                  }),
-                )
-                .max(60)
-                .optional()
-                .describe(
-                  "update: manual country allocation for a fund. Weights are percentages and need not reach 100; the rest is 'Other'.",
-                ),
-              assetWeightings: z
-                .array(
-                  z.object({
-                    name: z
-                      .string()
-                      .min(1)
-                      .max(100)
-                      .describe("Asset class name, free text."),
-                    weight: numberArg(z.number().min(0).max(100)).describe(
-                      "Percentage 0-100.",
-                    ),
-                  }),
-                )
-                .max(60)
-                .optional()
-                .describe(
-                  "update: manual asset-class allocation for a fund, same weighting rule. Names are free text -- reuse the spelling on the user's other securities.",
-                ),
-            }),
-          ),
+          operation: z
+            .enum(["list", "create", "update", "delete"])
+            .describe("list: accountName's holdings. Others: every item."),
+          accountName: z
+            .string()
+            .max(100)
+            .optional()
+            .describe("list: name or id."),
+          items: z
+            .array(
+              z.object({
+                query: z
+                  .string()
+                  .min(1)
+                  .max(100)
+                  .optional()
+                  .describe("create: ticker or name."),
+                symbol: z
+                  .string()
+                  .min(1)
+                  .max(100)
+                  .optional()
+                  .describe("update/delete: ticker or name."),
+                exchange: z
+                  .enum(SECURITY_EXCHANGES)
+                  .optional()
+                  .describe("create: disambiguates. update: the new one."),
+                securityType: z.enum(SECURITY_TYPES).optional(),
+                isFavourite: booleanArg()
+                  .optional()
+                  .describe("Pin to favourites."),
+                currencyCode: z
+                  .string()
+                  .regex(/^[A-Za-z]{3}$/)
+                  .optional()
+                  .describe("ISO 4217."),
+                countryWeightings: z
+                  .array(
+                    z.object({
+                      name: z
+                        .string()
+                        .min(1)
+                        .max(100)
+                        .describe("Country name, canonical where possible."),
+                      weight: numberArg(z.number().min(0).max(100)).describe(
+                        "Percent, 0-100.",
+                      ),
+                    }),
+                  )
+                  .max(60)
+                  .optional()
+                  .describe(
+                    "update: country allocation in percent; the rest is 'Other'.",
+                  ),
+                assetWeightings: z
+                  .array(
+                    z.object({
+                      name: z
+                        .string()
+                        .min(1)
+                        .max(100)
+                        .describe("Asset class name, free text."),
+                      weight: numberArg(z.number().min(0).max(100)).describe(
+                        "Percent, 0-100.",
+                      ),
+                    }),
+                  )
+                  .max(60)
+                  .optional()
+                  .describe(
+                    "update: asset-class allocation, same rule; reuse their spelling.",
+                  ),
+              }),
+            )
+            .max(25)
+            .optional()
+            .describe("The rows to act on (1-25)."),
           approvalMode: approvalMode(),
           dryRun: dryRun(),
         }),
@@ -457,11 +464,28 @@ export class McpInvestmentsTools {
       async (args, ctx) => {
         const user = resolveUserContext(ctx);
         if (!user) return toolError("No user context");
-        const check = requireScope(user.scopes, "write");
+        const operation = args.operation as ManageSecOperation;
+        const check = requireScope(
+          user.scopes,
+          operation === "list" ? "read" : "write",
+        );
         if (check.error) return check.result;
 
-        const operation = args.operation as ManageSecOperation;
-        const items = args.items as ManageSecItem[];
+        if (operation === "list") {
+          try {
+            return await this.listSecuritiesInAccount(
+              user.userId,
+              args.accountName,
+            );
+          } catch (err: unknown) {
+            return safeToolError(err);
+          }
+        }
+
+        const items = args.items as ManageSecItem[] | undefined;
+        if (!items || items.length === 0) {
+          return toolError(`${operation} needs 1-25 items.`);
+        }
         const approvalMode = (args.approvalMode ?? "bulk") as ApprovalMode;
 
         try {
@@ -1278,6 +1302,37 @@ export class McpInvestmentsTools {
   // -------------------------------------------------------------------------
   // manage_securities helpers
   // -------------------------------------------------------------------------
+
+  private async listSecuritiesInAccount(
+    userId: string,
+    accountName: string | undefined,
+  ) {
+    if (!accountName?.trim()) {
+      return toolError("list needs accountName.");
+    }
+    const { match, candidates } =
+      await this.accountsService.resolveBrokerageByNameOrId(
+        userId,
+        accountName,
+      );
+    if (!match) {
+      return toolError(
+        candidates.length > 0
+          ? `"${accountName}" is ambiguous: ${candidates.map((c) => c.name).join(", ")}.`
+          : `Unknown account: ${accountName}. Call list_accounts to look up valid names.`,
+      );
+    }
+    const securities = await this.securitiesService.listSecuritiesInAccount(
+      userId,
+      match.id,
+    );
+    return toolResult({
+      operation: "list",
+      account: match.name,
+      count: securities.length,
+      securities,
+    });
+  }
 
   private toSecCreateRow(item: ManageSecItem): ManageCreateSecurityRow {
     return {

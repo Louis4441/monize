@@ -485,3 +485,90 @@ describe("two samples", () => {
     expect(prompt).toContain(T2);
   });
 });
+
+describe("generating a trade profile", () => {
+  const tradeDto = (over: Record<string, unknown> = {}) =>
+    ({
+      domain: "shop.example.com",
+      kind: "trade",
+      tradeReceiptIds: [R1],
+      ...over,
+    }) as never;
+
+  it("asks for a trade profile over emails only, never reading a transaction", async () => {
+    const { service, aiQuery, manager } = setup({
+      known: [{ id: P_OLD }],
+      after: [{ id: P_NEW, revision: 1 }],
+      receipts: [receipt(R1, { bodyText: "Symbol: XCNS" })],
+    });
+    await expect(service.generate(USER, tradeDto())).resolves.toMatchObject({
+      status: "saved",
+      parserId: P_NEW,
+    });
+    const [, prompt] = aiQuery.executeQuery.mock.calls[0];
+    expect(prompt).toContain("trade-confirmation profile");
+    expect(prompt).toContain("investmentAccounts");
+    expect(prompt).toContain("Symbol: XCNS");
+    expect(prompt).toContain(`receiptIds = ["${R1}"]`);
+    expect(prompt).not.toContain("It paid for this transaction");
+    const sqls = manager.query.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((q) => q.includes("t.currency_code"))).toBe(false);
+  });
+
+  it.each([
+    ["a trade request without tradeReceiptIds", { tradeReceiptIds: undefined }],
+    [
+      "a trade request that also sends samples",
+      { samples: [{ receiptId: R1, transactionId: T1 }] },
+    ],
+    [
+      "a receipt request that sends tradeReceiptIds",
+      {
+        kind: "receipt",
+        samples: [{ receiptId: R1, transactionId: T1 }],
+      },
+    ],
+    [
+      "a receipt request without samples",
+      { kind: undefined, tradeReceiptIds: undefined },
+    ],
+  ])("refuses %s before any provider is called", async (_why, over) => {
+    const { service, aiQuery } = setup({
+      receipts: [receipt(R1, { bodyText: "Symbol: XCNS" })],
+    });
+    await expect(service.generate(USER, tradeDto(over))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(aiQuery.executeQuery).not.toHaveBeenCalled();
+  });
+
+  it("queues the trade instruction for the user's own agent", async () => {
+    const { service, requests } = setup({
+      noDirectProvider: true,
+      relayActive: true,
+    });
+    await service.generate(USER, tradeDto());
+    const [, , input] = requests.queueParserDraft.mock.calls[0];
+    expect(input.emailReceiptIds).toEqual([R1]);
+    expect(input.instruction).toContain("trade-confirmation profile");
+    expect(input.instruction).not.toContain("tx:");
+  });
+
+  it("still refuses an email of another domain, a foreign email and a skipped one before the provider is called", async () => {
+    let h = setup({
+      receipts: [receipt(R1, { fromDomain: "evil-shop.example.com" })],
+    });
+    await expect(h.service.generate(USER, tradeDto())).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    h = setup({ receipts: [] });
+    await expect(h.service.generate(USER, tradeDto())).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    h = setup({ receipts: [receipt(R1, { status: "skipped" })] });
+    await expect(h.service.generate(USER, tradeDto())).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(h.aiQuery.executeQuery).not.toHaveBeenCalled();
+  });
+});

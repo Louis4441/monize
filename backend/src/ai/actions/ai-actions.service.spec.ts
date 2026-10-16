@@ -58,8 +58,10 @@ describe("AiActionsService", () => {
   let attachments: Record<string, jest.Mock>;
   let attachmentStore: Record<string, jest.Mock>;
   let singleUseTokens: SingleUseTokenMock;
+  let scheduled: { post: jest.Mock };
   let aiReviewRequests: {
     markApplied: jest.Mock;
+    markTradeApplied: jest.Mock;
     isExemptFromWriteLimit: jest.Mock;
   };
 
@@ -117,8 +119,10 @@ describe("AiActionsService", () => {
       releaseForPrompt: jest.fn(),
     };
     singleUseTokens = createSingleUseTokenMock();
+    scheduled = { post: jest.fn().mockResolvedValue(null) };
     aiReviewRequests = {
       markApplied: jest.fn().mockResolvedValue(undefined),
+      markTradeApplied: jest.fn().mockResolvedValue(undefined),
       isExemptFromWriteLimit: jest.fn().mockResolvedValue(false),
     };
     service = new AiActionsService(
@@ -134,6 +138,7 @@ describe("AiActionsService", () => {
       {} as never,
       {} as never,
       aiReviewRequests as never,
+      scheduled as never,
     );
   });
 
@@ -1045,6 +1050,194 @@ describe("AiActionsService", () => {
     expect(result).toEqual({
       type: "create_investment_transaction",
       id: "inv-tx-new",
+    });
+  });
+
+  describe("a creation that answers an email_trade request", () => {
+    const TRADE_REQUEST = "70000000-0000-4000-8000-000000000001";
+    /** The write's manager: the ledger check reads through it. */
+    const txManager = (ledgerRows: unknown[] = []) => ({
+      query: jest.fn(async (sql: string, ..._params: unknown[]) =>
+        String(sql).includes("FROM investment_transactions") ? ledgerRows : [],
+      ),
+    });
+
+    beforeEach(() => {
+      aiReviewRequests.markTradeApplied.mockResolvedValue({
+        emailReceiptId: "receipt-1",
+      });
+    });
+
+    it("passes the plain two-argument create when no request is named", async () => {
+      await service.confirm(USER, dtoFor(createInvestmentDescriptor()));
+      expect(investments.create.mock.calls[0]).toHaveLength(2);
+      expect(aiReviewRequests.markTradeApplied).not.toHaveBeenCalled();
+    });
+
+    it("hands create() a hook that marks the request applied on the write's own manager, before the write", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({ aiReviewRequestId: TRADE_REQUEST }),
+        ),
+      );
+      const options = investments.create.mock.calls[0][2];
+      expect(typeof options.beforeWrite).toBe("function");
+      // Nothing is marked outside the write's transaction ...
+      expect(aiReviewRequests.markTradeApplied).not.toHaveBeenCalled();
+      // ... the hook does it on the manager create() passes.
+      const manager = txManager();
+      await options.beforeWrite(manager);
+      expect(aiReviewRequests.markTradeApplied).toHaveBeenCalledWith(
+        manager,
+        USER,
+        TRADE_REQUEST,
+      );
+    });
+
+    it("stores the signed executed total as given (INV-TRADE-001)", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({
+            aiReviewRequestId: TRADE_REQUEST,
+            totalAmount: 1500,
+          }),
+        ),
+      );
+      expect(investments.create.mock.calls[0][1].totalAmount).toBe(1500);
+    });
+
+    it("refuses, inside the write and before it, a trade the ledger gained since the card was built", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({ aiReviewRequestId: TRADE_REQUEST }),
+        ),
+      );
+      const options = investments.create.mock.calls[0][2];
+      const manager = txManager([{ id: "it-auto-posted", claimed: false }]);
+      await expect(options.beforeWrite(manager)).rejects.toThrow(
+        /already has this trade/,
+      );
+      const [, params] = manager.query.mock.calls.find((c) =>
+        String(c[0]).includes("FROM investment_transactions"),
+      ) as [string, unknown[]];
+      // By the card's own security, and the email's own row does not count.
+      expect(params).toEqual(expect.arrayContaining(["receipt-1"]));
+    });
+
+    it("records the row it created on the email, in the write's own transaction", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({ aiReviewRequestId: TRADE_REQUEST }),
+        ),
+      );
+      const options = investments.create.mock.calls[0][2];
+      const manager = txManager();
+      await options.afterWrite(manager, "it-new");
+      const [sql, params] = manager.query.mock.calls[0];
+      expect(String(sql)).toContain("SET investment_transaction_id = $3");
+      expect(params).toEqual([USER, TRADE_REQUEST, "it-new"]);
+    });
+
+    it("posts the scheduled bill it pays instead of creating a second row, marking the request applied in that post", async () => {
+      const SCHEDULE = "80000000-0000-4000-8000-000000000001";
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({
+            aiReviewRequestId: TRADE_REQUEST,
+            scheduledTransactionId: SCHEDULE,
+            scheduledDueDate: "2026-10-16",
+            description: "Email receipt: filled",
+          }),
+        ),
+      );
+      expect(investments.create).not.toHaveBeenCalled();
+      const [user, id, postDto, options] = scheduled.post.mock.calls[0];
+      expect(user).toBe(USER);
+      expect(id).toBe(SCHEDULE);
+      expect(postDto).toEqual({
+        transactionDate: "2026-01-15",
+        investmentQuantity: 10,
+        investmentPrice: 150,
+        description: "Email receipt: filled",
+      });
+      expect(options.expectedDueDate).toBe("2026-10-16");
+      const manager = txManager();
+      await options.beforeWrite(manager);
+      expect(aiReviewRequests.markTradeApplied).toHaveBeenCalledWith(
+        manager,
+        USER,
+        TRADE_REQUEST,
+      );
+    });
+
+    it("posts the schedule with the card's executed total and rate, and returns the row the post created", async () => {
+      const SCHEDULE = "80000000-0000-4000-8000-000000000001";
+      scheduled.post.mockImplementation(
+        async (_u: string, _id: string, _dto: unknown, options: any) => {
+          await options.afterInvestmentWrite(txManager(), "it-posted");
+          return null;
+        },
+      );
+      const result = await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({
+            aiReviewRequestId: TRADE_REQUEST,
+            scheduledTransactionId: SCHEDULE,
+            scheduledDueDate: "2026-10-16",
+            totalAmount: 1500,
+            exchangeRate: 1.37,
+          }),
+        ),
+      );
+      const options = scheduled.post.mock.calls[0][3];
+      expect(options.investmentFigures).toEqual({
+        totalAmount: 1500,
+        exchangeRate: 1.37,
+      });
+      expect(result).toMatchObject({ id: "it-posted" });
+    });
+
+    it("lets the schedule's refusal (it moved on since the card) stop the approval", async () => {
+      scheduled.post.mockRejectedValue(new Error("already posted"));
+      await expect(
+        service.confirm(
+          USER,
+          dtoFor(
+            createInvestmentDescriptor({
+              aiReviewRequestId: TRADE_REQUEST,
+              scheduledTransactionId: "80000000-0000-4000-8000-000000000001",
+              scheduledDueDate: "2026-10-16",
+            }),
+          ),
+        ),
+      ).rejects.toThrow("already posted");
+      expect(investments.create).not.toHaveBeenCalled();
+    });
+
+    it("lets a refusal by the hook stop the creation", async () => {
+      aiReviewRequests.markTradeApplied.mockRejectedValue(
+        new Error("no longer open"),
+      );
+      investments.create.mockImplementation(
+        async (_u: string, _dto: unknown, options: any) => {
+          await options.beforeWrite(txManager());
+          return { id: "inv-tx-new" };
+        },
+      );
+      await expect(
+        service.confirm(
+          USER,
+          dtoFor(
+            createInvestmentDescriptor({ aiReviewRequestId: TRADE_REQUEST }),
+          ),
+        ),
+      ).rejects.toThrow("no longer open");
     });
   });
 

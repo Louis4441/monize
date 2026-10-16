@@ -93,7 +93,7 @@
         "automatic": "[XX-The poll asks the AI about a matched receipt that no approved profile could read completely, and drafts a profile for a sender that has none.-XX]"
       },
       "autoApplyLabel": "[XX-Apply proposals automatically-XX]",
-      "autoApplyHelp": "[XX-Off by default. A proposal is applied without asking only when all of these hold: an approved profile read the whole email, the transaction was found by an order number or a reference, or by exact amount and payee, with a single candidate, and the proposal adds up to the cent. Everything else waits for your approval.-XX]",
+      "autoApplyHelp": "[XX-Off by default. A proposal is applied without asking only when all of these hold: an approved profile read the whole email, the transaction was found by an order number or a reference, or by exact amount and payee, with a single candidate, and the proposal adds up to the cent. A trade confirmation is booked without asking only when its trade profile is approved, it read the whole trade, the price agrees with the shares and the total, and your ledger does not already hold a matching trade. Everything else waits for your approval.-XX]",
       "profileLimitLabel": "[XX-Count profile proposals toward the daily AI limit-XX]",
       "profileLimitHelp": "[XX-On by default: an edit a profile proposes from an email is counted in the daily limit of AI-proposed changes, like any other AI proposal. Turn it off when a large batch of stored emails would otherwise use the limit up. Only proposals from profiles are exempt; every proposal still waits for your approval.-XX]"
     },
@@ -177,14 +177,15 @@
       "confirm": "[XX-Process now-XX]",
       "later": "[XX-Not now-XX]"
     },
-    "reparse": "[XX-Re-parse emails ({count})-XX]"
+    "reparse": "[XX-Re-parse emails ({count})-XX]",
+    "kindTrade": "[XX-Brokerage trades-XX]"
   },
   "editor": {
     "createTitle": "[XX-New profile-XX]",
     "editTitle": "[XX-Edit profile-XX]",
-    "loading": "[XX-Loading payees and categories-XX]",
+    "loading": "[XX-Loading payees, categories, accounts and currencies-XX]",
     "lookupsError": {
-      "title": "[XX-Payees and categories could not be loaded-XX]",
+      "title": "[XX-Payees, categories, accounts or currencies could not be loaded-XX]",
       "body": "[XX-The pickers need them, so the editor cannot open yet. Try again.-XX]",
       "retry": "[XX-Try again-XX]"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "[XX-Tag name-XX]",
       "aiCategoriesLabel": "[XX-Let the AI choose the category of items no rule matches-XX]",
       "aiCategoriesHelp": "[XX-When an item matches no category rule and there is no default category, the AI is asked for its category from your category list. The choice is marked as the AI's on the proposal. With this off the AI is never asked.-XX]"
+    },
+    "kind": {
+      "label": "[XX-Profile kind-XX]",
+      "receipt": "[XX-Order receipt-XX]",
+      "trade": "[XX-Brokerage trade-XX]",
+      "receiptHelp": "[XX-Reads an order confirmation and finds the bank transaction that paid for it.-XX]",
+      "tradeHelp": "[XX-Reads a brokerage trade confirmation and proposes the investment transaction it reports, a buy or a sell.-XX]"
+    },
+    "trade": {
+      "guardsHeading": "[XX-Which of the sender's emails it reads-XX]",
+      "guardsHelp": "[XX-Optional. Each pattern is matched against one whole line of the email, one pattern per line.-XX]",
+      "guards": {
+        "requireLine": "[XX-Required lines-XX]",
+        "requireLineHint": "[XX-The profile reads an email only when one of these lines is in it; otherwise the next profile for the sender is tried.-XX]",
+        "skipIfLine": "[XX-Lines that skip the email-XX]",
+        "skipIfLineHint": "[XX-An email with one of these lines is set aside, such as a cancelled order.-XX]",
+        "waitIfLine": "[XX-Lines that hold the email-XX]",
+        "waitIfLineHint": "[XX-An email with one of these lines is held and read again later, such as a partial fill.-XX]"
+      },
+      "fieldsHeading": "[XX-The trade-XX]",
+      "fieldsHelp": "[XX-Buy or sell, the ticker and the share count are required, and a total or a price. Each field takes patterns one per line, tried in order.-XX]",
+      "fields": {
+        "tradeAction": "[XX-Buy or sell patterns-XX]",
+        "tradeSymbol": "[XX-Ticker patterns-XX]",
+        "tradeQuantity": "[XX-Share count patterns-XX]",
+        "tradeTotal": "[XX-Trade total patterns-XX]",
+        "tradePrice": "[XX-Price per share patterns-XX]",
+        "tradeCommission": "[XX-Commission patterns-XX]",
+        "tradeDate": "[XX-Trade date patterns-XX]",
+        "tradeAccount": "[XX-Account patterns-XX]"
+      },
+      "fieldHint": "[XX-Must capture {capture}. Example: {example}-XX]",
+      "amountsHelp": "[XX-The total is the executed amount, commission included for a buy. The price is a cross-check, and gives the total when the email states none. An amount that names its currency (US$, C$, USD, €) also sets the currency of the trade.-XX]",
+      "rulesHeading": "[XX-Account rules-XX]",
+      "rulesHelp": "[XX-Which account the trade is booked to. The rules are tried in order against the account text the Account patterns read, and the first that applies wins; {star} is any text. A rule with a currency applies only to a trade in that currency, so two accounts the broker prints the same way, such as a CAD and a USD RRSP both shown as RRSP, are two rules with the same text and different currencies. When the email prints no account text, only a rule whose text is {star} can apply. The default account takes the rest.-XX]",
+      "currencyOrder": "[XX-The currency of the trade is taken from, in order: the amount itself when it names one (US$, C$, USD, €), then the first currency marker below that matches a line of the email, then the currency of your security for the ticker. A rule with a currency never guesses: when none of the three tells the currency, the email waits for you instead of being booked to either account.-XX]",
+      "ruleMatchLabel": "[XX-Account text of rule {rule}-XX]",
+      "ruleMatchPlaceholder": "[XX-Account text, such as RRSP-XX]",
+      "ruleCurrencyLabel": "[XX-Currency of rule {rule}-XX]",
+      "ruleAccountLabel": "[XX-Account of rule {rule}-XX]",
+      "ruleMoveUp": "[XX-Move rule {rule} earlier-XX]",
+      "ruleMoveDown": "[XX-Move rule {rule} later-XX]",
+      "ruleRemove": "[XX-Remove rule {rule}-XX]",
+      "ruleAdd": "[XX-Add an account rule-XX]",
+      "rulesMax": "[XX-At most {max} rules.-XX]",
+      "rulesWithoutAccountText": "[XX-There are no Account patterns, so the rules are tried against empty text: only a rule whose text is {star} can apply.-XX]",
+      "anyCurrency": "[XX-Any currency-XX]",
+      "baseCurrency": "[XX-{code} (your base currency)-XX]",
+      "currencyPlaceholder": "[XX-Choose a currency-XX]",
+      "accountPlaceholder": "[XX-Choose an account-XX]",
+      "accountOption": "[XX-{name} ({currency})-XX]",
+      "accountNotTradableOption": "[XX-{name} (not an open brokerage account)-XX]",
+      "accountUnknownOption": "[XX-An account not in your list-XX]",
+      "accountNotTradable": "[XX-A trade cannot be booked to this account: it is closed, a cash account or not an investment account.-XX]",
+      "accountUnknown": "[XX-This account is not in your list: it may have been deleted. Pick another one.-XX]",
+      "defaultAccountLabel": "[XX-Default account-XX]",
+      "defaultAccountNone": "[XX-No default account-XX]",
+      "defaultAccountHint": "[XX-The account when no rule applies. Without one, an email no rule applies to waits for you.-XX]",
+      "markersHeading": "[XX-Currency markers-XX]",
+      "markersHelp": "[XX-Text that names the currency of the trade when its amounts do not, such as a line saying the amounts are in U.S. dollars beside a bare $. Each marker is matched against every line of the email ({star} is any text), and the first marker, in order, that matches names the currency. Markers are used only when the amount names no currency.-XX]",
+      "markerMatchLabel": "[XX-Text of marker {marker}-XX]",
+      "markerMatchPlaceholder": "[XX-Such as *U.S. dollars*-XX]",
+      "markerCurrencyLabel": "[XX-Currency of marker {marker}-XX]",
+      "markerMoveUp": "[XX-Move marker {marker} earlier-XX]",
+      "markerMoveDown": "[XX-Move marker {marker} later-XX]",
+      "markerRemove": "[XX-Remove marker {marker}-XX]",
+      "markerAdd": "[XX-Add a currency marker-XX]",
+      "markersMax": "[XX-At most {max} markers.-XX]"
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "[XX-Line to skip {line}-XX]",
       "recordStep": "[XX-Record step {step}-XX]",
       "recordStepPart": "[XX-Record step {step}, {part}-XX]",
-      "recordAlternative": "[XX-Record step {step}, alternative {alternative}-XX]"
+      "recordAlternative": "[XX-Record step {step}, alternative {alternative}-XX]",
+      "accountRule": "[XX-Account rule {rule}-XX]",
+      "accountRulePart": "[XX-Account rule {rule}, {part}-XX]",
+      "currencyMarker": "[XX-Currency marker {marker}-XX]",
+      "currencyMarkerPart": "[XX-Currency marker {marker}, {part}-XX]"
     },
     "fields": {
       "orderId": "[XX-Order number patterns-XX]",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "[XX-Days after the purchase-XX]",
       "matchTolerance": "[XX-Amount tolerance-XX]",
       "tag": "[XX-Tag-XX]",
-      "aiCategories": "[XX-AI categories-XX]"
+      "aiCategories": "[XX-AI categories-XX]",
+      "trade": "[XX-The trade section-XX]",
+      "tradeAction": "[XX-Buy or sell patterns-XX]",
+      "tradeSymbol": "[XX-Ticker patterns-XX]",
+      "tradeQuantity": "[XX-Share count patterns-XX]",
+      "tradeTotal": "[XX-Trade total patterns-XX]",
+      "tradePrice": "[XX-Price per share patterns-XX]",
+      "tradeCommission": "[XX-Commission patterns-XX]",
+      "tradeDate": "[XX-Trade date patterns-XX]",
+      "tradeAccount": "[XX-Account patterns-XX]",
+      "accountRules": "[XX-Account rules-XX]",
+      "currencyMarkers": "[XX-Currency markers-XX]",
+      "defaultAccount": "[XX-Default account-XX]",
+      "ruleAccount": "[XX-account-XX]",
+      "ruleCurrency": "[XX-currency-XX]"
     },
     "codes": {
       "not_object": "[XX-is not a valid definition-XX]",
@@ -376,7 +463,12 @@
       "duplicate_entry": "[XX-lists the same entry twice-XX]",
       "reference_field_missing": "[XX-needs reference patterns (the reference strategy is on)-XX]",
       "out_of_range_days": "[XX-must be a whole number from 0 to {max}-XX]",
-      "out_of_range_tolerance": "[XX-must be an amount from 0.00 to {max}-XX]"
+      "out_of_range_tolerance": "[XX-must be an amount from 0.00 to {max}-XX]",
+      "trade_conflict": "[XX-cannot be in a brokerage trade profile, which reads only the trade-XX]",
+      "trade_amount_missing": "[XX-needs total or price patterns (at least one of the two)-XX]",
+      "trade_account_missing": "[XX-needs a default account, or account rules-XX]",
+      "invalid_currency": "[XX-is not a 3-letter currency code, such as USD-XX]",
+      "invalid_uuid_account": "[XX-is not a valid account-XX]"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "[XX-Required line-XX]",
         "skipIfLine": "[XX-Skip line-XX]",
         "waitIfLine": "[XX-Wait line-XX]",
-        "reference": "[XX-Reference-XX]"
+        "reference": "[XX-Reference-XX]",
+        "action": "[XX-Buy or sell-XX]",
+        "symbol": "[XX-Ticker-XX]",
+        "quantity": "[XX-Shares-XX]",
+        "price": "[XX-Price-XX]",
+        "commission": "[XX-Commission-XX]",
+        "date": "[XX-Date-XX]",
+        "account": "[XX-Account-XX]",
+        "currency": "[XX-Currency marker-XX]"
       },
       "entryLine": "[XX-entry {entry} ({pattern}), line {line}: {text}-XX]",
       "entrySubject": "[XX-entry {entry} ({pattern}), the subject: {text}-XX]",
@@ -553,10 +653,12 @@
       "reprocess": "[XX-Reprocess-XX]",
       "link": "[XX-Choose transaction-XX]",
       "recognizeAi": "[XX-Recognize with AI-XX]",
+      "recognizeTradeAi": "[XX-Recognize as a trade with AI-XX]",
       "approve": "[XX-Approve-XX]",
       "draftParser": "[XX-Prepare a profile with AI-XX]",
       "createParser": "[XX-Create profile-XX]",
-      "ignore": "[XX-Ignore-XX]"
+      "ignore": "[XX-Ignore-XX]",
+      "reviewTrade": "[XX-Review in inbox-XX]"
     },
     "toasts": {
       "approved": "[XX-Proposal approved-XX]",
@@ -592,8 +694,11 @@
       "handoffFailed": "[XX-The request is queued, but the emails could not be opened in the chat. It waits in the AI review inbox for an agent.-XX]",
       "inboxLink": "[XX-Open the AI review inbox-XX]",
       "opened": "[XX-Opened the chat with the emails attached. Read the message and press Send.-XX]",
-      "chatPrompt": "[XX-Build an email receipt profile for {count, plural, one {this order email} other {these # order emails}} from {domain}. Claim AI review request {requestId}, test your profile on every attached email with the email_receipt_parsers tool, fix it until each one reads completely, then save it as a draft for request {requestId}.-XX]"
-    }
+      "chatPrompt": "[XX-Build an email receipt profile for {count, plural, one {this order email} other {these # order emails}} from {domain}. Claim AI review request {requestId}, test your profile on every attached email with the email_receipt_parsers tool, fix it until each one reads completely, then save it as a draft for request {requestId}.-XX]",
+      "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]",
+      "chatPromptTrade": "[XX-Build a trade profile for {count, plural, one {this trade confirmation email} other {these # trade confirmation emails}} from {domain}. Claim AI review request {requestId}, test your profile on every attached email with the email_receipt_parsers tool, fix it until each one reads a complete trade, then save it as a draft for request {requestId}.-XX]"
+    },
+    "tradeBadge": "[XX-Trade-XX]"
   },
   "detail": {
     "title": "[XX-Email receipt-XX]",
@@ -644,11 +749,22 @@
       "wait_line": "[XX-A line says the order is not final yet, so the email will be read again later.-XX]",
       "no_html": "[XX-This profile reads the HTML part of the email, and this email has none.-XX]",
       "schema_org": "[XX-No profile was needed: the order was read from the structured data (schema.org) in the email.-XX]",
-      "item_amount_missing": "[XX-An item has no amount, and the email has no single total to give it.-XX]"
+      "item_amount_missing": "[XX-An item has no amount, and the email has no single total to give it.-XX]",
+      "trade_no_action": "[XX-The profile found no buy or sell in this email.-XX]",
+      "trade_no_symbol": "[XX-The profile found no ticker symbol in this email.-XX]",
+      "trade_no_quantity": "[XX-The profile found no number of shares in this email.-XX]",
+      "trade_no_amount": "[XX-The profile found neither a total nor a price in this email.-XX]",
+      "trade_no_account": "[XX-The profile could not tell which account this trade is for.-XX]",
+      "trade_exists": "[XX-Your accounts already hold this trade, so nothing was proposed.-XX]",
+      "trade_linked": "[XX-Linked to the transaction it reports, so nothing was proposed.-XX]",
+      "trade_no_currency": "[XX-The profile could not tell which currency this trade is in, so it could not choose its account.-XX]"
     },
     "reasonUnknown": "[XX-Reason: {reason}-XX]",
     "requestNote": "[XX-Review request ({state}): {note}-XX]",
     "parsedHeading": "[XX-What the profile read-XX]",
+    "tradeHeading": "[XX-Trade read from the email-XX]",
+    "tradeCandidatesHeading": "[XX-Existing transactions that could be this trade-XX]",
+    "tradeCandidatesHelp": "[XX-These investment transactions could be the trade this email reports. Link the one it is: no new transaction is created, and a scheduled bill or deposit it pays is marked paid.-XX]",
     "notParsed": "[XX-Nothing has been read from this email yet.-XX]",
     "candidatesHeading": "[XX-Transactions that fit-XX]",
     "candidatesHelp": "[XX-Several transactions fit this email equally well. Choose the one it paid for.-XX]",
@@ -688,7 +804,15 @@
       "capped": "[XX-Only the first {max} lines are read.-XX]",
       "empty": "[XX-No lines.-XX]",
       "listLabel": "[XX-Numbered lines of the email-XX]"
-    }
+    },
+    "tradeTransactionSummary": "[XX-{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.-XX]",
+    "noTradeTransaction": "[XX-None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.-XX]",
+    "candidateShares": "[XX-{quantity} shares-XX]",
+    "tradeNoCandidates": "[XX-No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox.-XX]",
+    "aiTradeHeading": "[XX-Trade the AI agent proposes-XX]",
+    "aiTradeReader": "[XX-None: the AI agent reads it as a trade-XX]",
+    "noAiTradeTransaction": "[XX-None yet: the trade is booked when you approve the AI agent's proposal.-XX]",
+    "tradeProposalHeading": "[XX-What its proposal would book-XX]"
   },
   "picker": {
     "heading": "[XX-Choose the transaction-XX]",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "[XX-Recognize with AI-XX]",
+    "tradeTitle": "[XX-Recognize as a trade with AI-XX]",
+    "tradeMessage": "[XX-The AI will read this email as a brokerage trade confirmation and propose the investment transaction it reports (account, buy or sell, ticker, shares and total). Nothing is saved until you approve it.-XX]",
+    "tradeConfirm": "[XX-Recognize as a trade-XX]",
     "transactionSummary": "[XX-{date}, {amount}, {payee}-XX]",
     "noPayee": "[XX-no payee-XX]",
     "confirmMessage": "[XX-This email is linked to the transaction {summary}. The AI will read the email and propose how to split this transaction by product. Continue with this transaction?-XX]",
@@ -765,7 +892,9 @@
     "handoffFailed": "[XX-The request is queued, but the email could not be opened in the chat. It waits in the AI review inbox for an agent (for example over MCP).-XX]",
     "inboxLink": "[XX-Open the AI review inbox-XX]",
     "opened": "[XX-Opened the chat with the email attached. Read the message and press Send.-XX]",
-    "chatPrompt": "[XX-Recognize the products, quantities and prices in the attached order email and split my transaction of {date} ({payee}, {amount}) by product with a category for each. Claim AI review request {requestId} and submit your proposal for it.-XX]"
+    "chatPrompt": "[XX-Recognize the products, quantities and prices in the attached order email and split my transaction of {date} ({payee}, {amount}) by product with a category for each. Claim AI review request {requestId} and submit your proposal for it.-XX]",
+    "tradeChatPrompt": "[XX-Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy or a sell, the ticker, the shares, the executed total and the date. Claim AI review request {requestId} and submit the trade for it.-XX]",
+    "tradeDetachesTransaction": "[XX-Read as a trade, this email no longer stands behind {summary}: the trade creates its own investment transaction.-XX]"
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "[XX-No stored email has a sender at {domain}.-XX]"
       },
       "help": "[XX-Click an email to read it, and choose the transaction it paid for. Then tick up to {max} emails to write the profile from; an email can be ticked only once it has a transaction.-XX]",
+      "tradeToggle": "[XX-These emails are brokerage trade confirmations (they create an investment transaction, so no bank transaction is paired)-XX]",
+      "tradeHelp": "[XX-Click an email to read it, then tick up to {max} trade confirmations to write the profile from. No transaction needs to be chosen.-XX]",
       "columns": {
         "select": "[XX-Use-XX]",
         "date": "[XX-Date-XX]",
@@ -913,6 +1044,7 @@
       "needsTransaction": "[XX-Choose a transaction for this email first.-XX]",
       "limitReached": "[XX-At most {max} samples. Untick one to choose another.-XX]",
       "noTransaction": "[XX-None chosen-XX]",
+      "tradeNoTransaction": "[XX-Not needed for a trade confirmation-XX]",
       "selectedCount": "[XX-{count} of {max} samples ticked-XX]",
       "continue": "[XX-Continue to the assistant-XX]",
       "emailLoading": "[XX-Loading the email-XX]",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "[XX-The assistant reads these emails and the transactions they paid for and writes a draft profile for {domain}. Nothing is approved yet.-XX]",
       "reviseHelp": "[XX-Tell the assistant what to change. It updates the same draft from these emails and transactions.-XX]",
+      "tradeHelp": "[XX-The assistant reads these trade confirmations and writes a draft profile for {domain} that proposes the investment transaction each one reports. Nothing is approved yet.-XX]",
+      "tradeSample": "[XX-Trade confirmation-XX]",
       "feedbackLabel": "[XX-What should change-XX]",
       "feedbackPlaceholder": "[XX-For example: the total is the line that says Amount paid, not the subtotal.-XX]",
       "send": "[XX-Send to AI-XX]",
@@ -969,6 +1103,8 @@
       "parsedDate": "[XX-Date: {date}-XX]",
       "parsedTotal": "[XX-Total: {total}-XX]",
       "parsedLines": "[XX-{count, plural, one {# line} other {# lines}}-XX]",
+      "parsedTrade": "[XX-{action, select, BUY {Buys} other {Sells}} {quantity} shares of {symbol}-XX]",
+      "tradeInconsistent": "[XX-The price does not match the total, so it will not be applied automatically-XX]",
       "noExpectation": "[XX-None-XX]",
       "noMatch": "[XX-No transaction-XX]",
       "agreesYes": "[XX-Yes-XX]",
@@ -991,8 +1127,37 @@
         "not_applicable": "[XX-Not read by this profile-XX]",
         "skip_line": "[XX-Skipped (skip line found)-XX]",
         "wait_line": "[XX-On hold (order not final)-XX]",
-        "no_html": "[XX-No HTML part-XX]"
-      }
+        "no_html": "[XX-No HTML part-XX]",
+        "trade": "[XX-Proposes a trade-XX]",
+        "trade_exists": "[XX-Already in your ledger-XX]"
+      },
+      "parsedTradeAccount": "[XX-Account: {account}-XX]",
+      "accountWithCurrency": "[XX-{name} ({currency})-XX]",
+      "accountUnknown": "[XX-unknown-XX]",
+      "parsedTradeNoAccount": "[XX-No account found for this trade-XX]",
+      "parsedTradeCurrency": "[XX-Currency: {currency}-XX]"
     }
+  },
+  "trade": {
+    "summary": "[XX-{action, select, BUY {Buy} other {Sell}} {quantity} shares of {symbol} for {total}, dated {date}.-XX]",
+    "account": "[XX-Account named in the email: {account}-XX]",
+    "priceMismatch": "[XX-The average price does not match the shares and the total, so this trade will not be applied automatically.-XX]",
+    "incomplete": "[XX-The profile could not read a complete trade from this email.-XX]",
+    "totalFromPrice": "[XX-the total implied by the price-XX]",
+    "dateUnknown": "[XX-the day the email arrived-XX]",
+    "price": "[XX-Average price in the email: {price} a share-XX]",
+    "proposalSecurity": "[XX-Security: {name}-XX]",
+    "proposalAccount": "[XX-Account: {account}-XX]",
+    "proposalPrice": "[XX-Price: {price} a share-XX]",
+    "proposalCommission": "[XX-Commission: {commission}-XX]",
+    "proposalReview": "[XX-Nothing is booked until you approve it.-XX]",
+    "proposalReviewLink": "[XX-Review it in the inbox-XX]",
+    "aiWaiting": "[XX-The AI agent has not proposed the trade yet. Its proposal appears here and in the review inbox.-XX]",
+    "aiBooked": "[XX-Booked from the AI agent's proposal: see the transaction above.-XX]",
+    "aiNoProposal": "[XX-No proposal from the AI agent is waiting for this email.-XX]",
+    "currencyFrom": "[XX-Currency: {currency}, {source, select, amount {named by the amount} marker {from a currency marker of the profile} other {from your security for the ticker}}-XX]",
+    "bookTo": "[XX-Books to: {account}-XX]",
+    "bookToNotTradable": "[XX-Books to {account}, which is not an open brokerage account, so the trade cannot be booked there.-XX]",
+    "bookToUnknown": "[XX-Books to an account that is not in your list, so the trade cannot be booked there.-XX]"
   }
 }

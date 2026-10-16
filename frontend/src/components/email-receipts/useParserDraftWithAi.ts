@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { stageChatHandoff } from '@/lib/ai-chat-handoff';
 import { assistantCanAnswerNow } from '@/lib/assistant-ready';
 import { buildParserDraftAttachments } from '@/lib/email-receipt-chat';
-import { dominantSenderDomain } from '@/lib/email-receipts-format';
+import { dominantSenderDomain, parserDraftKind } from '@/lib/email-receipts-format';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
@@ -38,6 +38,10 @@ export type ParserDraftOutcome =
  * 3. Otherwise, or when the emails could not be read for the hand-off, the
  *    request just waits in the inbox for an agent: `queued`.
  *
+ * Trade confirmations (every email `isTrade`) ask for a trade profile; the
+ * caller never passes a mix of trade and order emails (`parserDraftKind`), which
+ * no one profile reads, and such a mix is refused here before anything is queued.
+ *
  * A parser the assistant saves is a DRAFT: it reads nothing until the user
  * approves it in the parser settings.
  */
@@ -48,9 +52,11 @@ export function useParserDraftWithAi(): (receipts: readonly EmailReceiptListItem
   return useCallback(
     async (receipts) => {
       const ids = receipts.map((receipt) => receipt.id);
+      const kind = parserDraftKind(receipts);
+      if (kind === 'mixed') return { kind: 'failed', message: t('mixedKinds') };
       let requestId: string;
       try {
-        requestId = (await emailReceiptsApi.parsers.draftWithAi(ids)).requestId;
+        requestId = (await emailReceiptsApi.parsers.draftWithAi(ids, kind)).requestId;
       } catch (error) {
         logger.error(error);
         return { kind: 'failed', message: getErrorMessage(error, t('failed')) };
@@ -60,7 +66,7 @@ export function useParserDraftWithAi(): (receipts: readonly EmailReceiptListItem
         const details = await Promise.all(ids.map((id) => emailReceiptsApi.receipts.get(id)));
         const handoffId = stageChatHandoff({
           files: buildParserDraftAttachments(details),
-          draft: t('chatPrompt', {
+          draft: t(kind === 'trade' ? 'chatPromptTrade' : 'chatPrompt', {
             count: details.length,
             domain: dominantSenderDomain(details),
             requestId,

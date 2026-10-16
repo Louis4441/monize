@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
+import {
+  emailDayOfUser,
+  findTradeInLedger,
+} from "../../ai-review/trade-ledger";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { roundMoney } from "../../common/round.util";
@@ -12,7 +16,12 @@ import { Payee } from "../../payees/entities/payee.entity";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { receiptMatchAmount } from "../matching/match-receipt";
 import type { ReceiptOutcome } from "../parsing/parse-receipt";
-import type { ParsedReceiptReason } from "../parsing/receipt-parser.types";
+import { tradeExecutedTotalUnits } from "../parsing/parse-trade";
+import type {
+  ParsedReceiptReason,
+  ParsedTrade,
+  ParsedTradeReason,
+} from "../parsing/receipt-parser.types";
 import { validateReceiptParserDefinition } from "../parsing/receipt-parser.validation";
 import type { PreviewEmailReceiptParserDto } from "./dto/email-receipt-parser.dto";
 import { invalidDefinitionError } from "./parser-references.util";
@@ -35,14 +44,18 @@ const MONEY_UNITS = 10_000;
  * What the commit would do with one email: the guard that stops the pipeline
  * reading it (`not_applicable`, `skip_line`, `wait_line`, `no_html`), a read
  * that is not complete (`parse_failed`, with `statusReason`), or, for a
- * complete read, what the matcher found.
+ * complete read, what the matcher found. A trade profile's complete read is
+ * `trade`: it creates an investment transaction, so there is nothing to match.
  */
 export type ParserPreviewOutcome =
   | Exclude<ReceiptOutcome, "read">
   | "parse_failed"
   | "matched"
   | "ambiguous"
-  | "unmatched";
+  | "unmatched"
+  | "trade"
+  /** A complete trade the ledger already holds: the pipeline ignores the email (`trade_exists`). */
+  | "trade_exists";
 
 export interface ParserPreviewItem {
   receiptId: string;
@@ -52,17 +65,28 @@ export interface ParserPreviewItem {
   /** ISO timestamp to show: when the shop sent the email if a forward carried it (`original_sent_at`), else `receivedAt`. */
   effectiveDate: string;
   outcome: ParserPreviewOutcome;
-  /** Why a read is incomplete (`ParsedReceiptReason`); null otherwise. */
-  statusReason: ParsedReceiptReason | null;
+  /** Why a read is incomplete (`ParsedReceiptReason`, or `ParsedTradeReason` for a trade profile); null otherwise. */
+  statusReason: ParsedReceiptReason | ParsedTradeReason | null;
   /** What was read, in decimal units; null when a guard stopped the read. */
   parsed: {
     /** `YYYY-MM-DD`: the day the shop sent the order, or the day the email arrived. */
     date: string;
     /** The amount paid, else the total; null when the email states neither. */
     total: number | null;
-    /** The currency of the expected or matched transaction; null when there is neither. */
+    /** The currency of the expected or matched transaction, or the one a trade's reading decided; null when there is none. */
     currency: string | null;
     lineCount: number;
+  } | null;
+  /** For a trade profile: the trade it read (shares, ticker, direction); null for a receipt or when a guard stopped the read. */
+  trade: {
+    action: "BUY" | "SELL" | null;
+    symbol: string | null;
+    quantity: number | null;
+    /** Shares times price agrees with the total; null when the email states no price. */
+    consistent: boolean | null;
+    /** The account the rules chose, so two accounts printed alike can be checked apart. */
+    accountId: string | null;
+    currency: string | null;
   } | null;
   match: { transactionId: string; summary: string } | null;
   expected: { transactionId: string; summary: string } | null;
@@ -283,6 +307,31 @@ export class EmailReceiptParserPreviewService {
     return rows.map(toPreviewRow);
   }
 
+  /** Whether the pipeline would find this complete trade already in the ledger (and ignore the email). */
+  private async tradeAlreadyBooked(
+    m: EntityManager,
+    userId: string,
+    trade: ParsedTrade,
+    row: PreviewRow,
+  ): Promise<boolean> {
+    const date =
+      trade.date ??
+      (await emailDayOfUser(m, userId, row.originalSentAt ?? row.receivedAt));
+    const ledger = await findTradeInLedger(
+      m,
+      userId,
+      {
+        accountId: trade.accountId as string,
+        action: trade.action as "BUY" | "SELL",
+        symbol: trade.symbol as string,
+        quantity: trade.quantity as number,
+        date,
+      },
+      row.id,
+    );
+    return ledger.unclaimedId !== null;
+  }
+
   private async previewOne(
     m: EntityManager,
     userId: string,
@@ -294,10 +343,28 @@ export class EmailReceiptParserPreviewService {
     const run = await dryRunReceipt(m, userId, definition, row, payee);
     const { parsed, outcome } = run;
     const read = outcome === "read";
+    const tradeRead = read ? (run.trade?.parsed ?? null) : null;
+    // A trade the email does not date is dated the day it was sent in the
+    // user's timezone, as the pipeline dates it.
+    const tradeDay =
+      tradeRead === null
+        ? null
+        : (tradeRead.date ??
+          (await emailDayOfUser(
+            m,
+            userId,
+            row.originalSentAt ?? row.receivedAt,
+          )));
     const paid = receiptMatchAmount(parsed);
     let itemOutcome: ParserPreviewOutcome;
     if (!read) itemOutcome = outcome;
-    else if (!parsed.complete) itemOutcome = "parse_failed";
+    else if (run.trade) {
+      itemOutcome = !run.trade.parsed.complete
+        ? "parse_failed"
+        : (await this.tradeAlreadyBooked(m, userId, run.trade.parsed, row))
+          ? "trade_exists"
+          : "trade";
+    } else if (!parsed.complete) itemOutcome = "parse_failed";
     else itemOutcome = run.match.kind;
     return {
       receiptId: row.id,
@@ -305,13 +372,39 @@ export class EmailReceiptParserPreviewService {
       receivedAt: row.receivedAt.toISOString(),
       effectiveDate: (row.originalSentAt ?? row.receivedAt).toISOString(),
       outcome: itemOutcome,
-      statusReason: read && !parsed.complete ? parsed.reason : null,
+      statusReason: !read
+        ? null
+        : run.trade
+          ? run.trade.parsed.reason
+          : !parsed.complete
+            ? parsed.reason
+            : null,
       parsed: read
         ? {
-            date: run.purchaseDate,
-            total: paid === null ? null : roundMoney(paid / MONEY_UNITS),
-            currency: expected?.currencyCode ?? null,
+            date: tradeDay ?? run.purchaseDate,
+            total:
+              tradeRead !== null
+                ? (() => {
+                    const units = tradeExecutedTotalUnits(tradeRead);
+                    return units === null
+                      ? null
+                      : roundMoney(units / MONEY_UNITS);
+                  })()
+                : paid === null
+                  ? null
+                  : roundMoney(paid / MONEY_UNITS),
+            currency: tradeRead?.currency ?? expected?.currencyCode ?? null,
             lineCount: parsed.items.length,
+          }
+        : null,
+      trade: tradeRead
+        ? {
+            action: tradeRead.action,
+            symbol: tradeRead.symbol,
+            quantity: tradeRead.quantity,
+            consistent: tradeRead.consistent,
+            accountId: tradeRead.accountId,
+            currency: tradeRead.currency ?? null,
           }
         : null,
       match: run.hit

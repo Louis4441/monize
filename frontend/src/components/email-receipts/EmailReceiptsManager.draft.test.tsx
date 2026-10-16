@@ -181,7 +181,7 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
 
       expect(api.draftWithAi).toHaveBeenCalledTimes(1);
       // list order, not click order
-      expect(api.draftWithAi).toHaveBeenCalledWith(['r-1', 'r-3']);
+      expect(api.draftWithAi).toHaveBeenCalledWith(['r-1', 'r-3'], 'receipt');
       expect(api.get).toHaveBeenCalledTimes(2);
       expect(toast.success).toHaveBeenCalledWith('Opened the chat with the emails attached. Read the message and press Send.');
 
@@ -224,7 +224,7 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
       await click(checkbox('Order 1'));
       await click(draftButton(1));
 
-      expect(api.draftWithAi).toHaveBeenCalledWith(['r-1']);
+      expect(api.draftWithAi).toHaveBeenCalledWith(['r-1'], 'receipt');
       expect(api.get).not.toHaveBeenCalled();
       expect(useRouter().push).not.toHaveBeenCalled();
       const notice = screen.getByRole('status');
@@ -288,13 +288,61 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
     });
   });
 
+  describe('trade confirmations', () => {
+    const fills = [
+      shop(1, { isTrade: true, tradeSource: 'profile', status: 'parse_failed', statusReason: 'trade_no_account' }),
+      shop(2, { isTrade: true, tradeSource: 'profile', status: 'parse_failed', statusReason: 'trade_no_symbol' }),
+      shop(3),
+    ];
+
+    it('asks for a trade profile when every selected email is a trade confirmation, with a trade message staged', async () => {
+      api.list.mockResolvedValue(fills);
+      await renderManager();
+      await click(checkbox('Order 1'));
+      await click(checkbox('Order 2'));
+      await click(draftButton(2));
+
+      expect(api.draftWithAi).toHaveBeenCalledWith(['r-1', 'r-2'], 'trade');
+      const push = useRouter().push as ReturnType<typeof vi.fn>;
+      const handoff = peekChatHandoff((push.mock.calls.at(-1)?.[0] as string).replace('/ai?handoff=', ''));
+      expect(handoff?.draft).toContain('Build a trade profile for these 2 trade confirmation emails from shop.example.com.');
+    });
+
+    it('asks for a trade profile from a trade email\'s own row action', async () => {
+      api.list.mockResolvedValue(fills);
+      await renderManager();
+      // A parse_failed email leads with Reprocess: the draft action is in the row's menu.
+      const row = screen.getByRole('row', { name: /Order 2/ });
+      const inline = within(row).queryByRole('button', { name: 'Prepare a profile with AI' });
+      if (inline) await click(inline);
+      else {
+        await click(within(row).getByRole('button', { name: 'More actions' }));
+        await click(screen.getByRole('menuitem', { name: 'Prepare a profile with AI' }));
+      }
+      expect(api.draftWithAi).toHaveBeenCalledWith(['r-2'], 'trade');
+    });
+
+    it('refuses a mix of trade confirmations and order emails, and says why', async () => {
+      api.list.mockResolvedValue(fills);
+      await renderManager();
+      await click(checkbox('Order 1'));
+      await click(checkbox('Order 3'));
+
+      expect(draftButton(2)).toBeDisabled();
+      const why = within(bar()!).getByRole('alert');
+      expect(why).toHaveTextContent('The selected emails mix trade confirmations and order emails');
+      expect(draftButton(2)).toHaveAttribute('aria-describedby', why.id);
+      expect(api.draftWithAi).not.toHaveBeenCalled();
+    });
+  });
+
   describe('the row action', () => {
     it('drafts from that one email through the same flow', async () => {
       await renderManager();
       const row = screen.getByRole('row', { name: /Order 4/ });
       await click(within(row).getByRole('button', { name: 'Prepare a profile with AI' }));
 
-      expect(api.draftWithAi).toHaveBeenCalledWith(['r-4']);
+      expect(api.draftWithAi).toHaveBeenCalledWith(['r-4'], 'receipt');
       expect(api.get).toHaveBeenCalledWith('r-4');
       const push = useRouter().push as ReturnType<typeof vi.fn>;
       expect(push.mock.calls.at(-1)?.[0]).toMatch(/^\/ai\?handoff=/);

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { render, screen, fireEvent, act, within } from '@/test/render';
 import { EmailReceiptsManager } from './EmailReceiptsManager';
 import { makeDetail, makeMailbox, makeParser, makeReceipt } from './email-receipts-fixtures';
+import type { EmailReceiptListItem } from '@/types/email-receipts';
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -36,6 +37,8 @@ const assistant = vi.hoisted(() => ({ canAnswer: vi.fn() }));
 const transactionsApi = vi.hoisted(() => ({ getAll: vi.fn() }));
 const payeesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
 const categoriesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
+const accountsApi = vi.hoisted(() => ({ getAll: vi.fn() }));
+const exchangeRatesApi = vi.hoisted(() => ({ getCurrencies: vi.fn() }));
 
 vi.mock('@/lib/email-receipts-api', () => ({
   emailReceiptsApi: {
@@ -69,6 +72,15 @@ vi.mock('@/lib/payees', async (importOriginal) => ({
 vi.mock('@/lib/categories', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/categories')>()),
   categoriesApi,
+}));
+// The profile editor's lookups read the accounts and the currencies too (for a trade profile).
+vi.mock('@/lib/accounts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/accounts')>()),
+  accountsApi,
+}));
+vi.mock('@/lib/exchange-rates', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/exchange-rates')>()),
+  exchangeRatesApi,
 }));
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
@@ -163,6 +175,8 @@ describe('EmailReceiptsManager', () => {
     api.mailboxGet.mockResolvedValue(makeMailbox({ aiMode: 'on_demand' }));
     payeesApi.getAll.mockResolvedValue([]);
     categoriesApi.getAll.mockResolvedValue([]);
+    accountsApi.getAll.mockResolvedValue([]);
+    exchangeRatesApi.getCurrencies.mockResolvedValue([]);
   });
 
   describe('the list', () => {
@@ -610,6 +624,118 @@ describe('EmailReceiptsManager', () => {
     });
   });
 
+  describe('a trade confirmation', () => {
+    const trade = (over: Partial<EmailReceiptListItem> = {}) =>
+      makeReceipt({
+        id: 'r-trade',
+        subject: 'Order trade',
+        isTrade: true,
+        tradeSource: 'profile',
+        status: 'review',
+        displayState: 'proposed',
+        ...over,
+      });
+    const booked = { id: 'it-1', date: '2026-10-15', action: 'BUY', symbol: 'XCNS', quantity: 75.9878, totalAmount: 2000, currencyCode: 'CAD' };
+
+    it('offers "Recognize as a trade with AI" where "Recognize with AI" is, and the trade email only the former', async () => {
+      api.list.mockResolvedValue([...all, trade({ status: 'parse_failed', displayState: null, statusReason: 'trade_no_symbol' })]);
+      await renderManager();
+      expect(await allActions('Order unmatched')).toContain('Recognize as a trade with AI');
+      expect(await allActions('Order unmatched')).toContain('Recognize with AI');
+      const tradeActions = await allActions('Order trade');
+      expect(tradeActions).toContain('Recognize as a trade with AI');
+      // A trade creates a transaction: there is no bank transaction to split.
+      expect(tradeActions).not.toContain('Recognize with AI');
+    });
+
+    it('offers no recognition for an email with a proposal waiting or an applied one', async () => {
+      api.list.mockResolvedValue([...all]);
+      await renderManager();
+      for (const subject of ['Order proposed', 'Order applied', 'Order ignored', 'Order skipped', 'Order pending']) {
+        expect(await allActions(subject), subject).not.toContain('Recognize as a trade with AI');
+      }
+    });
+
+    it('lets a trade email be linked to the transaction it reports, even once it was closed as already booked', async () => {
+      api.list.mockResolvedValue([
+        trade({ id: 'r-booked', subject: 'Order booked', status: 'ignored', displayState: null, statusReason: 'trade_exists' }),
+        trade({ id: 'r-applied', subject: 'Order trade applied', displayState: 'applied' }),
+      ]);
+      await renderManager();
+      expect(await allActions('Order booked')).toContain('Choose transaction');
+      expect(await allActions('Order trade applied')).not.toContain('Choose transaction');
+    });
+
+    it('never links an email that already accounts for a transaction, and links one a trade profile read in part, as the server does', async () => {
+      api.list.mockResolvedValue([
+        trade({ id: 'r-linked', subject: 'Order linked', status: 'ignored', displayState: null, statusReason: 'trade_linked', investmentTransaction: booked }),
+        trade({ id: 'r-noacct', subject: 'Order no account', status: 'parse_failed', displayState: null, statusReason: 'trade_no_account' }),
+      ]);
+      await renderManager();
+      expect(await allActions('Order linked')).not.toContain('Choose transaction');
+      expect(await allActions('Order no account')).toContain('Choose transaction');
+    });
+
+    it('offers to reprocess a trade the ledger already held, and nothing else on a closed email', async () => {
+      api.list.mockResolvedValue([
+        trade({ id: 'r-booked', subject: 'Order booked', status: 'ignored', displayState: null, statusReason: 'trade_exists' }),
+        trade({ id: 'r-linked', subject: 'Order linked', status: 'ignored', displayState: null, statusReason: 'trade_linked', investmentTransaction: booked }),
+        ignored,
+      ]);
+      api.reprocess.mockResolvedValue(makeDetail());
+      await renderManager();
+      const actions = await allActions('Order booked');
+      expect(actions).toContain('Reprocess');
+      expect(actions).not.toContain('Ignore');
+      expect(await allActions('Order linked')).not.toContain('Reprocess');
+      expect(await allActions('Order ignored')).not.toContain('Reprocess');
+      await runAction('Order booked', 'Reprocess');
+      expect(api.reprocess).toHaveBeenCalledWith('r-booked');
+    });
+
+    it('shows the investment transaction a trade email accounts for, linked to it, and marks the row as a trade', async () => {
+      api.list.mockResolvedValue([
+        trade({ id: 'r-done', subject: 'Order done', displayState: 'applied', investmentTransaction: booked }),
+        trade({ id: 'r-open', subject: 'Order open' }),
+      ]);
+      await renderManager();
+      const done = rowOf('Order done');
+      expect(within(done).getByRole('link', { name: /^Bought 75\.9878 XCNS for .*2,000\.00/ })).toHaveAttribute(
+        'href',
+        '/investments?edit=it-1',
+      );
+      expect(within(done).getByText('Trade')).toBeInTheDocument();
+      const open = rowOf('Order open');
+      expect(within(open).getByText('Trade')).toBeInTheDocument();
+      expect(within(open).getByText('None yet')).toBeInTheDocument();
+      expect(within(rowOf('Order open')).queryByRole('link', { name: /Bought/ })).not.toBeInTheDocument();
+    });
+
+    it('marks no order email as a trade', async () => {
+      await renderManager();
+      expect(within(rowOf('Order proposed')).queryByText('Trade')).not.toBeInTheDocument();
+    });
+
+    it('sends a trade proposal to the review inbox, where its card is shown, and approves nothing from the list', async () => {
+      api.list.mockResolvedValue([trade({ aiReviewRequestId: 'req-trade' })]);
+      await renderManager();
+      await runAction('Order trade', 'Review in inbox');
+      expect(useRouter().push).toHaveBeenCalledWith('/ai-reviews?kind=email_receipt');
+      expect(api.approveProposal).not.toHaveBeenCalled();
+    });
+
+    it('opens the trade dialog, which queues the request as a trade', async () => {
+      api.list.mockResolvedValue([trade({ status: 'no_parser', displayState: null, isTrade: false, id: 'r-np', subject: 'Order np' })]);
+      api.askAi.mockResolvedValue({ ok: true, requestId: 'req-t', transactionId: null });
+      api.get.mockResolvedValue(makeDetail({ id: 'r-np', transaction: null, bodyText: 'Symbol: XCNS' }));
+      await renderManager();
+      await runAction('Order np', 'Recognize as a trade with AI');
+      expect(screen.getByRole('dialog', { name: 'Recognize as a trade with AI' })).toBeInTheDocument();
+      await click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Recognize as a trade' }));
+      expect(api.askAi).toHaveBeenCalledWith('r-np', undefined, { asTrade: true });
+    });
+  });
+
   describe('Recognize with AI', () => {
     beforeEach(() => {
       api.list.mockResolvedValue([dismissed, unmatched]);
@@ -659,6 +785,17 @@ describe('EmailReceiptsManager', () => {
       const dialog = screen.getByRole('dialog', { name: 'New profile' });
       expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('shop.example');
       expect((within(dialog).getByLabelText('Sender domains') as HTMLTextAreaElement).value).toBe('shop.example');
+      expect(within(dialog).getByRole('button', { name: 'Order receipt' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('starts a profile made from a trade confirmation as a trade profile, still switchable', async () => {
+      api.list.mockResolvedValue([{ ...noParser, isTrade: true, tradeSource: 'ai' as const }]);
+      await renderManager();
+      await runAction('Order no profile', 'Create profile');
+      const dialog = screen.getByRole('dialog', { name: 'New profile' });
+      expect(within(dialog).getByRole('button', { name: 'Brokerage trade' })).toHaveAttribute('aria-pressed', 'true');
+      await click(within(dialog).getByRole('button', { name: 'Order receipt' }));
+      expect(within(dialog).getByRole('button', { name: 'Order receipt' })).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('refreshes the list when a profile was created, and closes the editor', async () => {

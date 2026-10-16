@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   canDraftParser,
+  canLinkTradeEmail,
+  canReprocessReceipt,
   distinctSenderDomains,
   dominantSenderDomain,
   fromReceiptUnits,
@@ -8,6 +10,7 @@ import {
   canRecognizeWithAi,
   isReceiptActionable,
   normalizeDomainFilter,
+  parserDraftKind,
   processableForDomains,
   readParsedReceipt,
   senderDomain,
@@ -254,4 +257,77 @@ describe('normalizeDomainFilter', () => {
       expect(normalizeDomainFilter(raw as string | null | undefined)).toBe('');
     },
   );
+});
+
+describe('canLinkTradeEmail', () => {
+  const trade = (over: Partial<Parameters<typeof canLinkTradeEmail>[0]> = {}) => ({
+    isTrade: true,
+    tradeSource: 'profile' as const,
+    status: 'review' as const,
+    statusReason: null,
+    displayState: 'proposed' as const,
+    investmentTransaction: null,
+    ...over,
+  });
+  const booked = { id: 'it-1', date: '2026-10-15', action: 'BUY', symbol: 'XCNS', quantity: 1, totalAmount: 1, currencyCode: 'CAD' };
+
+  it('links a trade whose proposal waits or was refused, and one the ledger already held', () => {
+    expect(canLinkTradeEmail(trade())).toBe(true);
+    expect(canLinkTradeEmail(trade({ status: 'review_conflict', displayState: null }))).toBe(true);
+    expect(
+      canLinkTradeEmail(
+        trade({ status: 'ignored', statusReason: 'trade_exists', displayState: null, investmentTransaction: booked }),
+      ),
+    ).toBe(true);
+  });
+
+  // The server refuses no more than these, so every candidate it lists can be linked.
+  it('links what the server links: a partial reading and an email a person ignored', () => {
+    expect(canLinkTradeEmail(trade({ status: 'parse_failed', statusReason: 'trade_no_account', displayState: null }))).toBe(true);
+    // A person's ignore writes no reason (`status_reason` null).
+    expect(canLinkTradeEmail(trade({ status: 'ignored', statusReason: null, displayState: null }))).toBe(true);
+    // A proposal that was dismissed or expired was never applied.
+    expect(canLinkTradeEmail(trade({ displayState: 'dismissed' }))).toBe(true);
+  });
+
+  it('never links an email twice, an applied one, a skipped one or a non-trade', () => {
+    expect(canLinkTradeEmail(trade({ status: 'ignored', statusReason: 'trade_linked', displayState: null, investmentTransaction: booked }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ displayState: 'applied', investmentTransaction: booked }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ investmentTransaction: booked }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ status: 'skipped', displayState: null }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ isTrade: false, tradeSource: null }))).toBe(false);
+  });
+
+  it('takes a linked email from a server that sends no ledger row as accounting for one', () => {
+    expect(canLinkTradeEmail(trade({ status: 'ignored', statusReason: 'trade_linked', displayState: null, investmentTransaction: undefined }))).toBe(false);
+  });
+
+  it('is false for an email the AI reads as a trade: its candidates come from a profile\'s reading', () => {
+    expect(canLinkTradeEmail(trade({ tradeSource: 'ai' }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ tradeSource: 'profile' }))).toBe(true);
+  });
+});
+
+describe('canReprocessReceipt', () => {
+  it.each([
+    ['unmatched', null, null, true],
+    ['review', null, 'proposed', true],
+    ['pending', null, null, false],
+    ['skipped', null, null, false],
+    ['review', null, 'applied', false],
+    // An email a person ignored stays closed; one the ledger already held is read again.
+    ['ignored', null, null, false],
+    ['ignored', 'trade_linked', null, false],
+    ['ignored', 'trade_exists', null, true],
+  ] as const)('%s (%s) / %s is %s', (status, statusReason, displayState, expected) => {
+    expect(canReprocessReceipt({ status, statusReason, displayState })).toBe(expected);
+  });
+});
+
+describe('parserDraftKind', () => {
+  it('drafts a trade profile from trade confirmations only, a receipt profile from order emails only, and neither from a mix', () => {
+    expect(parserDraftKind([{ isTrade: true }, { isTrade: true }])).toBe('trade');
+    expect(parserDraftKind([{ isTrade: false }])).toBe('receipt');
+    expect(parserDraftKind([{ isTrade: true }, { isTrade: false }])).toBe('mixed');
+  });
 });

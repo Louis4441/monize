@@ -112,6 +112,7 @@
     "total": "कुल",
     "cashImpact": "नकद प्रभाव",
     "bondSeries": "सीरीज़",
+    "marksPaid": "भुगतान किया हुआ चिह्नित करता है",
     "accruedInterest": "उपार्जित ब्याज",
     "redemptionSplit": "मोचन विभाजन",
     "redemptionSplitValue": "मूलधन {principal} + ब्याज {interest} = भुगतान {payout}",
@@ -230,7 +231,11 @@
       "category": "श्रेणी को {name} पर सेट करें",
       "payee": "प्राप्तकर्ता को {name} पर सेट करें",
       "aiReview": "{count, plural, one {# AI समीक्षा अनुरोध कतार में जोड़ें} other {# AI समीक्षा अनुरोध कतार में जोड़ें}}"
-    }
+    },
+    "aiCategory": "AI द्वारा सुझाई गई",
+    "tags": "टैग",
+    "newTag": "(नया टैग)",
+    "marksPaidDue": "{name} (देय {date})"
   },
   "table": {
     "downloadTitle": "तालिका CSV के रूप में डाउनलोड करें",

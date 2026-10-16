@@ -157,9 +157,19 @@
     "splitDifference": "拆分行合計為 {{ sum }}，但交易金額為 {{ amount }}：{{ difference }} 尚未分配。請讓各行合計等於交易金額；運費等餘額需要單獨一行，或告知使用者而不是自行分配。",
     "noTransaction": "此 AI 審核請求與交易無關。",
     "parserDraftNotSubmittable": "解析器草稿請求應使用 email_receipt_parsers 工具回覆（先測試，再用此 requestId 執行 save_draft），而不是提交交易提案。",
+    "tradeNotSubmittable": "交易請求用 trade 欄位（帳戶、動作、代號、數量、合計和日期）來回應，而不是用交易提案。",
+    "notATradeRequest": "此 AI 審查請求不是交易請求。",
+    "tradeOnTradeRequest": "trade 欄位只用於回應交易請求。",
+    "tradeDateRequired": "交易需要日期（YYYY-MM-DD）：郵件已不存在，因此沒有可退而求其次的日期。",
+    "tradeInvalid": "交易需要 accountName、action（BUY 或 SELL）、symbol、quantity、totalAmount，以及可選的 commission 和 date（YYYY-MM-DD）。",
+    "tradeSecurityAmbiguous": "「{{ symbol }}」符合你的多個證券（{{ list }}）。請重新命名其中一個，使代號唯一。",
+    "tradeSecurityUnknown": "你沒有代號為「{{ symbol }}」的證券。請先新增該證券，然後重新處理郵件。",
     "tagNamesInvalid": "一則提議最多可新增 {{ max }} 個標籤，每個標籤 1 到 {{ length }} 個字元，且不能包含控制字元。",
     "noApprovableProposal": "此請求在這裡沒有可核准的提議。",
-    "approveFailed": "無法核准此提議。請單獨嘗試。"
+    "approveFailed": "無法核准此提議。請單獨嘗試。",
+    "tradeAlreadyBooked": "您的帳本中已有這筆交易。請將郵件連結到該交易，而不是再次記帳。",
+    "tradeScheduleMoved": "這筆交易原本要支付的排程交易在提議後已被記帳或變更。請改為將郵件連結到該交易，或將其忽略。",
+    "tradeCurrencyMismatch": "郵件中的金額為 {{ currency }}，但您的證券 {{ symbol }} 以 {{ securityCurrency }} 交易。請確認買入的是哪個上市品種，然後自行輸入這筆交易。"
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "驗證嘗試次數過多。請重新登入。",
@@ -384,6 +394,7 @@
     "parserCategoryNotFound": "找不到此解析器中指定的類別。",
     "parserDefinitionInvalid": "解析器定義無效：{{ codes }}",
     "receiptSkipped": "無法讀取此郵件（郵件過大或無法解碼），因此沒有可處理的內容。",
+    "notATradeEmail": "這封郵件沒有被讀取為交易確認。",
     "receiptIgnored": "此郵件已被忽略。請先重新處理，再將其關聯到交易。",
     "transactionNotFound": "找不到該交易。",
     "linkTransfer": "轉帳無法關聯到郵件。",
@@ -409,7 +420,12 @@
     "previewExpectedNotSelected": "為一封不在所選郵件之列的郵件指定了預期交易。",
     "previewReceiptOutsideDomain": "有一封郵件並非來自此解析器的任何寄件者網域。",
     "parserCategoryNameUnknown": "找不到類別\"{{ name }}\"。請使用您的其中一個類別的名稱。",
-    "parserCategoryNameAmbiguous": "類別\"{{ name }}\"符合多個類別({{ candidates }})。請使用完整名稱，例如\"父級：子級\"。"
+    "parserCategoryNameAmbiguous": "類別\"{{ name }}\"符合多個類別({{ candidates }})。請使用完整名稱，例如\"父級：子級\"。",
+    "tradeNotBankLinkable": "此郵件被讀取為交易確認。請改為將其連結到一筆投資交易。",
+    "tradeAccountedFor": "此郵件已對應一筆投資交易，因此不會再次讀取。",
+    "tradeLinkedElsewhere": "另一封郵件已對應該交易。",
+    "parserAccountNotFound": "此交易設定檔中指定的帳戶不是您未關閉的經紀帳戶之一。",
+    "generateSamplesForKind": "收據設定檔由 samples 產生（每封郵件及其支付的交易）；交易設定檔由 tradeReceiptIds 產生。請只傳送與類型對應的那一項，不要傳送另一項。"
   },
   "emergencyAccess": {
     "smtpNotConfigured": "未設定電子郵件。在設定 SMTP 之前，無法啟用緊急存取。",

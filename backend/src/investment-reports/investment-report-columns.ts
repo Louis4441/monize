@@ -238,7 +238,8 @@ export const INVESTMENT_REPORT_COLUMNS: readonly InvestmentColumnDef[] = [
     key: "reinvestments",
     label: "Reinvestments",
     type: "currency",
-    description: "The total reinvested income for this investment: the cost of the shares each reinvestment added. Also counted in Income.",
+    description:
+      "The total reinvested income for this investment: the cost of the shares each reinvestment added. Also counted in Income.",
     native: true,
   },
   {

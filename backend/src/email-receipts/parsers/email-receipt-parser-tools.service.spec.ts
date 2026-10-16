@@ -1,8 +1,15 @@
 import {
+  WEALTHSIMPLE_BUY_BODY,
+  WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+  WEALTHSIMPLE_TFSA_ACCOUNT_ID,
+  WEALTHSIMPLE_TRADE_DEFINITION,
+} from "../parsing/fixtures/wealthsimple-trade";
+import {
   ConflictException,
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import { Account } from "../../accounts/entities/account.entity";
 import { Category } from "../../categories/entities/category.entity";
 import { Payee } from "../../payees/entities/payee.entity";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
@@ -84,11 +91,24 @@ function setup() {
     count: jest.fn(async ({ where }) => (where.id._value as string[]).length),
   };
   const payeeRepo = { count: jest.fn().mockResolvedValue(1) };
+  // The open brokerage accounts a trade profile may name (`usableTradeAccountIds`).
+  const accountRepo = {
+    find: jest.fn(async ({ where }) =>
+      (where.id._value as string[])
+        .filter(
+          (id) =>
+            id === WEALTHSIMPLE_RRSP_ACCOUNT_ID ||
+            id === WEALTHSIMPLE_TFSA_ACCOUNT_ID,
+        )
+        .map((id) => ({ id, accountSubType: "INVESTMENT_BROKERAGE" })),
+    ),
+  };
   const { manager, dataSource } = createScopedDbMocks([
     [EmailReceiptParser, parserRepo],
     [EmailReceipt, receiptRepo],
     [Category, categoryRepo],
     [Payee, payeeRepo],
+    [Account, accountRepo],
   ]);
   // The candidate query (`JOIN accounts`) the test's matching runs; none by default.
   manager.query.mockResolvedValue([]);
@@ -138,8 +158,32 @@ describe("EmailReceiptParserToolsService.listCategories", () => {
       ],
       totalCount: 2,
       truncated: false,
+      investmentAccounts: [],
       guide: EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE,
     });
+  });
+
+  it("lists the user's open investment accounts, cash accounts apart, for a trade profile's account rules", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([
+      { id: "acc-1", name: "RRSP", currencyCode: "CAD" },
+      { id: "acc-2", name: "RRSP USD", currencyCode: "USD" },
+    ]);
+
+    const result = await service.listCategories(USER);
+
+    // The currency lets an agent write one rule per currency for accounts the
+    // broker prints alike.
+    expect(result.investmentAccounts).toEqual([
+      { id: "acc-1", name: "RRSP", currencyCode: "CAD" },
+      { id: "acc-2", name: "RRSP USD", currencyCode: "USD" },
+    ]);
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(String(sql)).toContain('currency_code AS "currencyCode"');
+    expect(String(sql)).toContain("account_type = 'INVESTMENT'");
+    expect(String(sql)).toContain("IS DISTINCT FROM 'INVESTMENT_CASH'");
+    expect(String(sql)).toContain("is_closed = false");
+    expect(params).toEqual([USER]);
   });
 
   it("is bounded, and says when more exist", async () => {
@@ -599,6 +643,19 @@ describe("EmailReceiptParserToolsService.saveDraft", () => {
       requestProposed: false,
       payee: null,
     });
+    expect(result.match).toMatchObject({ by: expect.any(Array) });
+  });
+
+  it("reports no matching for a trade profile, which matches no bank transaction", async () => {
+    const { service } = setup();
+
+    const result = await service.saveDraft(USER, CALLER, {
+      name: "Wealthsimple trades",
+      fromDomains: ["wealthsimple.com"],
+      definition: WEALTHSIMPLE_TRADE_DEFINITION,
+    });
+
+    expect(result.match).toBeNull();
   });
 
   it("validates the definition with the one validator, and writes nothing when it is refused", async () => {
@@ -895,6 +952,81 @@ describe("EmailReceiptParserToolsService.saveDraft", () => {
       expect(manager.query).not.toHaveBeenCalled();
       expect(requests.proposeParserDraft).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("EmailReceiptParserToolsService.testDefinition of a trade profile", () => {
+  it("reports what the profile read as shares and decimal money, with no bank match, and counts a complete trade as complete", async () => {
+    const { service, receiptRepo, manager } = setup();
+    receiptRepo.find.mockResolvedValue([
+      receipt({ bodyText: WEALTHSIMPLE_BUY_BODY }),
+    ]);
+
+    const result = await service.testDefinition(USER, {
+      definition: WEALTHSIMPLE_TRADE_DEFINITION,
+      receiptIds: [R1],
+    });
+
+    expect(result.valid).toBe(true);
+    const [email] = result.emails;
+    expect(email.trade?.parsed).toEqual({
+      action: "BUY",
+      symbol: "XCNS",
+      quantity: 75.9878,
+      total: 2000,
+      price: 26.32,
+      commission: null,
+      currency: null,
+      currencySource: null,
+      date: "2026-10-15",
+      accountText: "RRSP",
+      accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+      complete: true,
+      consistent: true,
+      reason: null,
+    });
+    expect(email.trade?.trace.symbol?.line.text).toBe("Symbol: XCNS");
+    expect(email.outcome).toBe("read");
+    expect(email.match.outcome).toBe("unmatched");
+    expect(result.allComplete).toBe(true);
+    // No candidate query: a trade creates a transaction, it does not find one.
+    expect(manager.query).not.toHaveBeenCalled();
+  });
+
+  it("is not complete when the trade is not", async () => {
+    const { service, receiptRepo } = setup();
+    receiptRepo.find.mockResolvedValue([
+      receipt({
+        bodyText: WEALTHSIMPLE_BUY_BODY.replace("Symbol:", "Ticker:"),
+      }),
+    ]);
+    const result = await service.testDefinition(USER, {
+      definition: WEALTHSIMPLE_TRADE_DEFINITION,
+      receiptIds: [R1],
+    });
+    expect(result.emails[0].trade?.parsed.reason).toBe("trade_no_symbol");
+    expect(result.allComplete).toBe(false);
+  });
+
+  it("lists an account id that is not an open brokerage account of the user's, and is then not complete", async () => {
+    const { service, receiptRepo } = setup();
+    receiptRepo.find.mockResolvedValue([
+      receipt({ bodyText: WEALTHSIMPLE_BUY_BODY }),
+    ]);
+    const made_up = "90000000-0000-4000-8000-000000000009";
+    const result = await service.testDefinition(USER, {
+      definition: {
+        ...WEALTHSIMPLE_TRADE_DEFINITION,
+        trade: {
+          ...WEALTHSIMPLE_TRADE_DEFINITION.trade,
+          defaultAccountId: made_up,
+        },
+      },
+      receiptIds: [R1],
+    });
+    expect(result.unknownAccountIds).toEqual([made_up]);
+    expect(result.emails[0].trade?.parsed.complete).toBe(true);
+    expect(result.allComplete).toBe(false);
   });
 });
 

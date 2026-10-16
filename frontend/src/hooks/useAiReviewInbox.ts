@@ -42,7 +42,10 @@ const isConflict = (error: unknown) => error instanceof AxiosError && error.resp
 
 /** The requests a kind filter shows. A parser draft has no card, so it is under "all" only. */
 export function itemsOfKind(items: readonly AiReviewItem[], kind: AiReviewKindFilter): AiReviewItem[] {
-  return kind === 'all' ? [...items] : items.filter((item) => item.kind === kind);
+  if (kind === 'all') return [...items];
+  // A trade confirmation is an order email's proposal too.
+  if (kind === 'email_receipt') return items.filter((item) => item.kind === 'email_receipt' || item.kind === 'email_trade');
+  return items.filter((item) => item.kind === kind);
 }
 
 /**
@@ -132,8 +135,9 @@ export function useAiReviewInbox(initialKind: AiReviewKindFilter = 'all') {
       return card ? { ...rest, [id]: card } : rest;
     });
 
-  const reloadAfterConflict = async () => {
-    toast.error(t('toasts.changed'));
+  /** A 409: the request changed under the person. `message` is the server's own reason, when it gave one. */
+  const reloadAfterConflict = async (message?: string) => {
+    toast.error(message ?? t('toasts.changed'));
     setCards({});
     await load();
   };
@@ -156,7 +160,9 @@ export function useAiReviewInbox(initialKind: AiReviewKindFilter = 'all') {
       toast.success(t('toasts.approved'));
     } catch (error) {
       if (isConflict(error)) {
-        await reloadAfterConflict();
+        // The confirm says why it refused (the trade is already in the ledger, the
+        // email was linked meanwhile, ...); a bare 409 is the generic "changed".
+        await reloadAfterConflict(getErrorMessage(error, t('toasts.changed')));
         return;
       }
       logger.error(error);

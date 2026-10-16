@@ -38,11 +38,14 @@
     "transactionMissing": "Bu işlem artık yok",
     "rule": "Kural: {name}",
     "manualRequest": "Elle istendi",
+    "trade": "{action, select, BUY {{symbol} için {quantity} adet alım} other {{symbol} için {quantity} adet satım}}",
     "receiptInstruction": {
       "automatic": "Bu işlemi ekteki sipariş e-postasından tamamlayın: her biri bir kategoriyle kalemlere bölün ya da açıklamayı ayarlayın.",
       "chat": "Ekteki sipariş e-postasının tanınmasını istediniz: bu işlemi her biri bir kategoriyle ürünlere bölün ya da açıklamayı ayarlayın.",
       "categorize": "Ekteki sipariş e-postasında hiçbir kuralın kategorilendirmediği her kaleme bir kategori atayın, ardından bu işlemin bölünmesini önerin ya da açıklamayı ayarlayın.",
-      "parsed": "Kayıtlı bir ayrıştırıcı sipariş e-postasını okudu ve işlem için bu kategori satırlarını ve bu açıklamayı öneriyor."
+      "parsed": "Kayıtlı bir ayrıştırıcı sipariş e-postasını okudu ve işlem için bu kategori satırlarını ve bu açıklamayı öneriyor.",
+      "trade": "Kayıtlı bir ayrıştırıcının okuduğu işlem onayı e-postası bu yatırım işlemini öneriyor. Onaylamadan önce hesabı, menkul kıymeti, adedi ve toplamı aracı kurumunuzdaki kayıtlarla karşılaştırın.",
+      "tradeChat": "Ekteki işlem onayının tanınmasını istediniz: bildirdiği yatırım işlemini önerin."
     },
     "emailReceipt": "E-posta makbuzu: {subject}, gönderen: {sender}",
     "emailReceiptMissing": "E-posta makbuzu (e-posta silindi)",
@@ -52,7 +55,9 @@
     "dates": "Oluşturulma {created}, bitiş {expires}",
     "viewTransaction": "İşlemi görüntüle",
     "waitingForAgent": "Bir yapay zekâ ajanı bekleniyor. <link>Ayarlar'dan bir yapay zekâ sağlayıcısı bağlayın</link> veya bir MCP istemcisinin üstlenmesine izin verin.",
-    "parserDraftReady": "Profil taslağı hazır. <link>Profil ayarlarında test edin ve onaylayın</link>."
+    "parserDraftReady": "Profil taslağı hazır. <link>Profil ayarlarında test edin ve onaylayın</link>.",
+    "tradePending": "E-postadan bir işlem, henüz okunmadı",
+    "tradeEmail": "İşlem onayı e-postası"
   },
   "actions": {
     "dismiss": "Yoksay"

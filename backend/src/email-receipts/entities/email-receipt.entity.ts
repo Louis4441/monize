@@ -172,6 +172,22 @@ export class EmailReceipt {
   @Column({ type: "jsonb", nullable: true })
   parsed: Record<string, unknown> | null;
 
+  /**
+   * A trade profile's reading (`ParsedTrade`, design "Trade confirmations"), or
+   * null for every email read as a receipt.
+   */
+  @Column({ type: "jsonb", nullable: true })
+  trade: Record<string, unknown> | null;
+
+  /**
+   * The investment transaction a trade email accounts for: the row its approved
+   * proposal created, the row a person linked it to, or the row already in the
+   * ledger when it arrived (`trade_exists`). A matching row no email accounts for
+   * is what makes a second email a duplicate; null for every other email.
+   */
+  @Column({ type: "uuid", name: "investment_transaction_id", nullable: true })
+  investmentTransactionId: string | null;
+
   @Column({ type: "uuid", name: "transaction_id", nullable: true })
   transactionId: string | null;
 

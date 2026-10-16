@@ -19,11 +19,14 @@ import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
  * confirmation and carries `emailReceiptId` (email-receipts design section 4);
  * `email_parser_draft` asks an agent to write a receipt parser from up to five
  * stored emails of one sender: it has NO transaction and carries
- * `emailReceiptIds` and `parserDomain` instead. Mirrors the schema's
+ * `emailReceiptIds` and `parserDomain` instead; `email_trade` is the proposal
+ * to CREATE the investment transaction a brokerage's trade-confirmation email
+ * reports: it has NO transaction either (there is none yet) and carries
+ * `emailReceiptId`. Mirrors the schema's
  * `ck_ai_review_requests_kind`.
  */
 export type AiReviewRequestKind =
-  "transaction_review" | "email_receipt" | "email_parser_draft";
+  "transaction_review" | "email_receipt" | "email_parser_draft" | "email_trade";
 
 /** Most emails one parser-draft request names (the schema's CHECK). */
 export const MAX_PARSER_DRAFT_EMAILS = 5;
@@ -61,6 +64,11 @@ export const AI_REVIEW_REQUEST_LIFETIME_DAYS = 30;
   where:
     "kind = 'email_parser_draft' AND status IN ('pending', 'claimed', 'proposed')",
 })
+@Index("uq_ai_review_requests_trade_open", ["emailReceiptId"], {
+  unique: true,
+  where:
+    "kind = 'email_trade' AND status IN ('pending', 'claimed', 'proposed')",
+})
 @Index("idx_ai_review_requests_claim", ["userId", "status", "createdAt"])
 export class AiReviewRequest {
   @PrimaryGeneratedColumn("uuid")
@@ -73,7 +81,7 @@ export class AiReviewRequest {
   @JoinColumn({ name: "user_id" })
   user?: User;
 
-  /** Null only for a request of kind `email_parser_draft`, which is about emails. */
+  /** Null only for the kinds about an email (`email_parser_draft`, `email_trade`). */
   @Column({ type: "uuid", name: "transaction_id", nullable: true })
   transactionId: string | null;
 

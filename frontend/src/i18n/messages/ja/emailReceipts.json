@@ -93,7 +93,7 @@
         "automatic": "承認済みのプロフィールでは完全に読み取れなかった一致済みレシートについて確認時にAIに問い合わせ、プロフィールがない送信者にはプロフィールの下書きを作成します。"
       },
       "autoApplyLabel": "提案を自動で適用",
-      "autoApplyHelp": "デフォルトではオフです。提案が確認なしで適用されるのは、次のすべてに当てはまる場合だけです: 承認済みのプロフィールがメール全体を読み取った、取引が注文番号または参照番号、あるいは金額と取引先の完全一致で見つかった、候補が1件だけである、提案が端数まで合計と一致している。それ以外はすべて、あなたの承認を待ちます。",
+      "autoApplyHelp": "デフォルトではオフです。提案が確認なしで適用されるのは、次のすべてに当てはまる場合だけです: 承認済みのプロフィールがメール全体を読み取った、取引が注文番号または参照番号、あるいは金額と取引先の完全一致で見つかった、候補が1件だけである、提案が端数まで合計と一致している。取引確認メールが確認なしで記帳されるのは、その取引プロフィールが承認済みで、取引全体を読み取り、価格が数量と合計金額に一致し、同じ取引がまだ口座に記録されていない場合だけです。それ以外はすべて、あなたの承認を待ちます。",
       "profileLimitLabel": "プロフィールの提案を1日のAI上限に含める",
       "profileLimitHelp": "デフォルトでオンです。プロフィールがメールから提案した編集は、他のAI提案と同様に、AIが提案する変更の1日あたりの上限に含まれます。保存済みメールの大量のバッチで上限を使い切ってしまう場合はオフにしてください。対象外となるのはプロフィールからの提案のみで、すべての提案は引き続きあなたの承認を待ちます。"
     },
@@ -177,14 +177,15 @@
       "confirm": "今すぐ処理",
       "later": "後で"
     },
-    "reparse": "メールを再解析 ({count})"
+    "reparse": "メールを再解析 ({count})",
+    "kindTrade": "証券取引"
   },
   "editor": {
     "createTitle": "新規プロフィール",
     "editTitle": "プロフィールを編集",
-    "loading": "支払先とカテゴリを読み込み中",
+    "loading": "支払先、カテゴリ、口座、通貨を読み込んでいます",
     "lookupsError": {
-      "title": "支払先とカテゴリを読み込めませんでした",
+      "title": "支払先、カテゴリ、口座、通貨のいずれかを読み込めませんでした",
       "body": "選択項目に必要なため、エディターはまだ開けません。もう一度お試しください。",
       "retry": "再試行"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "タグ名",
       "aiCategoriesLabel": "どのルールにも一致しない商品のカテゴリをAIに選ばせる",
       "aiCategoriesHelp": "商品がどのカテゴリルールにも一致せず、既定のカテゴリもない場合は、あなたのカテゴリ一覧からAIがカテゴリを選びます。その選択は提案上でAIによるものと表示されます。オフにすると、AIには一切問い合わせません。"
+    },
+    "kind": {
+      "label": "プロフィールの種類",
+      "receipt": "注文の領収書",
+      "trade": "証券取引",
+      "receiptHelp": "注文確認メールを読み取り、その支払いに使われた銀行取引を見つけます。",
+      "tradeHelp": "証券会社の約定通知を読み取り、そこに記載された投資取引 (買いまたは売り) を提案します。"
+    },
+    "trade": {
+      "guardsHeading": "送信者のどのメールを読むか",
+      "guardsHelp": "任意。各パターンはメールの 1 行全体と照合されます。1 行に 1 パターンです。",
+      "guards": {
+        "requireLine": "必須の行",
+        "requireLineHint": "これらの行のいずれかがあるメールだけを読みます。ない場合は、その送信者の次のプロフィールが試されます。",
+        "skipIfLine": "メールをスキップする行",
+        "skipIfLineHint": "これらの行のいずれかがあるメールは脇に置かれます (取り消された注文など)。",
+        "waitIfLine": "メールを保留にする行",
+        "waitIfLineHint": "これらの行のいずれかがあるメールは保留され、後で再度読まれます (一部約定など)。"
+      },
+      "fieldsHeading": "取引",
+      "fieldsHelp": "売買の区別、銘柄コード、株数は必須で、合計または価格も必要です。各欄にはパターンを 1 行に 1 つずつ書き、順に試されます。",
+      "fields": {
+        "tradeAction": "売買のパターン",
+        "tradeSymbol": "銘柄コードのパターン",
+        "tradeQuantity": "株数のパターン",
+        "tradeTotal": "取引合計のパターン",
+        "tradePrice": "1 株あたり価格のパターン",
+        "tradeCommission": "手数料のパターン",
+        "tradeDate": "取引日のパターン",
+        "tradeAccount": "口座のパターン"
+      },
+      "fieldHint": "{capture} を取り込む必要があります。例: {example}",
+      "amountsHelp": "合計は約定金額で、買いの場合は手数料を含みます。価格は照合用で、メールに合計がないときは価格から合計を求めます。通貨を示す金額 (US$、C$、USD、€) は取引の通貨も決めます。",
+      "rulesHeading": "口座のルール",
+      "rulesHelp": "取引をどの口座に記帳するか。ルールは口座のパターンが読み取った口座テキストに対して順に試され、最初に当てはまったルールが採用されます。{star} は任意のテキストです。通貨付きのルールはその通貨の取引にだけ当てはまるため、証券会社が同じように表記する 2 つの口座 (どちらも RRSP と表示される CAD の RRSP と USD の RRSP など) は、テキストが同じで通貨が異なる 2 つのルールになります。メールに口座テキストがない場合、当てはまるのはテキストが {star} のルールだけです。残りは既定の口座が受け持ちます。",
+      "currencyOrder": "取引の通貨は次の順に決まります: 金額自体が通貨を示していればそれ (US$、C$、USD、€)、次にメールの行に一致する下の最初の通貨マーカー、次にその銘柄コードのあなたの証券の通貨。通貨付きのルールは推測しません。3 つのどれからも通貨が分からない場合、メールはどちらの口座にも記帳されず、あなたの確認を待ちます。",
+      "ruleMatchLabel": "ルール {rule} の口座テキスト",
+      "ruleMatchPlaceholder": "口座テキスト (例: RRSP)",
+      "ruleCurrencyLabel": "ルール {rule} の通貨",
+      "ruleAccountLabel": "ルール {rule} の口座",
+      "ruleMoveUp": "ルール {rule} を上へ",
+      "ruleMoveDown": "ルール {rule} を下へ",
+      "ruleRemove": "ルール {rule} を削除",
+      "ruleAdd": "口座のルールを追加",
+      "rulesMax": "ルールは最大 {max} 件です。",
+      "rulesWithoutAccountText": "口座のパターンがないため、ルールは空のテキストに対して試されます。当てはまるのはテキストが {star} のルールだけです。",
+      "anyCurrency": "すべての通貨",
+      "baseCurrency": "{code} (基本通貨)",
+      "currencyPlaceholder": "通貨を選択",
+      "accountPlaceholder": "口座を選択",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (開いている証券口座ではありません)",
+      "accountUnknownOption": "一覧にない口座",
+      "accountNotTradable": "この口座には取引を記帳できません。閉鎖済み、現金口座、または投資口座ではありません。",
+      "accountUnknown": "この口座は一覧にありません。削除された可能性があります。別の口座を選んでください。",
+      "defaultAccountLabel": "既定の口座",
+      "defaultAccountNone": "既定の口座なし",
+      "defaultAccountHint": "どのルールも当てはまらないときの口座です。ない場合、ルールが当てはまらないメールはあなたの確認を待ちます。",
+      "markersHeading": "通貨マーカー",
+      "markersHelp": "金額が通貨を示さないときに取引の通貨を示すテキストです。たとえば単なる $ の横にある、金額が米ドルであると書かれた行です。各マーカーはメールのすべての行と照合され ({star} は任意のテキスト)、順番で最初に一致したマーカーが通貨を決めます。マーカーは金額が通貨を示さないときだけ使われます。",
+      "markerMatchLabel": "マーカー {marker} のテキスト",
+      "markerMatchPlaceholder": "例: *U.S. dollars*",
+      "markerCurrencyLabel": "マーカー {marker} の通貨",
+      "markerMoveUp": "マーカー {marker} を上へ",
+      "markerMoveDown": "マーカー {marker} を下へ",
+      "markerRemove": "マーカー {marker} を削除",
+      "markerAdd": "通貨マーカーを追加",
+      "markersMax": "マーカーは最大 {max} 件です。"
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "スキップする行 {line}",
       "recordStep": "レコードのステップ {step}",
       "recordStepPart": "レコードのステップ {step}、{part}",
-      "recordAlternative": "レコードのステップ {step}、代替 {alternative}"
+      "recordAlternative": "レコードのステップ {step}、代替 {alternative}",
+      "accountRule": "口座のルール {rule}",
+      "accountRulePart": "口座のルール {rule}、{part}",
+      "currencyMarker": "通貨マーカー {marker}",
+      "currencyMarkerPart": "通貨マーカー {marker}、{part}"
     },
     "fields": {
       "orderId": "注文番号のパターン",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "購入日より後の日数",
       "matchTolerance": "金額の許容差",
       "tag": "タグ",
-      "aiCategories": "AIカテゴリ"
+      "aiCategories": "AIカテゴリ",
+      "trade": "取引のセクション",
+      "tradeAction": "売買のパターン",
+      "tradeSymbol": "銘柄コードのパターン",
+      "tradeQuantity": "株数のパターン",
+      "tradeTotal": "取引合計のパターン",
+      "tradePrice": "1 株あたり価格のパターン",
+      "tradeCommission": "手数料のパターン",
+      "tradeDate": "取引日のパターン",
+      "tradeAccount": "口座のパターン",
+      "accountRules": "口座のルール",
+      "currencyMarkers": "通貨マーカー",
+      "defaultAccount": "既定の口座",
+      "ruleAccount": "口座",
+      "ruleCurrency": "通貨"
     },
     "codes": {
       "not_object": "は有効な定義ではありません",
@@ -376,7 +463,12 @@
       "duplicate_entry": "に同じ項目が2回含まれています",
       "reference_field_missing": "には参照パターンが必要です (参照の方式がオンです)",
       "out_of_range_days": "は 0 から {max} までの整数にしてください",
-      "out_of_range_tolerance": "は 0.00 から {max} までの金額にしてください"
+      "out_of_range_tolerance": "は 0.00 から {max} までの金額にしてください",
+      "trade_conflict": "は取引だけを読む証券取引プロフィールには含められません",
+      "trade_amount_missing": "には合計または価格のパターンが必要です (少なくともどちらか一方)",
+      "trade_account_missing": "には既定の口座または口座のルールが必要です",
+      "invalid_currency": "は USD のような 3 文字の通貨コードではありません",
+      "invalid_uuid_account": "は有効な口座ではありません"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "必須の行",
         "skipIfLine": "スキップする行",
         "waitIfLine": "保留にする行",
-        "reference": "参照"
+        "reference": "参照",
+        "action": "売買区分",
+        "symbol": "銘柄コード",
+        "quantity": "株数",
+        "price": "価格",
+        "commission": "手数料",
+        "date": "日付",
+        "account": "口座",
+        "currency": "通貨マーカー"
       },
       "entryLine": "項目 {entry} ({pattern})、{line} 行目: {text}",
       "entrySubject": "項目 {entry} ({pattern})、件名: {text}",
@@ -553,10 +653,12 @@
       "reprocess": "再処理",
       "link": "取引を選択",
       "recognizeAi": "AIで認識",
+      "recognizeTradeAi": "AIで取引として認識",
       "approve": "承認",
       "draftParser": "AIでプロフィールを準備",
       "createParser": "プロフィールを作成",
-      "ignore": "無視"
+      "ignore": "無視",
+      "reviewTrade": "受信箱で確認"
     },
     "toasts": {
       "approved": "提案を承認しました",
@@ -592,8 +694,11 @@
       "handoffFailed": "依頼はキューに追加されましたが、チャットでメールを開けませんでした。AIレビュー受信箱でエージェントを待ちます。",
       "inboxLink": "AIレビュー受信箱を開く",
       "opened": "メールを添付してチャットを開きました。メッセージを確認して送信を押してください。",
-      "chatPrompt": "{domain} から届いた{count, plural, one {この注文メール} other {これら # 通の注文メール}}用に、メールレシートのプロフィールを作成してください。AIレビュー依頼 {requestId} を引き受け、email_receipt_profiles ツールで添付されたすべてのメールでプロフィールをテストし、各メールが完全に読み取れるまで修正してから、依頼 {requestId} 用の下書きとして保存してください。"
-    }
+      "chatPrompt": "{domain} から届いた{count, plural, one {この注文メール} other {これら # 通の注文メール}}用に、メールレシートのプロフィールを作成してください。AIレビュー依頼 {requestId} を引き受け、email_receipt_profiles ツールで添付されたすべてのメールでプロフィールをテストし、各メールが完全に読み取れるまで修正してから、依頼 {requestId} 用の下書きとして保存してください。",
+      "mixedKinds": "選択したメールに取引確認メールと注文メールが混在しています。1つのプロフィールが読むのは1種類だけなので、取引確認メールだけ、または注文メールだけを選択してください。",
+      "chatPromptTrade": "{domain} から届いた{count, plural, one {この取引確認メール} other {これら # 通の取引確認メール}}用に、取引プロフィールを作成してください。AIレビュー依頼 {requestId} を引き受け、email_receipt_parsers ツールで添付されたすべてのメールでプロフィールをテストし、各メールから完全な取引が読み取れるまで修正してから、依頼 {requestId} 用の下書きとして保存してください。"
+    },
+    "tradeBadge": "取引"
   },
   "detail": {
     "title": "メールレシート",
@@ -644,11 +749,22 @@
       "wait_line": "注文がまだ確定していないことを示す行があるため、メールは後でもう一度読み取られます。",
       "no_html": "このプロフィールはメールのHTML部分を読み取りますが、このメールにはHTML部分がありません。",
       "schema_org": "プロフィールは不要でした。注文はメール内の構造化データ (schema.org) から読み取られました。",
-      "item_amount_missing": "明細に金額がなく、メールにも割り当てられる単一の合計がありません。"
+      "item_amount_missing": "明細に金額がなく、メールにも割り当てられる単一の合計がありません。",
+      "trade_no_action": "プロフィールはこのメールで購入も売却も見つけられませんでした。",
+      "trade_no_symbol": "プロフィールはこのメールでティッカーシンボルを見つけられませんでした。",
+      "trade_no_quantity": "プロフィールはこのメールで数量を見つけられませんでした。",
+      "trade_no_amount": "プロフィールはこのメールで合計も価格も見つけられませんでした。",
+      "trade_no_account": "プロフィールは、この取引がどの口座のものか判断できませんでした。",
+      "trade_exists": "この取引はすでに口座に記録されているため、何も提案されませんでした。",
+      "trade_linked": "報告されている取引に紐づけたため、何も提案されませんでした。",
+      "trade_no_currency": "この取引の通貨をプロフィールが判別できなかったため、口座を選べませんでした。"
     },
     "reasonUnknown": "理由: {reason}",
     "requestNote": "レビュー依頼 ({state}): {note}",
     "parsedHeading": "プロフィールが読み取った内容",
+    "tradeHeading": "メールから読み取った取引",
+    "tradeCandidatesHeading": "この取引になりうる既存の取引",
+    "tradeCandidatesHelp": "これらの投資取引は、このメールが報告する取引かもしれません。該当するものを紐づけてください。新しい取引は作成されず、その取引が支払う予定の請求や入金は支払い済みになります。",
     "notParsed": "このメールからはまだ何も読み取られていません。",
     "candidatesHeading": "一致する取引",
     "candidatesHelp": "このメールと同じ程度に一致する取引が複数あります。このメールが支払った取引を選んでください。",
@@ -688,7 +804,15 @@
       "capped": "最初の {max} 行のみが読み取られます。",
       "empty": "行がありません。",
       "listLabel": "メールの番号付き行"
-    }
+    },
+    "tradeTransactionSummary": "{date} に {symbol} を {quantity} 株、{total} で{action, select, BUY {購入} other {売却}}。",
+    "noTradeTransaction": "まだありません。提案を承認すると記帳されるか、台帳にある既存の取引に紐付けられます。",
+    "candidateShares": "{quantity} 株",
+    "tradeNoCandidates": "取引日の前後1週間以内に、この口座・売買区分・銘柄コードで紐付けられる投資取引はありません。自分で入力した場合は口座と日付を確認してください。そうでなければ、レビュー受信箱で提案を承認してください。",
+    "aiTradeHeading": "AIエージェントが提案する取引",
+    "aiTradeReader": "なし: AIエージェントが取引として読み取ります",
+    "noAiTradeTransaction": "まだありません。AIエージェントの提案を承認すると記帳されます。",
+    "tradeProposalHeading": "この提案で記帳される内容"
   },
   "picker": {
     "heading": "取引を選択",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "AIで認識",
+    "tradeTitle": "AIで取引として認識",
+    "tradeMessage": "AIはこのメールを証券会社の取引確認として読み取り、報告されている投資取引(口座、購入か売却か、ティッカー、数量、合計金額)を提案します。承認するまで何も保存されません。",
+    "tradeConfirm": "取引として認識",
     "transactionSummary": "{date}、{amount}、{payee}",
     "noPayee": "支払先なし",
     "confirmMessage": "このメールは取引 {summary} に紐づいています。AIがメールを読み取り、この取引を商品ごとに分割する方法を提案します。この取引で続行しますか？",
@@ -765,7 +892,9 @@
     "handoffFailed": "依頼はキューに追加されましたが、チャットでメールを開けませんでした。AIレビュー受信箱でエージェント (たとえばMCP経由) を待ちます。",
     "inboxLink": "AIレビュー受信箱を開く",
     "opened": "メールを添付してチャットを開きました。メッセージを確認して送信を押してください。",
-    "chatPrompt": "添付された注文メールの商品、数量、価格を認識し、{date} の私の取引 ({payee}、{amount}) を、それぞれにカテゴリを付けて商品ごとに分割してください。AIレビュー依頼 {requestId} を引き受け、その提案を送信してください。"
+    "chatPrompt": "添付された注文メールの商品、数量、価格を認識し、{date} の私の取引 ({payee}、{amount}) を、それぞれにカテゴリを付けて商品ごとに分割してください。AIレビュー依頼 {requestId} を引き受け、その提案を送信してください。",
+    "tradeChatPrompt": "添付の証券会社の確認メールにある取引を認識してください:口座、購入か売却か、ティッカー、数量、約定合計金額、日付。AIレビューリクエスト{requestId}を受け取り、その取引を提出してください。",
+    "tradeDetachesTransaction": "取引として読み取ると、このメールは {summary} に対応しなくなります。取引は独自の投資取引を作成します。"
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "{domain} に送信者がいる保存済みメールはありません。"
       },
       "help": "メールをクリックして内容を読み、そのメールの支払いに対応する取引を選択します。次に、プロフィールの作成に使うメールを最大 {max} 件チェックします。メールをチェックできるのは、取引を選択した後だけです。",
+      "tradeToggle": "これらのメールは証券会社の取引確認です(投資取引を作成するため、銀行取引は対応づけません)",
+      "tradeHelp": "メールをクリックして読み、プロフィールの元にする取引確認を最大{max}件選択してください。取引を選ぶ必要はありません。",
       "columns": {
         "select": "使用",
         "date": "日付",
@@ -913,6 +1044,7 @@
       "needsTransaction": "先にこのメールの取引を選択してください。",
       "limitReached": "サンプルは最大 {max} 件までです。別のものを選ぶには、どれかのチェックを外してください。",
       "noTransaction": "未選択",
+      "tradeNoTransaction": "取引確認には不要です",
       "selectedCount": "{max} 件中 {count} 件のサンプルをチェック済み",
       "continue": "アシスタントに進む",
       "emailLoading": "メールを読み込み中",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "アシスタントがこれらのメールとその支払いに対応する取引を読み取り、{domain} のプロフィールの下書きを作成します。まだ何も承認されていません。",
       "reviseHelp": "変更してほしい点をアシスタントに伝えてください。これらのメールと取引から、同じ下書きを更新します。",
+      "tradeHelp": "アシスタントはこれらの取引確認を読み取り、それぞれが報告する投資取引を提案する{domain}用のプロフィール案を作成します。まだ何も承認されません。",
+      "tradeSample": "取引確認",
       "feedbackLabel": "変更する内容",
       "feedbackPlaceholder": "例: 合計は小計ではなく、「お支払い金額」と書かれた行です。",
       "send": "AIに送信",
@@ -969,6 +1103,8 @@
       "parsedDate": "日付: {date}",
       "parsedTotal": "合計: {total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
+      "parsedTrade": "{action, select, BUY {購入} other {売却}}: {symbol} × {quantity}",
+      "tradeInconsistent": "価格が合計金額と一致しないため、自動的には適用されません",
       "noExpectation": "なし",
       "noMatch": "取引なし",
       "agreesYes": "はい",
@@ -991,8 +1127,37 @@
         "not_applicable": "このプロフィールでは読み取れません",
         "skip_line": "スキップ (スキップ行を検出)",
         "wait_line": "保留 (注文が未確定)",
-        "no_html": "HTML部分なし"
-      }
+        "no_html": "HTML部分なし",
+        "trade": "取引を提案",
+        "trade_exists": "台帳に記帳済み"
+      },
+      "parsedTradeAccount": "口座: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "不明",
+      "parsedTradeNoAccount": "この取引の口座が見つかりません",
+      "parsedTradeCurrency": "通貨: {currency}"
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {購入} other {売却}}: {symbol} × {quantity}、{total}、日付 {date}。",
+    "account": "メールに記載の口座: {account}",
+    "priceMismatch": "平均価格が数量と合計金額に一致しないため、この取引は自動的には適用されません。",
+    "incomplete": "プロフィールはこのメールから完全な取引を読み取れませんでした。",
+    "totalFromPrice": "価格から求めた合計",
+    "dateUnknown": "メールが届いた日",
+    "price": "メールの平均価格: 1株あたり {price}",
+    "proposalSecurity": "銘柄: {name}",
+    "proposalAccount": "口座: {account}",
+    "proposalPrice": "価格: 1株あたり {price}",
+    "proposalCommission": "手数料: {commission}",
+    "proposalReview": "承認するまで何も記帳されません。",
+    "proposalReviewLink": "受信箱で確認",
+    "aiWaiting": "AIエージェントはまだ取引を提案していません。提案はここと確認用の受信箱に表示されます。",
+    "aiBooked": "AIエージェントの提案から記帳しました。上の取引を確認してください。",
+    "aiNoProposal": "このメールについて承認待ちのAIエージェントの提案はありません。",
+    "currencyFrom": "通貨: {currency}、{source, select, amount {金額が示す通貨} marker {プロフィールの通貨マーカーから} other {銘柄コードのあなたの証券から}}",
+    "bookTo": "記帳先: {account}",
+    "bookToNotTradable": "記帳先は {account} ですが、開いている証券口座ではないため、取引をそこに記帳できません。",
+    "bookToUnknown": "記帳先は一覧にない口座のため、取引をそこに記帳できません。"
   }
 }

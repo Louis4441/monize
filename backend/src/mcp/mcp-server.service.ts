@@ -102,7 +102,7 @@ export class McpServerService {
           "- Never do arithmetic yourself: use calculate, and present a value a tool already computed as it stands.",
           "",
           "## Writing",
-          "- manage_transactions, manage_payees, manage_securities and manage_investment_transactions each take operation = create/update/delete and 1-25 items.",
+          "- manage_transactions, manage_payees, manage_securities and manage_investment_transactions each take operation = create/update/delete and 1-25 items (manage_securities also takes list with an accountName).",
           "- Every write is confirmed by the user before it is saved. By default 6 or more items are confirmed as one batch and 1-5 one at a time; approvalMode 'individual' forces one each. dryRun previews without saving.",
           "",
           "## Choosing a tool",

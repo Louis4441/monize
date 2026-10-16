@@ -93,7 +93,7 @@
         "automatic": "La relève interroge l'IA sur un reçu associé qu'aucun profil approuvé n'a pu lire entièrement, et rédige un profil pour un expéditeur qui n'en a pas."
       },
       "autoApplyLabel": "Appliquer les propositions automatiquement",
-      "autoApplyHelp": "Désactivé par défaut. Une proposition est appliquée sans demander uniquement lorsque toutes ces conditions sont réunies : un profil approuvé a lu l'e-mail en entier, la transaction a été trouvée par un numéro de commande ou une référence, ou par montant et bénéficiaire exacts, avec un seul candidat, et la proposition tombe juste au centime. Tout le reste attend votre approbation.",
+      "autoApplyHelp": "Désactivé par défaut. Une proposition est appliquée sans demander uniquement lorsque toutes ces conditions sont réunies : un profil approuvé a lu l'e-mail en entier, la transaction a été trouvée par un numéro de commande ou une référence, ou par montant et bénéficiaire exacts, avec un seul candidat, et la proposition tombe juste au centime. Une confirmation d'opération est enregistrée sans demander uniquement lorsque son profil d'opérations est approuvé, qu'il a lu l'opération en entier, que le prix correspond aux parts et au total, et que vos comptes ne contiennent pas déjà une opération identique. Tout le reste attend votre approbation.",
       "profileLimitLabel": "Compter les propositions des profils dans la limite quotidienne de l'IA",
       "profileLimitHelp": "Activé par défaut : une modification qu'un profil propose à partir d'un e-mail compte dans la limite quotidienne de modifications proposées par l'IA, comme toute autre proposition de l'IA. Désactivez-le quand un gros lot d'e-mails enregistrés épuiserait la limite. Seules les propositions issues de profils sont exemptées ; chaque proposition attend toujours votre approbation."
     },
@@ -177,14 +177,15 @@
       "confirm": "Traiter maintenant",
       "later": "Pas maintenant"
     },
-    "reparse": "Relire les e-mails ({count})"
+    "reparse": "Relire les e-mails ({count})",
+    "kindTrade": "Opérations boursières"
   },
   "editor": {
     "createTitle": "Nouveau profil",
     "editTitle": "Modifier le profil",
-    "loading": "Chargement des bénéficiaires et des catégories",
+    "loading": "Chargement des bénéficiaires, des catégories, des comptes et des devises",
     "lookupsError": {
-      "title": "Impossible de charger les bénéficiaires et les catégories",
+      "title": "Les bénéficiaires, les catégories, les comptes ou les devises n'ont pas pu être chargés",
       "body": "Les sélecteurs en ont besoin, l'éditeur ne peut donc pas encore s'ouvrir. Réessayez.",
       "retry": "Réessayer"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "Nom de l'étiquette",
       "aiCategoriesLabel": "Laisser l'IA choisir la catégorie des articles qu'aucune règle ne couvre",
       "aiCategoriesHelp": "Lorsqu'un article ne correspond à aucune règle de catégorie et qu'il n'y a pas de catégorie par défaut, l'IA est interrogée sur sa catégorie à partir de votre liste de catégories. Le choix est signalé comme celui de l'IA sur la proposition. Désactivée, l'IA n'est jamais interrogée."
+    },
+    "kind": {
+      "label": "Type de profil",
+      "receipt": "Reçu de commande",
+      "trade": "Opération boursière",
+      "receiptHelp": "Lit une confirmation de commande et trouve la transaction bancaire qui l'a payée.",
+      "tradeHelp": "Lit un avis d'exécution du courtier et propose la transaction de placement qu'il annonce, un achat ou une vente."
+    },
+    "trade": {
+      "guardsHeading": "Quels e-mails de l'expéditeur il lit",
+      "guardsHelp": "Facultatif. Chaque motif est comparé à une ligne entière de l'e-mail, un motif par ligne.",
+      "guards": {
+        "requireLine": "Lignes obligatoires",
+        "requireLineHint": "Le profil ne lit un e-mail que s'il contient l'une de ces lignes ; sinon le profil suivant de l'expéditeur est essayé.",
+        "skipIfLine": "Lignes qui font ignorer l'e-mail",
+        "skipIfLineHint": "Un e-mail contenant l'une de ces lignes est mis de côté, comme un ordre annulé.",
+        "waitIfLine": "Lignes qui mettent l'e-mail en attente",
+        "waitIfLineHint": "Un e-mail contenant l'une de ces lignes est mis en attente et relu plus tard, comme une exécution partielle."
+      },
+      "fieldsHeading": "L'opération",
+      "fieldsHelp": "L'achat ou la vente, le symbole et le nombre d'actions sont obligatoires, ainsi qu'un total ou un prix. Chaque champ accepte des motifs, un par ligne, essayés dans l'ordre.",
+      "fields": {
+        "tradeAction": "Motifs d'achat ou de vente",
+        "tradeSymbol": "Motifs du symbole",
+        "tradeQuantity": "Motifs du nombre d'actions",
+        "tradeTotal": "Motifs du total de l'opération",
+        "tradePrice": "Motifs du prix par action",
+        "tradeCommission": "Motifs de la commission",
+        "tradeDate": "Motifs de la date de l'opération",
+        "tradeAccount": "Motifs du compte"
+      },
+      "fieldHint": "Doit capturer {capture}. Exemple : {example}",
+      "amountsHelp": "Le total est le montant exécuté, commission comprise pour un achat. Le prix sert de vérification et donne le total quand l'e-mail n'en indique pas. Un montant qui nomme sa devise (US$, C$, USD, €) fixe aussi la devise de l'opération.",
+      "rulesHeading": "Règles de compte",
+      "rulesHelp": "Le compte où l'opération est inscrite. Les règles sont essayées dans l'ordre sur le texte de compte que lisent les motifs du compte, et la première qui s'applique l'emporte ; {star} désigne n'importe quel texte. Une règle avec une devise ne s'applique qu'à une opération dans cette devise : deux comptes que le courtier écrit de la même façon, comme un REER en CAD et un en USD tous deux affichés RRSP, sont donc deux règles au même texte et aux devises différentes. Quand l'e-mail n'affiche aucun texte de compte, seule une règle dont le texte est {star} peut s'appliquer. Le compte par défaut prend le reste.",
+      "currencyOrder": "La devise de l'opération est prise, dans l'ordre : du montant lui-même quand il en nomme une (US$, C$, USD, €), puis du premier marqueur de devise ci-dessous qui correspond à une ligne de l'e-mail, puis de la devise de votre titre pour ce symbole. Une règle avec une devise ne devine jamais : quand aucun des trois n'indique la devise, l'e-mail vous attend au lieu d'être inscrit à l'un des comptes.",
+      "ruleMatchLabel": "Texte de compte de la règle {rule}",
+      "ruleMatchPlaceholder": "Texte de compte, comme RRSP",
+      "ruleCurrencyLabel": "Devise de la règle {rule}",
+      "ruleAccountLabel": "Compte de la règle {rule}",
+      "ruleMoveUp": "Monter la règle {rule}",
+      "ruleMoveDown": "Descendre la règle {rule}",
+      "ruleRemove": "Supprimer la règle {rule}",
+      "ruleAdd": "Ajouter une règle de compte",
+      "rulesMax": "Au plus {max} règles.",
+      "rulesWithoutAccountText": "Il n'y a pas de motifs du compte, les règles sont donc essayées sur un texte vide : seule une règle dont le texte est {star} peut s'appliquer.",
+      "anyCurrency": "Toute devise",
+      "baseCurrency": "{code} (votre devise de base)",
+      "currencyPlaceholder": "Choisir une devise",
+      "accountPlaceholder": "Choisir un compte",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (pas un compte de courtage ouvert)",
+      "accountUnknownOption": "Un compte absent de votre liste",
+      "accountNotTradable": "Aucune opération ne peut être inscrite à ce compte : il est fermé, c'est un compte d'espèces ou ce n'est pas un compte de placement.",
+      "accountUnknown": "Ce compte n'est pas dans votre liste : il a peut-être été supprimé. Choisissez-en un autre.",
+      "defaultAccountLabel": "Compte par défaut",
+      "defaultAccountNone": "Aucun compte par défaut",
+      "defaultAccountHint": "Le compte quand aucune règle ne s'applique. Sans lui, un e-mail auquel aucune règle ne s'applique vous attend.",
+      "markersHeading": "Marqueurs de devise",
+      "markersHelp": "Du texte qui nomme la devise de l'opération quand ses montants ne le font pas, comme une ligne indiquant que les montants sont en dollars américains à côté d'un simple $. Chaque marqueur est comparé à chaque ligne de l'e-mail ({star} désigne n'importe quel texte), et le premier marqueur, dans l'ordre, qui correspond nomme la devise. Les marqueurs ne servent que si le montant ne nomme aucune devise.",
+      "markerMatchLabel": "Texte du marqueur {marker}",
+      "markerMatchPlaceholder": "Comme *U.S. dollars*",
+      "markerCurrencyLabel": "Devise du marqueur {marker}",
+      "markerMoveUp": "Monter le marqueur {marker}",
+      "markerMoveDown": "Descendre le marqueur {marker}",
+      "markerRemove": "Supprimer le marqueur {marker}",
+      "markerAdd": "Ajouter un marqueur de devise",
+      "markersMax": "Au plus {max} marqueurs."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "Ligne à ignorer {line}",
       "recordStep": "Étape de l'enregistrement {step}",
       "recordStepPart": "Étape de l'enregistrement {step}, {part}",
-      "recordAlternative": "Étape de l'enregistrement {step}, variante {alternative}"
+      "recordAlternative": "Étape de l'enregistrement {step}, variante {alternative}",
+      "accountRule": "Règle de compte {rule}",
+      "accountRulePart": "Règle de compte {rule}, {part}",
+      "currencyMarker": "Marqueur de devise {marker}",
+      "currencyMarkerPart": "Marqueur de devise {marker}, {part}"
     },
     "fields": {
       "orderId": "Motifs du numéro de commande",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "Jours après l'achat",
       "matchTolerance": "Tolérance du montant",
       "tag": "Étiquette",
-      "aiCategories": "Catégories de l'IA"
+      "aiCategories": "Catégories de l'IA",
+      "trade": "La section de l'opération",
+      "tradeAction": "Motifs d'achat ou de vente",
+      "tradeSymbol": "Motifs du symbole",
+      "tradeQuantity": "Motifs du nombre d'actions",
+      "tradeTotal": "Motifs du total de l'opération",
+      "tradePrice": "Motifs du prix par action",
+      "tradeCommission": "Motifs de la commission",
+      "tradeDate": "Motifs de la date de l'opération",
+      "tradeAccount": "Motifs du compte",
+      "accountRules": "Règles de compte",
+      "currencyMarkers": "Marqueurs de devise",
+      "defaultAccount": "Compte par défaut",
+      "ruleAccount": "compte",
+      "ruleCurrency": "devise"
     },
     "codes": {
       "not_object": "n'est pas une définition valide",
@@ -376,7 +463,12 @@
       "duplicate_entry": "liste deux fois la même entrée",
       "reference_field_missing": "nécessite des motifs de référence (la stratégie de référence est activée)",
       "out_of_range_days": "doit être un nombre entier de 0 à {max}",
-      "out_of_range_tolerance": "doit être un montant de 0,00 à {max}"
+      "out_of_range_tolerance": "doit être un montant de 0,00 à {max}",
+      "trade_conflict": "ne peut pas figurer dans un profil d'opération boursière, qui ne lit que l'opération",
+      "trade_amount_missing": "a besoin de motifs du total ou du prix (au moins l'un des deux)",
+      "trade_account_missing": "a besoin d'un compte par défaut ou de règles de compte",
+      "invalid_currency": "n'est pas un code de devise à 3 lettres, comme USD",
+      "invalid_uuid_account": "n'est pas un compte valide"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "Ligne obligatoire",
         "skipIfLine": "Ligne d'exclusion",
         "waitIfLine": "Ligne d'attente",
-        "reference": "Référence"
+        "reference": "Référence",
+        "action": "Achat ou vente",
+        "symbol": "Symbole",
+        "quantity": "Actions",
+        "price": "Prix",
+        "commission": "Commission",
+        "date": "Date",
+        "account": "Compte",
+        "currency": "Marqueur de devise"
       },
       "entryLine": "entrée {entry} ({pattern}), ligne {line} : {text}",
       "entrySubject": "entrée {entry} ({pattern}), l'objet : {text}",
@@ -553,10 +653,12 @@
       "reprocess": "Retraiter",
       "link": "Choisir la transaction",
       "recognizeAi": "Reconnaître avec l'IA",
+      "recognizeTradeAi": "Reconnaître comme une opération avec l'IA",
       "approve": "Approuver",
       "draftParser": "Préparer un profil avec l'IA",
       "createParser": "Créer un profil",
-      "ignore": "Ignorer"
+      "ignore": "Ignorer",
+      "reviewTrade": "Examiner dans la boîte"
     },
     "toasts": {
       "approved": "Proposition approuvée",
@@ -592,8 +694,11 @@
       "handoffFailed": "La demande est en file d'attente, mais les e-mails n'ont pas pu être ouverts dans le chat. Elle attend un agent dans la boîte de révision par l'IA.",
       "inboxLink": "Ouvrir la boîte de révision par l'IA",
       "opened": "Le chat est ouvert avec les e-mails joints. Lisez le message et appuyez sur Envoyer.",
-      "chatPrompt": "Crée un profil de reçus par e-mail pour {count, plural, one {cet e-mail de commande} other {ces # e-mails de commande}} de {domain}. Prends en charge la demande de revue IA {requestId}, teste ton profil sur chaque e-mail joint avec l'outil email_receipt_profiles, corrige-le jusqu'à ce que chacun soit lu entièrement, puis enregistre-le comme brouillon pour la demande {requestId}."
-    }
+      "chatPrompt": "Crée un profil de reçus par e-mail pour {count, plural, one {cet e-mail de commande} other {ces # e-mails de commande}} de {domain}. Prends en charge la demande de revue IA {requestId}, teste ton profil sur chaque e-mail joint avec l'outil email_receipt_profiles, corrige-le jusqu'à ce que chacun soit lu entièrement, puis enregistre-le comme brouillon pour la demande {requestId}.",
+      "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande.",
+      "chatPromptTrade": "Crée un profil d'opérations pour {count, plural, one {cette confirmation d'opération} other {ces # confirmations d'opération}} de {domain}. Prends en charge la demande de revue IA {requestId}, teste ton profil sur chaque e-mail joint avec l'outil email_receipt_parsers, corrige-le jusqu'à ce que chacun donne une opération complète, puis enregistre-le comme brouillon pour la demande {requestId}."
+    },
+    "tradeBadge": "Opération"
   },
   "detail": {
     "title": "Reçu par e-mail",
@@ -644,11 +749,22 @@
       "wait_line": "Une ligne indique que la commande n'est pas encore définitive, l'e-mail sera donc relu plus tard.",
       "no_html": "Ce profil lit la partie HTML de l'e-mail, et cet e-mail n'en a pas.",
       "schema_org": "Aucun profil n'était nécessaire : la commande a été lue à partir des données structurées (schema.org) de l'e-mail.",
-      "item_amount_missing": "Un article n'a pas de montant, et l'e-mail n'a pas de total unique à lui attribuer."
+      "item_amount_missing": "Un article n'a pas de montant, et l'e-mail n'a pas de total unique à lui attribuer.",
+      "trade_no_action": "Le profil n'a trouvé ni achat ni vente dans cet e-mail.",
+      "trade_no_symbol": "Le profil n'a trouvé aucun symbole boursier dans cet e-mail.",
+      "trade_no_quantity": "Le profil n'a trouvé aucun nombre de parts dans cet e-mail.",
+      "trade_no_amount": "Le profil n'a trouvé ni total ni prix dans cet e-mail.",
+      "trade_no_account": "Le profil n'a pas pu déterminer à quel compte cette opération correspond.",
+      "trade_exists": "Vos comptes contiennent déjà cette opération, donc rien n'a été proposé.",
+      "trade_linked": "Lié à la transaction qu'il indique, donc rien n'a été proposé.",
+      "trade_no_currency": "Le profil n'a pas pu déterminer la devise de cette opération, il n'a donc pas pu choisir son compte."
     },
     "reasonUnknown": "Motif : {reason}",
     "requestNote": "Demande de révision ({state}) : {note}",
     "parsedHeading": "Ce que le profil a lu",
+    "tradeHeading": "Opération lue dans l'e-mail",
+    "tradeCandidatesHeading": "Transactions existantes qui pourraient être cette opération",
+    "tradeCandidatesHelp": "Ces transactions d'investissement pourraient être l'opération indiquée par cet e-mail. Liez la bonne : aucune nouvelle transaction n'est créée, et une échéance ou un dépôt planifié qu'elle règle est marqué comme payé.",
     "notParsed": "Rien n'a encore été lu dans cet e-mail.",
     "candidatesHeading": "Transactions qui conviennent",
     "candidatesHelp": "Plusieurs transactions conviennent aussi bien à cet e-mail. Choisissez celle qu'il a réglée.",
@@ -688,7 +804,15 @@
       "capped": "Seules les {max} premières lignes sont lues.",
       "empty": "Aucune ligne.",
       "listLabel": "Lignes numérotées de l'e-mail"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Achat} other {Vente}} de {quantity} {symbol} pour {total} le {date}.",
+    "noTradeTransaction": "Aucune pour l'instant : l'opération est enregistrée quand vous approuvez sa proposition, ou liée à une opération déjà présente dans votre registre.",
+    "candidateShares": "{quantity} actions",
+    "tradeNoCandidates": "Aucune opération de placement de ce compte, de ce sens et de ce symbole à moins d'une semaine du jour de l'opération n'est libre à lier. Si vous avez saisi l'opération vous-même, vérifiez son compte et sa date ; sinon, approuvez la proposition dans la boîte de révision.",
+    "aiTradeHeading": "Opération proposée par l'agent IA",
+    "aiTradeReader": "Aucun : l'agent IA la lit comme une opération",
+    "noAiTradeTransaction": "Aucune pour l'instant : l'opération est enregistrée quand vous approuvez la proposition de l'agent IA.",
+    "tradeProposalHeading": "Ce que sa proposition enregistrerait"
   },
   "picker": {
     "heading": "Choisir la transaction",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "Reconnaître avec l'IA",
+    "tradeTitle": "Reconnaître comme une opération avec l'IA",
+    "tradeMessage": "L'IA lira cet e-mail comme une confirmation d'opération de courtage et proposera la transaction d'investissement qu'il indique (compte, achat ou vente, symbole, parts et total). Rien n'est enregistré avant votre approbation.",
+    "tradeConfirm": "Reconnaître comme une opération",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "aucun bénéficiaire",
     "confirmMessage": "Cet e-mail est associé à la transaction {summary}. L'IA lira l'e-mail et proposera comment répartir cette transaction par produit. Continuer avec cette transaction ?",
@@ -765,7 +892,9 @@
     "handoffFailed": "La demande est en attente, mais l'e-mail n'a pas pu être ouvert dans le chat. Elle attend dans la boîte de révision par l'IA qu'un agent la prenne en charge (par exemple via MCP).",
     "inboxLink": "Ouvrir la boîte de révision par l'IA",
     "opened": "Le chat est ouvert avec l'e-mail joint. Lisez le message et appuyez sur Envoyer.",
-    "chatPrompt": "Reconnaissez les produits, les quantités et les prix dans l'e-mail de commande joint et répartissez ma transaction du {date} ({payee}, {amount}) par produit, avec une catégorie pour chacun. Prenez en charge la demande de révision par l'IA {requestId} et soumettez votre proposition pour celle-ci."
+    "chatPrompt": "Reconnaissez les produits, les quantités et les prix dans l'e-mail de commande joint et répartissez ma transaction du {date} ({payee}, {amount}) par produit, avec une catégorie pour chacun. Prenez en charge la demande de révision par l'IA {requestId} et soumettez votre proposition pour celle-ci.",
+    "tradeChatPrompt": "Reconnais l'opération dans l'e-mail de confirmation du courtier joint : le compte, achat ou vente, le symbole, les parts, le total exécuté et la date. Prends la demande de revue par IA {requestId} et soumets l'opération pour elle.",
+    "tradeDetachesTransaction": "Lu comme une opération, ce courriel ne correspond plus à {summary} : l'opération crée sa propre opération de placement."
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "Aucun e-mail enregistré n'a d'expéditeur chez {domain}."
       },
       "help": "Cliquez sur un e-mail pour le lire et choisir la transaction qu'il a réglée. Cochez ensuite jusqu'à {max} e-mails pour rédiger le profil ; un e-mail ne peut être coché qu'une fois qu'il a une transaction.",
+      "tradeToggle": "Ces e-mails sont des confirmations d'opérations de courtage (elles créent une transaction d'investissement, donc aucune transaction bancaire n'est associée)",
+      "tradeHelp": "Cliquez sur un e-mail pour le lire, puis cochez jusqu'à {max} confirmations pour écrire le profil. Aucune transaction n'est à choisir.",
       "columns": {
         "select": "Utiliser",
         "date": "Date",
@@ -913,6 +1044,7 @@
       "needsTransaction": "Choisissez d'abord une transaction pour cet e-mail.",
       "limitReached": "{max} échantillons au maximum. Décochez-en un pour en choisir un autre.",
       "noTransaction": "Aucune choisie",
+      "tradeNoTransaction": "Inutile pour une confirmation d'opération",
       "selectedCount": "{count} échantillons cochés sur {max}",
       "continue": "Continuer vers l'assistant",
       "emailLoading": "Chargement de l'e-mail",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "L'assistant lit ces e-mails et les transactions qu'ils ont réglées, puis rédige un brouillon de profil pour {domain}. Rien n'est encore approuvé.",
       "reviseHelp": "Dites à l'assistant ce qu'il faut changer. Il met à jour le même brouillon à partir de ces e-mails et transactions.",
+      "tradeHelp": "L'assistant lit ces confirmations et écrit un brouillon de profil pour {domain} qui propose la transaction d'investissement indiquée par chacune. Rien n'est encore approuvé.",
+      "tradeSample": "Confirmation d'opération",
       "feedbackLabel": "Ce qui doit changer",
       "feedbackPlaceholder": "Par exemple : le total est la ligne qui indique Montant payé, pas le sous-total.",
       "send": "Envoyer à l'IA",
@@ -969,6 +1103,8 @@
       "parsedDate": "Date : {date}",
       "parsedTotal": "Total : {total}",
       "parsedLines": "{count, plural, one {# ligne} other {# lignes}}",
+      "parsedTrade": "{action, select, BUY {Achète} other {Vend}} {quantity} parts de {symbol}",
+      "tradeInconsistent": "Le prix ne correspond pas au total, donc il ne sera pas appliqué automatiquement",
       "noExpectation": "Aucune",
       "noMatch": "Aucune transaction",
       "agreesYes": "Oui",
@@ -991,8 +1127,37 @@
         "not_applicable": "Non lu par ce profil",
         "skip_line": "Ignoré (ligne à ignorer trouvée)",
         "wait_line": "En attente (commande non définitive)",
-        "no_html": "Aucune partie HTML"
-      }
+        "no_html": "Aucune partie HTML",
+        "trade": "Propose une opération",
+        "trade_exists": "Déjà dans votre registre"
+      },
+      "parsedTradeAccount": "Compte : {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "inconnu",
+      "parsedTradeNoAccount": "Aucun compte trouvé pour cette opération",
+      "parsedTradeCurrency": "Devise : {currency}"
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Achat} other {Vente}} de {quantity} parts de {symbol} pour {total}, date : {date}.",
+    "account": "Compte indiqué dans l'e-mail : {account}",
+    "priceMismatch": "Le prix moyen ne correspond pas aux parts et au total ; cette opération ne sera donc pas appliquée automatiquement.",
+    "incomplete": "Le profil n'a pas pu lire une opération complète dans cet e-mail.",
+    "totalFromPrice": "le total déduit du prix",
+    "dateUnknown": "jour de réception de l'e-mail",
+    "price": "Prix moyen dans le courriel : {price} par action",
+    "proposalSecurity": "Titre : {name}",
+    "proposalAccount": "Compte : {account}",
+    "proposalPrice": "Prix : {price} par action",
+    "proposalCommission": "Commission : {commission}",
+    "proposalReview": "Rien n'est enregistré avant votre approbation.",
+    "proposalReviewLink": "La vérifier dans la boîte de réception",
+    "aiWaiting": "L'agent IA n'a pas encore proposé l'opération. Sa proposition apparaîtra ici et dans la boîte de réception des vérifications.",
+    "aiBooked": "Enregistrée à partir de la proposition de l'agent IA : voir l'opération ci-dessus.",
+    "aiNoProposal": "Aucune proposition de l'agent IA n'attend pour ce courriel.",
+    "currencyFrom": "Devise : {currency}, {source, select, amount {nommée par le montant} marker {d'un marqueur de devise du profil} other {de votre titre pour ce symbole}}",
+    "bookTo": "Inscrit à : {account}",
+    "bookToNotTradable": "Inscrit à {account}, qui n'est pas un compte de courtage ouvert : l'opération ne peut pas y être inscrite.",
+    "bookToUnknown": "Inscrit à un compte absent de votre liste : l'opération ne peut pas y être inscrite."
   }
 }

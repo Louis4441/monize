@@ -67,6 +67,7 @@ export function makeParser(overrides: Partial<EmailReceiptParser> = {}): EmailRe
   };
 }
 
+/** One stored email as `GET /email-receipts` answers it, every field the server always sends included; `overrides` win. */
 export function makeReceipt(overrides: Partial<EmailReceiptListItem> = {}): EmailReceiptListItem {
   return {
     id: 'r-1',
@@ -83,9 +84,12 @@ export function makeReceipt(overrides: Partial<EmailReceiptListItem> = {}): Emai
     parserId: null,
     parserName: null,
     aiReviewRequestId: null,
+    isTrade: false,
+    tradeSource: null,
     displayState: null,
     requestNote: null,
     transaction: null,
+    investmentTransaction: null,
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   };
@@ -99,6 +103,8 @@ export function makeDetail(overrides: Partial<EmailReceiptDetail> = {}): EmailRe
     lines: { text: ['Thank you for your order.', 'Total 25.00'], html: null },
     structuredOrder: null,
     parsed: null,
+    trade: null,
+    tradeProposal: null,
     candidates: [],
     ...overrides,
   };
@@ -141,3 +147,20 @@ export function makeOverview(overrides: Partial<EmailReceiptsOverview> = {}): Em
     ...overrides,
   };
 }
+
+/** A `ParsedTrade` as the API stores it: the total in 1/10000 units. */
+export const PARSED_TRADE = {
+  action: 'BUY',
+  symbol: 'XCNS',
+  quantity: 75.9878,
+  total: 20_000_000,
+  price: 263_200,
+  commission: null,
+  currency: null,
+  date: '2026-10-15',
+  accountText: 'RRSP',
+  accountId: 'acc-rrsp',
+  complete: true,
+  consistent: true,
+  reason: null,
+};

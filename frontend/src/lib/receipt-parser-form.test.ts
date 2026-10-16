@@ -9,6 +9,9 @@ import {
   emptyParserForm,
   formCanRepresent,
   formatDefinitionJson,
+  isTradeDefinition,
+  newTradeAccountRule,
+  newTradeCurrencyMarker,
   parseDefinitionJson,
   parseValidationProblems,
   parserToForm,
@@ -17,6 +20,7 @@ import {
   splitWords,
   toleranceFromString,
   toleranceToString,
+  tradeCurrencyChoices,
 } from './receipt-parser-form';
 import type { EmailReceiptParser } from '@/types/email-receipts';
 
@@ -498,5 +502,138 @@ describe('the matching section', () => {
   it('writes aiCategories only when it is on', () => {
     expect(buildParserDefinition(emptyParserForm({ aiCategories: true }))).toMatchObject({ aiCategories: true });
     expect(buildParserDefinition(emptyParserForm())).not.toHaveProperty('aiCategories');
+  });
+});
+
+describe('a trade profile', () => {
+  const RRSP_CAD = '33333333-3333-4333-8333-333333333333';
+  const RRSP_USD = '44444444-4444-4444-8444-444444444444';
+  const TFSA = '55555555-5555-4555-8555-555555555555';
+  // Two RRSP accounts the broker prints the same way, told apart by the trade's currency.
+  const definition = {
+    version: 2,
+    source: 'html',
+    trade: {
+      action: ['You {action} *'],
+      symbol: ['Symbol: {symbol}'],
+      quantity: ['Shares: {quantity}'],
+      total: ['Total: {amount}'],
+      price: ['Price: {amount}'],
+      commission: ['Commission: {amount}'],
+      date: ['Date: {date}'],
+      account: ['Account: {account}'],
+      accountRules: [
+        { match: 'RRSP', accountId: RRSP_USD, currency: 'USD' },
+        { match: 'RRSP', accountId: RRSP_CAD, currency: 'CAD' },
+        { match: 'TFSA*', accountId: TFSA },
+      ],
+      defaultAccountId: TFSA,
+      currencyMarkers: [
+        { match: '*U.S. dollars*', currency: 'USD' },
+        { match: '*Canadian dollars*', currency: 'CAD' },
+      ],
+    },
+    requireLine: ['*order has been filled*'],
+    skipIfLine: ['*cancelled*'],
+    waitIfLine: ['*partially filled*'],
+  };
+
+  it('is shown in the form and round-trips through it to the same definition', () => {
+    expect(formCanRepresent(definition)).toBe(true);
+    const fields = definitionToFormFields(definition);
+    expect(fields.kind).toBe('trade');
+    expect(fields.tradeAction).toBe('You {action} *');
+    expect(fields.tradeAccountRules.map(({ match, currency, accountId }) => ({ match, currency, accountId }))).toEqual([
+      { match: 'RRSP', currency: 'USD', accountId: RRSP_USD },
+      { match: 'RRSP', currency: 'CAD', accountId: RRSP_CAD },
+      { match: 'TFSA*', currency: '', accountId: TFSA },
+    ]);
+    expect(fields.tradeCurrencyMarkers.map(({ match, currency }) => ({ match, currency }))).toEqual([
+      { match: '*U.S. dollars*', currency: 'USD' },
+      { match: '*Canadian dollars*', currency: 'CAD' },
+    ]);
+    // Each row has its own key for the list, which is never sent.
+    expect(new Set(fields.tradeAccountRules.map((rule) => rule.id)).size).toBe(3);
+    expect(buildParserDefinition({ ...emptyParserForm(), ...fields })).toEqual(definition);
+  });
+
+  it('always sends the trade section, so an empty one is reported rather than read as a receipt profile', () => {
+    expect(buildParserDefinition(emptyParserForm({ kind: 'trade' }))).toEqual({ version: 2, trade: {} });
+  });
+
+  it('writes no receipt key, whatever the receipt fields hold', () => {
+    const form = emptyParserForm({ kind: 'trade', total: 'Total {amount}', tradeSymbol: 'Symbol: {symbol}', tagEnabled: true, tagName: 'x' });
+    expect(buildParserDefinition(form)).toEqual({ version: 2, trade: { symbol: ['Symbol: {symbol}'] } });
+  });
+
+  it('drops a row left wholly blank and sends a half-filled one for the server to name what is missing', () => {
+    const form = emptyParserForm({
+      kind: 'trade',
+      tradeAccountRules: [newTradeAccountRule(), { ...newTradeAccountRule(), match: ' RRSP ' }],
+      tradeCurrencyMarkers: [newTradeCurrencyMarker(), { ...newTradeCurrencyMarker(), currency: 'USD' }],
+    });
+    expect(buildParserDefinition(form).trade).toEqual({
+      accountRules: [{ match: 'RRSP', accountId: '' }],
+      currencyMarkers: [{ match: '', currency: 'USD' }],
+    });
+  });
+
+  it('sends no payee for a trade profile', () => {
+    expect(buildParserPayload(emptyParserForm({ kind: 'trade', payeeId: 'payee-1' })).payeeId).toBeNull();
+  });
+
+  it('is edited as JSON when it holds what the form cannot show', () => {
+    const withTrade = (trade: Record<string, unknown>, rest: Record<string, unknown> = {}) => ({
+      version: 2,
+      trade: { action: ['{action}'], ...trade },
+      ...rest,
+    });
+    expect(formCanRepresent(withTrade({}))).toBe(true);
+    // A receipt key beside the trade section (the server refuses the mix).
+    expect(formCanRepresent(withTrade({}, { total: ['Total {amount}'] }))).toBe(false);
+    // A labelled entry.
+    expect(formCanRepresent(withTrade({ symbol: [{ label: 'Symbol', value: '{symbol}' }] }))).toBe(false);
+    // A key the form has no field for.
+    expect(formCanRepresent(withTrade({ extra: true }))).toBe(false);
+    expect(formCanRepresent(withTrade({ accountRules: [{ match: 'x', accountId: RRSP_CAD, note: 'y' }] }))).toBe(false);
+    // Values the form would drop or could not hold.
+    expect(formCanRepresent(withTrade({ accountRules: [{ match: 'x', accountId: RRSP_CAD, currency: '' }] }))).toBe(false);
+    expect(formCanRepresent(withTrade({ accountRules: [{ match: '', accountId: '' }] }))).toBe(false);
+    expect(formCanRepresent(withTrade({ accountRules: [{ match: 'x', accountId: 5 }] }))).toBe(false);
+    expect(formCanRepresent(withTrade({ currencyMarkers: [{ match: 'x' }] }))).toBe(false);
+    expect(formCanRepresent(withTrade({ defaultAccountId: '' }))).toBe(false);
+    expect(formCanRepresent({ version: 2, trade: 'yes' })).toBe(false);
+  });
+
+  it('keeps a code the server would refuse as it is, so the server names it', () => {
+    const odd = { version: 2, trade: { currencyMarkers: [{ match: '*US$*', currency: 'usd' }] } };
+    expect(formCanRepresent(odd)).toBe(true);
+    expect(buildParserDefinition({ ...emptyParserForm(), ...definitionToFormFields(odd) })).toEqual(odd);
+  });
+
+  it('marks a stored definition with a trade section', () => {
+    expect(isTradeDefinition(definition)).toBe(true);
+    expect(isTradeDefinition({ version: 2, total: ['Total {amount}'] })).toBe(false);
+    expect(isTradeDefinition(null)).toBe(false);
+  });
+});
+
+describe('tradeCurrencyChoices', () => {
+  it('offers the base currency first, the other active ones A-Z, then a held code neither lists', () => {
+    expect(tradeCurrencyChoices('CAD', ['USD', 'CAD', 'EUR', 'USD'], ['', 'GBP', 'USD'])).toEqual(['CAD', 'EUR', 'USD', 'GBP']);
+  });
+});
+
+describe('the trade codes', () => {
+  it('reads the trade codes out of a 400 message, beside the known ones', () => {
+    const message =
+      'The parser definition is not valid: total: trade_conflict; trade.total: trade_amount_missing; trade.defaultAccountId: trade_account_missing; trade.accountRules[1].currency: invalid_currency; trade.currencyMarkers[0].match: empty';
+    expect(parseValidationProblems(message)).toEqual([
+      { path: 'total', code: 'trade_conflict' },
+      { path: 'trade.total', code: 'trade_amount_missing' },
+      { path: 'trade.defaultAccountId', code: 'trade_account_missing' },
+      { path: 'trade.accountRules[1].currency', code: 'invalid_currency' },
+      { path: 'trade.currencyMarkers[0].match', code: 'empty' },
+    ]);
   });
 });

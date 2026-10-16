@@ -157,9 +157,19 @@
     "splitDifference": "Linie podziału sumują się do {{ sum }}, a transakcja wynosi {{ amount }}: {{ difference }} nie zostało przypisane. Dopasuj linie do kwoty transakcji; pozostałość, np. koszt dostawy, wymaga własnej linii albo jest wskazywana użytkownikowi zamiast przypisywana.",
     "noTransaction": "Ten wniosek o przegląd AI nie dotyczy transakcji.",
     "parserDraftNotSubmittable": "Na wniosek o szkic parsera odpowiada się narzędziem email_receipt_parsers (test, potem save_draft z tym requestId), a nie propozycją transakcji.",
+    "tradeNotSubmittable": "Na żądanie transakcji odpowiada się polem trade (konto, akcja, symbol, ilość, suma i data), a nie propozycją transakcji.",
+    "notATradeRequest": "To żądanie przeglądu AI nie jest żądaniem transakcji.",
+    "tradeOnTradeRequest": "Pole trade odpowiada tylko na żądanie transakcji.",
+    "tradeDateRequired": "Transakcja wymaga daty (RRRR-MM-DD): wiadomości już nie ma, więc nie ma dnia zastępczego.",
+    "tradeInvalid": "Transakcja wymaga accountName, action (BUY lub SELL), symbol, quantity, totalAmount oraz opcjonalnie commission i date (RRRR-MM-DD).",
+    "tradeSecurityAmbiguous": "„{{ symbol }}” pasuje do kilku Twoich papierów wartościowych ({{ list }}). Zmień nazwę jednego z nich, aby symbol był unikalny.",
+    "tradeSecurityUnknown": "Nie masz papieru wartościowego o symbolu „{{ symbol }}”. Dodaj go, a następnie przetwórz wiadomość ponownie.",
     "tagNamesInvalid": "Propozycja może dodać do {{ max }} tagów, każdy o długości od 1 do {{ length }} znaków, bez znaków sterujących.",
     "noApprovableProposal": "Ten wniosek nie ma tu propozycji do zatwierdzenia.",
-    "approveFailed": "Nie udało się zatwierdzić tej propozycji. Spróbuj zatwierdzić ją osobno."
+    "approveFailed": "Nie udało się zatwierdzić tej propozycji. Spróbuj zatwierdzić ją osobno.",
+    "tradeAlreadyBooked": "Ta transakcja jest już w Twojej księdze. Połącz z nią e-mail zamiast księgować ją ponownie.",
+    "tradeScheduleMoved": "Zaplanowana transakcja, którą miała opłacić ta operacja, została od czasu propozycji zaksięgowana lub zmieniona. Zamiast tego połącz e-mail z tą transakcją albo go odrzuć.",
+    "tradeCurrencyMismatch": "Kwoty w e-mailu są w {{ currency }}, ale Twój papier {{ symbol }} jest notowany w {{ securityCurrency }}. Sprawdź, który instrument kupiono, a potem wprowadź transakcję samodzielnie."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Zbyt wiele prób weryfikacji. Zaloguj się ponownie.",
@@ -384,6 +394,7 @@
     "parserCategoryNotFound": "Nie znaleziono kategorii wskazanej w tym parserze.",
     "parserDefinitionInvalid": "Definicja parsera jest nieprawidłowa: {{ codes }}",
     "receiptSkipped": "Nie udało się odczytać tej wiadomości (była za duża lub nie dało się jej zdekodować), więc nie ma czego przetwarzać.",
+    "notATradeEmail": "Ta wiadomość nie została odczytana jako potwierdzenie transakcji.",
     "receiptIgnored": "Ta wiadomość została zignorowana. Przetwórz ją ponownie, zanim powiążesz ją z transakcją.",
     "transactionNotFound": "Nie znaleziono tej transakcji.",
     "linkTransfer": "Przelewu nie można powiązać z wiadomością e-mail.",
@@ -409,7 +420,12 @@
     "previewExpectedNotSelected": "Podano oczekiwaną transakcję dla wiadomości, której nie ma wśród wybranych.",
     "previewReceiptOutsideDomain": "Wiadomość nie pochodzi z żadnej domeny nadawcy tego parsera.",
     "parserCategoryNameUnknown": "Kategoria \"{{ name }}\" nie została znaleziona. Użyj nazwy jednej z Twoich kategorii.",
-    "parserCategoryNameAmbiguous": "Kategoria \"{{ name }}\" pasuje do kilku kategorii ({{ candidates }}). Użyj pełnej nazwy, na przykład \"Nadrzędna: Podrzędna\"."
+    "parserCategoryNameAmbiguous": "Kategoria \"{{ name }}\" pasuje do kilku kategorii ({{ candidates }}). Użyj pełnej nazwy, na przykład \"Nadrzędna: Podrzędna\".",
+    "tradeNotBankLinkable": "Ten e-mail jest odczytywany jako potwierdzenie transakcji. Zamiast tego połącz go z transakcją inwestycyjną.",
+    "tradeAccountedFor": "Ten e-mail odpowiada już transakcji inwestycyjnej, więc nie jest odczytywany ponownie.",
+    "tradeLinkedElsewhere": "Inny e-mail odpowiada już tej transakcji.",
+    "parserAccountNotFound": "Konto wskazane w tym profilu transakcji nie jest jednym z Twoich otwartych rachunków maklerskich.",
+    "generateSamplesForKind": "Profil paragonów tworzy się z samples (każdy e-mail z transakcją, którą opłacił), a profil transakcji z tradeReceiptIds. Wyślij pole dla danego rodzaju, a nie drugie."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "E-mail nie jest skonfigurowany. Dostępu awaryjnego nie można włączyć, dopóki nie skonfigurujesz SMTP.",

@@ -12,6 +12,7 @@ import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import { EmailReceipt } from "../entities/email-receipt.entity";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
 import { orderFromStructuredData } from "../parsing/schema-org-order";
+import { EmailReceiptTradeLinkService } from "./email-receipt-trade-link.service";
 import { EmailReceiptPipelineService } from "../pipeline/email-receipt-pipeline.service";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
 import {
@@ -27,6 +28,8 @@ import {
   EMAIL_RECEIPTS_MAX_LIST_LIMIT,
 } from "./dto/email-receipts.dto";
 import { describeFailure } from "../pipeline/receipt-failure";
+import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
+import { readTradeProposal } from "./email-receipt-trade-proposal";
 import type {
   EmailReceiptCandidateSummary,
   EmailReceiptDetail,
@@ -125,6 +128,8 @@ interface ItemRow {
   parser_id: string | null;
   parser_name: string | null;
   ai_review_request_id: string | null;
+  is_trade?: boolean;
+  trade_source?: "profile" | "ai" | null;
   request_status: string | null;
   request_expired: boolean | null;
   request_note: string | null;
@@ -133,25 +138,45 @@ interface ItemRow {
   tx_amount: string | number | null;
   tx_currency: string | null;
   tx_payee: string | null;
+  inv_id?: string | null;
+  inv_date?: string | null;
+  inv_action?: string | null;
+  inv_symbol?: string | null;
+  inv_quantity?: string | number | null;
+  inv_total?: string | number | null;
+  inv_currency?: string | null;
 }
 
 interface DetailRow extends ItemRow {
   body_text: string;
   body_html: string | null;
   parsed: Record<string, unknown> | null;
+  trade: Record<string, unknown> | null;
+  trade_proposal: unknown;
+  trade_request_source: "profile" | "ai" | null;
   candidate_transaction_ids: string[];
 }
 
 const ITEM_COLUMNS = `r.id, r.from_address, r.from_domain, r.subject, r.received_at,
        r.forwarded_by, r.original_sent_at, r.created_at, r.status, r.status_reason, r.match_kind, r.parser_id,
        p.name AS parser_name, r.ai_review_request_id,
+       -- A trade is read by a trade profile (its reading in r.trade) or, with
+       -- none, by the AI the email's email_trade request hands it to.
+       (r.trade IS NOT NULL OR rq.kind = 'email_trade') AS is_trade,
+       CASE WHEN r.trade IS NOT NULL THEN 'profile'
+            WHEN rq.kind = 'email_trade' THEN 'ai' END AS trade_source,
        rq.status AS request_status,
        (rq.expires_at <= CURRENT_TIMESTAMP) AS request_expired,
        rq.proposal #>> '{agentNote,reason}' AS request_note,
        r.transaction_id,
        TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS tx_date,
        t.amount AS tx_amount, t.currency_code AS tx_currency,
-       t.payee_name AS tx_payee`;
+       t.payee_name AS tx_payee,
+       it.id AS inv_id,
+       TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS inv_date,
+       it.action AS inv_action, its.symbol AS inv_symbol,
+       it.quantity AS inv_quantity, it.total_amount AS inv_total,
+       its.currency_code AS inv_currency`;
 
 const ITEM_JOINS = `FROM email_receipts r
        LEFT JOIN email_receipt_parsers p
@@ -159,7 +184,11 @@ const ITEM_JOINS = `FROM email_receipts r
        LEFT JOIN ai_review_requests rq
               ON rq.id = r.ai_review_request_id AND rq.user_id = r.user_id
        LEFT JOIN transactions t
-              ON t.id = r.transaction_id AND t.user_id = r.user_id`;
+              ON t.id = r.transaction_id AND t.user_id = r.user_id
+       LEFT JOIN investment_transactions it
+              ON it.id = r.investment_transaction_id AND it.user_id = r.user_id
+       LEFT JOIN securities its
+              ON its.id = it.security_id`;
 
 const iso = (value: Date | string): string =>
   (value instanceof Date ? value : new Date(value)).toISOString();
@@ -180,6 +209,8 @@ function toListItem(row: ItemRow): EmailReceiptListItem {
     parserId: row.parser_id,
     parserName: row.parser_name,
     aiReviewRequestId: row.ai_review_request_id,
+    isTrade: row.is_trade === true,
+    tradeSource: row.trade_source ?? null,
     displayState: deriveDisplayState(
       row.status,
       row.request_status === null
@@ -198,6 +229,18 @@ function toListItem(row: ItemRow): EmailReceiptListItem {
             amount: Number(row.tx_amount),
             currencyCode: row.tx_currency as string,
             payeeName: row.tx_payee,
+          }
+        : null,
+    investmentTransaction:
+      row.inv_id && row.inv_date
+        ? {
+            id: row.inv_id,
+            date: row.inv_date,
+            action: row.inv_action ?? "",
+            symbol: row.inv_symbol ?? "",
+            quantity: Number(row.inv_quantity ?? 0),
+            totalAmount: Number(row.inv_total ?? 0),
+            currencyCode: row.inv_currency ?? "",
           }
         : null,
     createdAt: iso(row.created_at),
@@ -219,6 +262,7 @@ export class EmailReceiptsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly pipeline: EmailReceiptPipelineService,
+    private readonly tradeLinks: EmailReceiptTradeLinkService,
   ) {}
 
   /**
@@ -418,7 +462,7 @@ export class EmailReceiptsService {
              (SELECT COUNT(*)::int
                 FROM ai_review_requests rq
                WHERE rq.user_id = $1
-                 AND rq.kind = 'email_receipt'
+                 AND rq.kind IN ('email_receipt', 'email_trade')
                  AND rq.status = 'proposed'
                  AND rq.expires_at > CURRENT_TIMESTAMP) AS to_approve,
              (SELECT json_build_object(
@@ -694,7 +738,23 @@ export class EmailReceiptsService {
     id: string,
     transactionId: string,
   ): Promise<EmailReceiptDetail> {
-    await this.pipeline.process(userId, id, { link: { transactionId } });
+    // A trade email is linked to the investment transaction it reports.
+    const isTrade = await withScopedDb(this.dataSource, async (m) => {
+      const rows = returnedRows<{ is_trade: boolean }>(
+        await m.query(
+          `SELECT (trade IS NOT NULL) AS is_trade
+             FROM email_receipts
+            WHERE id = $1 AND user_id = $2`,
+          [id, userId],
+        ),
+      );
+      return rows[0]?.is_trade === true;
+    });
+    if (isTrade) {
+      await this.tradeLinks.link(userId, id, transactionId);
+    } else {
+      await this.pipeline.process(userId, id, { link: { transactionId } });
+    }
     return this.get(userId, id);
   }
 
@@ -781,11 +841,21 @@ export class EmailReceiptsService {
     const rows = returnedRows<DetailRow>(
       await m.query(
         `SELECT ${ITEM_COLUMNS},
-                r.body_text, r.body_html, r.parsed, r.candidate_transaction_ids
+                r.body_text, r.body_html, r.parsed, r.trade, r.candidate_transaction_ids,
+                CASE WHEN rq.kind = 'email_trade'
+                      AND rq.status = 'proposed'
+                      AND rq.expires_at > CURRENT_TIMESTAMP
+                     THEN rq.proposal END AS trade_proposal,
+                -- Who reads the trade the request asks about: the profile's
+                -- own request, or the one "Recognize as a trade" queued for
+                -- the AI (told apart by its fixed instruction).
+                CASE WHEN rq.kind = 'email_trade'
+                     THEN CASE WHEN rq.instruction = $3 THEN 'ai' ELSE 'profile' END
+                END AS trade_request_source
            ${ITEM_JOINS}
           WHERE r.user_id = $1
             AND r.id = $2`,
-        [userId, id],
+        [userId, id, RECEIPT_TRADE_CHAT_INSTRUCTION],
       ),
     );
     const row = rows[0];
@@ -803,11 +873,22 @@ export class EmailReceiptsService {
       structuredOrder:
         structured === null ? null : orderFromStructuredData(structured),
       parsed: row.parsed,
-      candidates: await this.readCandidates(
-        m,
-        userId,
-        row.candidate_transaction_ids ?? [],
-      ),
+      trade: row.trade ?? null,
+      tradeProposal: readTradeProposal(row.trade_proposal),
+      tradeRequestSource: row.trade_request_source ?? null,
+      candidates: row.trade
+        ? await this.tradeLinks.candidates(
+            m,
+            userId,
+            row.trade,
+            iso(row.original_sent_at ?? row.received_at),
+            row.id,
+          )
+        : await this.readCandidates(
+            m,
+            userId,
+            row.candidate_transaction_ids ?? [],
+          ),
     };
   }
 

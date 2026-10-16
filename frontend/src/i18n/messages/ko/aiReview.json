@@ -38,11 +38,14 @@
     "transactionMissing": "이 거래는 더 이상 존재하지 않습니다",
     "rule": "규칙: {name}",
     "manualRequest": "수동으로 요청됨",
+    "trade": "{action, select, BUY {{symbol} {quantity}주 매수} other {{symbol} {quantity}주 매도}}",
     "receiptInstruction": {
       "automatic": "첨부된 주문 이메일로 이 거래를 보완합니다. 품목별로 각각 카테고리를 지정해 분할하거나 설명을 설정합니다.",
       "chat": "첨부된 주문 이메일 인식을 요청했습니다. 이 거래를 상품별로 각각 카테고리를 지정해 분할하거나 설명을 설정합니다.",
       "categorize": "첨부된 주문 이메일에서 어떤 규칙으로도 분류되지 않은 각 품목에 카테고리를 지정한 다음, 이 거래의 분할을 제안하거나 설명을 설정합니다.",
-      "parsed": "저장된 파서가 주문 이메일을 읽고 이 거래에 대해 이 카테고리 줄과 설명을 제안합니다."
+      "parsed": "저장된 파서가 주문 이메일을 읽고 이 거래에 대해 이 카테고리 줄과 설명을 제안합니다.",
+      "trade": "저장된 프로필이 읽은 거래 확인 메일이 이 투자 거래를 제안합니다. 승인하기 전에 계좌, 종목, 수량, 합계를 증권사 기록과 대조해 보세요.",
+      "tradeChat": "첨부된 거래 확인을 인식해 달라고 요청하셨습니다: 보고된 투자 거래를 제안하세요."
     },
     "emailReceipt": "이메일 영수증: {sender}의 {subject}",
     "emailReceiptMissing": "이메일 영수증 (이메일이 삭제됨)",
@@ -52,7 +55,9 @@
     "dates": "생성 {created}, 만료 {expires}",
     "viewTransaction": "거래 보기",
     "waitingForAgent": "AI 에이전트를 기다리는 중입니다. <link>설정에서 AI 제공자를 연결</link>하거나 MCP 클라이언트가 맡도록 하세요.",
-    "parserDraftReady": "프로필 초안이 준비되었습니다. <link>프로필 설정에서 테스트하고 승인하세요</link>."
+    "parserDraftReady": "프로필 초안이 준비되었습니다. <link>프로필 설정에서 테스트하고 승인하세요</link>.",
+    "tradePending": "이메일의 거래, 아직 읽지 않음",
+    "tradeEmail": "거래 확인 메일"
   },
   "actions": {
     "dismiss": "무시"

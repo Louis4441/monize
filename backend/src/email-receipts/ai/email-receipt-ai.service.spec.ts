@@ -21,6 +21,7 @@ import { EmailReceipt } from "../entities/email-receipt.entity";
 import {
   RECEIPT_AUTOMATIC_AI_INSTRUCTION,
   RECEIPT_CHAT_INSTRUCTION,
+  RECEIPT_TRADE_CHAT_INSTRUCTION,
 } from "../pipeline/receipt-instructions";
 import { MAX_PARSERS_PER_USER } from "../parsers/email-receipt-parsers.service";
 import {
@@ -164,6 +165,10 @@ function setup(over: Partial<World> = {}) {
     release: jest.fn(async () => null),
     enqueuePendingForReceipt: jest.fn(
       async () => requestRow({ id: "request-new" }) as AiReviewRequest | null,
+    ),
+    enqueueTrade: jest.fn(
+      async (..._args: unknown[]) =>
+        requestRow({ id: "request-trade" }) as AiReviewRequest | null,
     ),
   } as unknown as jest.Mocked<AiReviewRequestsService>;
   const work = {
@@ -404,7 +409,7 @@ describe("EmailReceiptAiService.askAi", () => {
     });
     h.manager.query.mockImplementation(async (sql: string) => {
       const text = String(sql);
-      if (text.includes("SELECT status FROM ai_review_requests")) {
+      if (/SELECT status(, kind)? FROM ai_review_requests/.test(text)) {
         return [{ status: "proposed" }];
       }
       if (text.includes("FROM transactions t")) return [txRow()];
@@ -412,6 +417,73 @@ describe("EmailReceiptAiService.askAi", () => {
     });
     return h;
   };
+
+  describe("as a trade", () => {
+    it("queues a pending trade request with no transaction, replacing the open one, and calls no provider", async () => {
+      const h = happy();
+      const result = await h.service.askAi(USER, RECEIPT, null, {
+        asTrade: true,
+      });
+      expect(result).toEqual({
+        ok: true,
+        requestId: "request-trade",
+        transactionId: null,
+      });
+      expect(h.requests.enqueueTrade).toHaveBeenCalledWith(
+        expect.anything(),
+        USER,
+        {
+          emailReceiptId: RECEIPT,
+          instruction: RECEIPT_TRADE_CHAT_INSTRUCTION,
+          claimedBy: null,
+        },
+      );
+      expect(h.requests.enqueuePendingForReceipt).not.toHaveBeenCalled();
+      const sqls = h.manager.query.mock.calls.map((c) => String(c[0]));
+      expect(sqls.some((q) => q.includes("SET status = 'rejected'"))).toBe(
+        true,
+      );
+      expect(h.receiptRepo.update).toHaveBeenCalledWith(
+        { id: RECEIPT, userId: USER },
+        expect.objectContaining({
+          status: "review",
+          aiReviewRequestId: "request-trade",
+          transactionId: null,
+        }),
+      );
+    });
+
+    it("needs no bank transaction, whatever the email has", async () => {
+      const h = happy({
+        receipt: receiptRow({ status: "no_parser", transactionId: null }),
+      });
+      await expect(
+        h.service.askAi(USER, RECEIPT, null, { asTrade: true }),
+      ).resolves.toMatchObject({ ok: true });
+    });
+
+    it("is a conflict when another trade request is open, writing nothing to the receipt", async () => {
+      const h = happy();
+      h.requests.enqueueTrade.mockResolvedValueOnce(null);
+      await expect(
+        h.service.askAi(USER, RECEIPT, null, { asTrade: true }),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses an email whose proposal was applied", async () => {
+      const h = happy();
+      h.manager.query.mockImplementation(async (sql: string) =>
+        /SELECT status(, kind)? FROM ai_review_requests/.test(String(sql))
+          ? [{ status: "applied" }]
+          : [],
+      );
+      await expect(
+        h.service.askAi(USER, RECEIPT, null, { asTrade: true }),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(h.requests.enqueueTrade).not.toHaveBeenCalled();
+    });
+  });
 
   it("dismisses the open request, queues a pending one, points the receipt at it, and calls no provider", async () => {
     const h = happy();

@@ -157,9 +157,19 @@
     "splitDifference": "Le righe di suddivisione sommano {{ sum }} ma la transazione è {{ amount }}: {{ difference }} non è assegnato. Fai in modo che le righe sommino all'importo della transazione; un residuo come le spese di consegna richiede una riga propria, oppure viene indicato all'utente invece di essere assegnato.",
     "noTransaction": "Questa richiesta di revisione IA non riguarda una transazione.",
     "parserDraftNotSubmittable": "A una richiesta di bozza di parser si risponde con lo strumento email_receipt_parsers (test, poi save_draft con questo requestId), non con una proposta di transazione.",
+    "tradeNotSubmittable": "Una richiesta di operazione riceve risposta con il campo trade (conto, azione, simbolo, quantità, totale e data), non con una proposta di transazione.",
+    "notATradeRequest": "Questa richiesta di revisione IA non è una richiesta di operazione.",
+    "tradeOnTradeRequest": "Il campo trade risponde solo a una richiesta di operazione.",
+    "tradeDateRequired": "L'operazione richiede una data (AAAA-MM-GG): l'email non esiste più, quindi non c'è un giorno di riserva.",
+    "tradeInvalid": "L'operazione richiede accountName, action (BUY o SELL), symbol, quantity, totalAmount e, facoltativamente, commission e date (AAAA-MM-GG).",
+    "tradeSecurityAmbiguous": "«{{ symbol }}» corrisponde a più dei tuoi titoli ({{ list }}). Rinomina uno di essi così il simbolo è univoco.",
+    "tradeSecurityUnknown": "Non hai alcun titolo con il simbolo «{{ symbol }}». Aggiungi il titolo, poi rielabora l'email.",
     "tagNamesInvalid": "Una proposta può aggiungere fino a {{ max }} etichette, ciascuna da 1 a {{ length }} caratteri, senza caratteri di controllo.",
     "noApprovableProposal": "Questa richiesta non ha qui alcuna proposta da approvare.",
-    "approveFailed": "Non è stato possibile approvare questa proposta. Prova ad approvarla da sola."
+    "approveFailed": "Non è stato possibile approvare questa proposta. Prova ad approvarla da sola.",
+    "tradeAlreadyBooked": "Il tuo registro contiene già questa operazione. Collega l'email a essa invece di registrarla di nuovo.",
+    "tradeScheduleMoved": "La transazione pianificata che questa operazione doveva pagare è stata registrata o modificata dopo la proposta. Collega invece l'email a quella transazione, oppure ignorala.",
+    "tradeCurrencyMismatch": "Gli importi dell'email sono in {{ currency }}, ma il tuo titolo {{ symbol }} è negoziato in {{ securityCurrency }}. Verifica quale quotazione è stata acquistata, poi inserisci tu l'operazione."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Troppi tentativi di verifica. Accedi di nuovo.",
@@ -384,6 +394,7 @@
     "parserCategoryNotFound": "Una categoria indicata in questo parser non è stata trovata.",
     "parserDefinitionInvalid": "La definizione del parser non è valida: {{ codes }}",
     "receiptSkipped": "Non è stato possibile leggere questa email (era troppo grande o non è stato possibile decodificarla), quindi non c'è nulla da elaborare.",
+    "notATradeEmail": "Questa email non è stata letta come conferma di un'operazione.",
     "receiptIgnored": "Questa email è stata ignorata. Rielaborala prima di collegarla a una transazione.",
     "transactionNotFound": "Transazione non trovata.",
     "linkTransfer": "Un trasferimento non può essere collegato a un'email.",
@@ -409,7 +420,12 @@
     "previewExpectedNotSelected": "È stata indicata una transazione attesa per un'email che non è tra quelle selezionate.",
     "previewReceiptOutsideDomain": "Un'email non proviene da un dominio mittente di questo parser.",
     "parserCategoryNameUnknown": "La categoria \"{{ name }}\" non è stata trovata. Utilizzare il nome di una delle tue categorie.",
-    "parserCategoryNameAmbiguous": "La categoria \"{{ name }}\" corrisponde a diverse categorie ({{ candidates }}). Utilizzare il nome completo, ad esempio \"Parent: Child\"."
+    "parserCategoryNameAmbiguous": "La categoria \"{{ name }}\" corrisponde a diverse categorie ({{ candidates }}). Utilizzare il nome completo, ad esempio \"Parent: Child\".",
+    "tradeNotBankLinkable": "Questa email viene letta come conferma di un'operazione. Collegala invece a una transazione di investimento.",
+    "tradeAccountedFor": "Questa email corrisponde già a una transazione di investimento, quindi non viene riletta.",
+    "tradeLinkedElsewhere": "Un'altra email corrisponde già a quella transazione.",
+    "parserAccountNotFound": "Un conto indicato in questo profilo delle operazioni non è uno dei tuoi conti di intermediazione aperti.",
+    "generateSamplesForKind": "Un profilo di ricevute si genera da samples (ogni email con la transazione che ha pagato); un profilo delle operazioni da tradeReceiptIds. Invia quello del tipo scelto, non l'altro."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "L'email non è configurata. L'accesso di emergenza non può essere abilitato finché SMTP non è configurato.",

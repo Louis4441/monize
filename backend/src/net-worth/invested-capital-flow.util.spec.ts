@@ -24,9 +24,7 @@ describe("investedCapitalFlowSql", () => {
     // mocked-query spec can see -- the lesson the mixed-split count taught.
     const named = [...sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1]));
 
-    expect([...new Set(named)].sort((a, b) => a - b)).toEqual([
-      1, 2, 3, 4, 5,
-    ]);
+    expect([...new Set(named)].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("returns each reinvestment as its own row, so its own price values it", () => {

@@ -112,6 +112,7 @@
     "total": "合計",
     "cashImpact": "現金影響",
     "bondSeries": "系列",
+    "marksPaid": "標記為已付款",
     "accruedInterest": "應計利息",
     "redemptionSplit": "贖回拆分",
     "redemptionSplitValue": "本金 {principal} + 利息 {interest} = 支付 {payout}",
@@ -230,7 +231,11 @@
       "category": "將分類設定為 {name}",
       "payee": "將收款對象設定為 {name}",
       "aiReview": "{count, plural, other {將 # 個 AI 審核請求加入佇列}}"
-    }
+    },
+    "aiCategory": "AI 建議",
+    "tags": "標籤",
+    "newTag": "(新標籤)",
+    "marksPaidDue": "{name}（到期日 {date}）"
   },
   "table": {
     "downloadTitle": "下載表格為 CSV",

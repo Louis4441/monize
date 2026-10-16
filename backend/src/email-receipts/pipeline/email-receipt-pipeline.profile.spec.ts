@@ -195,7 +195,7 @@ function setup(over: Partial<World> = {}) {
   manager.query.mockImplementation(async (sql: string) => {
     const text = String(sql);
     if (text.includes("SET status = 'rejected'")) return [[], 0];
-    if (text.includes("SELECT status FROM ai_review_requests")) return [];
+    if (/SELECT status(, kind)? FROM ai_review_requests/.test(text)) return [];
     if (text.includes("JOIN accounts a")) return world.candidates;
     return [];
   });
@@ -229,6 +229,7 @@ function setup(over: Partial<World> = {}) {
       resolveByName: jest.fn(async () => world.sellerPayee),
     } as unknown as PayeesService,
     categoryAi,
+    { process: jest.fn() } as never,
   );
   return {
     service,

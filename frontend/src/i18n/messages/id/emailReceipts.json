@@ -93,7 +93,7 @@
         "automatic": "Pemeriksaan meminta AI menangani struk yang cocok yang tidak dapat dibaca lengkap oleh profil yang disetujui mana pun, dan membuat draf profil untuk pengirim yang belum memilikinya."
       },
       "autoApplyLabel": "Terapkan usulan secara otomatis",
-      "autoApplyHelp": "Nonaktif secara default. Usulan diterapkan tanpa bertanya hanya jika semua hal berikut terpenuhi: profil yang disetujui membaca seluruh surel, transaksi ditemukan lewat nomor pesanan atau referensi, atau lewat jumlah dan penerima yang persis sama, dengan satu kandidat saja, dan usulan itu pas sampai ke sen. Semua yang lain menunggu persetujuan Anda.",
+      "autoApplyHelp": "Nonaktif secara default. Usulan diterapkan tanpa bertanya hanya jika semua hal berikut terpenuhi: profil yang disetujui membaca seluruh surel, transaksi ditemukan lewat nomor pesanan atau referensi, atau lewat jumlah dan penerima yang persis sama, dengan satu kandidat saja, dan usulan itu pas sampai ke sen. Konfirmasi perdagangan dicatat tanpa bertanya hanya jika profil perdagangannya sudah disetujui, profil itu membaca seluruh perdagangan, harganya cocok dengan jumlah saham dan total, dan akun Anda belum memuat perdagangan yang sama. Semua yang lain menunggu persetujuan Anda.",
       "profileLimitLabel": "Hitung usulan profil dalam batas harian AI",
       "profileLimitHelp": "Aktif secara default: perubahan yang diusulkan profil dari sebuah surel dihitung dalam batas harian perubahan yang diusulkan AI, seperti usulan AI lainnya. Nonaktifkan bila satu kelompok besar surel tersimpan akan menghabiskan batas. Hanya usulan dari profil yang dikecualikan; setiap usulan tetap menunggu persetujuan Anda."
     },
@@ -177,14 +177,15 @@
       "confirm": "Proses sekarang",
       "later": "Nanti saja"
     },
-    "reparse": "Urai ulang surel ({count})"
+    "reparse": "Urai ulang surel ({count})",
+    "kindTrade": "Transaksi pialang"
   },
   "editor": {
     "createTitle": "Profil baru",
     "editTitle": "Edit profil",
-    "loading": "Memuat penerima dan kategori",
+    "loading": "Memuat penerima, kategori, akun, dan mata uang",
     "lookupsError": {
-      "title": "Penerima dan kategori tidak dapat dimuat",
+      "title": "Penerima, kategori, akun, atau mata uang tidak dapat dimuat",
       "body": "Pemilih memerlukannya, sehingga editor belum dapat dibuka. Coba lagi.",
       "retry": "Coba lagi"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "Nama tag",
       "aiCategoriesLabel": "Biarkan AI memilih kategori item yang tidak cocok dengan aturan apa pun",
       "aiCategoriesHelp": "Jika sebuah item tidak cocok dengan aturan kategori mana pun dan tidak ada kategori default, AI diminta memilih kategorinya dari daftar kategori Anda. Pilihan itu ditandai sebagai pilihan AI pada usulan. Jika ini dimatikan, AI tidak pernah ditanya."
+    },
+    "kind": {
+      "label": "Jenis profil",
+      "receipt": "Tanda terima pesanan",
+      "trade": "Transaksi pialang",
+      "receiptHelp": "Membaca konfirmasi pesanan dan menemukan transaksi bank yang membayarnya.",
+      "tradeHelp": "Membaca konfirmasi transaksi dari pialang dan mengusulkan transaksi investasi yang dilaporkannya, pembelian atau penjualan."
+    },
+    "trade": {
+      "guardsHeading": "Surel pengirim mana yang dibacanya",
+      "guardsHelp": "Opsional. Setiap pola dicocokkan dengan satu baris utuh surel, satu pola per baris.",
+      "guards": {
+        "requireLine": "Baris wajib",
+        "requireLineHint": "Profil membaca surel hanya jika salah satu baris ini ada di dalamnya; jika tidak, profil berikutnya untuk pengirim dicoba.",
+        "skipIfLine": "Baris yang membuat surel dilewati",
+        "skipIfLineHint": "Surel dengan salah satu baris ini disisihkan, misalnya pesanan yang dibatalkan.",
+        "waitIfLine": "Baris yang menahan surel",
+        "waitIfLineHint": "Surel dengan salah satu baris ini ditahan dan dibaca lagi nanti, misalnya eksekusi sebagian."
+      },
+      "fieldsHeading": "Transaksinya",
+      "fieldsHelp": "Beli atau jual, kode saham, dan jumlah saham wajib ada, beserta total atau harga. Setiap kolom menerima pola, satu per baris, dicoba berurutan.",
+      "fields": {
+        "tradeAction": "Pola beli atau jual",
+        "tradeSymbol": "Pola kode saham",
+        "tradeQuantity": "Pola jumlah saham",
+        "tradeTotal": "Pola total transaksi",
+        "tradePrice": "Pola harga per saham",
+        "tradeCommission": "Pola komisi",
+        "tradeDate": "Pola tanggal transaksi",
+        "tradeAccount": "Pola akun"
+      },
+      "fieldHint": "Harus menangkap {capture}. Contoh: {example}",
+      "amountsHelp": "Total adalah jumlah yang dieksekusi, termasuk komisi untuk pembelian. Harga adalah pemeriksaan silang, dan memberi total jika surel tidak menyebutkannya. Jumlah yang menyebut mata uangnya (US$, C$, USD, €) juga menetapkan mata uang transaksi.",
+      "rulesHeading": "Aturan akun",
+      "rulesHelp": "Ke akun mana transaksi dicatat. Aturan dicoba berurutan terhadap teks akun yang dibaca pola akun, dan aturan pertama yang berlaku menang; {star} adalah teks apa pun. Aturan dengan mata uang hanya berlaku untuk transaksi dalam mata uang itu, jadi dua akun yang ditulis pialang dengan cara sama, seperti RRSP CAD dan RRSP USD yang sama-sama tampil sebagai RRSP, adalah dua aturan dengan teks sama dan mata uang berbeda. Jika surel tidak mencantumkan teks akun, hanya aturan dengan teks {star} yang bisa berlaku. Akun bawaan menangani sisanya.",
+      "currencyOrder": "Mata uang transaksi diambil, berurutan: dari jumlahnya sendiri jika menyebut satu (US$, C$, USD, €), lalu dari penanda mata uang pertama di bawah yang cocok dengan baris surel, lalu dari mata uang sekuritas Anda untuk kode saham itu. Aturan dengan mata uang tidak pernah menebak: jika tidak satu pun dari ketiganya menyebut mata uang, surel menunggu Anda alih-alih dicatat ke salah satu akun.",
+      "ruleMatchLabel": "Teks akun aturan {rule}",
+      "ruleMatchPlaceholder": "Teks akun, misalnya RRSP",
+      "ruleCurrencyLabel": "Mata uang aturan {rule}",
+      "ruleAccountLabel": "Akun aturan {rule}",
+      "ruleMoveUp": "Naikkan aturan {rule}",
+      "ruleMoveDown": "Turunkan aturan {rule}",
+      "ruleRemove": "Hapus aturan {rule}",
+      "ruleAdd": "Tambah aturan akun",
+      "rulesMax": "Paling banyak {max} aturan.",
+      "rulesWithoutAccountText": "Tidak ada pola akun, jadi aturan dicoba terhadap teks kosong: hanya aturan dengan teks {star} yang bisa berlaku.",
+      "anyCurrency": "Mata uang apa pun",
+      "baseCurrency": "{code} (mata uang dasar Anda)",
+      "currencyPlaceholder": "Pilih mata uang",
+      "accountPlaceholder": "Pilih akun",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (bukan akun pialang yang terbuka)",
+      "accountUnknownOption": "Akun yang tidak ada di daftar Anda",
+      "accountNotTradable": "Transaksi tidak dapat dicatat ke akun ini: akun ini ditutup, akun kas, atau bukan akun investasi.",
+      "accountUnknown": "Akun ini tidak ada di daftar Anda: mungkin sudah dihapus. Pilih akun lain.",
+      "defaultAccountLabel": "Akun bawaan",
+      "defaultAccountNone": "Tanpa akun bawaan",
+      "defaultAccountHint": "Akun ketika tidak ada aturan yang berlaku. Tanpanya, surel yang tidak terkena aturan apa pun menunggu Anda.",
+      "markersHeading": "Penanda mata uang",
+      "markersHelp": "Teks yang menyebut mata uang transaksi ketika jumlahnya tidak menyebutkannya, misalnya baris yang menyatakan jumlah dalam dolar AS di samping $ saja. Setiap penanda dicocokkan dengan setiap baris surel ({star} adalah teks apa pun), dan penanda pertama, berurutan, yang cocok menyebut mata uangnya. Penanda hanya dipakai jika jumlah tidak menyebut mata uang.",
+      "markerMatchLabel": "Teks penanda {marker}",
+      "markerMatchPlaceholder": "Misalnya *U.S. dollars*",
+      "markerCurrencyLabel": "Mata uang penanda {marker}",
+      "markerMoveUp": "Naikkan penanda {marker}",
+      "markerMoveDown": "Turunkan penanda {marker}",
+      "markerRemove": "Hapus penanda {marker}",
+      "markerAdd": "Tambah penanda mata uang",
+      "markersMax": "Paling banyak {max} penanda."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "Baris yang dilewati {line}",
       "recordStep": "Langkah rekaman {step}",
       "recordStepPart": "Langkah rekaman {step}, {part}",
-      "recordAlternative": "Langkah rekaman {step}, alternatif {alternative}"
+      "recordAlternative": "Langkah rekaman {step}, alternatif {alternative}",
+      "accountRule": "Aturan akun {rule}",
+      "accountRulePart": "Aturan akun {rule}, {part}",
+      "currencyMarker": "Penanda mata uang {marker}",
+      "currencyMarkerPart": "Penanda mata uang {marker}, {part}"
     },
     "fields": {
       "orderId": "Pola nomor pesanan",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "Jumlah hari setelah pembelian",
       "matchTolerance": "Toleransi jumlah",
       "tag": "Tag",
-      "aiCategories": "Kategori AI"
+      "aiCategories": "Kategori AI",
+      "trade": "Bagian transaksi",
+      "tradeAction": "Pola beli atau jual",
+      "tradeSymbol": "Pola kode saham",
+      "tradeQuantity": "Pola jumlah saham",
+      "tradeTotal": "Pola total transaksi",
+      "tradePrice": "Pola harga per saham",
+      "tradeCommission": "Pola komisi",
+      "tradeDate": "Pola tanggal transaksi",
+      "tradeAccount": "Pola akun",
+      "accountRules": "Aturan akun",
+      "currencyMarkers": "Penanda mata uang",
+      "defaultAccount": "Akun bawaan",
+      "ruleAccount": "akun",
+      "ruleCurrency": "mata uang"
     },
     "codes": {
       "not_object": "bukan definisi yang valid",
@@ -376,7 +463,12 @@
       "duplicate_entry": "mencantumkan entri yang sama dua kali",
       "reference_field_missing": "membutuhkan pola referensi (strategi referensi aktif)",
       "out_of_range_days": "harus berupa bilangan bulat dari 0 sampai {max}",
-      "out_of_range_tolerance": "harus berupa jumlah dari 0.00 sampai {max}"
+      "out_of_range_tolerance": "harus berupa jumlah dari 0.00 sampai {max}",
+      "trade_conflict": "tidak boleh ada di profil transaksi pialang, yang hanya membaca transaksinya",
+      "trade_amount_missing": "memerlukan pola total atau harga (setidaknya salah satunya)",
+      "trade_account_missing": "memerlukan akun bawaan atau aturan akun",
+      "invalid_currency": "bukan kode mata uang 3 huruf, seperti USD",
+      "invalid_uuid_account": "bukan akun yang valid"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "Baris wajib",
         "skipIfLine": "Baris lewati",
         "waitIfLine": "Baris tunggu",
-        "reference": "Referensi"
+        "reference": "Referensi",
+        "action": "Beli atau jual",
+        "symbol": "Kode",
+        "quantity": "Saham",
+        "price": "Harga",
+        "commission": "Komisi",
+        "date": "Tanggal",
+        "account": "Akun",
+        "currency": "Penanda mata uang"
       },
       "entryLine": "entri {entry} ({pattern}), baris {line}: {text}",
       "entrySubject": "entri {entry} ({pattern}), subjek: {text}",
@@ -553,10 +653,12 @@
       "reprocess": "Proses ulang",
       "link": "Pilih transaksi",
       "recognizeAi": "Kenali dengan AI",
+      "recognizeTradeAi": "Kenali sebagai perdagangan dengan AI",
       "approve": "Setujui",
       "draftParser": "Siapkan profil dengan AI",
       "createParser": "Buat profil",
-      "ignore": "Kecualikan"
+      "ignore": "Kecualikan",
+      "reviewTrade": "Tinjau di kotak masuk"
     },
     "toasts": {
       "approved": "Usulan disetujui",
@@ -592,8 +694,11 @@
       "handoffFailed": "Permintaan sudah diantrekan, tetapi surel tidak dapat dibuka di obrolan. Permintaan menunggu di kotak masuk peninjauan AI untuk sebuah agen.",
       "inboxLink": "Buka kotak masuk peninjauan AI",
       "opened": "Obrolan dibuka dengan surel terlampir. Baca pesannya lalu tekan Kirim.",
-      "chatPrompt": "Buat profil struk surel untuk {count, plural, one {surel pesanan ini} other {# surel pesanan ini}} dari {domain}. Ambil permintaan peninjauan AI {requestId}, uji profil Anda pada setiap surel terlampir dengan alat email_receipt_profiles, perbaiki sampai setiap surel terbaca lengkap, lalu simpan sebagai draf untuk permintaan {requestId}."
-    }
+      "chatPrompt": "Buat profil struk surel untuk {count, plural, one {surel pesanan ini} other {# surel pesanan ini}} dari {domain}. Ambil permintaan peninjauan AI {requestId}, uji profil Anda pada setiap surel terlampir dengan alat email_receipt_profiles, perbaiki sampai setiap surel terbaca lengkap, lalu simpan sebagai draf untuk permintaan {requestId}.",
+      "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan.",
+      "chatPromptTrade": "Buat profil perdagangan untuk {count, plural, one {surel konfirmasi perdagangan ini} other {# surel konfirmasi perdagangan ini}} dari {domain}. Ambil permintaan peninjauan AI {requestId}, uji profil Anda pada setiap surel terlampir dengan alat email_receipt_parsers, perbaiki sampai setiap surel terbaca sebagai perdagangan lengkap, lalu simpan sebagai draf untuk permintaan {requestId}."
+    },
+    "tradeBadge": "Perdagangan"
   },
   "detail": {
     "title": "Struk surel",
@@ -644,11 +749,22 @@
       "wait_line": "Sebuah baris menyatakan pesanan belum final, jadi surel akan dibaca lagi nanti.",
       "no_html": "Profil ini membaca bagian HTML surel, dan surel ini tidak memilikinya.",
       "schema_org": "Tidak perlu profil: pesanan dibaca dari data terstruktur (schema.org) di surel.",
-      "item_amount_missing": "Sebuah item tidak memiliki jumlah, dan surel tidak memiliki total tunggal untuk diberikan kepadanya."
+      "item_amount_missing": "Sebuah item tidak memiliki jumlah, dan surel tidak memiliki total tunggal untuk diberikan kepadanya.",
+      "trade_no_action": "Profil tidak menemukan pembelian atau penjualan di surel ini.",
+      "trade_no_symbol": "Profil tidak menemukan simbol ticker di surel ini.",
+      "trade_no_quantity": "Profil tidak menemukan jumlah saham di surel ini.",
+      "trade_no_amount": "Profil tidak menemukan total maupun harga di surel ini.",
+      "trade_no_account": "Profil tidak dapat menentukan akun mana yang dimaksud perdagangan ini.",
+      "trade_exists": "Akun Anda sudah memuat perdagangan ini, jadi tidak ada yang diusulkan.",
+      "trade_linked": "Ditautkan ke transaksi yang dilaporkannya, jadi tidak ada yang diusulkan.",
+      "trade_no_currency": "Profil tidak dapat mengetahui mata uang perdagangan ini, sehingga tidak dapat memilih akunnya."
     },
     "reasonUnknown": "Alasan: {reason}",
     "requestNote": "Permintaan peninjauan ({state}): {note}",
     "parsedHeading": "Apa yang dibaca profil",
+    "tradeHeading": "Perdagangan yang dibaca dari surel",
+    "tradeCandidatesHeading": "Transaksi yang ada dan mungkin perdagangan ini",
+    "tradeCandidatesHelp": "Transaksi investasi ini mungkin perdagangan yang dilaporkan surel ini. Tautkan yang tepat: tidak ada transaksi baru dibuat, dan tagihan atau setoran terjadwal yang dibayarnya ditandai lunas.",
     "notParsed": "Belum ada yang dibaca dari surel ini.",
     "candidatesHeading": "Transaksi yang cocok",
     "candidatesHelp": "Beberapa transaksi sama-sama cocok dengan surel ini. Pilih transaksi yang dibayarnya.",
@@ -688,7 +804,15 @@
       "capped": "Hanya {max} baris pertama yang dibaca.",
       "empty": "Tidak ada baris.",
       "listLabel": "Baris surel yang bernomor"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Membeli} other {Menjual}} {quantity} {symbol} seharga {total} pada {date}.",
+    "noTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulannya, atau ditautkan ke transaksi yang sudah ada di buku besar Anda.",
+    "candidateShares": "{quantity} saham",
+    "tradeNoCandidates": "Tidak ada transaksi investasi dengan akun, arah, dan kode ini dalam seminggu dari hari transaksi yang bebas untuk ditautkan. Jika Anda mencatatnya sendiri, periksa akun dan tanggalnya; jika tidak, setujui usulannya di kotak tinjauan.",
+    "aiTradeHeading": "Transaksi yang diusulkan agen AI",
+    "aiTradeReader": "Tidak ada: agen AI membacanya sebagai transaksi",
+    "noAiTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulan agen AI.",
+    "tradeProposalHeading": "Yang akan dicatat oleh usulannya"
   },
   "picker": {
     "heading": "Pilih transaksi",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "Kenali dengan AI",
+    "tradeTitle": "Kenali sebagai perdagangan dengan AI",
+    "tradeMessage": "AI akan membaca surel ini sebagai konfirmasi perdagangan pialang dan mengusulkan transaksi investasi yang dilaporkannya (akun, beli atau jual, ticker, saham, dan total). Tidak ada yang disimpan sampai Anda menyetujuinya.",
+    "tradeConfirm": "Kenali sebagai perdagangan",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "tanpa penerima",
     "confirmMessage": "Surel ini ditautkan ke transaksi {summary}. AI akan membaca surel dan mengusulkan cara membagi transaksi ini per produk. Lanjutkan dengan transaksi ini?",
@@ -765,7 +892,9 @@
     "handoffFailed": "Permintaan sudah diantrekan, tetapi surel tidak dapat dibuka di obrolan. Permintaan menunggu di kotak masuk peninjauan AI untuk sebuah agen (misalnya lewat MCP).",
     "inboxLink": "Buka kotak masuk peninjauan AI",
     "opened": "Obrolan dibuka dengan surel terlampir. Baca pesannya lalu tekan Kirim.",
-    "chatPrompt": "Kenali produk, jumlah, dan harga dalam surel pesanan terlampir, lalu bagi transaksi saya tanggal {date} ({payee}, {amount}) per produk dengan satu kategori untuk masing-masing. Ambil permintaan peninjauan AI {requestId} dan kirimkan usulan Anda untuk permintaan itu."
+    "chatPrompt": "Kenali produk, jumlah, dan harga dalam surel pesanan terlampir, lalu bagi transaksi saya tanggal {date} ({payee}, {amount}) per produk dengan satu kategori untuk masing-masing. Ambil permintaan peninjauan AI {requestId} dan kirimkan usulan Anda untuk permintaan itu.",
+    "tradeChatPrompt": "Kenali perdagangan di surel konfirmasi pialang terlampir: akun, apakah beli atau jual, ticker, saham, total yang dieksekusi, dan tanggal. Ambil permintaan tinjauan AI {requestId} dan ajukan perdagangan untuknya.",
+    "tradeDetachesTransaction": "Jika dibaca sebagai transaksi, email ini tidak lagi mewakili {summary}: transaksi itu membuat transaksi investasinya sendiri."
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "Tidak ada surel tersimpan yang pengirimnya berada di {domain}."
       },
       "help": "Klik sebuah surel untuk membacanya, lalu pilih transaksi yang dibayarnya. Setelah itu centang hingga {max} surel untuk dijadikan dasar penulisan profil; surel hanya dapat dicentang setelah memiliki transaksi.",
+      "tradeToggle": "Surel ini adalah konfirmasi perdagangan pialang (membuat transaksi investasi, jadi tidak ada transaksi bank yang dipasangkan)",
+      "tradeHelp": "Klik surel untuk membacanya, lalu centang hingga {max} konfirmasi perdagangan untuk menulis profil. Tidak perlu memilih transaksi.",
       "columns": {
         "select": "Gunakan",
         "date": "Tanggal",
@@ -913,6 +1044,7 @@
       "needsTransaction": "Pilih transaksi untuk surel ini terlebih dahulu.",
       "limitReached": "Paling banyak {max} contoh. Hapus centang satu contoh untuk memilih yang lain.",
       "noTransaction": "Belum dipilih",
+      "tradeNoTransaction": "Tidak diperlukan untuk konfirmasi perdagangan",
       "selectedCount": "{count} dari {max} contoh dicentang",
       "continue": "Lanjut ke asisten",
       "emailLoading": "Memuat surel",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "Asisten membaca surel-surel ini beserta transaksi yang dibayarnya, lalu menulis draf profil untuk {domain}. Belum ada yang disetujui.",
       "reviseHelp": "Beri tahu asisten apa yang perlu diubah. Asisten akan memperbarui draf yang sama dari surel dan transaksi ini.",
+      "tradeHelp": "Asisten membaca konfirmasi perdagangan ini dan menulis draf profil untuk {domain} yang mengusulkan transaksi investasi yang dilaporkan masing-masing. Belum ada yang disetujui.",
+      "tradeSample": "Konfirmasi perdagangan",
       "feedbackLabel": "Apa yang perlu diubah",
       "feedbackPlaceholder": "Contoh: total adalah baris yang bertuliskan Jumlah dibayar, bukan subtotal.",
       "send": "Kirim ke AI",
@@ -969,6 +1103,8 @@
       "parsedDate": "Tanggal: {date}",
       "parsedTotal": "Total: {total}",
       "parsedLines": "{count, plural, one {# baris} other {# baris}}",
+      "parsedTrade": "{action, select, BUY {Membeli} other {Menjual}} {quantity} saham {symbol}",
+      "tradeInconsistent": "Harga tidak cocok dengan total, jadi tidak akan diterapkan otomatis",
       "noExpectation": "Tidak ada",
       "noMatch": "Tidak ada transaksi",
       "agreesYes": "Ya",
@@ -991,8 +1127,37 @@
         "not_applicable": "Tidak dibaca oleh profil ini",
         "skip_line": "Dilewati (baris lewati ditemukan)",
         "wait_line": "Ditahan (pesanan belum final)",
-        "no_html": "Tidak ada bagian HTML"
-      }
+        "no_html": "Tidak ada bagian HTML",
+        "trade": "Mengusulkan perdagangan",
+        "trade_exists": "Sudah ada di buku besar"
+      },
+      "parsedTradeAccount": "Akun: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "tidak diketahui",
+      "parsedTradeNoAccount": "Tidak ada akun yang ditemukan untuk perdagangan ini",
+      "parsedTradeCurrency": "Mata uang: {currency}"
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Pembelian} other {Penjualan}}: {quantity} saham {symbol} senilai {total}, bertanggal {date}.",
+    "account": "Akun yang disebut di surel: {account}",
+    "priceMismatch": "Harga rata-rata tidak cocok dengan jumlah saham dan total, sehingga perdagangan ini tidak akan diterapkan otomatis.",
+    "incomplete": "Profil tidak dapat membaca perdagangan yang lengkap dari surel ini.",
+    "totalFromPrice": "total yang tersirat dari harga",
+    "dateUnknown": "hari surel diterima",
+    "price": "Harga rata-rata di email: {price} per saham",
+    "proposalSecurity": "Efek: {name}",
+    "proposalAccount": "Akun: {account}",
+    "proposalPrice": "Harga: {price} per saham",
+    "proposalCommission": "Komisi: {commission}",
+    "proposalReview": "Tidak ada yang dicatat sebelum Anda menyetujuinya.",
+    "proposalReviewLink": "Tinjau di kotak masuk",
+    "aiWaiting": "Agen AI belum mengusulkan transaksi ini. Usulannya akan muncul di sini dan di kotak masuk tinjauan.",
+    "aiBooked": "Dicatat dari usulan agen AI: lihat transaksi di atas.",
+    "aiNoProposal": "Tidak ada usulan agen AI yang menunggu untuk email ini.",
+    "currencyFrom": "Mata uang: {currency}, {source, select, amount {disebut oleh jumlahnya} marker {dari penanda mata uang profil} other {dari sekuritas Anda untuk kode saham itu}}",
+    "bookTo": "Dicatat ke: {account}",
+    "bookToNotTradable": "Dicatat ke {account}, yang bukan akun pialang yang terbuka, jadi transaksi tidak dapat dicatat di sana.",
+    "bookToUnknown": "Dicatat ke akun yang tidak ada di daftar Anda, jadi transaksi tidak dapat dicatat di sana."
   }
 }

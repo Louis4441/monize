@@ -139,7 +139,7 @@ function hitOf(
 }
 
 /** The first entry, in array order, that reads something, with what read it. */
-function findField(
+export function findField(
   entries: readonly ReceiptFieldEntry[] | undefined,
   lines: readonly string[],
   accept: (captures: GlobCaptures) => boolean,
@@ -183,7 +183,7 @@ interface Read<T> {
   hit: ReceiptTraceHit;
 }
 
-function readAmount(
+export function readAmount(
   entries: readonly ReceiptFieldEntry[] | undefined,
   lines: readonly string[],
 ): Read<number> | null {

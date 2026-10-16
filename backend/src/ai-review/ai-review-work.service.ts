@@ -11,7 +11,15 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 import { AiActionBuilderService } from "../ai/actions/ai-action-builder.service";
-import type { PendingAiAction } from "../ai/actions/ai-action.types";
+import type {
+  CreateInvestmentTransactionDescriptor,
+  PendingAiAction,
+} from "../ai/actions/ai-action.types";
+import { AccountsService } from "../accounts/accounts.service";
+import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
+import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
+import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
+import { SecuritiesService } from "../securities/securities.service";
 import { TransactionsService } from "../transactions/transactions.service";
 import { TransactionToolPrepService } from "../transactions/transaction-tool-prep.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
@@ -20,14 +28,18 @@ import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
 import { receiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
 import { AiReviewRequest } from "./ai-review-request.entity";
 import { AiReviewRequestsService } from "./ai-review-requests.service";
+import { emailDayOfUser, findTradeInLedger } from "./trade-ledger";
 import {
   AI_REVIEW_EMAIL_TEXT_MAX_CHARS,
   AI_REVIEW_MAX_TAG_NAME_LENGTH,
   AI_REVIEW_MAX_TAG_NAMES,
   AI_REVIEW_PARSER_EMAIL_TEXT_MAX_CHARS,
+  AiReviewAgentTrade,
+  aiReviewAgentTradeSchema,
   AiReviewInboxItem,
   AiReviewProposalInput,
   AiReviewSubmitResult,
+  AiReviewTradeInput,
   DEFAULT_AI_REVIEW_TOOL_LIST_LIMIT,
   LlmAiReviewClaim,
   LlmAiReviewEmailReceipt,
@@ -36,6 +48,7 @@ import {
   LlmAiReviewRequest,
   MAX_AI_REVIEW_TOOL_LIST_LIMIT,
   StoredAiReviewProposal,
+  StoredAiReviewTradeProposal,
 } from "./ai-review-work.types";
 
 /** Inbox page size when the caller names none, and its ceiling. */
@@ -84,6 +97,14 @@ function inboxParserDraft(
   };
 }
 
+/** The trade a stored `email_trade` proposal holds, else undefined (also for any other kind). */
+function tradeOf(request: AiReviewRequest): AiReviewTradeInput | undefined {
+  if (request.kind !== "email_trade") return undefined;
+  const stored =
+    request.proposal as Partial<StoredAiReviewTradeProposal> | null;
+  return stored?.trade;
+}
+
 /** The inbox's view of a stored email: who, what, when -- never its text. */
 function inboxEmail(
   receipt: EmailReceipt | undefined,
@@ -118,6 +139,14 @@ export class AiReviewWorkService {
     @Inject(forwardRef(() => TransactionToolPrepService))
     private readonly prepService: TransactionToolPrepService,
     private readonly actionBuilder: AiActionBuilderService,
+    @Inject(forwardRef(() => InvestmentTransactionsService))
+    private readonly investmentTransactionsService: InvestmentTransactionsService,
+    @Inject(forwardRef(() => SecuritiesService))
+    private readonly securitiesService: SecuritiesService,
+    @Inject(forwardRef(() => ScheduledTransactionsService))
+    private readonly scheduledTransactionsService: ScheduledTransactionsService,
+    @Inject(forwardRef(() => AccountsService))
+    private readonly accountsService: AccountsService,
   ) {}
 
   private toLlm(request: AiReviewRequest, caller: string): LlmAiReviewRequest {
@@ -187,6 +216,13 @@ export class AiReviewWorkService {
         return {
           request: this.toLlm(request, caller),
           emailReceipts: await this.loadParserEmailsForClaim(userId, request),
+        };
+      }
+      if (request.kind === "email_trade") {
+        const emailReceipt = await this.loadEmailForClaim(userId, request);
+        return {
+          request: this.toLlm(request, caller),
+          ...(emailReceipt ? { emailReceipt } : {}),
         };
       }
       const transaction = await this.transactionsService.getLlmTransactionById(
@@ -284,7 +320,10 @@ export class AiReviewWorkService {
     userId: string,
     request: AiReviewRequest,
   ): Promise<LlmAiReviewEmailReceipt | undefined> {
-    if (request.kind !== "email_receipt" || !request.emailReceiptId) {
+    if (
+      (request.kind !== "email_receipt" && request.kind !== "email_trade") ||
+      !request.emailReceiptId
+    ) {
       return undefined;
     }
     const receipt = await withScopedDb(this.dataSource, (m) =>
@@ -474,9 +513,286 @@ export class AiReviewWorkService {
         ),
       );
     }
+    if (request.kind === "email_trade") {
+      // An agent answers a trade request with the trade field only. (A request
+      // a profile queued is born claimed by the receipts key, so no agent holds it.)
+      if (!input.trade) {
+        throw new BadRequestException(
+          tr(
+            "errors.aiReview.tradeNotSubmittable",
+            "A trade request is answered with the trade field (account, action, symbol, quantity, total and date), not with a transaction proposal.",
+          ),
+        );
+      }
+      return this.submitTrade(
+        userId,
+        caller,
+        requestId,
+        await this.tradeFromAgent(userId, request, input.trade),
+      );
+    }
+    if (input.trade !== undefined) {
+      throw new BadRequestException(
+        tr(
+          "errors.aiReview.tradeOnTradeRequest",
+          "The trade field answers a trade request only.",
+        ),
+      );
+    }
     const action = await this.buildCard(userId, request, input);
     const stored: StoredAiReviewProposal = {
       input,
+      action,
+      proposedAt: new Date().toISOString(),
+    };
+    const proposed = await this.requests.submitProposal(
+      userId,
+      requestId,
+      caller,
+      stored as unknown as Record<string, unknown>,
+    );
+    if (!proposed) throw new ConflictException(this.notClaimedMessage());
+    return { request: this.toLlm(proposed, caller), action };
+  }
+
+  /**
+   * The confirmation card of a trade: ONE `create_investment_transaction`
+   * action for the account and the security the proposal names, built by the
+   * same preview the chat's investment tool uses (so the card shows the total
+   * the commit will store and the price it will derive, INV-TRADE-001) and
+   * carrying the request's id, which confirm marks applied in the write's own
+   * transaction. Every refusal happens here, before anything is stored: an
+   * account that is not the user's INVESTMENT account, a ticker that is no
+   * security of theirs (or is ambiguous), an oversell the preview can see.
+   */
+  private async buildTradeCard(
+    userId: string,
+    request: AiReviewRequest,
+    trade: AiReviewTradeInput,
+  ): Promise<PendingAiAction> {
+    const resolved = await this.securitiesService.resolveByTradeSymbol(
+      userId,
+      trade.symbol,
+      trade.accountId,
+      trade.currency ?? null,
+    );
+    if (!resolved.match) {
+      if (resolved.candidates.length > 0) {
+        const list = resolved.candidates.map((c) => c.symbol).join(", ");
+        throw new BadRequestException(
+          tr(
+            "errors.aiReview.tradeSecurityAmbiguous",
+            `"${trade.symbol}" matches several of your securities (${list}). Rename one so the ticker is unique.`,
+            { symbol: trade.symbol, list },
+          ),
+        );
+      }
+      throw new NotFoundException(
+        tr(
+          "errors.aiReview.tradeSecurityUnknown",
+          `You have no security with the ticker "${trade.symbol}". Add the security, then reprocess the email.`,
+          { symbol: trade.symbol },
+        ),
+      );
+    }
+    // The total is in the security's currency. An email whose amounts name
+    // another (a CAD total for a USD listing) would be booked at the wrong
+    // figure, and the ticker alone cannot say which listing was meant.
+    if (
+      trade.currency &&
+      trade.currency.toUpperCase() !== resolved.match.currencyCode.toUpperCase()
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.aiReview.tradeCurrencyMismatch",
+          `The email's amounts are in ${trade.currency}, but your security ${resolved.match.symbol} trades in ${resolved.match.currencyCode}. Check which listing was bought, then enter the trade yourself.`,
+          {
+            currency: trade.currency,
+            symbol: resolved.match.symbol,
+            securityCurrency: resolved.match.currencyCode,
+          },
+        ),
+      );
+    }
+    // The ledger may hold this trade already: a card for it would book it twice.
+    // Asked for every card (the profile's, an agent's, the inbox's rebuild), and
+    // again by the confirm itself, under the write's lock.
+    const ledger = await withScopedDb(this.dataSource, (m) =>
+      findTradeInLedger(
+        m,
+        userId,
+        { ...trade, securityId: resolved.match!.id },
+        request.emailReceiptId,
+      ),
+    );
+    if (ledger.unclaimedId !== null) {
+      throw new ConflictException(
+        tr(
+          "errors.aiReview.tradeAlreadyBooked",
+          "Your ledger already has this trade. Link the email to it instead of booking it again.",
+        ),
+      );
+    }
+    const action =
+      trade.action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL;
+    // A scheduled bill or deposit this trade pays is marked paid by approving
+    // it. Looked up each time the card is built, so the inbox shows the
+    // schedule as it is now; an unsure match (none, or several) is no match.
+    // Posting it settles through the schedule's own funding account, so the
+    // card is previewed with that account: what it shows is what is written.
+    const scheduled =
+      await this.scheduledTransactionsService.findInvestmentOccurrenceForTrade(
+        userId,
+        {
+          accountId: trade.accountId,
+          securityId: resolved.match.id,
+          action,
+          date: trade.date,
+          commission: trade.commission,
+        },
+      );
+    const preview =
+      await this.investmentTransactionsService.previewCreateInvestmentTransaction(
+        userId,
+        {
+          accountId: trade.accountId,
+          action,
+          transactionDate: trade.date,
+          securityQuery: resolved.match.symbol,
+          quantity: trade.quantity,
+          totalAmount: trade.totalAmount,
+          commission: trade.commission,
+          ...(scheduled?.fundingAccountId
+            ? { fundingAccountId: scheduled.fundingAccountId }
+            : {}),
+          description: trade.description ?? undefined,
+        },
+      );
+    return this.actionBuilder.buildCreateInvestmentTransaction(
+      userId,
+      preview,
+      {
+        aiReviewRequestId: request.id,
+        ...(scheduled
+          ? {
+              scheduled: {
+                id: scheduled.id,
+                name: scheduled.name,
+                dueDate: scheduled.dueDate,
+              },
+            }
+          : {}),
+      },
+    );
+  }
+
+  /** An agent's trade, with its account found by name among the user's investment accounts. */
+  private async tradeFromAgent(
+    userId: string,
+    request: AiReviewRequest,
+    given: unknown,
+  ): Promise<AiReviewTradeInput> {
+    const parsed = aiReviewAgentTradeSchema.safeParse(given);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        tr(
+          "errors.aiReview.tradeInvalid",
+          "The trade needs accountName, action (BUY or SELL), symbol, quantity, totalAmount and, optionally, commission and date (YYYY-MM-DD).",
+        ),
+      );
+    }
+    const agent: AiReviewAgentTrade = parsed.data;
+    const resolved = await this.accountsService.resolveBrokerageByNameOrId(
+      userId,
+      agent.accountName,
+    );
+    if (!resolved.match) {
+      const list = resolved.candidates.map((c) => c.name).join(", ");
+      throw resolved.candidates.length > 0
+        ? new BadRequestException(
+            tr(
+              "errors.accounts.ambiguousBrokerage",
+              `"${agent.accountName}" matches multiple brokerage accounts: ${list}. Use the exact account name.`,
+              { query: agent.accountName, list },
+            ),
+          )
+        : new NotFoundException(
+            tr(
+              "errors.accounts.unknownInvestmentAccount",
+              `Unknown account: ${agent.accountName}. Use an exact name from the user's account list.`,
+              { name: agent.accountName },
+            ),
+          );
+    }
+    const date = agent.date ?? (await this.emailDay(userId, request));
+    if (date === null) {
+      throw new BadRequestException(
+        tr(
+          "errors.aiReview.tradeDateRequired",
+          "The trade needs a date (YYYY-MM-DD): the email is gone, so there is no day to fall back on.",
+        ),
+      );
+    }
+    return {
+      accountId: resolved.match.id,
+      action: agent.action,
+      symbol: agent.symbol.trim(),
+      quantity: agent.quantity,
+      totalAmount: agent.totalAmount,
+      commission: agent.commission ?? 0,
+      date,
+      description: agent.description ?? "Email receipt",
+      currency: agent.currency ?? null,
+    };
+  }
+
+  /** The day the trade email was sent (the shop's day for a forward) in the user's timezone, else null when the email is gone. */
+  private async emailDay(
+    userId: string,
+    request: AiReviewRequest,
+  ): Promise<string | null> {
+    if (!request.emailReceiptId) return null;
+    const receipt = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(EmailReceipt).findOne({
+        where: { id: request.emailReceiptId as string, userId },
+        select: { id: true, receivedAt: true, originalSentAt: true },
+      }),
+    );
+    return receipt
+      ? withScopedDb(this.dataSource, (m) =>
+          emailDayOfUser(
+            m,
+            userId,
+            receipt.originalSentAt ?? receipt.receivedAt,
+          ),
+        )
+      : null;
+  }
+
+  /**
+   * Store the proposal of a trade request the email-receipts profile owns
+   * (claimed under `caller`) and return the signed card. Same contract as
+   * {@link submit}: the conditional UPDATE in `submitProposal` is the authority
+   * on the claim, and nothing is written to the ledger.
+   */
+  async submitTrade(
+    userId: string,
+    caller: string,
+    requestId: string,
+    trade: AiReviewTradeInput,
+  ): Promise<AiReviewSubmitResult> {
+    const request = await this.requireClaim(userId, caller, requestId);
+    if (request.kind !== "email_trade") {
+      throw new BadRequestException(
+        tr(
+          "errors.aiReview.notATradeRequest",
+          "This AI review request is not a trade request.",
+        ),
+      );
+    }
+    const action = await this.buildTradeCard(userId, request, trade);
+    const stored: StoredAiReviewTradeProposal = {
+      trade,
       action,
       proposedAt: new Date().toISOString(),
     };
@@ -589,13 +905,14 @@ export class AiReviewWorkService {
         : undefined;
       const note = agentNoteOf(request);
       const stored = request.proposal as Partial<StoredAiReviewProposal> | null;
+      const trade = tradeOf(request);
       items.push({
         id: request.id,
         kind: request.kind,
         status: request.status,
         instruction: request.instruction,
         instructionKey:
-          request.kind === "email_receipt"
+          request.kind === "email_receipt" || request.kind === "email_trade"
             ? receiptInstructionKey(request.instruction)
             : null,
         transactionId: request.transactionId,
@@ -609,6 +926,7 @@ export class AiReviewWorkService {
             : undefined,
         ),
         parserDraft: inboxParserDraft(request),
+        trade: trade ?? null,
         createdAt: request.createdAt.toISOString(),
         expiresAt: request.expiresAt.toISOString(),
         transaction: t
@@ -628,6 +946,11 @@ export class AiReviewWorkService {
         ...(note ? { agentNote: note } : {}),
         ...(request.status === "proposed" && stored?.input
           ? { proposal: await this.rebuiltCard(userId, request, stored.input) }
+          : {}),
+        ...(request.status === "proposed" &&
+        request.kind === "email_trade" &&
+        trade !== undefined
+          ? { proposal: await this.rebuiltTradeCard(userId, request, trade) }
           : {}),
       });
     }
@@ -669,6 +992,17 @@ export class AiReviewWorkService {
         ),
       };
     }
+    if (request.kind === "email_trade") {
+      const trade = tradeOf(request);
+      return trade === undefined
+        ? {
+            error: tr(
+              "errors.aiReview.noApprovableProposal",
+              "This request has no proposal to approve here.",
+            ),
+          }
+        : this.rebuiltTradeCard(userId, request, trade);
+    }
     if (request.kind === "email_parser_draft" || !stored?.input) {
       return {
         error: tr(
@@ -678,6 +1012,49 @@ export class AiReviewWorkService {
       };
     }
     return this.rebuiltCard(userId, request, stored.input);
+  }
+
+  private async rebuiltTradeCard(
+    userId: string,
+    request: AiReviewRequest,
+    trade: AiReviewTradeInput,
+  ): Promise<{ action: PendingAiAction } | { error: string }> {
+    try {
+      const action = await this.buildTradeCard(userId, request, trade);
+      // The card the proposal was made with paid a scheduled occurrence. If the
+      // rebuild no longer finds it, it was posted (the auto-post cron, a person)
+      // or moved since: a plain creation now would put the trade in the ledger
+      // beside the posted row, so there is no card to approve.
+      const stored =
+        request.proposal as Partial<StoredAiReviewTradeProposal> | null;
+      const before = stored?.action?.descriptor as
+        Partial<CreateInvestmentTransactionDescriptor> | undefined;
+      const after = action.descriptor as CreateInvestmentTransactionDescriptor;
+      if (
+        typeof before?.scheduledTransactionId === "string" &&
+        (before.scheduledTransactionId !== after.scheduledTransactionId ||
+          before.scheduledDueDate !== after.scheduledDueDate)
+      ) {
+        return {
+          error: tr(
+            "errors.aiReview.tradeScheduleMoved",
+            "The scheduled transaction this trade was to pay has been posted or changed since it was proposed. Link the email to that transaction instead, or dismiss it.",
+          ),
+        };
+      }
+      return { action };
+    } catch (err) {
+      // A refusal (the account was closed, the security renamed, the position
+      // no longer covers a sell) is the reason to show; anything else is ours.
+      if (
+        err instanceof BadRequestException ||
+        err instanceof NotFoundException ||
+        err instanceof ConflictException
+      ) {
+        return { error: err.message };
+      }
+      throw err;
+    }
   }
 
   private async rebuiltCard(

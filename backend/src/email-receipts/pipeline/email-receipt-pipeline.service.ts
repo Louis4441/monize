@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -43,7 +42,10 @@ import {
 import { matchReceipt } from "../matching/match-receipt";
 import { completeness, parseReceiptLines } from "../parsing/parse-receipt";
 import { resolveMatchConfig } from "../parsing/receipt-match-config";
-import type { ParsedReceipt } from "../parsing/receipt-parser.types";
+import type {
+  ParsedReceipt,
+  ParsedTrade,
+} from "../parsing/receipt-parser.types";
 import {
   applyCategoryHistory,
   loadItemCategoryHistory,
@@ -55,15 +57,19 @@ import {
   type ReceiptProposalTransaction,
 } from "../proposal/build-receipt-proposal";
 import { autoApplyAllowed, type AutoApplyFacts } from "./auto-apply-gate";
+import {
+  EmailReceiptTradeService,
+  RECEIPT_TRADE_EXISTS_REASON,
+} from "./email-receipt-trade.service";
 import { chooseReceiptParser } from "./choose-receipt-parser";
-import { describeFailure } from "./receipt-failure";
+import { describeFailure, isRefusal, refusalNote } from "./receipt-failure";
 import { loadLinkableTransaction } from "./linkable-transaction";
 import { loadReceiptCandidates } from "./receipt-candidates";
 import { ReceiptSourceLines } from "./receipt-source-lines";
 import { readSchemaOrgReceipt } from "./schema-org-reading";
 import {
   closeReceiptRequests,
-  currentReceiptRequestStatus,
+  currentReceiptRequest,
   lockReceiptTransaction,
 } from "./receipt-requests.util";
 
@@ -96,8 +102,6 @@ export const RECEIPT_SCHEMA_ORG_REASON = "schema_org";
 
 /** At most this many approved parsers are considered for one email. */
 const MAX_PARSERS_CONSIDERED = 1000;
-/** The longest note a refused proposal leaves on its request. */
-const MAX_REFUSAL_NOTE = 400;
 
 /** What `process` does and refuses, by who asked. */
 export interface ProcessReceiptOptions {
@@ -155,6 +159,10 @@ interface Stored {
   reason: string | null;
   parserId: string | null;
   parsed: ParsedReceipt | null;
+  /** A trade profile's reading; absent (stored as null) for every other email. */
+  trade?: ParsedTrade | null;
+  /** The ledger row a trade email accounts for; absent (stored as null) otherwise. */
+  investmentTransactionId?: string | null;
   transactionId: string | null;
   candidateIds: string[];
   matchKind: EmailReceiptMatchKind | null;
@@ -180,11 +188,6 @@ interface Committed {
     categories: ReadonlyMap<string, string>;
   };
 }
-
-const isRefusal = (error: unknown): boolean =>
-  error instanceof BadRequestException ||
-  error instanceof NotFoundException ||
-  error instanceof ConflictException;
 
 export { describeFailure };
 
@@ -217,6 +220,7 @@ export class EmailReceiptPipelineService {
     private readonly actions: AiActionsService,
     private readonly payees: PayeesService,
     private readonly categoryAi: EmailReceiptCategoryAiService,
+    private readonly trades: EmailReceiptTradeService,
   ) {}
 
   async process(
@@ -303,12 +307,24 @@ export class EmailReceiptPipelineService {
     ) {
       return { result: unchanged(receipt), autoApply: null };
     }
-    const requestStatus = await currentReceiptRequestStatus(
+    const current = await currentReceiptRequest(
       m,
       userId,
       receipt.aiReviewRequestId,
     );
+    const requestStatus = current?.status ?? null;
     if (requestStatus === "applied" && options.onlyWhenStatusIn) {
+      return { result: unchanged(receipt), autoApply: null };
+    }
+    // An automatic pass (the poll's rematch, a bulk run) never replaces a trade
+    // proposal: one waiting for approval would be swapped for a new card the
+    // person never saw, and one they dismissed would come back. A person's own
+    // Reprocess still re-reads it; an expired one is read again too.
+    if (
+      options.onlyWhenStatusIn &&
+      current?.kind === "email_trade" &&
+      current.status !== "expired"
+    ) {
       return { result: unchanged(receipt), autoApply: null };
     }
     this.refuseUnprocessable(receipt, requestStatus, options);
@@ -399,6 +415,42 @@ export class EmailReceiptPipelineService {
           candidateIds: [],
           matchKind: null,
         });
+      }
+      // A trade profile reads a brokerage confirmation: the email proposes an
+      // investment transaction to CREATE, so nothing below (payee, items,
+      // matching a bank transaction) applies to it.
+      if (definition.trade) {
+        // A link to a BANK transaction is a command about a purchase; this
+        // email is now read as a trade, which is linked to an investment
+        // transaction instead. Refused before anything is written, so the
+        // command never turns into a booking.
+        if (link) {
+          throw new BadRequestException(
+            tr(
+              "errors.emailReceipts.tradeNotBankLinkable",
+              "This email is read as a trade confirmation. Link it to an investment transaction instead.",
+            ),
+          );
+        }
+        const traded = await this.trades.process(m, userId, receipt, {
+          parser: choice.parser,
+          definition: definition.trade,
+          lines: sources.forSource(definition.source) ?? [],
+          mailboxAutoApply: autoApplyOn,
+        });
+        const committed = await this.finish(m, userId, receipt, {
+          status: traded.status,
+          reason: traded.reason,
+          parserId: choice.parser.id,
+          parsed: null,
+          trade: traded.trade,
+          investmentTransactionId: traded.investmentTransactionId,
+          transactionId: null,
+          candidateIds: [],
+          matchKind: null,
+          requestId: traded.requestId,
+        });
+        return { ...committed, autoApply: traded.autoApply };
       }
       payee = choice.parser.payeeId
         ? await m.getRepository(Payee).findOne({
@@ -865,6 +917,20 @@ export class EmailReceiptPipelineService {
         ),
       );
     }
+    // A trade email linked to the ledger row it reports, or whose approval
+    // booked one, accounts for that row: read again, it would propose the same
+    // trade a second time.
+    if (
+      Boolean(receipt.investmentTransactionId) &&
+      receipt.statusReason !== RECEIPT_TRADE_EXISTS_REASON
+    ) {
+      throw new ConflictException(
+        tr(
+          "errors.emailReceipts.tradeAccountedFor",
+          "This email already accounts for an investment transaction, so it is not read again.",
+        ),
+      );
+    }
     if (options.link && receipt.status === "ignored") {
       throw new ConflictException(
         tr(
@@ -895,6 +961,9 @@ export class EmailReceiptPipelineService {
         parserId: stored.parserId,
         parsed:
           stored.parsed as unknown as QueryDeepPartialEntity<EmailReceipt>["parsed"],
+        trade: (stored.trade ??
+          null) as unknown as QueryDeepPartialEntity<EmailReceipt>["trade"],
+        investmentTransactionId: stored.investmentTransactionId ?? null,
         transactionId: stored.transactionId,
         candidateTransactionIds: stored.candidateIds,
         matchKind: stored.matchKind,
@@ -977,14 +1046,6 @@ function unchanged(receipt: EmailReceipt): ProcessReceiptResult {
     autoApplied: false,
     unchanged: true,
   };
-}
-
-function refusalNote(error: unknown): string {
-  const message =
-    error instanceof HttpException
-      ? error.message
-      : "The proposal was refused.";
-  return message.slice(0, MAX_REFUSAL_NOTE);
 }
 
 function receiptNotFound(id: string): NotFoundException {

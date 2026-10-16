@@ -7,6 +7,9 @@ import {
   Logger,
 } from "@nestjs/common";
 import { DataSource, EntityManager, In, Not } from "typeorm";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import {
   Account,
   AccountType,
@@ -649,6 +652,39 @@ export class AccountsService {
       match: undefined,
       candidates: brokerageMatches.map((a) => ({ id: a.id, name: a.name })),
     };
+  }
+
+  /**
+   * Resolve an account given as either its UUID or its name. A UUID matches
+   * the user's open accounts by id; anything else goes through
+   * `resolveBrokerageByName`, so a base name ("RRSP") still reaches its
+   * brokerage. Same result shape as `resolveBrokerageByName`.
+   */
+  async resolveBrokerageByNameOrId(
+    userId: string,
+    nameOrId: string,
+  ): Promise<{
+    match: { id: string; name: string; currencyCode: string } | undefined;
+    candidates: { id: string; name: string }[];
+  }> {
+    const value = nameOrId.trim();
+    if (UUID_RE.test(value)) {
+      const accounts = await this.findAll(userId, false);
+      const byId = accounts.find(
+        (a) => a.id.toLowerCase() === value.toLowerCase(),
+      );
+      if (byId) {
+        return {
+          match: {
+            id: byId.id,
+            name: byId.name,
+            currencyCode: byId.currencyCode,
+          },
+          candidates: [],
+        };
+      }
+    }
+    return this.resolveBrokerageByName(userId, value);
   }
 
   /**

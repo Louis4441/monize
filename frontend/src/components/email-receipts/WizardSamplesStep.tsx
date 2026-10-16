@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge';
-import { WIZARD_MAX_SAMPLES, type ChosenTransaction } from '@/components/email-receipts/profile-wizard-types';
+import { WIZARD_MAX_SAMPLES, type ChosenTransaction, type WizardKind } from '@/components/email-receipts/profile-wizard-types';
 import { SampleDialog } from '@/components/email-receipts/WizardSampleDialogs';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -27,6 +27,11 @@ interface WizardSamplesStepProps {
   /** The transaction chosen for each email, by receipt id. Held by the wizard; nothing is written. */
   picks: Readonly<Record<string, ChosenTransaction>>;
   selected: ReadonlySet<string>;
+  /** `trade`: the emails are brokerage trade confirmations, which pay no bank transaction, so none is chosen. */
+  kind: WizardKind;
+  onKindChange: (kind: WizardKind) => void;
+  /** Remembers a ticked email's subject, which names a trade sample (it has no transaction line). */
+  onSubject: (receiptId: string, subject: string) => void;
   onPick: (receiptId: string, chosen: ChosenTransaction) => void;
   onToggle: (receiptId: string) => void;
   onContinue: () => void;
@@ -39,7 +44,7 @@ type ListState = { status: 'loading' } | { status: 'error' } | { status: 'ready'
  * the transaction it paid for; an email can be ticked as a sample only once it has one,
  * and at most five are ticked. The pairs live in the wizard's state.
  */
-export function WizardSamplesStep({ domain, picks, selected, onPick, onToggle, onContinue }: WizardSamplesStepProps) {
+export function WizardSamplesStep({ domain, picks, selected, kind, onKindChange, onSubject, onPick, onToggle, onContinue }: WizardSamplesStepProps) {
   const t = useTranslations('emailReceipts.profileWizard.samples');
   const { formatDateTime } = useDateFormat();
   const [list, setList] = useState<ListState>({ status: 'loading' });
@@ -85,10 +90,20 @@ export function WizardSamplesStep({ domain, picks, selected, onPick, onToggle, o
   if (list.items.length === 0) return <EmptyState title={t('empty.title')} description={t('empty.body', { domain })} />;
 
   const full = selected.size >= WIZARD_MAX_SAMPLES;
+  const isTrade = kind === 'trade';
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-600 dark:text-gray-400">{t('help', { max: WIZARD_MAX_SAMPLES })}</p>
+      <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+        <input
+          type="checkbox"
+          checked={isTrade}
+          onChange={(e) => onKindChange(e.target.checked ? 'trade' : 'receipt')}
+          className={`mt-0.5 ${CHECKBOX_CLASS}`}
+        />
+        <span>{t('tradeToggle')}</span>
+      </label>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{isTrade ? t('tradeHelp', { max: WIZARD_MAX_SAMPLES }) : t('help', { max: WIZARD_MAX_SAMPLES })}</p>
       <div className="overflow-x-auto">
         <table className={TABLE_CLASS}>
           <thead>
@@ -103,7 +118,7 @@ export function WizardSamplesStep({ domain, picks, selected, onPick, onToggle, o
             {list.items.map((receipt) => {
               const pick = picks[receipt.id];
               const isSelected = selected.has(receipt.id);
-              const blockedReason = pick === undefined ? t('needsTransaction') : !isSelected && full ? t('limitReached', { max: WIZARD_MAX_SAMPLES }) : undefined;
+              const blockedReason = pick === undefined && !isTrade ? t('needsTransaction') : !isSelected && full ? t('limitReached', { max: WIZARD_MAX_SAMPLES }) : undefined;
               return (
                 <tr
                   key={receipt.id}
@@ -118,7 +133,10 @@ export function WizardSamplesStep({ domain, picks, selected, onPick, onToggle, o
                       checked={isSelected}
                       disabled={blockedReason !== undefined}
                       title={blockedReason}
-                      onChange={() => onToggle(receipt.id)}
+                      onChange={() => {
+                        onSubject(receipt.id, receipt.subject);
+                        onToggle(receipt.id);
+                      }}
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       onTouchStart={(e) => e.stopPropagation()}
@@ -136,7 +154,13 @@ export function WizardSamplesStep({ domain, picks, selected, onPick, onToggle, o
                     </div>
                   </Td>
                   <Td className="min-w-0 px-2 align-top break-words sm:px-4">
-                    {pick ? pick.summary : <span className="text-gray-500 dark:text-gray-400">{t('noTransaction')}</span>}
+                    {isTrade ? (
+                      <span className="text-gray-500 dark:text-gray-400">{t('tradeNoTransaction')}</span>
+                    ) : pick ? (
+                      pick.summary
+                    ) : (
+                      <span className="text-gray-500 dark:text-gray-400">{t('noTransaction')}</span>
+                    )}
                   </Td>
                 </tr>
               );

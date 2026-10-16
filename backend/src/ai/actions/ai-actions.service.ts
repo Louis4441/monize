@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   forwardRef,
   Inject,
@@ -16,6 +17,7 @@ import {
 } from "../../attachments/attachments.service";
 import { RelayAttachmentStore } from "../relay/relay-attachment.store";
 import { PayeesService, CreatePayeeOptions } from "../../payees/payees.service";
+import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import { CreateTransactionDto } from "../../transactions/dto/create-transaction.dto";
@@ -83,6 +85,12 @@ import { ConfirmAiActionDto } from "./dto/confirm-ai-action.dto";
 import { SingleUseTokenService } from "../../auth/single-use-token.service";
 import { AiReviewRequestsService } from "../../ai-review/ai-review-requests.service";
 import { EMAIL_RECEIPTS_CLAIM_KEY } from "../../ai-review/ai-review-work.types";
+import {
+  findTradeInLedger,
+  recordTradeBooking,
+} from "../../ai-review/trade-ledger";
+import type { EntityManager } from "typeorm";
+import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
 
 export interface ConfirmActionResult {
   type: AiActionDescriptor["type"];
@@ -125,6 +133,8 @@ export class AiActionsService {
     private readonly transactionRulesService: TransactionRulesService,
     private readonly transactionRulesRunService: TransactionRulesRunService,
     private readonly aiReviewRequests: AiReviewRequestsService,
+    @Inject(forwardRef(() => ScheduledTransactionsService))
+    private readonly scheduledTransactionsService: ScheduledTransactionsService,
   ) {}
 
   async confirm(
@@ -1053,15 +1063,109 @@ export class AiActionsService {
       fundingAccountId: descriptor.fundingAccountId ?? undefined,
       quantity: descriptor.quantity ?? undefined,
       price: descriptor.price ?? undefined,
+      // A trade email's card signs the executed total, so it is stored as the
+      // email gave it, not re-derived from the price (INV-TRADE-001).
+      totalAmount: descriptor.totalAmount ?? undefined,
       commission: descriptor.commission,
       accruedInterest: descriptor.accruedInterest,
       exchangeRate: descriptor.exchangeRate,
       description: descriptor.description ?? undefined,
       bondInstrumentId: descriptor.bondInstrumentId ?? undefined,
     });
+    const reviewRequestId = descriptor.aiReviewRequestId;
+    if (typeof reviewRequestId !== "string") {
+      const transaction = await this.investmentTransactionsService.create(
+        userId,
+        dto,
+      );
+      return { type: "create_investment_transaction", id: transaction.id };
+    }
+
+    // A creation that answers an `email_trade` request marks it applied in the
+    // write's own transaction, under the holdings lock and before anything is
+    // written: a request dismissed or expired since the card was built refuses
+    // the creation (409) with nothing changed, and so does a trade the ledger
+    // has gained since (the schedule auto-posted it, the person entered it):
+    // checked here, under the same lock, not only when the card was built. The
+    // row is then recorded on the email, so the two commit or roll back together.
+    const beforeWrite = async (m: EntityManager): Promise<void> => {
+      const { emailReceiptId } = await this.aiReviewRequests.markTradeApplied(
+        m,
+        userId,
+        reviewRequestId,
+      );
+      if (descriptor.securityId && descriptor.quantity !== null) {
+        const ledger = await findTradeInLedger(
+          m,
+          userId,
+          {
+            accountId: descriptor.accountId,
+            action:
+              descriptor.action === InvestmentAction.SELL ? "SELL" : "BUY",
+            securityId: descriptor.securityId,
+            quantity: descriptor.quantity,
+            date: descriptor.transactionDate,
+          },
+          emailReceiptId,
+        );
+        if (ledger.unclaimedId !== null) {
+          throw new ConflictException(
+            tr(
+              "errors.aiReview.tradeAlreadyBooked",
+              "Your ledger already has this trade. Link the email to it instead of booking it again.",
+            ),
+          );
+        }
+      }
+    };
+    const afterWrite = (m: EntityManager, id: string): Promise<void> =>
+      recordTradeBooking(m, userId, reviewRequestId, id);
+
+    // A trade that pays a scheduled bill or deposit posts THAT occurrence with
+    // the figures the card showed (the schedule's own post creates the row, marks
+    // the occurrence paid and advances the schedule), so no second row is made.
+    // The due date is signed: a schedule that has moved on since the card was
+    // built refuses with a conflict and nothing is written.
+    if (
+      typeof descriptor.scheduledTransactionId === "string" &&
+      typeof descriptor.scheduledDueDate === "string"
+    ) {
+      let createdId: string | null = null;
+      await this.scheduledTransactionsService.post(
+        userId,
+        descriptor.scheduledTransactionId,
+        {
+          transactionDate: descriptor.transactionDate,
+          investmentQuantity: descriptor.quantity ?? undefined,
+          investmentPrice: descriptor.price ?? undefined,
+          description: descriptor.description ?? undefined,
+        },
+        {
+          expectedDueDate: descriptor.scheduledDueDate,
+          beforeWrite,
+          ...(typeof descriptor.totalAmount === "number"
+            ? {
+                investmentFigures: {
+                  totalAmount: descriptor.totalAmount,
+                  exchangeRate: descriptor.exchangeRate,
+                },
+              }
+            : {}),
+          afterInvestmentWrite: async (m, id) => {
+            createdId = id;
+            await afterWrite(m, id);
+          },
+        },
+      );
+      return {
+        type: "create_investment_transaction",
+        id: createdId ?? descriptor.scheduledTransactionId,
+      };
+    }
     const transaction = await this.investmentTransactionsService.create(
       userId,
       dto,
+      { beforeWrite, afterWrite },
     );
     return { type: "create_investment_transaction", id: transaction.id };
   }

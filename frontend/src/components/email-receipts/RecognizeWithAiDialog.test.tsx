@@ -243,4 +243,67 @@ describe('RecognizeWithAiDialog', () => {
       expect(onClose).toHaveBeenCalled();
     });
   });
+
+  describe('as a trade', () => {
+    const openAsTrade = async (receipt = makeReceipt({ id: 'r-1', subject: 'Your order has been filled', status: 'no_parser' })) => {
+      await act(async () => {
+        render(<RecognizeWithAiDialog receipt={receipt} asTrade onClose={onClose} onChanged={onChanged} />);
+      });
+      await act(async () => {});
+    };
+
+    beforeEach(() => {
+      api.askAi.mockResolvedValue({ ok: true, requestId: 'req-trade', transactionId: null });
+      api.get.mockResolvedValue(
+        makeDetail({ id: 'r-1', subject: 'Your order has been filled', bodyText: 'Symbol: XCNS', transaction: null }),
+      );
+    });
+
+    it('says the email will no longer stand behind the bank transaction it was matched to', async () => {
+      await openAsTrade(
+        makeReceipt({
+          id: 'r-1',
+          subject: 'Your order has been filled',
+          status: 'review_conflict',
+          transaction: { id: 'tx-1', date: '2026-10-15', amount: -2000, currencyCode: 'CAD', payeeName: 'Wealthsimple' },
+        }),
+      );
+      expect(screen.getByRole('note')).toHaveTextContent(/no longer stands behind/);
+    });
+
+    it('asks for no bank transaction: it explains the trade and offers one button', async () => {
+      await openAsTrade();
+      expect(screen.getByRole('dialog', { name: 'Recognize as a trade with AI' })).toBeInTheDocument();
+      expect(screen.getByText(/read this email as a brokerage trade confirmation/)).toBeInTheDocument();
+      expect(screen.queryByText(/Search other transactions|Choose another transaction/)).not.toBeInTheDocument();
+    });
+
+    it('queues the request as a trade with no transaction and stages the chat for the person to send', async () => {
+      await openAsTrade();
+      await click(screen.getByRole('button', { name: 'Recognize as a trade' }));
+      expect(api.askAi).toHaveBeenCalledWith('r-1', undefined, { asTrade: true });
+      expect(onChanged).toHaveBeenCalled();
+      const handoff = peekChatHandoff(handoffIdFromPush());
+      expect(handoff?.files).toHaveLength(1);
+      expect(await handoff!.files[0].text()).toContain('Symbol: XCNS');
+      expect(handoff?.draft).toContain('Recognize the trade in the attached brokerage confirmation email');
+      expect(handoff?.draft).toContain('req-trade');
+    });
+
+    it('leaves the request in the inbox when the assistant cannot answer now', async () => {
+      assistant.canAnswer.mockResolvedValue(false);
+      await openAsTrade();
+      await click(screen.getByRole('button', { name: 'Recognize as a trade' }));
+      expect(screen.getByRole('status')).toHaveTextContent('Queued');
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it('shows the server\'s refusal', async () => {
+      api.askAi.mockRejectedValue(new Error('boom'));
+      await openAsTrade();
+      await click(screen.getByRole('button', { name: 'Recognize as a trade' }));
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(router.push).not.toHaveBeenCalled();
+    });
+  });
 });

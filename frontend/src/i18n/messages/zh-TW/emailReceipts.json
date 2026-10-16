@@ -93,7 +93,7 @@
         "automatic": "檢查信箱時，對於已比對但已核准的解析器無法完整讀取的收據，會詢問 AI；對於沒有解析器的寄件者，會起草解析器。"
       },
       "autoApplyLabel": "自動套用提議",
-      "autoApplyHelp": "預設為關閉。僅當以下條件全部成立時，提議才會不經詢問直接套用：已核准的設定檔讀取了整封郵件；透過訂單編號或參考號碼，或透過完全相符的金額和收款人找到了交易，且只有一個候選；提議的合計精確到最小貨幣單位。其他情況都會等待您的核准。",
+      "autoApplyHelp": "預設為關閉。僅當以下條件全部成立時，提議才會不經詢問直接套用：已核准的設定檔讀取了整封郵件；透過訂單編號或參考號碼，或透過完全相符的金額和收款人找到了交易，且只有一個候選；提議的合計精確到最小貨幣單位。僅當交易設定檔已核准、讀取了完整的交易、價格與份數和合計相符，且您的帳戶中尚無相同的交易時，交易確認郵件才會不經詢問直接記帳。其他情況都會等待您的核准。",
       "profileLimitLabel": "將設定檔的提議計入每日 AI 上限",
       "profileLimitHelp": "預設為開啟：設定檔根據郵件提出的修改，與其他 AI 提議一樣，計入 AI 提議變更的每日上限。如果大批已儲存的郵件會耗盡該上限，請將其關閉。只有來自設定檔的提議可免計；每則提議仍需等待您的核准。"
     },
@@ -177,14 +177,15 @@
       "confirm": "立即處理",
       "later": "暫不處理"
     },
-    "reparse": "重新解析郵件（{count}）"
+    "reparse": "重新解析郵件（{count}）",
+    "kindTrade": "證券交易"
   },
   "editor": {
     "createTitle": "新增解析器",
     "editTitle": "編輯解析器",
-    "loading": "正在載入收款人和類別",
+    "loading": "正在載入收款方、類別、帳戶和貨幣",
     "lookupsError": {
-      "title": "無法載入收款人和類別",
+      "title": "無法載入收款方、類別、帳戶或貨幣",
       "body": "選擇器需要它們，因此編輯器暫時無法開啟。請重試。",
       "retry": "重試"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "標籤名稱",
       "aiCategoriesLabel": "讓 AI 為沒有規則相符的商品選擇類別",
       "aiCategoriesHelp": "當商品不符合任何類別規則且沒有預設類別時，會請 AI 從您的類別清單中為其選擇類別。提議中會將該選擇標示為 AI 所選。關閉後，永遠不會詢問 AI。"
+    },
+    "kind": {
+      "label": "設定檔類型",
+      "receipt": "訂單收據",
+      "trade": "證券交易",
+      "receiptHelp": "讀取訂單確認郵件，並找到為其付款的銀行交易。",
+      "tradeHelp": "讀取券商的成交確認郵件，並提議其中報告的投資交易，即一筆買進或賣出。"
+    },
+    "trade": {
+      "guardsHeading": "讀取寄件者的哪些郵件",
+      "guardsHelp": "選填。每個模式與郵件的一整行比對，每行一個模式。",
+      "guards": {
+        "requireLine": "必要的行",
+        "requireLineHint": "僅當郵件包含其中一行時才讀取；否則嘗試該寄件者的下一個設定檔。",
+        "skipIfLine": "使郵件被略過的行",
+        "skipIfLineHint": "包含其中一行的郵件會被擱置，例如已取消的委託。",
+        "waitIfLine": "使郵件暫緩處理的行",
+        "waitIfLineHint": "包含其中一行的郵件會被暫緩，稍後再讀取，例如部分成交。"
+      },
+      "fieldsHeading": "交易",
+      "fieldsHelp": "買進或賣出、代碼和股數為必填，另需合計或價格。每個欄位每行一個模式，依序嘗試。",
+      "fields": {
+        "tradeAction": "買進或賣出模式",
+        "tradeSymbol": "代碼模式",
+        "tradeQuantity": "股數模式",
+        "tradeTotal": "交易合計模式",
+        "tradePrice": "每股價格模式",
+        "tradeCommission": "手續費模式",
+        "tradeDate": "交易日期模式",
+        "tradeAccount": "帳戶模式"
+      },
+      "fieldHint": "必須擷取 {capture}。範例：{example}",
+      "amountsHelp": "合計是成交金額，買進時含手續費。價格用於核對，郵件未寫合計時由價格算出合計。註明貨幣的金額（US$、C$、USD、€）也決定交易的貨幣。",
+      "rulesHeading": "帳戶規則",
+      "rulesHelp": "交易記入哪個帳戶。規則依序與帳戶模式讀取的帳戶文字比對，第一個適用的規則生效；{star} 表示任意文字。帶貨幣的規則只適用於該貨幣的交易，因此券商寫法相同的兩個帳戶，例如都顯示為 RRSP 的 CAD RRSP 和 USD RRSP，就是文字相同、貨幣不同的兩條規則。郵件未寫帳戶文字時，只有文字為 {star} 的規則可以適用。其餘的由預設帳戶處理。",
+      "currencyOrder": "交易的貨幣依下列順序決定：金額本身註明貨幣時取該貨幣（US$、C$、USD、€），其次是下方第一個與郵件某行相符的貨幣標記，再次是您該代碼證券的貨幣。帶貨幣的規則從不猜測：三者都無法說明貨幣時，郵件會等待您處理，而不會記入任何一個帳戶。",
+      "ruleMatchLabel": "規則 {rule} 的帳戶文字",
+      "ruleMatchPlaceholder": "帳戶文字，例如 RRSP",
+      "ruleCurrencyLabel": "規則 {rule} 的貨幣",
+      "ruleAccountLabel": "規則 {rule} 的帳戶",
+      "ruleMoveUp": "上移規則 {rule}",
+      "ruleMoveDown": "下移規則 {rule}",
+      "ruleRemove": "刪除規則 {rule}",
+      "ruleAdd": "新增帳戶規則",
+      "rulesMax": "最多 {max} 條規則。",
+      "rulesWithoutAccountText": "沒有帳戶模式，因此規則與空白文字比對：只有文字為 {star} 的規則可以適用。",
+      "anyCurrency": "任何貨幣",
+      "baseCurrency": "{code}（您的基礎貨幣）",
+      "currencyPlaceholder": "選擇貨幣",
+      "accountPlaceholder": "選擇帳戶",
+      "accountOption": "{name}（{currency}）",
+      "accountNotTradableOption": "{name}（不是開放的證券帳戶）",
+      "accountUnknownOption": "不在您清單中的帳戶",
+      "accountNotTradable": "無法將交易記入此帳戶：它已關閉、是現金帳戶或不是投資帳戶。",
+      "accountUnknown": "此帳戶不在您的清單中：可能已被刪除。請選擇其他帳戶。",
+      "defaultAccountLabel": "預設帳戶",
+      "defaultAccountNone": "無預設帳戶",
+      "defaultAccountHint": "沒有規則適用時使用的帳戶。沒有預設帳戶時，沒有規則適用的郵件會等待您處理。",
+      "markersHeading": "貨幣標記",
+      "markersHelp": "在金額未註明貨幣時說明交易貨幣的文字，例如在單獨的 $ 旁邊寫明金額以美元計的一行。每個標記與郵件的每一行比對（{star} 表示任意文字），依序第一個相符的標記決定貨幣。僅當金額未註明貨幣時才使用標記。",
+      "markerMatchLabel": "標記 {marker} 的文字",
+      "markerMatchPlaceholder": "例如 *U.S. dollars*",
+      "markerCurrencyLabel": "標記 {marker} 的貨幣",
+      "markerMoveUp": "上移標記 {marker}",
+      "markerMoveDown": "下移標記 {marker}",
+      "markerRemove": "刪除標記 {marker}",
+      "markerAdd": "新增貨幣標記",
+      "markersMax": "最多 {max} 個標記。"
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "要略過的行 {line}",
       "recordStep": "記錄步驟 {step}",
       "recordStepPart": "記錄步驟 {step}，{part}",
-      "recordAlternative": "記錄步驟 {step}，替代項 {alternative}"
+      "recordAlternative": "記錄步驟 {step}，替代項 {alternative}",
+      "accountRule": "帳戶規則 {rule}",
+      "accountRulePart": "帳戶規則 {rule}，{part}",
+      "currencyMarker": "貨幣標記 {marker}",
+      "currencyMarkerPart": "貨幣標記 {marker}，{part}"
     },
     "fields": {
       "orderId": "訂單編號模式",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "購買後的天數",
       "matchTolerance": "金額容差",
       "tag": "標籤",
-      "aiCategories": "AI 類別"
+      "aiCategories": "AI 類別",
+      "trade": "交易部分",
+      "tradeAction": "買進或賣出模式",
+      "tradeSymbol": "代碼模式",
+      "tradeQuantity": "股數模式",
+      "tradeTotal": "交易合計模式",
+      "tradePrice": "每股價格模式",
+      "tradeCommission": "手續費模式",
+      "tradeDate": "交易日期模式",
+      "tradeAccount": "帳戶模式",
+      "accountRules": "帳戶規則",
+      "currencyMarkers": "貨幣標記",
+      "defaultAccount": "預設帳戶",
+      "ruleAccount": "帳戶",
+      "ruleCurrency": "貨幣"
     },
     "codes": {
       "not_object": "不是有效的定義",
@@ -376,7 +463,12 @@
       "duplicate_entry": "重複列出了同一項目",
       "reference_field_missing": "需要參考號碼模式（參考號碼策略已開啟）",
       "out_of_range_days": "必須是 0 到 {max} 之間的整數",
-      "out_of_range_tolerance": "必須是 0.00 到 {max} 之間的金額"
+      "out_of_range_tolerance": "必須是 0.00 到 {max} 之間的金額",
+      "trade_conflict": "不能出現在只讀取交易的證券交易設定檔中",
+      "trade_amount_missing": "需要合計或價格模式（至少其一）",
+      "trade_account_missing": "需要預設帳戶或帳戶規則",
+      "invalid_currency": "不是 3 個字母的貨幣代碼，例如 USD",
+      "invalid_uuid_account": "不是有效的帳戶"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "必要的行",
         "skipIfLine": "略過行",
         "waitIfLine": "暫緩行",
-        "reference": "參考號碼"
+        "reference": "參考號碼",
+        "action": "買入或賣出",
+        "symbol": "代碼",
+        "quantity": "股數",
+        "price": "價格",
+        "commission": "佣金",
+        "date": "日期",
+        "account": "帳戶",
+        "currency": "貨幣標記"
       },
       "entryLine": "項目 {entry}（{pattern}），第 {line} 行：{text}",
       "entrySubject": "項目 {entry}（{pattern}），主旨：{text}",
@@ -553,10 +653,12 @@
       "reprocess": "重新處理",
       "link": "選擇交易",
       "recognizeAi": "用 AI 辨識",
+      "recognizeTradeAi": "用 AI 辨識為交易",
       "approve": "核准",
       "draftParser": "使用 AI 準備設定檔",
       "createParser": "建立設定檔",
-      "ignore": "忽略"
+      "ignore": "忽略",
+      "reviewTrade": "在收件匣中審核"
     },
     "toasts": {
       "approved": "提案已核准",
@@ -592,8 +694,11 @@
       "handoffFailed": "請求已排入佇列，但無法在聊天中開啟這些郵件。它會在 AI 審核收件匣中等待代理處理。",
       "inboxLink": "開啟 AI 審核收件匣",
       "opened": "已開啟聊天並附上這些郵件。請閱讀訊息並按下「傳送」。",
-      "chatPrompt": "請為來自 {domain} 的{count, plural, one {這封訂單郵件} other {這 # 封訂單郵件}}建立一個郵件收據解析器。請認領 AI 審核請求 {requestId}，用 email_receipt_parsers 工具在每封所附郵件上測試你的解析器，修改到每封都能完整讀取，然後將其儲存為請求 {requestId} 的草稿。"
-    }
+      "chatPrompt": "請為來自 {domain} 的{count, plural, one {這封訂單郵件} other {這 # 封訂單郵件}}建立一個郵件收據解析器。請認領 AI 審核請求 {requestId}，用 email_receipt_parsers 工具在每封所附郵件上測試你的解析器，修改到每封都能完整讀取，然後將其儲存為請求 {requestId} 的草稿。",
+      "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。",
+      "chatPromptTrade": "請為來自 {domain} 的{count, plural, one {這封交易確認郵件} other {這 # 封交易確認郵件}}建立一個交易設定檔。請認領 AI 審核請求 {requestId}，用 email_receipt_parsers 工具在每封所附郵件上測試你的設定檔，修改到每封都能讀取出完整的交易，然後將其儲存為請求 {requestId} 的草稿。"
+    },
+    "tradeBadge": "交易"
   },
   "detail": {
     "title": "郵件收據",
@@ -644,11 +749,22 @@
       "wait_line": "有一行表示訂單尚未最終確定，因此稍後會再次讀取該郵件。",
       "no_html": "此解析器讀取郵件的 HTML 部分，而這封郵件沒有 HTML。",
       "schema_org": "無需解析器：訂單是從郵件中的結構化資料（schema.org）讀取的。",
-      "item_amount_missing": "某個明細沒有金額，而郵件中也沒有可分配給它的單一合計。"
+      "item_amount_missing": "某個明細沒有金額，而郵件中也沒有可分配給它的單一合計。",
+      "trade_no_action": "解析器在這封郵件中找不到買入或賣出。",
+      "trade_no_symbol": "解析器在這封郵件中找不到股票代號。",
+      "trade_no_quantity": "解析器在這封郵件中找不到份數。",
+      "trade_no_amount": "解析器在這封郵件中找不到合計，也找不到價格。",
+      "trade_no_account": "解析器無法判斷這筆交易屬於哪個帳戶。",
+      "trade_exists": "你的帳戶中已有這筆交易，因此沒有提出任何建議。",
+      "trade_linked": "已連結到它所回報的交易，因此沒有提出任何建議。",
+      "trade_no_currency": "設定檔無法判斷這筆交易的幣別，因此無法選擇其帳戶。"
     },
     "reasonUnknown": "原因：{reason}",
     "requestNote": "審核請求（{state}）：{note}",
     "parsedHeading": "解析器讀取的內容",
+    "tradeHeading": "從郵件中讀取的交易",
+    "tradeCandidatesHeading": "可能是這筆交易的現有交易",
+    "tradeCandidatesHelp": "這些投資交易可能就是這封郵件回報的交易。請連結正確的一筆：不會建立新交易，它所支付的排程帳單或存款會被標記為已付款。",
     "notParsed": "尚未從這封郵件中讀取到任何內容。",
     "candidatesHeading": "相符的交易",
     "candidatesHelp": "有多筆交易與這封郵件同樣相符。請選擇它所支付的那一筆。",
@@ -688,7 +804,15 @@
       "capped": "僅讀取前 {max} 行。",
       "empty": "沒有行。",
       "listLabel": "郵件的編號行"
-    }
+    },
+    "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {買入} other {賣出}} {quantity} 股 {symbol}。",
+    "noTradeTransaction": "尚無：核准提議後會記帳這筆交易，或將其連結到帳本中已有的交易。",
+    "candidateShares": "{quantity} 股",
+    "tradeNoCandidates": "在交易日前後一週內，沒有此帳戶、方向和代碼的可連結投資交易。如果您自己輸入過這筆交易，請檢查其帳戶和日期；否則請在審核收件匣中核准提議。",
+    "aiTradeHeading": "AI 代理提議的交易",
+    "aiTradeReader": "無：AI 代理將其視為交易讀取",
+    "noAiTradeTransaction": "尚無：核准 AI 代理的提議後會記帳這筆交易。",
+    "tradeProposalHeading": "其提議將記入的內容"
   },
   "picker": {
     "heading": "選擇交易",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "用 AI 辨識",
+    "tradeTitle": "用 AI 辨識為交易",
+    "tradeMessage": "AI 會把這封郵件當作券商的交易確認來讀取，並提出它所回報的投資交易（帳戶、買入或賣出、股票代號、份數和合計）。在你核准之前不會儲存任何內容。",
+    "tradeConfirm": "辨識為交易",
     "transactionSummary": "{date}，{amount}，{payee}",
     "noPayee": "無收款人",
     "confirmMessage": "此郵件已連結到交易 {summary}。AI 將讀取郵件，並提議如何依商品拆分這筆交易。要使用這筆交易繼續嗎？",
@@ -765,7 +892,9 @@
     "handoffFailed": "請求已排入佇列，但無法在聊天中開啟該郵件。它會在 AI 審核收件匣中等待代理（例如透過 MCP）處理。",
     "inboxLink": "開啟 AI 審核收件匣",
     "opened": "已開啟聊天並附上該郵件。請閱讀訊息並按下「傳送」。",
-    "chatPrompt": "請辨識所附訂單郵件中的商品、數量和價格，並將我 {date} 的交易（{payee}，{amount}）依商品拆分，並為每項指定類別。請認領 AI 審核請求 {requestId}，並為它提交你的提議。"
+    "chatPrompt": "請辨識所附訂單郵件中的商品、數量和價格，並將我 {date} 的交易（{payee}，{amount}）依商品拆分，並為每項指定類別。請認領 AI 審核請求 {requestId}，並為它提交你的提議。",
+    "tradeChatPrompt": "辨識所附券商確認郵件中的交易：帳戶、是買入還是賣出、股票代號、份數、成交合計和日期。領取 AI 審查請求 {requestId} 並為它提交這筆交易。",
+    "tradeDetachesTransaction": "按交易讀取後，此郵件不再對應 {summary}：該交易會建立自己的投資交易。"
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "沒有任何已儲存的郵件的寄件者位於 {domain}。"
       },
       "help": "點擊郵件進行閱讀，並選擇它所支付的交易。然後勾選最多 {max} 封郵件，用來撰寫設定檔；郵件只有在有了交易之後才能勾選。",
+      "tradeToggle": "這些郵件是券商的交易確認（它們會建立投資交易，因此不配對銀行交易）",
+      "tradeHelp": "點擊郵件閱讀，然後勾選最多 {max} 封交易確認來撰寫解析器。無需選擇交易。",
       "columns": {
         "select": "使用",
         "date": "日期",
@@ -913,6 +1044,7 @@
       "needsTransaction": "請先為這封郵件選擇交易。",
       "limitReached": "最多 {max} 個樣本。取消勾選一個後才能選擇其他的。",
       "noTransaction": "未選擇",
+      "tradeNoTransaction": "交易確認不需要",
       "selectedCount": "已勾選 {count}/{max} 個樣本",
       "continue": "繼續前往助理",
       "emailLoading": "正在載入郵件",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "助理會閱讀這些郵件及其所支付的交易，並為 {domain} 撰寫設定檔草稿。目前尚未核准任何內容。",
       "reviseHelp": "告訴助理需要變更什麼。它會根據這些郵件和交易更新同一份草稿。",
+      "tradeHelp": "助理會讀取這些交易確認，並為 {domain} 撰寫解析器草稿，提出每封郵件所回報的投資交易。目前還沒有核准任何內容。",
+      "tradeSample": "交易確認",
       "feedbackLabel": "需要變更什麼",
       "feedbackPlaceholder": "例如：合計是標有「實付金額」的那一行，而不是小計。",
       "send": "傳送給 AI",
@@ -969,6 +1103,8 @@
       "parsedDate": "日期：{date}",
       "parsedTotal": "合計：{total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
+      "parsedTrade": "{action, select, BUY {買入} other {賣出}} {quantity} 份 {symbol}",
+      "tradeInconsistent": "價格與合計不符，因此不會自動套用",
       "noExpectation": "無",
       "noMatch": "無交易",
       "agreesYes": "是",
@@ -991,8 +1127,37 @@
         "not_applicable": "此設定檔未讀取",
         "skip_line": "已略過（發現略過行）",
         "wait_line": "已擱置（訂單尚未最終確定）",
-        "no_html": "沒有 HTML 部分"
-      }
+        "no_html": "沒有 HTML 部分",
+        "trade": "提出一筆交易",
+        "trade_exists": "已在帳本中"
+      },
+      "parsedTradeAccount": "帳戶：{account}",
+      "accountWithCurrency": "{name}（{currency}）",
+      "accountUnknown": "未知",
+      "parsedTradeNoAccount": "找不到這筆交易的帳戶",
+      "parsedTradeCurrency": "幣別：{currency}"
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {買入} other {賣出}}：{quantity} 份 {symbol}，金額 {total}，日期 {date}。",
+    "account": "郵件中註明的帳戶：{account}",
+    "priceMismatch": "平均價格與份數和合計不符，因此這筆交易不會自動套用。",
+    "incomplete": "解析器無法從這封郵件中讀取完整的交易。",
+    "totalFromPrice": "由價格推算出的合計",
+    "dateUnknown": "郵件送達的當天",
+    "price": "郵件中的平均價格：每股 {price}",
+    "proposalSecurity": "證券：{name}",
+    "proposalAccount": "帳戶：{account}",
+    "proposalPrice": "價格：每股 {price}",
+    "proposalCommission": "手續費：{commission}",
+    "proposalReview": "在你核准之前不會記帳。",
+    "proposalReviewLink": "在收件匣中審閱",
+    "aiWaiting": "AI 代理尚未提議這筆交易。提議會顯示在這裡和審閱收件匣中。",
+    "aiBooked": "已依 AI 代理的提議記帳：請查看上方的交易。",
+    "aiNoProposal": "此郵件沒有等待處理的 AI 代理提議。",
+    "currencyFrom": "貨幣：{currency}，{source, select, amount {由金額註明} marker {來自設定檔的貨幣標記} other {來自您該代碼的證券}}",
+    "bookTo": "記入：{account}",
+    "bookToNotTradable": "記入 {account}，但它不是開放的證券帳戶，因此交易無法記入該帳戶。",
+    "bookToUnknown": "記入不在您清單中的帳戶，因此交易無法記入該帳戶。"
   }
 }

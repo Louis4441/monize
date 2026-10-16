@@ -107,6 +107,7 @@ export class EmailReceiptParserGenerateService {
       domain: dto.domain,
       samples: prepared.samples,
       revision: prepared.revision,
+      kind: dto.kind,
     });
     // The assistant's own door: a user with no tool-capable provider is refused
     // here exactly as in the chat.
@@ -188,6 +189,7 @@ export class EmailReceiptParserGenerateService {
           domain: dto.domain,
           samples: prepared.samples,
           revision: prepared.revision,
+          kind: dto.kind,
         }),
       });
       return { status: "queued" as const, requestId: request.id };
@@ -199,17 +201,36 @@ export class EmailReceiptParserGenerateService {
     userId: string,
     dto: GenerateParserWithAiDto,
   ): Promise<Prepared> {
+    // A trade confirmation pays no bank transaction: its samples are emails only.
+    const isTrade = dto.kind === "trade";
+    const given = isTrade ? dto.tradeReceiptIds : dto.samples;
+    const other = isTrade ? dto.samples : dto.tradeReceiptIds;
+    if (given === undefined || other !== undefined) {
+      throw new BadRequestException(
+        tr(
+          "errors.emailReceipts.generateSamplesForKind",
+          "A receipt profile is generated from samples (each email with the transaction it paid for); a trade profile from tradeReceiptIds. Send the one for the kind, and not the other.",
+        ),
+      );
+    }
+    const pairs: Array<{ receiptId: string; transactionId: string | null }> =
+      isTrade
+        ? (dto.tradeReceiptIds ?? []).map((receiptId) => ({
+            receiptId,
+            transactionId: null,
+          }))
+        : (dto.samples ?? []);
     const receipts = await m.getRepository(EmailReceipt).find({
-      where: { userId, id: In(dto.samples.map((s) => s.receiptId)) },
+      where: { userId, id: In(pairs.map((s) => s.receiptId)) },
     });
     const receiptById = new Map(receipts.map((r) => [r.id, r]));
     const transactions = await loadTransactionSummaries(
       m,
       userId,
-      dto.samples.map((s) => s.transactionId),
+      pairs.flatMap((s) => (s.transactionId ? [s.transactionId] : [])),
     );
     const samples: GenerateSample[] = [];
-    for (const pair of dto.samples) {
+    for (const pair of pairs) {
       const receipt = receiptById.get(pair.receiptId);
       if (!receipt) {
         throw new NotFoundException(
@@ -220,8 +241,10 @@ export class EmailReceiptParserGenerateService {
           ),
         );
       }
-      const transaction = transactions.get(pair.transactionId);
-      if (!transaction) {
+      const transaction = pair.transactionId
+        ? (transactions.get(pair.transactionId) ?? null)
+        : null;
+      if (!isTrade && !transaction) {
         throw new NotFoundException(
           tr(
             "errors.emailReceipts.transactionNotFound",

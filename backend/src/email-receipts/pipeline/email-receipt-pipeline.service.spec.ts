@@ -18,7 +18,11 @@ import type { EmailReceiptCategoryAiService } from "../ai/email-receipt-category
 import { EmailReceiptMailbox } from "../entities/email-receipt-mailbox.entity";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
-import type { ParsedReceipt } from "../parsing/receipt-parser.types";
+import type {
+  ParsedReceipt,
+  ParsedTrade,
+} from "../parsing/receipt-parser.types";
+import type { TradeOutcome } from "./email-receipt-trade.service";
 import {
   autoApplyAllowed,
   describeFailure,
@@ -147,6 +151,39 @@ const submitted = (): AiReviewSubmitResult => ({
 const request = (id = "rq-1"): AiReviewRequest =>
   Object.assign(new AiReviewRequest(), { id });
 
+const TRADE_DEFINITION = {
+  version: 2,
+  trade: {
+    action: ["Type: {action}"],
+    symbol: ["Symbol: {symbol}"],
+    quantity: ["Shares: {quantity}"],
+    total: ["Total cost: {amount}"],
+    defaultAccountId: "33333333-3333-4333-8333-333333333333",
+  },
+};
+
+const TRADE_BODY = [
+  "Type: Fractional Buy",
+  "Symbol: XCNS",
+  "Shares: 75.9878",
+  "Total cost: $2,000.00",
+].join("\n");
+
+const TRADE_READING: ParsedTrade = {
+  action: "BUY",
+  symbol: "XCNS",
+  quantity: 75.9878,
+  total: 20_000_000,
+  price: null,
+  commission: null,
+  date: null,
+  accountText: null,
+  accountId: "33333333-3333-4333-8333-333333333333",
+  complete: true,
+  consistent: null,
+  reason: null,
+};
+
 interface World {
   receipt: EmailReceipt | null;
   mailbox: EmailReceiptMailbox;
@@ -157,6 +194,8 @@ interface World {
   candidates: Array<Record<string, unknown>>;
   linkRow: Record<string, unknown> | null;
   requestStatus: string | null;
+  /** The kind of the request the receipt stands behind; `email_receipt` by default. */
+  requestKind?: string;
 }
 
 function setup(over: Partial<World> = {}) {
@@ -202,10 +241,15 @@ function setup(over: Partial<World> = {}) {
       order.push("close");
       return [[], 0];
     }
-    if (text.includes("SELECT status FROM ai_review_requests")) {
+    if (/SELECT status(, kind)? FROM ai_review_requests/.test(text)) {
       return world.requestStatus === null
         ? []
-        : [{ status: world.requestStatus }];
+        : [
+            {
+              status: world.requestStatus,
+              kind: world.requestKind ?? "email_receipt",
+            },
+          ];
     }
     if (text.includes("JOIN accounts a")) return world.candidates;
     if (text.includes("WHERE t.id = $1")) {
@@ -243,6 +287,16 @@ function setup(over: Partial<World> = {}) {
     ),
   } as unknown as jest.Mocked<EmailReceiptCategoryAiService>;
 
+  const trades = {
+    process: jest.fn(async (): Promise<TradeOutcome> => ({
+      status: "review",
+      reason: null,
+      requestId: "rq-trade",
+      trade: TRADE_READING,
+      investmentTransactionId: null,
+      autoApply: null,
+    })),
+  };
   const service = new EmailReceiptPipelineService(
     dataSource as never,
     requests,
@@ -250,9 +304,11 @@ function setup(over: Partial<World> = {}) {
     actions,
     payees,
     categoryAi,
+    trades as never,
   );
   return {
     service,
+    trades,
     world,
     payees,
     categoryAi,
@@ -348,6 +404,8 @@ describe("EmailReceiptPipelineService.process", () => {
           statusReason: null,
           parserId: null,
           parsed: null,
+          trade: null,
+          investmentTransactionId: null,
           transactionId: null,
           candidateTransactionIds: [],
           matchKind: null,
@@ -1944,6 +2002,182 @@ describe("EmailReceiptPipelineService.process: the email's own schema.org order"
     expect(storedParsed(h)).toMatchObject({
       source: "schema_org",
       items: [{ name: "Bundle", amount: 150000 }],
+    });
+  });
+
+  describe("a trade profile", () => {
+    const tradeWorld = () =>
+      setup({
+        receipt: receiptRow({ bodyText: TRADE_BODY }),
+        parsers: [parserRow({ definition: TRADE_DEFINITION })],
+      });
+
+    it("hands the lines to the trade reader and stores its reading, matching no bank transaction", async () => {
+      const h = tradeWorld();
+      const result = await run(h);
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
+      expect(h.trades.process).toHaveBeenCalledWith(
+        h.manager,
+        USER,
+        expect.objectContaining({ id: RECEIPT }),
+        expect.objectContaining({
+          lines: TRADE_BODY.split("\n"),
+          mailboxAutoApply: false,
+        }),
+      );
+      expect(result).toMatchObject({
+        status: "review",
+        requestId: "rq-trade",
+        transactionId: null,
+        matchKind: null,
+        autoApplied: false,
+      });
+      expect(h.lastUpdate()[1]).toMatchObject({
+        status: "review",
+        parserId: "parser-1",
+        parsed: null,
+        trade: TRADE_READING,
+        aiReviewRequestId: "rq-trade",
+      });
+      expect(h.work.submit).not.toHaveBeenCalled();
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+    });
+
+    it("does not close the request the trade service just queued", async () => {
+      const h = tradeWorld();
+      await run(h);
+      expect(h.order).not.toContain("close");
+    });
+
+    it("closes the requests of an email whose trade holds none", async () => {
+      const h = tradeWorld();
+      h.trades.process.mockResolvedValueOnce({
+        status: "ignored",
+        reason: "trade_exists",
+        requestId: null,
+        trade: TRADE_READING,
+        investmentTransactionId: "it-1",
+        autoApply: null,
+      });
+      const result = await run(h);
+      expect(result).toMatchObject({ status: "ignored", requestId: null });
+      expect(h.order).toContain("close");
+      // The email accounts for the row the ledger already held.
+      expect(h.lastUpdate()[1]).toMatchObject({
+        investmentTransactionId: "it-1",
+      });
+    });
+
+    it.each(["pending", "claimed", "proposed", "rejected"])(
+      "an automatic pass leaves an email whose trade request is %s as it is",
+      async (status) => {
+        const h = tradeWorld();
+        h.world.receipt = receiptRow({
+          bodyText: TRADE_BODY,
+          status: "review",
+          aiReviewRequestId: "rq-trade",
+        });
+        h.world.requestStatus = status;
+        h.world.requestKind = "email_trade";
+        const result = await run(h, { onlyWhenStatusIn: ["review"] });
+        expect(result.unchanged).toBe(true);
+        expect(h.trades.process).not.toHaveBeenCalled();
+        expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it("an automatic pass reads again an email whose trade request expired, and a person's reprocess always does", async () => {
+      let h = tradeWorld();
+      h.world.receipt = receiptRow({
+        bodyText: TRADE_BODY,
+        status: "review",
+        aiReviewRequestId: "rq-trade",
+      });
+      h.world.requestStatus = "expired";
+      h.world.requestKind = "email_trade";
+      await run(h, { onlyWhenStatusIn: ["review"] });
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
+
+      h = tradeWorld();
+      h.world.requestStatus = "proposed";
+      h.world.requestKind = "email_trade";
+      await run(h);
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses a bank-transaction link on an email a trade profile now reads, writing nothing", async () => {
+      const h = tradeWorld();
+      h.world.linkRow = {
+        id: "tx-9",
+        amount: "-15.0000",
+        description: "CARD",
+        payee_id: null,
+        is_transfer: false,
+        status: "UNRECONCILED",
+        plain: true,
+      };
+      await expect(
+        run(h, { link: { transactionId: "tx-9" } }),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(h.trades.process).not.toHaveBeenCalled();
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses to read again an email that accounts for a row, unless that row was only already there", async () => {
+      let h = tradeWorld();
+      h.world.receipt = receiptRow({
+        bodyText: TRADE_BODY,
+        investmentTransactionId: "it-1",
+        status: "ignored",
+        statusReason: "trade_linked",
+      });
+      await expect(run(h)).rejects.toBeInstanceOf(ConflictException);
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+
+      h = tradeWorld();
+      h.world.receipt = receiptRow({
+        bodyText: TRADE_BODY,
+        investmentTransactionId: "it-1",
+        status: "ignored",
+        statusReason: "trade_exists",
+      });
+      await run(h);
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
+    });
+
+    it("confirms the card the trade service passed the gate with, as an approval does", async () => {
+      const h = tradeWorld();
+      h.world.mailbox = mailboxRow({ autoApply: true });
+      h.trades.process.mockResolvedValueOnce({
+        status: "review",
+        reason: null,
+        requestId: "rq-trade",
+        trade: { ...TRADE_READING, consistent: true },
+        investmentTransactionId: null,
+        autoApply: action,
+      });
+      const result = await run(h);
+      expect(h.trades.process).toHaveBeenCalledWith(
+        h.manager,
+        USER,
+        expect.anything(),
+        expect.objectContaining({ mailboxAutoApply: true }),
+      );
+      expect(h.actions.confirm).toHaveBeenCalledWith(USER, {
+        actionId: action.actionId,
+        signature: action.signature,
+        descriptor: action.descriptor,
+      });
+      expect(result.autoApplied).toBe(true);
+    });
+
+    it("never reads a trade profile's email as a receipt", async () => {
+      const h = tradeWorld();
+      await run(h);
+      expect(h.manager.query).not.toHaveBeenCalledWith(
+        expect.stringContaining("JOIN accounts a"),
+        expect.anything(),
+      );
     });
   });
 });

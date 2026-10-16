@@ -200,4 +200,29 @@ describe('ProfileWizard', () => {
     await click(screen.getByRole('button', { name: 'Cancel' }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe('trade confirmations', () => {
+    it('writes a trade profile from emails alone: no transaction is chosen, and the request is a trade one', async () => {
+      api.generateWithAi.mockResolvedValue({ status: 'saved', parserId: 'p-1', revision: 1, answer: 'Done' });
+      await renderWizard();
+      await click(screen.getByRole('checkbox', { name: /brokerage trade confirmations/ }));
+      await click(screen.getByRole('checkbox', { name: 'Use the email Order 1 as a sample' }));
+      await click(screen.getByRole('button', { name: 'Continue to the assistant' }));
+      expect(screen.getByText('Order 1')).toBeInTheDocument();
+      expect(screen.getByText('Trade confirmation')).toBeInTheDocument();
+      await click(screen.getByRole('button', { name: 'Send to AI' }));
+      expect(api.generateWithAi).toHaveBeenCalledWith({ domain: 'allegro.pl', kind: 'trade', tradeReceiptIds: ['r-1'] });
+      // The preview then names the ticked emails, though none has a transaction to pair.
+      expect(api.preview).toHaveBeenCalledWith('p-1', { selectedReceiptIds: ['r-1'] });
+    });
+
+    it('forgets the ticked emails when the kind changes, so a receipt sample is never sent as a trade', async () => {
+      await renderWizard();
+      await click(screen.getByRole('checkbox', { name: /brokerage trade confirmations/ }));
+      await click(screen.getByRole('checkbox', { name: 'Use the email Order 1 as a sample' }));
+      expect(screen.getByText('1 of 5 samples ticked')).toBeInTheDocument();
+      await click(screen.getByRole('checkbox', { name: /brokerage trade confirmations/ }));
+      expect(screen.getByText('0 of 5 samples ticked')).toBeInTheDocument();
+    });
+  });
 });

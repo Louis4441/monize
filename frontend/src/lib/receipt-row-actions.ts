@@ -8,6 +8,7 @@ export type ReceiptActionKey =
   | 'createParser'
   | 'link'
   | 'recognizeAi'
+  | 'recognizeTradeAi'
   | 'reprocess'
   | 'ignore'
   | 'delete';

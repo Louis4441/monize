@@ -93,7 +93,7 @@
         "automatic": "Podczas sprawdzania skrzynki AI jest pytane o dopasowany paragon, którego żaden zatwierdzony parser nie odczytał w całości, i przygotowuje parser dla nadawcy, który go nie ma."
       },
       "autoApplyLabel": "Stosuj propozycje automatycznie",
-      "autoApplyHelp": "Domyślnie wyłączone. Propozycja jest stosowana bez pytania tylko wtedy, gdy spełnione jest wszystko naraz: zatwierdzony profil odczytał całą wiadomość, transakcję znaleziono po numerze zamówienia, po referencji albo po dokładnej kwocie i odbiorcy przy jednym kandydacie, a propozycja zgadza się co do grosza. Wszystko inne czeka na Twoją akceptację.",
+      "autoApplyHelp": "Domyślnie wyłączone. Propozycja jest stosowana bez pytania tylko wtedy, gdy spełnione jest wszystko naraz: zatwierdzony profil odczytał całą wiadomość, transakcję znaleziono po numerze zamówienia, po referencji albo po dokładnej kwocie i odbiorcy przy jednym kandydacie, a propozycja zgadza się co do grosza. Potwierdzenie transakcji jest księgowane bez pytania tylko wtedy, gdy jego profil transakcji jest zatwierdzony, odczytał całą transakcję, cena zgadza się z liczbą jednostek i sumą, a Twoje konta nie zawierają jeszcze takiej samej transakcji. Wszystko inne czeka na Twoją akceptację.",
       "profileLimitLabel": "Wliczaj propozycje profili do dziennego limitu AI",
       "profileLimitHelp": "Domyślnie włączone: zmiana, którą profil proponuje na podstawie wiadomości, jest wliczana do dziennego limitu zmian proponowanych przez AI, jak każda inna propozycja AI. Wyłącz tę opcję, gdy duża partia zapisanych wiadomości w innym razie wyczerpałaby limit. Zwolnione są tylko propozycje z profili; każda propozycja nadal czeka na Twoją akceptację."
     },
@@ -177,14 +177,15 @@
       "confirm": "Przetwórz teraz",
       "later": "Nie teraz"
     },
-    "reparse": "Przeanalizuj ponownie wiadomości ({count})"
+    "reparse": "Przeanalizuj ponownie wiadomości ({count})",
+    "kindTrade": "Transakcje maklerskie"
   },
   "editor": {
     "createTitle": "Nowy parser",
     "editTitle": "Edytuj parser",
-    "loading": "Wczytywanie odbiorców i kategorii",
+    "loading": "Wczytywanie odbiorców, kategorii, kont i walut",
     "lookupsError": {
-      "title": "Nie udało się wczytać odbiorców i kategorii",
+      "title": "Nie udało się wczytać odbiorców, kategorii, kont lub walut",
       "body": "Listy wyboru ich potrzebują, więc edytor nie może jeszcze się otworzyć. Spróbuj ponownie.",
       "retry": "Spróbuj ponownie"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "Nazwa tagu",
       "aiCategoriesLabel": "Pozwól AI wybrać kategorię pozycji, do których nie pasuje żadna reguła",
       "aiCategoriesHelp": "Gdy pozycja nie pasuje do żadnej reguły kategorii i nie ma kategorii domyślnej, AI jest pytane o jej kategorię z Twojej listy kategorii. Wybór jest oznaczony w propozycji jako wybór AI. Przy wyłączonej opcji AI nigdy nie jest pytane."
+    },
+    "kind": {
+      "label": "Rodzaj profilu",
+      "receipt": "Paragon zamówienia",
+      "trade": "Transakcja maklerska",
+      "receiptHelp": "Odczytuje potwierdzenie zamówienia i znajduje transakcję bankową, którą je opłacono.",
+      "tradeHelp": "Odczytuje potwierdzenie transakcji od maklera i proponuje transakcję inwestycyjną, którą zgłasza, kupno lub sprzedaż."
+    },
+    "trade": {
+      "guardsHeading": "Które wiadomości nadawcy odczytuje",
+      "guardsHelp": "Opcjonalne. Każdy wzorzec jest porównywany z całym wierszem wiadomości, jeden wzorzec w wierszu.",
+      "guards": {
+        "requireLine": "Wymagane wiersze",
+        "requireLineHint": "Profil odczytuje wiadomość tylko wtedy, gdy zawiera jeden z tych wierszy; w przeciwnym razie próbowany jest następny profil nadawcy.",
+        "skipIfLine": "Wiersze pomijające wiadomość",
+        "skipIfLineHint": "Wiadomość z jednym z tych wierszy jest odkładana, na przykład anulowane zlecenie.",
+        "waitIfLine": "Wiersze wstrzymujące wiadomość",
+        "waitIfLineHint": "Wiadomość z jednym z tych wierszy jest wstrzymywana i odczytywana ponownie później, na przykład częściowa realizacja."
+      },
+      "fieldsHeading": "Transakcja",
+      "fieldsHelp": "Kupno lub sprzedaż, symbol i liczba akcji są wymagane, a także suma lub cena. Każde pole przyjmuje wzorce, po jednym w wierszu, próbowane po kolei.",
+      "fields": {
+        "tradeAction": "Wzorce kupna lub sprzedaży",
+        "tradeSymbol": "Wzorce symbolu",
+        "tradeQuantity": "Wzorce liczby akcji",
+        "tradeTotal": "Wzorce sumy transakcji",
+        "tradePrice": "Wzorce ceny za akcję",
+        "tradeCommission": "Wzorce prowizji",
+        "tradeDate": "Wzorce daty transakcji",
+        "tradeAccount": "Wzorce konta"
+      },
+      "fieldHint": "Musi przechwytywać {capture}. Przykład: {example}",
+      "amountsHelp": "Suma to wykonana kwota, przy kupnie z prowizją. Cena służy do kontroli i daje sumę, gdy wiadomość jej nie podaje. Kwota, która podaje swoją walutę (US$, C$, USD, €), ustala też walutę transakcji.",
+      "rulesHeading": "Reguły konta",
+      "rulesHelp": "Na które konto księgowana jest transakcja. Reguły są próbowane po kolei na tekście konta odczytanym przez wzorce konta, a wygrywa pierwsza pasująca; {star} oznacza dowolny tekst. Reguła z walutą dotyczy tylko transakcji w tej walucie, więc dwa konta zapisywane przez maklera tak samo, na przykład RRSP w CAD i RRSP w USD, oba pokazywane jako RRSP, to dwie reguły z tym samym tekstem i różnymi walutami. Gdy wiadomość nie podaje tekstu konta, może zadziałać tylko reguła z tekstem {star}. Resztę przejmuje konto domyślne.",
+      "currencyOrder": "Waluta transakcji jest brana po kolei: z samej kwoty, gdy ją podaje (US$, C$, USD, €), potem z pierwszego znacznika waluty poniżej, który pasuje do wiersza wiadomości, potem z waluty Twojego papieru wartościowego dla tego symbolu. Reguła z walutą nigdy nie zgaduje: gdy żadne z trzech nie wskazuje waluty, wiadomość czeka na Ciebie, zamiast trafić na któreś z kont.",
+      "ruleMatchLabel": "Tekst konta reguły {rule}",
+      "ruleMatchPlaceholder": "Tekst konta, na przykład RRSP",
+      "ruleCurrencyLabel": "Waluta reguły {rule}",
+      "ruleAccountLabel": "Konto reguły {rule}",
+      "ruleMoveUp": "Przesuń regułę {rule} w górę",
+      "ruleMoveDown": "Przesuń regułę {rule} w dół",
+      "ruleRemove": "Usuń regułę {rule}",
+      "ruleAdd": "Dodaj regułę konta",
+      "rulesMax": "Najwyżej {max} reguł.",
+      "rulesWithoutAccountText": "Nie ma wzorców konta, więc reguły są próbowane na pustym tekście: zadziałać może tylko reguła z tekstem {star}.",
+      "anyCurrency": "Dowolna waluta",
+      "baseCurrency": "{code} (Twoja waluta bazowa)",
+      "currencyPlaceholder": "Wybierz walutę",
+      "accountPlaceholder": "Wybierz konto",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (nie jest otwartym kontem maklerskim)",
+      "accountUnknownOption": "Konto spoza Twojej listy",
+      "accountNotTradable": "Na tym koncie nie można zaksięgować transakcji: jest zamknięte, jest kontem gotówkowym albo nie jest kontem inwestycyjnym.",
+      "accountUnknown": "Tego konta nie ma na Twojej liście: mogło zostać usunięte. Wybierz inne.",
+      "defaultAccountLabel": "Konto domyślne",
+      "defaultAccountNone": "Bez konta domyślnego",
+      "defaultAccountHint": "Konto, gdy żadna reguła nie pasuje. Bez niego wiadomość, do której nie pasuje żadna reguła, czeka na Ciebie.",
+      "markersHeading": "Znaczniki waluty",
+      "markersHelp": "Tekst, który podaje walutę transakcji, gdy kwoty jej nie podają, na przykład wiersz mówiący, że kwoty są w dolarach amerykańskich, obok samego $. Każdy znacznik jest porównywany z każdym wierszem wiadomości ({star} oznacza dowolny tekst), a pierwszy pasujący znacznik, w kolejności, wskazuje walutę. Znaczniki są używane tylko wtedy, gdy kwota nie podaje waluty.",
+      "markerMatchLabel": "Tekst znacznika {marker}",
+      "markerMatchPlaceholder": "Na przykład *U.S. dollars*",
+      "markerCurrencyLabel": "Waluta znacznika {marker}",
+      "markerMoveUp": "Przesuń znacznik {marker} w górę",
+      "markerMoveDown": "Przesuń znacznik {marker} w dół",
+      "markerRemove": "Usuń znacznik {marker}",
+      "markerAdd": "Dodaj znacznik waluty",
+      "markersMax": "Najwyżej {max} znaczników."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "Wiersz do pominięcia {line}",
       "recordStep": "Krok rekordu {step}",
       "recordStepPart": "Krok rekordu {step}, {part}",
-      "recordAlternative": "Krok rekordu {step}, wariant {alternative}"
+      "recordAlternative": "Krok rekordu {step}, wariant {alternative}",
+      "accountRule": "Reguła konta {rule}",
+      "accountRulePart": "Reguła konta {rule}, {part}",
+      "currencyMarker": "Znacznik waluty {marker}",
+      "currencyMarkerPart": "Znacznik waluty {marker}, {part}"
     },
     "fields": {
       "orderId": "Wzorce numeru zamówienia",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "Dni po zakupie",
       "matchTolerance": "Tolerancja kwoty",
       "tag": "Tag",
-      "aiCategories": "Kategorie AI"
+      "aiCategories": "Kategorie AI",
+      "trade": "Sekcja transakcji",
+      "tradeAction": "Wzorce kupna lub sprzedaży",
+      "tradeSymbol": "Wzorce symbolu",
+      "tradeQuantity": "Wzorce liczby akcji",
+      "tradeTotal": "Wzorce sumy transakcji",
+      "tradePrice": "Wzorce ceny za akcję",
+      "tradeCommission": "Wzorce prowizji",
+      "tradeDate": "Wzorce daty transakcji",
+      "tradeAccount": "Wzorce konta",
+      "accountRules": "Reguły konta",
+      "currencyMarkers": "Znaczniki waluty",
+      "defaultAccount": "Konto domyślne",
+      "ruleAccount": "konto",
+      "ruleCurrency": "waluta"
     },
     "codes": {
       "not_object": "nie jest prawidłową definicją",
@@ -376,7 +463,12 @@
       "duplicate_entry": "wymienia ten sam wpis dwa razy",
       "reference_field_missing": "wymaga wzorców referencji (strategia referencji jest włączona)",
       "out_of_range_days": "musi być liczbą całkowitą od 0 do {max}",
-      "out_of_range_tolerance": "musi być kwotą od 0,00 do {max}"
+      "out_of_range_tolerance": "musi być kwotą od 0,00 do {max}",
+      "trade_conflict": "nie może być w profilu transakcji maklerskich, który odczytuje tylko transakcję",
+      "trade_amount_missing": "wymaga wzorców sumy lub ceny (co najmniej jednego z nich)",
+      "trade_account_missing": "wymaga konta domyślnego lub reguł konta",
+      "invalid_currency": "nie jest 3-literowym kodem waluty, takim jak USD",
+      "invalid_uuid_account": "nie jest prawidłowym kontem"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "Wymagany wiersz",
         "skipIfLine": "Wiersz pomijający",
         "waitIfLine": "Wiersz wstrzymujący",
-        "reference": "Referencja"
+        "reference": "Referencja",
+        "action": "Kupno lub sprzedaż",
+        "symbol": "Symbol",
+        "quantity": "Akcje",
+        "price": "Cena",
+        "commission": "Prowizja",
+        "date": "Data",
+        "account": "Konto",
+        "currency": "Znacznik waluty"
       },
       "entryLine": "wpis {entry} ({pattern}), wiersz {line}: {text}",
       "entrySubject": "wpis {entry} ({pattern}), temat: {text}",
@@ -553,10 +653,12 @@
       "reprocess": "Przetwórz ponownie",
       "link": "Wybierz transakcję",
       "recognizeAi": "Rozpoznaj z AI",
+      "recognizeTradeAi": "Rozpoznaj jako transakcję z AI",
       "approve": "Zatwierdź",
       "draftParser": "Przygotuj profil za pomocą AI",
       "createParser": "Utwórz profil",
-      "ignore": "Zignoruj"
+      "ignore": "Zignoruj",
+      "reviewTrade": "Przejrzyj w skrzynce"
     },
     "toasts": {
       "approved": "Propozycja zatwierdzona",
@@ -592,8 +694,11 @@
       "handoffFailed": "Prośba jest w kolejce, ale nie udało się otworzyć wiadomości w czacie. Czeka na agenta w skrzynce przeglądów AI.",
       "inboxLink": "Otwórz skrzynkę przeglądów AI",
       "opened": "Otwarto czat z dołączonymi wiadomościami. Przeczytaj treść i naciśnij Wyślij.",
-      "chatPrompt": "Zbuduj parser paragonów z e-maili dla {count, plural, one {tej wiadomości z zamówieniem} few {tych # wiadomości z zamówieniami} many {tych # wiadomości z zamówieniami} other {tych # wiadomości z zamówieniami}} od {domain}. Przejmij prośbę o przegląd AI {requestId}, przetestuj parser na każdej dołączonej wiadomości za pomocą narzędzia email_receipt_parsers, poprawiaj go, aż każda wiadomość zostanie odczytana w całości, a następnie zapisz go jako szkic dla prośby {requestId}."
-    }
+      "chatPrompt": "Zbuduj parser paragonów z e-maili dla {count, plural, one {tej wiadomości z zamówieniem} few {tych # wiadomości z zamówieniami} many {tych # wiadomości z zamówieniami} other {tych # wiadomości z zamówieniami}} od {domain}. Przejmij prośbę o przegląd AI {requestId}, przetestuj parser na każdej dołączonej wiadomości za pomocą narzędzia email_receipt_parsers, poprawiaj go, aż każda wiadomość zostanie odczytana w całości, a następnie zapisz go jako szkic dla prośby {requestId}.",
+      "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami.",
+      "chatPromptTrade": "Zbuduj profil transakcji dla {count, plural, one {tego potwierdzenia transakcji} few {tych # potwierdzeń transakcji} many {tych # potwierdzeń transakcji} other {tych # potwierdzeń transakcji}} od {domain}. Przejmij prośbę o przegląd AI {requestId}, przetestuj profil na każdej dołączonej wiadomości za pomocą narzędzia email_receipt_parsers, poprawiaj go, aż z każdej wiadomości zostanie odczytana pełna transakcja, a następnie zapisz go jako szkic dla prośby {requestId}."
+    },
+    "tradeBadge": "Transakcja"
   },
   "detail": {
     "title": "Paragon z e-maila",
@@ -644,11 +749,22 @@
       "wait_line": "Jeden z wierszy mówi, że zamówienie nie jest jeszcze ostateczne, więc wiadomość zostanie odczytana ponownie później.",
       "no_html": "Ten parser odczytuje część HTML wiadomości, a ta wiadomość jej nie ma.",
       "schema_org": "Parser nie był potrzebny: zamówienie odczytano z danych ustrukturyzowanych (schema.org) zawartych w wiadomości.",
-      "item_amount_missing": "Pozycja nie ma kwoty, a wiadomość nie podaje jednej sumy, którą można by jej przypisać."
+      "item_amount_missing": "Pozycja nie ma kwoty, a wiadomość nie podaje jednej sumy, którą można by jej przypisać.",
+      "trade_no_action": "Parser nie znalazł w tej wiadomości ani zakupu, ani sprzedaży.",
+      "trade_no_symbol": "Parser nie znalazł w tej wiadomości symbolu giełdowego.",
+      "trade_no_quantity": "Parser nie znalazł w tej wiadomości liczby jednostek.",
+      "trade_no_amount": "Parser nie znalazł w tej wiadomości ani sumy, ani ceny.",
+      "trade_no_account": "Parser nie ustalił, którego konta dotyczy ta transakcja.",
+      "trade_exists": "Twoje konta zawierają już tę transakcję, więc nic nie zaproponowano.",
+      "trade_linked": "Powiązano z transakcją, którą zgłasza, więc nic nie zaproponowano.",
+      "trade_no_currency": "Profil nie rozpoznał waluty tej transakcji, więc nie mógł wybrać jej konta."
     },
     "reasonUnknown": "Powód: {reason}",
     "requestNote": "Prośba o przegląd ({state}): {note}",
     "parsedHeading": "Co odczytał parser",
+    "tradeHeading": "Transakcja odczytana z wiadomości",
+    "tradeCandidatesHeading": "Istniejące transakcje, które mogą być tą transakcją",
+    "tradeCandidatesHelp": "Te transakcje inwestycyjne mogą być transakcją zgłaszaną w tej wiadomości. Powiąż właściwą: nie powstaje nowa transakcja, a zaplanowany rachunek lub wpłata, które ona reguluje, zostaje oznaczona jako zapłacona.",
     "notParsed": "Z tej wiadomości nic jeszcze nie odczytano.",
     "candidatesHeading": "Pasujące transakcje",
     "candidatesHelp": "Kilka transakcji pasuje do tej wiadomości jednakowo dobrze. Wybierz tę, którą opłacono.",
@@ -688,7 +804,15 @@
       "capped": "Odczytywane jest tylko pierwszych {max} wierszy.",
       "empty": "Brak wierszy.",
       "listLabel": "Ponumerowane wiersze wiadomości"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Kupiono} other {Sprzedano}} {quantity} {symbol} za {total} dnia {date}.",
+    "noTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji albo połączona z już istniejącą w księdze.",
+    "candidateShares": "{quantity} akcji",
+    "tradeNoCandidates": "Żadna transakcja inwestycyjna z tego konta, w tym kierunku i z tym symbolem, w ciągu tygodnia od dnia transakcji, nie jest wolna do połączenia. Jeśli wprowadziłeś ją sam, sprawdź konto i datę; w przeciwnym razie zatwierdź propozycję w skrzynce przeglądu.",
+    "aiTradeHeading": "Transakcja proponowana przez agenta AI",
+    "aiTradeReader": "Brak: agent AI odczytuje ją jako transakcję",
+    "noAiTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji agenta AI.",
+    "tradeProposalHeading": "Co zaksięgowałaby jego propozycja"
   },
   "picker": {
     "heading": "Wybierz transakcję",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "Rozpoznaj z AI",
+    "tradeTitle": "Rozpoznaj jako transakcję z AI",
+    "tradeMessage": "AI przeczyta tę wiadomość jako potwierdzenie transakcji z domu maklerskiego i zaproponuje zgłaszaną w niej transakcję inwestycyjną (konto, kupno lub sprzedaż, symbol, jednostki i suma). Nic nie jest zapisywane, dopóki jej nie zatwierdzisz.",
+    "tradeConfirm": "Rozpoznaj jako transakcję",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "brak odbiorcy",
     "confirmMessage": "Ta wiadomość jest powiązana z transakcją {summary}. AI odczyta wiadomość i zaproponuje podział tej transakcji według produktów. Kontynuować z tą transakcją?",
@@ -765,7 +892,9 @@
     "handoffFailed": "Prośba jest w kolejce, ale nie udało się otworzyć wiadomości w czacie. Czeka w skrzynce przeglądów AI na agenta (na przykład przez MCP).",
     "inboxLink": "Otwórz skrzynkę przeglądów AI",
     "opened": "Otwarto czat z dołączoną wiadomością. Przeczytaj treść i naciśnij Wyślij.",
-    "chatPrompt": "Rozpoznaj produkty, ilości i ceny w załączonej wiadomości z zamówieniem i podziel moją transakcję z {date} ({payee}, {amount}) według produktów, przypisując każdemu kategorię. Przejmij prośbę o przegląd AI {requestId} i prześlij do niej swoją propozycję."
+    "chatPrompt": "Rozpoznaj produkty, ilości i ceny w załączonej wiadomości z zamówieniem i podziel moją transakcję z {date} ({payee}, {amount}) według produktów, przypisując każdemu kategorię. Przejmij prośbę o przegląd AI {requestId} i prześlij do niej swoją propozycję.",
+    "tradeChatPrompt": "Rozpoznaj transakcję w załączonej wiadomości z potwierdzeniem od brokera: konto, czy to kupno, czy sprzedaż, symbol, jednostki, wykonaną sumę i datę. Przejmij żądanie przeglądu AI {requestId} i złóż dla niego transakcję.",
+    "tradeDetachesTransaction": "Odczytany jako transakcja, ten e-mail przestaje odpowiadać {summary}: transakcja tworzy własną transakcję inwestycyjną."
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "Żadna zapisana wiadomość nie ma nadawcy w domenie {domain}."
       },
       "help": "Kliknij wiadomość, aby ją przeczytać, i wybierz transakcję, którą opłacono. Następnie zaznacz do {max} wiadomości, z których powstanie profil; wiadomość można zaznaczyć dopiero, gdy ma transakcję.",
+      "tradeToggle": "Te wiadomości to potwierdzenia transakcji z domu maklerskiego (tworzą transakcję inwestycyjną, więc nie łączy się ich z transakcją bankową)",
+      "tradeHelp": "Kliknij wiadomość, aby ją przeczytać, a następnie zaznacz do {max} potwierdzeń, z których powstanie parser. Nie trzeba wybierać transakcji.",
       "columns": {
         "select": "Użyj",
         "date": "Data",
@@ -913,6 +1044,7 @@
       "needsTransaction": "Najpierw wybierz transakcję dla tej wiadomości.",
       "limitReached": "Najwyżej {max} próbek. Odznacz jedną, aby wybrać inną.",
       "noTransaction": "Nie wybrano",
+      "tradeNoTransaction": "Niepotrzebne przy potwierdzeniu transakcji",
       "selectedCount": "Zaznaczono {count} z {max} próbek",
       "continue": "Przejdź do asystenta",
       "emailLoading": "Wczytywanie wiadomości",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "Asystent czyta te wiadomości oraz transakcje, którymi je opłacono, i pisze szkic profilu dla {domain}. Nic nie jest jeszcze zatwierdzone.",
       "reviseHelp": "Powiedz asystentowi, co zmienić. Zaktualizuje ten sam szkic na podstawie tych wiadomości i transakcji.",
+      "tradeHelp": "Asystent czyta te potwierdzenia i pisze wersję roboczą parsera dla {domain}, który proponuje transakcję inwestycyjną zgłaszaną w każdym z nich. Nic jeszcze nie jest zatwierdzone.",
+      "tradeSample": "Potwierdzenie transakcji",
       "feedbackLabel": "Co należy zmienić",
       "feedbackPlaceholder": "Na przykład: suma to wiersz z napisem Kwota zapłacona, a nie suma częściowa.",
       "send": "Wyślij do AI",
@@ -969,6 +1103,8 @@
       "parsedDate": "Data: {date}",
       "parsedTotal": "Suma: {total}",
       "parsedLines": "{count, plural, one {# wiersz} few {# wiersze} many {# wierszy} other {# wierszy}}",
+      "parsedTrade": "{action, select, BUY {Kupuje} other {Sprzedaje}} {quantity} jedn. {symbol}",
+      "tradeInconsistent": "Cena nie zgadza się z sumą, więc nie zostanie zastosowana automatycznie",
       "noExpectation": "Brak",
       "noMatch": "Brak transakcji",
       "agreesYes": "Tak",
@@ -991,8 +1127,37 @@
         "not_applicable": "Nie odczytane przez ten profil",
         "skip_line": "Pominięto (znaleziono wiersz do pominięcia)",
         "wait_line": "Wstrzymano (zamówienie niefinalne)",
-        "no_html": "Brak części HTML"
-      }
+        "no_html": "Brak części HTML",
+        "trade": "Proponuje transakcję",
+        "trade_exists": "Już jest w księdze"
+      },
+      "parsedTradeAccount": "Konto: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "nieznane",
+      "parsedTradeNoAccount": "Nie znaleziono konta dla tej transakcji",
+      "parsedTradeCurrency": "Waluta: {currency}"
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Zakup} other {Sprzedaż}}: {quantity} jedn. {symbol} za {total}, z datą {date}.",
+    "account": "Konto podane w wiadomości: {account}",
+    "priceMismatch": "Średnia cena nie zgadza się z liczbą jednostek i sumą, więc ta transakcja nie zostanie zastosowana automatycznie.",
+    "incomplete": "Parser nie odczytał z tej wiadomości kompletnej transakcji.",
+    "totalFromPrice": "suma wynikająca z ceny",
+    "dateUnknown": "dzień otrzymania wiadomości",
+    "price": "Średnia cena w e-mailu: {price} za akcję",
+    "proposalSecurity": "Papier wartościowy: {name}",
+    "proposalAccount": "Konto: {account}",
+    "proposalPrice": "Cena: {price} za akcję",
+    "proposalCommission": "Prowizja: {commission}",
+    "proposalReview": "Nic nie zostanie zaksięgowane, dopóki tego nie zatwierdzisz.",
+    "proposalReviewLink": "Sprawdź w skrzynce",
+    "aiWaiting": "Agent AI nie zaproponował jeszcze transakcji. Propozycja pojawi się tutaj i w skrzynce do przeglądu.",
+    "aiBooked": "Zaksięgowano na podstawie propozycji agenta AI: zobacz transakcję powyżej.",
+    "aiNoProposal": "Dla tej wiadomości nie czeka żadna propozycja agenta AI.",
+    "currencyFrom": "Waluta: {currency}, {source, select, amount {podana w kwocie} marker {ze znacznika waluty profilu} other {z Twojego papieru wartościowego dla symbolu}}",
+    "bookTo": "Księgowane na: {account}",
+    "bookToNotTradable": "Księgowane na {account}, które nie jest otwartym kontem maklerskim, więc transakcji nie można tam zaksięgować.",
+    "bookToUnknown": "Księgowane na konto spoza Twojej listy, więc transakcji nie można tam zaksięgować."
   }
 }

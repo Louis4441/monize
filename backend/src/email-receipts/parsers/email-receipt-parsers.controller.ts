@@ -77,7 +77,11 @@ export class EmailReceiptParsersController {
     @Request() req: { user: { id: string } },
     @Body() dto: DraftParserWithAiDto,
   ) {
-    return this.parsers.requestAiDraft(req.user.id, dto.receiptIds);
+    return this.parsers.requestAiDraft(
+      req.user.id,
+      dto.receiptIds,
+      dto.kind ?? "receipt",
+    );
   }
 
   // Declared before `:id`, so the literal segment is matched first.

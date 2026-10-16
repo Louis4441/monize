@@ -19,11 +19,29 @@ export type AiReviewStatus = (typeof AI_REVIEW_STATUSES)[number];
  * What raised a request: a rule or a person (`transaction_review`), a stored
  * order-confirmation email (`email_receipt`), or a person asking for a receipt
  * parser to be written from up to five stored emails (`email_parser_draft`,
- * which is about emails and has no transaction).
+ * which is about emails and has no transaction), or a brokerage's trade
+ * confirmation email read by a profile (`email_trade`: the proposal is to
+ * CREATE an investment transaction, so it has no transaction yet).
  */
-export const AI_REVIEW_KINDS = ['transaction_review', 'email_receipt', 'email_parser_draft'] as const;
+export const AI_REVIEW_KINDS = ['transaction_review', 'email_receipt', 'email_parser_draft', 'email_trade'] as const;
 
 export type AiReviewKind = (typeof AI_REVIEW_KINDS)[number];
+
+/** The trade a request of kind `email_trade` proposes (`AiReviewTradeInput`); the card is rebuilt from it. */
+export interface AiReviewTrade {
+  accountId: string;
+  action: 'BUY' | 'SELL';
+  symbol: string;
+  quantity: number;
+  /** The executed total, in the security's currency. */
+  totalAmount: number;
+  commission: number;
+  /** YYYY-MM-DD. */
+  date: string;
+  description: string | null;
+  /** The currency the email's amounts named, when they named one. */
+  currency?: string | null;
+}
 
 /** The email a request of kind `email_receipt` was raised for (`AiReviewInboxEmailReceipt`). */
 export interface AiReviewEmailReceipt {
@@ -69,7 +87,7 @@ export interface AiReviewParserDraft {
 }
 
 /** The fixed instructions the email receipt pipeline writes (`receipt-instructions.ts`). */
-export type AiReviewInstructionKey = 'automatic' | 'chat' | 'categorize' | 'parsed';
+export type AiReviewInstructionKey = 'automatic' | 'chat' | 'categorize' | 'parsed' | 'trade' | 'tradeChat';
 
 export interface AiReviewItem {
   id: string;
@@ -81,7 +99,7 @@ export interface AiReviewItem {
    * inbox shows it translated; null for any other instruction (a rule's own words).
    */
   instructionKey: AiReviewInstructionKey | null;
-  /** Null for a request of kind `email_parser_draft`. */
+  /** Null for a request of kind `email_parser_draft` or `email_trade`. */
   transactionId: string | null;
   ruleId: string | null;
   ruleName: string | null;
@@ -89,6 +107,8 @@ export interface AiReviewItem {
   emailReceipt: AiReviewEmailReceipt | null;
   /** Null unless the request is of kind `email_parser_draft`. */
   parserDraft: AiReviewParserDraft | null;
+  /** Null unless the request is of kind `email_trade`. */
+  trade: AiReviewTrade | null;
   createdAt: string;
   expiresAt: string;
   /** Null when the transaction no longer exists. */
@@ -126,7 +146,14 @@ export function isSendableToAssistant(item: AiReviewItem): boolean {
  * `null` when it has none of them.
  */
 export function reviewItemLabel(item: AiReviewItem): string | null {
-  return item.parserDraft?.domain ?? item.emailReceipt?.subject ?? item.transaction?.payeeName ?? item.ruleName ?? null;
+  return (
+    item.parserDraft?.domain ??
+    item.trade?.symbol ??
+    item.emailReceipt?.subject ??
+    item.transaction?.payeeName ??
+    item.ruleName ??
+    null
+  );
 }
 
 /** What happened to one request of a bulk approval. */

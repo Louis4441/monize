@@ -1,3 +1,4 @@
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { RECEIPT_PARSED_INSTRUCTION } from "../email-receipts/pipeline/receipt-instructions";
 import { DataSource } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
@@ -57,11 +58,13 @@ function setup() {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
   };
-  const { dataSource } = createScopedDbMocks([
+  const { dataSource, manager } = createScopedDbMocks([
     [Transaction, txRepo],
     [TransactionRule, ruleRepo],
     [EmailReceipt, receiptRepo],
   ]);
+  // The ledger check (`findTradeInLedger`) and the user's timezone: none by default.
+  manager.query.mockResolvedValue([]);
   const requests = {
     listForUser: jest.fn().mockResolvedValue([]),
     getForUser: jest.fn().mockResolvedValue(request()),
@@ -84,13 +87,26 @@ function setup() {
       .fn()
       .mockResolvedValue({ kind: "standard", preview, splits: [{ x: 1 }] }),
   };
-  const builder = { buildUpdateTransaction: jest.fn().mockReturnValue(card()) };
+  const builder = {
+    buildUpdateTransaction: jest.fn().mockReturnValue(card()),
+    buildCreateInvestmentTransaction: jest.fn().mockReturnValue(card()),
+  };
+  const investments = { previewCreateInvestmentTransaction: jest.fn() };
+  const securities = { resolveByTradeSymbol: jest.fn() };
+  const accounts = { resolveBrokerageByNameOrId: jest.fn() };
+  const scheduled = {
+    findInvestmentOccurrenceForTrade: jest.fn().mockResolvedValue(null),
+  };
   const service = new AiReviewWorkService(
     dataSource as unknown as DataSource,
     requests as never,
     transactions as never,
     prep as never,
     builder as never,
+    investments as never,
+    securities as never,
+    scheduled as never,
+    accounts as never,
   );
   return {
     service,
@@ -98,9 +114,14 @@ function setup() {
     transactions,
     prep,
     builder,
+    investments,
+    securities,
+    scheduled,
+    accounts,
     txRepo,
     ruleRepo,
     receiptRepo,
+    manager,
   };
 }
 
@@ -1201,5 +1222,530 @@ describe("AiReviewWorkService.buildApprovalCard (bulk approval)", () => {
     await expect(service.buildApprovalCard(USER, REQ)).rejects.toThrow(
       "db down",
     );
+  });
+});
+
+describe("AiReviewWorkService trade requests (email_trade)", () => {
+  const ACCOUNT = "50000000-0000-4000-8000-000000000001";
+  const SECURITY = "60000000-0000-4000-8000-000000000001";
+  const trade = {
+    accountId: ACCOUNT,
+    action: "BUY" as const,
+    symbol: "XCNS",
+    quantity: 75.9878,
+    totalAmount: 2000,
+    commission: 0,
+    date: "2026-10-15",
+    description: "Email receipt: Your order has been filled",
+  };
+  const tradeRequest = (over: Partial<AiReviewRequest> = {}) =>
+    request({
+      kind: "email_trade",
+      transactionId: null,
+      ruleId: null,
+      emailReceiptId: RECEIPT,
+      claimedBy: "email-receipts",
+      ...over,
+    });
+  const tradeCard = {
+    actionId: "trade-1",
+    type: "create_investment_transaction",
+    preview: {},
+    descriptor: {
+      type: "create_investment_transaction",
+      aiReviewRequestId: REQ,
+    },
+  } as never;
+
+  function tradeSetup() {
+    const h = setup();
+    h.securities.resolveByTradeSymbol.mockResolvedValue({
+      match: { id: SECURITY, symbol: "XCNS.TO", currencyCode: "CAD" },
+      candidates: [],
+    });
+    h.investments.previewCreateInvestmentTransaction.mockResolvedValue({
+      accountId: ACCOUNT,
+    });
+    h.builder.buildCreateInvestmentTransaction.mockReturnValue(tradeCard);
+    return h;
+  }
+
+  it("builds a create_investment_transaction card from the executed total and the user's own security", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    h.requests.submitProposal.mockResolvedValue(
+      tradeRequest({ status: "proposed" }),
+    );
+
+    const result = await h.service.submitTrade(
+      USER,
+      "email-receipts",
+      REQ,
+      trade,
+    );
+
+    // The account decides between listings in two currencies.
+    expect(h.securities.resolveByTradeSymbol).toHaveBeenCalledWith(
+      USER,
+      "XCNS",
+      ACCOUNT,
+      null,
+    );
+    // The resolved symbol, not the email's text, goes to the preview; the total
+    // is passed as the fact and no price is supplied (INV-TRADE-001).
+    expect(
+      h.investments.previewCreateInvestmentTransaction,
+    ).toHaveBeenCalledWith(USER, {
+      accountId: ACCOUNT,
+      action: "BUY",
+      transactionDate: "2026-10-15",
+      securityQuery: "XCNS.TO",
+      quantity: 75.9878,
+      totalAmount: 2000,
+      commission: 0,
+      description: "Email receipt: Your order has been filled",
+    });
+    expect(h.builder.buildCreateInvestmentTransaction).toHaveBeenCalledWith(
+      USER,
+      { accountId: ACCOUNT },
+      { aiReviewRequestId: REQ },
+    );
+    expect(h.requests.submitProposal).toHaveBeenCalledWith(
+      USER,
+      REQ,
+      "email-receipts",
+      expect.objectContaining({ trade, action: tradeCard }),
+    );
+    expect(result.action).toBe(tradeCard);
+  });
+
+  it("marks the scheduled bill it pays on the card, looked up with the resolved security and the schedule's commission rules", async () => {
+    const h = tradeSetup();
+    h.investments.previewCreateInvestmentTransaction.mockResolvedValue({
+      accountId: ACCOUNT,
+      securityId: SECURITY,
+      action: "BUY",
+    });
+    h.scheduled.findInvestmentOccurrenceForTrade.mockResolvedValue({
+      id: "sch-1",
+      name: "Monthly XCNS",
+      dueDate: "2026-10-16",
+      fundingAccountId: "chequing-1",
+    });
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    h.requests.submitProposal.mockResolvedValue(
+      tradeRequest({ status: "proposed" }),
+    );
+    await h.service.submitTrade(USER, "email-receipts", REQ, trade);
+    // Posting the occurrence settles through the schedule's funding account, so
+    // the card is previewed with it: what it shows is what is written.
+    expect(
+      h.investments.previewCreateInvestmentTransaction,
+    ).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({ fundingAccountId: "chequing-1" }),
+    );
+    expect(h.scheduled.findInvestmentOccurrenceForTrade).toHaveBeenCalledWith(
+      USER,
+      {
+        accountId: ACCOUNT,
+        securityId: SECURITY,
+        action: "BUY",
+        date: "2026-10-15",
+        commission: 0,
+      },
+    );
+    expect(h.builder.buildCreateInvestmentTransaction).toHaveBeenCalledWith(
+      USER,
+      expect.anything(),
+      {
+        aiReviewRequestId: REQ,
+        scheduled: {
+          id: "sch-1",
+          name: "Monthly XCNS",
+          dueDate: "2026-10-16",
+        },
+      },
+    );
+  });
+
+  it("refuses a trade the ledger already holds on a row no other email accounts for, storing nothing", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    h.manager.query.mockImplementation(async (sql: string) =>
+      String(sql).includes("FROM investment_transactions")
+        ? [{ id: "it-1", claimed: false }]
+        : [],
+    );
+    await expect(
+      h.service.submitTrade(USER, "email-receipts", REQ, trade),
+    ).rejects.toBeInstanceOf(ConflictException);
+    const ledger = h.manager.query.mock.calls.find((c) =>
+      String(c[0]).includes("FROM investment_transactions"),
+    );
+    // By the resolved security, and this email's own row is not "another's".
+    expect(ledger?.[1]).toEqual(
+      expect.arrayContaining([SECURITY, RECEIPT, ACCOUNT, "2026-10-15"]),
+    );
+    expect(h.requests.submitProposal).not.toHaveBeenCalled();
+  });
+
+  it("refuses an email whose amounts name another currency than the security's", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    await expect(
+      h.service.submitTrade(USER, "email-receipts", REQ, {
+        ...trade,
+        currency: "USD",
+      }),
+    ).rejects.toThrow(/in USD, but your security XCNS\.TO trades in CAD/);
+    expect(
+      h.investments.previewCreateInvestmentTransaction,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("has no approvable card once the scheduled occurrence the proposal paid was posted", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({
+        status: "proposed",
+        proposal: {
+          trade,
+          action: {
+            descriptor: {
+              type: "create_investment_transaction",
+              scheduledTransactionId: "sch-1",
+              scheduledDueDate: "2026-10-16",
+            },
+          },
+        },
+      }),
+    );
+    // The schedule moved on: the rebuild finds no occurrence.
+    h.scheduled.findInvestmentOccurrenceForTrade.mockResolvedValue(null);
+    const out = await h.service.buildApprovalCard(USER, REQ);
+    expect(out).toEqual({
+      error: expect.stringMatching(/has been posted or changed/),
+    });
+  });
+
+  it("refuses a ticker that is none of the user's securities, storing nothing", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    h.securities.resolveByTradeSymbol.mockResolvedValue({
+      match: null,
+      candidates: [],
+    });
+    await expect(
+      h.service.submitTrade(USER, "email-receipts", REQ, trade),
+    ).rejects.toThrow(/no security with the ticker "XCNS"/);
+    expect(h.requests.submitProposal).not.toHaveBeenCalled();
+  });
+
+  it("refuses an ambiguous ticker, naming the candidates", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    h.securities.resolveByTradeSymbol.mockResolvedValue({
+      match: null,
+      candidates: [{ symbol: "XCNS.TO" }, { symbol: "XCNS.V" }],
+    });
+    await expect(
+      h.service.submitTrade(USER, "email-receipts", REQ, trade),
+    ).rejects.toThrow(/XCNS\.TO, XCNS\.V/);
+  });
+
+  it("answers only a request of its own kind", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      request({ claimedBy: "email-receipts" }),
+    );
+    await expect(
+      h.service.submitTrade(USER, "email-receipts", REQ, trade),
+    ).rejects.toThrow(/not a trade request/);
+  });
+
+  describe("answered by an agent (Recognize as a trade)", () => {
+    const agentTrade = {
+      accountName: "RRSP",
+      action: "BUY" as const,
+      symbol: "XCNS",
+      quantity: 75.9878,
+      totalAmount: 2000,
+      date: "2026-10-15",
+    };
+
+    it("finds the account by name and stores the same card a profile's trade gets", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      const result = await h.service.submit(USER, "agent-1", REQ, {
+        trade: agentTrade,
+      });
+      expect(h.accounts.resolveBrokerageByNameOrId).toHaveBeenCalledWith(
+        USER,
+        "RRSP",
+      );
+      expect(
+        h.investments.previewCreateInvestmentTransaction,
+      ).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({
+          accountId: ACCOUNT,
+          totalAmount: 2000,
+          commission: 0,
+          transactionDate: "2026-10-15",
+        }),
+      );
+      expect(result.action).toBe(tradeCard);
+    });
+
+    it("keeps the agent's description and checks the currency it read against the security's", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: { ...agentTrade, currency: "cad", description: "XCNS buy" },
+      });
+      expect(h.securities.resolveByTradeSymbol).toHaveBeenCalledWith(
+        USER,
+        "XCNS",
+        ACCOUNT,
+        "CAD",
+      );
+      expect(
+        h.investments.previewCreateInvestmentTransaction,
+      ).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({ description: "XCNS buy" }),
+      );
+
+      h.requests.submitProposal.mockClear();
+      await expect(
+        h.service.submit(USER, "agent-1", REQ, {
+          trade: { ...agentTrade, currency: "USD" },
+        }),
+      ).rejects.toThrow(/amounts are in USD/);
+      expect(h.requests.submitProposal).not.toHaveBeenCalled();
+    });
+
+    it("dates the trade by the email when the agent gives no date", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1", emailReceiptId: RECEIPT }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      h.receiptRepo.findOne.mockResolvedValue({
+        receivedAt: new Date("2026-10-16T09:00:00Z"),
+        originalSentAt: new Date("2026-10-15T12:00:00Z"),
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: { ...agentTrade, date: undefined },
+      });
+      expect(
+        h.investments.previewCreateInvestmentTransaction,
+      ).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({ transactionDate: "2026-10-15" }),
+      );
+    });
+
+    it("refuses an unknown or ambiguous account, storing nothing", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: undefined,
+        candidates: [],
+      });
+      await expect(
+        h.service.submit(USER, "agent-1", REQ, { trade: agentTrade }),
+      ).rejects.toThrow(/Unknown account/);
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: undefined,
+        candidates: [
+          { id: "a", name: "RRSP 1" },
+          { id: "b", name: "RRSP 2" },
+        ],
+      });
+      await expect(
+        h.service.submit(USER, "agent-1", REQ, { trade: agentTrade }),
+      ).rejects.toThrow(/RRSP 1, RRSP 2/);
+      expect(h.requests.submitProposal).not.toHaveBeenCalled();
+    });
+
+    it("refuses a trade that does not have the required shape, storing nothing", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      for (const bad of [
+        { ...agentTrade, action: "HOLD" },
+        { ...agentTrade, quantity: -1 },
+        { ...agentTrade, date: "15/10/2026" },
+        // Not a calendar day, and finer than the confirm stores: refused
+        // before a card the approval would then refuse.
+        { ...agentTrade, date: "2026-02-31" },
+        { ...agentTrade, quantity: 1.123456789 },
+        { ...agentTrade, totalAmount: 2000.00001 },
+        { accountName: "RRSP" },
+      ]) {
+        await expect(
+          h.service.submit(USER, "agent-1", REQ, { trade: bad }),
+        ).rejects.toThrow(/accountName, action \(BUY or SELL\)/);
+      }
+      expect(h.accounts.resolveBrokerageByNameOrId).not.toHaveBeenCalled();
+      expect(h.requests.submitProposal).not.toHaveBeenCalled();
+    });
+
+    it("reads numbers a hand-written tool call sends as text", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: { ...agentTrade, quantity: "75.9878", totalAmount: "2000" },
+      });
+      expect(
+        h.investments.previewCreateInvestmentTransaction,
+      ).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({ quantity: 75.9878, totalAmount: 2000 }),
+      );
+    });
+
+    it("refuses the trade field on an ordinary request", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(request());
+      await expect(
+        h.service.submit(USER, "agent-1", REQ, { trade: agentTrade }),
+      ).rejects.toThrow(/trade request only/);
+    });
+
+    it("claims a trade request with the email and no transaction", async () => {
+      const h = tradeSetup();
+      h.requests.claimById.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1", emailReceiptId: RECEIPT }),
+      );
+      h.receiptRepo.findOne.mockResolvedValue({
+        fromAddress: "a@b.example",
+        subject: "Your order has been filled",
+        receivedAt: new Date("2026-10-15T16:00:00Z"),
+        bodyText: "Symbol: XCNS",
+      });
+      const claimed = await h.service.claim(USER, "agent-1", REQ);
+      expect(claimed.transaction).toBeUndefined();
+      expect(claimed.emailReceipt?.subject).toBe("Your order has been filled");
+      expect(h.transactions.getLlmTransactionById).not.toHaveBeenCalled();
+    });
+  });
+
+  it("refuses a submit with no trade field for this kind", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "agent-1" }),
+    );
+    await expect(
+      h.service.submit(USER, "agent-1", REQ, { description: "x" }),
+    ).rejects.toThrow(/answered with the trade field/);
+  });
+
+  it("shows the trade in the inbox and rebuilds its card from the stored trade", async () => {
+    const h = tradeSetup();
+    h.requests.listForUser.mockResolvedValue([
+      tradeRequest({
+        status: "proposed",
+        proposal: { trade, action: "stale" },
+      }),
+    ]);
+    const [item] = await h.service.listInbox(USER);
+    expect(item).toMatchObject({
+      kind: "email_trade",
+      transactionId: null,
+      transaction: null,
+      trade,
+      proposal: { action: tradeCard },
+    });
+    expect(h.prep.prepareUpdate).not.toHaveBeenCalled();
+  });
+
+  it("shows why the card can no longer be built (the account was closed) instead of failing the list", async () => {
+    const h = tradeSetup();
+    h.requests.listForUser.mockResolvedValue([
+      tradeRequest({ status: "proposed", proposal: { trade } }),
+    ]);
+    h.investments.previewCreateInvestmentTransaction.mockRejectedValue(
+      new NotFoundException("Account not found"),
+    );
+    const [item] = await h.service.listInbox(USER);
+    expect(item.proposal).toEqual({ error: "Account not found" });
+  });
+
+  it("does not turn an internal error into a proposal's reason", async () => {
+    const h = tradeSetup();
+    h.requests.listForUser.mockResolvedValue([
+      tradeRequest({ status: "proposed", proposal: { trade } }),
+    ]);
+    h.investments.previewCreateInvestmentTransaction.mockRejectedValue(
+      new Error("connection reset"),
+    );
+    await expect(h.service.listInbox(USER)).rejects.toThrow("connection reset");
+  });
+
+  it("rebuilds the card for an approval from the stored trade, and refuses a request with none", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ status: "proposed", proposal: { trade } }),
+    );
+    expect(await h.service.buildApprovalCard(USER, REQ)).toEqual({
+      action: tradeCard,
+    });
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ status: "proposed", proposal: null }),
+    );
+    expect(await h.service.buildApprovalCard(USER, REQ)).toEqual({
+      error: expect.stringMatching(/no proposal to approve/),
+    });
   });
 });

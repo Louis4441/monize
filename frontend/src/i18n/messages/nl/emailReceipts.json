@@ -93,7 +93,7 @@
         "automatic": "Het ophalen vraagt de AI naar een gekoppelde bon die geen enkel goedgekeurd profiel volledig kon lezen, en stelt een concept van een profiel op voor een afzender die er geen heeft."
       },
       "autoApplyLabel": "Voorstellen automatisch toepassen",
-      "autoApplyHelp": "Standaard uit. Een voorstel wordt alleen zonder te vragen toegepast als dit allemaal geldt: een goedgekeurd profiel heeft de hele e-mail gelezen, de transactie is gevonden via een ordernummer of een referentie, of via exact bedrag en begunstigde, met één enkele kandidaat, en het voorstel klopt tot op de cent. Al het andere wacht op jouw goedkeuring.",
+      "autoApplyHelp": "Standaard uit. Een voorstel wordt alleen zonder te vragen toegepast als dit allemaal geldt: een goedgekeurd profiel heeft de hele e-mail gelezen, de transactie is gevonden via een ordernummer of een referentie, of via exact bedrag en begunstigde, met één enkele kandidaat, en het voorstel klopt tot op de cent. Een transactiebevestiging wordt alleen zonder te vragen geboekt als het transactieprofiel is goedgekeurd, het de hele transactie heeft gelezen, de prijs klopt met de aandelen en het totaal, en je rekeningen nog geen overeenkomende transactie bevatten. Al het andere wacht op jouw goedkeuring.",
       "profileLimitLabel": "Voorstellen van profielen meetellen voor de dagelijkse AI-limiet",
       "profileLimitHelp": "Standaard aan: een wijziging die een profiel uit een e-mail voorstelt, telt mee voor de dagelijkse limiet van door AI voorgestelde wijzigingen, zoals elk ander AI-voorstel. Zet het uit wanneer een grote stapel opgeslagen e-mails de limiet anders zou opmaken. Alleen voorstellen van profielen zijn uitgezonderd; elk voorstel wacht nog steeds op jouw goedkeuring."
     },
@@ -177,14 +177,15 @@
       "confirm": "Nu verwerken",
       "later": "Niet nu"
     },
-    "reparse": "E-mails opnieuw inlezen ({count})"
+    "reparse": "E-mails opnieuw inlezen ({count})",
+    "kindTrade": "Beurstransacties"
   },
   "editor": {
     "createTitle": "Nieuw profiel",
     "editTitle": "Profiel bewerken",
-    "loading": "Begunstigden en categorieën laden",
+    "loading": "Begunstigden, categorieën, rekeningen en valuta laden",
     "lookupsError": {
-      "title": "Begunstigden en categorieën konden niet worden geladen",
+      "title": "Begunstigden, categorieën, rekeningen of valuta konden niet worden geladen",
       "body": "De keuzelijsten hebben ze nodig, dus de editor kan nog niet openen. Probeer het opnieuw.",
       "retry": "Opnieuw proberen"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "Labelnaam",
       "aiCategoriesLabel": "De AI de categorie laten kiezen van artikelen waar geen regel bij past",
       "aiCategoriesHelp": "Als een artikel bij geen enkele categorieregel past en er geen standaardcategorie is, wordt de AI om de categorie gevraagd uit je categorielijst. De keuze wordt in het voorstel als die van de AI aangemerkt. Als dit uit staat, wordt de AI nooit gevraagd."
+    },
+    "kind": {
+      "label": "Soort profiel",
+      "receipt": "Bestelbon",
+      "trade": "Beurstransactie",
+      "receiptHelp": "Leest een orderbevestiging en vindt de banktransactie waarmee ze betaald is.",
+      "tradeHelp": "Leest een uitvoeringsbevestiging van de broker en stelt de beleggingstransactie voor die ze meldt, een aankoop of een verkoop."
+    },
+    "trade": {
+      "guardsHeading": "Welke e-mails van de afzender het leest",
+      "guardsHelp": "Optioneel. Elk patroon wordt vergeleken met een hele regel van de e-mail, één patroon per regel.",
+      "guards": {
+        "requireLine": "Vereiste regels",
+        "requireLineHint": "Het profiel leest een e-mail alleen als een van deze regels erin staat; anders wordt het volgende profiel van de afzender geprobeerd.",
+        "skipIfLine": "Regels die de e-mail overslaan",
+        "skipIfLineHint": "Een e-mail met een van deze regels wordt opzijgelegd, zoals een geannuleerde order.",
+        "waitIfLine": "Regels die de e-mail vasthouden",
+        "waitIfLineHint": "Een e-mail met een van deze regels wordt vastgehouden en later opnieuw gelezen, zoals een gedeeltelijke uitvoering."
+      },
+      "fieldsHeading": "De transactie",
+      "fieldsHelp": "Aankoop of verkoop, de ticker en het aantal aandelen zijn verplicht, plus een totaal of een prijs. Elk veld neemt patronen, één per regel, op volgorde geprobeerd.",
+      "fields": {
+        "tradeAction": "Patronen voor aankoop of verkoop",
+        "tradeSymbol": "Patronen voor de ticker",
+        "tradeQuantity": "Patronen voor het aantal aandelen",
+        "tradeTotal": "Patronen voor het transactietotaal",
+        "tradePrice": "Patronen voor de prijs per aandeel",
+        "tradeCommission": "Patronen voor de commissie",
+        "tradeDate": "Patronen voor de transactiedatum",
+        "tradeAccount": "Patronen voor de rekening"
+      },
+      "fieldHint": "Moet {capture} vastleggen. Voorbeeld: {example}",
+      "amountsHelp": "Het totaal is het uitgevoerde bedrag, bij een aankoop inclusief commissie. De prijs is een controle en geeft het totaal als de e-mail er geen noemt. Een bedrag dat zijn valuta noemt (US$, C$, USD, €) bepaalt ook de valuta van de transactie.",
+      "rulesHeading": "Rekeningregels",
+      "rulesHelp": "Op welke rekening de transactie wordt geboekt. De regels worden op volgorde geprobeerd op de rekeningtekst die de rekeningpatronen lezen, en de eerste die van toepassing is wint; {star} is willekeurige tekst. Een regel met een valuta geldt alleen voor een transactie in die valuta, dus twee rekeningen die de broker hetzelfde schrijft, zoals een RRSP in CAD en een in USD die allebei als RRSP verschijnen, zijn twee regels met dezelfde tekst en verschillende valuta. Als de e-mail geen rekeningtekst toont, kan alleen een regel met de tekst {star} gelden. De standaardrekening neemt de rest.",
+      "currencyOrder": "De valuta van de transactie komt, op volgorde: uit het bedrag zelf als het er een noemt (US$, C$, USD, €), dan uit de eerste valutamarkering hieronder die bij een regel van de e-mail past, dan uit de valuta van je effect voor de ticker. Een regel met een valuta gokt nooit: als geen van de drie de valuta noemt, wacht de e-mail op jou in plaats van op een van de rekeningen te worden geboekt.",
+      "ruleMatchLabel": "Rekeningtekst van regel {rule}",
+      "ruleMatchPlaceholder": "Rekeningtekst, zoals RRSP",
+      "ruleCurrencyLabel": "Valuta van regel {rule}",
+      "ruleAccountLabel": "Rekening van regel {rule}",
+      "ruleMoveUp": "Regel {rule} omhoog",
+      "ruleMoveDown": "Regel {rule} omlaag",
+      "ruleRemove": "Regel {rule} verwijderen",
+      "ruleAdd": "Rekeningregel toevoegen",
+      "rulesMax": "Hooguit {max} regels.",
+      "rulesWithoutAccountText": "Er zijn geen rekeningpatronen, dus de regels worden geprobeerd op lege tekst: alleen een regel met de tekst {star} kan gelden.",
+      "anyCurrency": "Elke valuta",
+      "baseCurrency": "{code} (je basisvaluta)",
+      "currencyPlaceholder": "Kies een valuta",
+      "accountPlaceholder": "Kies een rekening",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (geen open effectenrekening)",
+      "accountUnknownOption": "Een rekening die niet in je lijst staat",
+      "accountNotTradable": "Op deze rekening kan geen transactie worden geboekt: ze is gesloten, een geldrekening of geen beleggingsrekening.",
+      "accountUnknown": "Deze rekening staat niet in je lijst: ze is misschien verwijderd. Kies een andere.",
+      "defaultAccountLabel": "Standaardrekening",
+      "defaultAccountNone": "Geen standaardrekening",
+      "defaultAccountHint": "De rekening als geen regel van toepassing is. Zonder wacht een e-mail waarop geen regel van toepassing is op jou.",
+      "markersHeading": "Valutamarkeringen",
+      "markersHelp": "Tekst die de valuta van de transactie noemt als de bedragen dat niet doen, zoals een regel dat de bedragen in Amerikaanse dollars zijn naast een kale $. Elke markering wordt vergeleken met elke regel van de e-mail ({star} is willekeurige tekst), en de eerste markering, op volgorde, die past noemt de valuta. Markeringen worden alleen gebruikt als het bedrag geen valuta noemt.",
+      "markerMatchLabel": "Tekst van markering {marker}",
+      "markerMatchPlaceholder": "Zoals *U.S. dollars*",
+      "markerCurrencyLabel": "Valuta van markering {marker}",
+      "markerMoveUp": "Markering {marker} omhoog",
+      "markerMoveDown": "Markering {marker} omlaag",
+      "markerRemove": "Markering {marker} verwijderen",
+      "markerAdd": "Valutamarkering toevoegen",
+      "markersMax": "Hooguit {max} markeringen."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "Over te slaan regel {line}",
       "recordStep": "Recordstap {step}",
       "recordStepPart": "Recordstap {step}, {part}",
-      "recordAlternative": "Recordstap {step}, alternatief {alternative}"
+      "recordAlternative": "Recordstap {step}, alternatief {alternative}",
+      "accountRule": "Rekeningregel {rule}",
+      "accountRulePart": "Rekeningregel {rule}, {part}",
+      "currencyMarker": "Valutamarkering {marker}",
+      "currencyMarkerPart": "Valutamarkering {marker}, {part}"
     },
     "fields": {
       "orderId": "Patronen voor het ordernummer",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "Dagen na de aankoop",
       "matchTolerance": "Bedragtolerantie",
       "tag": "Label",
-      "aiCategories": "AI-categorieën"
+      "aiCategories": "AI-categorieën",
+      "trade": "Het transactiedeel",
+      "tradeAction": "Patronen voor aankoop of verkoop",
+      "tradeSymbol": "Patronen voor de ticker",
+      "tradeQuantity": "Patronen voor het aantal aandelen",
+      "tradeTotal": "Patronen voor het transactietotaal",
+      "tradePrice": "Patronen voor de prijs per aandeel",
+      "tradeCommission": "Patronen voor de commissie",
+      "tradeDate": "Patronen voor de transactiedatum",
+      "tradeAccount": "Patronen voor de rekening",
+      "accountRules": "Rekeningregels",
+      "currencyMarkers": "Valutamarkeringen",
+      "defaultAccount": "Standaardrekening",
+      "ruleAccount": "rekening",
+      "ruleCurrency": "valuta"
     },
     "codes": {
       "not_object": "is geen geldige definitie",
@@ -376,7 +463,12 @@
       "duplicate_entry": "noemt hetzelfde item twee keer",
       "reference_field_missing": "heeft referentiepatronen nodig (de referentiestrategie staat aan)",
       "out_of_range_days": "moet een geheel getal van 0 tot {max} zijn",
-      "out_of_range_tolerance": "moet een bedrag van 0,00 tot {max} zijn"
+      "out_of_range_tolerance": "moet een bedrag van 0,00 tot {max} zijn",
+      "trade_conflict": "kan niet in een profiel voor beurstransacties staan, dat alleen de transactie leest",
+      "trade_amount_missing": "heeft patronen voor het totaal of de prijs nodig (minstens een van de twee)",
+      "trade_account_missing": "heeft een standaardrekening of rekeningregels nodig",
+      "invalid_currency": "is geen valutacode van 3 letters, zoals USD",
+      "invalid_uuid_account": "is geen geldige rekening"
     }
   },
   "test": {
@@ -422,7 +514,15 @@
         "requireLine": "Vereiste regel",
         "skipIfLine": "Overslaanregel",
         "waitIfLine": "Wachtregel",
-        "reference": "Referentie"
+        "reference": "Referentie",
+        "action": "Koop of verkoop",
+        "symbol": "Ticker",
+        "quantity": "Aandelen",
+        "price": "Prijs",
+        "commission": "Commissie",
+        "date": "Datum",
+        "account": "Rekening",
+        "currency": "Valutamarkering"
       },
       "entryLine": "vermelding {entry} ({pattern}), regel {line}: {text}",
       "entrySubject": "vermelding {entry} ({pattern}), het onderwerp: {text}",
@@ -553,10 +653,12 @@
       "reprocess": "Opnieuw verwerken",
       "link": "Transactie kiezen",
       "recognizeAi": "Herkennen met AI",
+      "recognizeTradeAi": "Herken als transactie met AI",
       "approve": "Goedkeuren",
       "draftParser": "Profiel laten opstellen door AI",
       "createParser": "Profiel maken",
-      "ignore": "Negeren"
+      "ignore": "Negeren",
+      "reviewTrade": "Beoordelen in inbox"
     },
     "toasts": {
       "approved": "Voorstel goedgekeurd",
@@ -592,8 +694,11 @@
       "handoffFailed": "Het verzoek staat in de wachtrij, maar de e-mails konden niet in de chat worden geopend. Het wacht in het AI-controlepostvak op een agent.",
       "inboxLink": "Het AI-controlepostvak openen",
       "opened": "De chat is geopend met de e-mails als bijlage. Lees het bericht en druk op Verzenden.",
-      "chatPrompt": "Maak een profile voor e-mailbonnen voor {count, plural, one {deze bestelmail} other {deze # bestelmails}} van {domain}. Claim AI-beoordelingsverzoek {requestId}, test je profile op elke bijgevoegde e-mail met de tool email_receipt_profiles, verbeter hem totdat elke e-mail volledig wordt gelezen en sla hem daarna op als concept voor verzoek {requestId}."
-    }
+      "chatPrompt": "Maak een profile voor e-mailbonnen voor {count, plural, one {deze bestelmail} other {deze # bestelmails}} van {domain}. Claim AI-beoordelingsverzoek {requestId}, test je profile op elke bijgevoegde e-mail met de tool email_receipt_profiles, verbeter hem totdat elke e-mail volledig wordt gelezen en sla hem daarna op als concept voor verzoek {requestId}.",
+      "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails.",
+      "chatPromptTrade": "Maak een transactieprofiel voor {count, plural, one {deze transactiebevestiging} other {deze # transactiebevestigingen}} van {domain}. Claim AI-beoordelingsverzoek {requestId}, test je profiel op elke bijgevoegde e-mail met de tool email_receipt_parsers, verbeter het totdat uit elke e-mail een volledige transactie wordt gelezen en sla het daarna op als concept voor verzoek {requestId}."
+    },
+    "tradeBadge": "Transactie"
   },
   "detail": {
     "title": "E-mailbon",
@@ -644,11 +749,22 @@
       "wait_line": "Een regel zegt dat de bestelling nog niet definitief is, dus de e-mail wordt later opnieuw gelezen.",
       "no_html": "Dit profiel leest het HTML-deel van de e-mail en deze e-mail heeft er geen.",
       "schema_org": "Er was geen profiel nodig: de bestelling is gelezen uit de gestructureerde gegevens (schema.org) in de e-mail.",
-      "item_amount_missing": "Een artikel heeft geen bedrag en de e-mail heeft geen enkel totaal om het te geven."
+      "item_amount_missing": "Een artikel heeft geen bedrag en de e-mail heeft geen enkel totaal om het te geven.",
+      "trade_no_action": "Het profiel vond geen aankoop of verkoop in deze e-mail.",
+      "trade_no_symbol": "Het profiel vond geen beurssymbool in deze e-mail.",
+      "trade_no_quantity": "Het profiel vond geen aantal aandelen in deze e-mail.",
+      "trade_no_amount": "Het profiel vond in deze e-mail geen totaal en geen prijs.",
+      "trade_no_account": "Het profiel kon niet bepalen voor welke rekening deze transactie is.",
+      "trade_exists": "Je rekeningen bevatten deze transactie al, dus er is niets voorgesteld.",
+      "trade_linked": "Gekoppeld aan de transactie die het meldt, dus er is niets voorgesteld.",
+      "trade_no_currency": "Het profiel kon niet bepalen in welke valuta deze transactie is, dus het kon de rekening niet kiezen."
     },
     "reasonUnknown": "Reden: {reason}",
     "requestNote": "Controleverzoek ({state}): {note}",
     "parsedHeading": "Wat het profiel las",
+    "tradeHeading": "Uit de e-mail gelezen transactie",
+    "tradeCandidatesHeading": "Bestaande transacties die deze transactie kunnen zijn",
+    "tradeCandidatesHelp": "Deze beleggingstransacties kunnen de transactie zijn die deze e-mail meldt. Koppel de juiste: er wordt geen nieuwe transactie gemaakt en een geplande rekening of storting die ze betaalt, wordt als betaald gemarkeerd.",
     "notParsed": "Er is nog niets uit deze e-mail gelezen.",
     "candidatesHeading": "Transacties die passen",
     "candidatesHelp": "Meerdere transacties passen even goed bij deze e-mail. Kies de transactie die ermee is betaald.",
@@ -688,7 +804,15 @@
       "capped": "Alleen de eerste {max} regels worden gelezen.",
       "empty": "Geen regels.",
       "listLabel": "Genummerde regels van de e-mail"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Gekocht} other {Verkocht}}: {quantity} {symbol} voor {total} op {date}.",
+    "noTradeTransaction": "Nog geen: de transactie wordt geboekt wanneer je het voorstel goedkeurt, of gekoppeld aan een transactie die al in je administratie staat.",
+    "candidateShares": "{quantity} aandelen",
+    "tradeNoCandidates": "Geen beleggingstransactie van deze rekening, richting en ticker binnen een week van de transactiedag is vrij om te koppelen. Heb je de transactie zelf ingevoerd, controleer dan de rekening en de datum; keur anders het voorstel goed in de beoordelingsinbox.",
+    "aiTradeHeading": "Transactie die de AI-agent voorstelt",
+    "aiTradeReader": "Geen: de AI-agent leest het als een transactie",
+    "noAiTradeTransaction": "Nog geen: de transactie wordt geboekt zodra je het voorstel van de AI-agent goedkeurt.",
+    "tradeProposalHeading": "Wat het voorstel zou boeken"
   },
   "picker": {
     "heading": "Kies de transactie",
@@ -747,6 +871,9 @@
   },
   "recognize": {
     "title": "Herkennen met AI",
+    "tradeTitle": "Herken als transactie met AI",
+    "tradeMessage": "De AI leest deze e-mail als handelsbevestiging van een broker en stelt de beleggingstransactie voor die erin staat (rekening, aankoop of verkoop, symbool, aandelen en totaal). Er wordt niets opgeslagen tot je het goedkeurt.",
+    "tradeConfirm": "Herken als transactie",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "geen begunstigde",
     "confirmMessage": "Deze e-mail is gekoppeld aan de transactie {summary}. De AI leest de e-mail en stelt voor hoe deze transactie per product wordt gesplitst. Doorgaan met deze transactie?",
@@ -765,7 +892,9 @@
     "handoffFailed": "Het verzoek staat in de wachtrij, maar de e-mail kon niet in de chat worden geopend. Het wacht in het AI-controlepostvak op een agent (bijvoorbeeld via MCP).",
     "inboxLink": "Het AI-controlepostvak openen",
     "opened": "De chat is geopend met de e-mail als bijlage. Lees het bericht en druk op Verzenden.",
-    "chatPrompt": "Herken de producten, aantallen en prijzen in de bijgevoegde bestel-e-mail en splits mijn transactie van {date} ({payee}, {amount}) per product, met een categorie voor elk. Neem AI-controleverzoek {requestId} over en dien je voorstel ervoor in."
+    "chatPrompt": "Herken de producten, aantallen en prijzen in de bijgevoegde bestel-e-mail en splits mijn transactie van {date} ({payee}, {amount}) per product, met een categorie voor elk. Neem AI-controleverzoek {requestId} over en dien je voorstel ervoor in.",
+    "tradeChatPrompt": "Herken de transactie in de bijgevoegde bevestigingsmail van de broker: de rekening, of het een aankoop of verkoop is, het symbool, de aandelen, het uitgevoerde totaal en de datum. Neem AI-beoordelingsverzoek {requestId} aan en dien de transactie ervoor in.",
+    "tradeDetachesTransaction": "Als transactie gelezen hoort deze e-mail niet meer bij {summary}: de transactie maakt een eigen beleggingstransactie aan."
   },
   "hub": {
     "tabs": {
@@ -903,6 +1032,8 @@
         "body": "Geen enkele opgeslagen e-mail heeft een afzender bij {domain}."
       },
       "help": "Klik op een e-mail om hem te lezen en kies de transactie waarmee hij is betaald. Vink daarna maximaal {max} e-mails aan om het profiel uit te schrijven; een e-mail kan pas worden aangevinkt als hij een transactie heeft.",
+      "tradeToggle": "Deze e-mails zijn handelsbevestigingen van een broker (ze maken een beleggingstransactie, dus er wordt geen banktransactie gekoppeld)",
+      "tradeHelp": "Klik op een e-mail om hem te lezen en vink maximaal {max} handelsbevestigingen aan om het profiel van te schrijven. Je hoeft geen transactie te kiezen.",
       "columns": {
         "select": "Gebruiken",
         "date": "Datum",
@@ -913,6 +1044,7 @@
       "needsTransaction": "Kies eerst een transactie voor deze e-mail.",
       "limitReached": "Maximaal {max} voorbeelden. Haal bij een het vinkje weg om een ander te kiezen.",
       "noTransaction": "Geen gekozen",
+      "tradeNoTransaction": "Niet nodig voor een handelsbevestiging",
       "selectedCount": "{count} van {max} voorbeelden aangevinkt",
       "continue": "Verder naar de assistent",
       "emailLoading": "E-mail laden",
@@ -923,6 +1055,8 @@
     "generate": {
       "help": "De assistent leest deze e-mails en de transacties waarmee ze zijn betaald en schrijft een conceptprofiel voor {domain}. Er is nog niets goedgekeurd.",
       "reviseHelp": "Vertel de assistent wat er moet veranderen. Hij werkt hetzelfde concept bij op basis van deze e-mails en transacties.",
+      "tradeHelp": "De assistent leest deze handelsbevestigingen en schrijft een conceptprofiel voor {domain} dat de beleggingstransactie voorstelt die elk meldt. Er is nog niets goedgekeurd.",
+      "tradeSample": "Handelsbevestiging",
       "feedbackLabel": "Wat moet er veranderen",
       "feedbackPlaceholder": "Bijvoorbeeld: het totaal is de regel met Betaald bedrag, niet het subtotaal.",
       "send": "Naar AI sturen",
@@ -969,6 +1103,8 @@
       "parsedDate": "Datum: {date}",
       "parsedTotal": "Totaal: {total}",
       "parsedLines": "{count, plural, one {# regel} other {# regels}}",
+      "parsedTrade": "{action, select, BUY {Koopt} other {Verkoopt}} {quantity} aandelen {symbol}",
+      "tradeInconsistent": "De prijs komt niet overeen met het totaal, dus dit wordt niet automatisch toegepast",
       "noExpectation": "Geen",
       "noMatch": "Geen transactie",
       "agreesYes": "Ja",
@@ -991,8 +1127,37 @@
         "not_applicable": "Niet gelezen door dit profiel",
         "skip_line": "Overgeslagen (overslaanregel gevonden)",
         "wait_line": "In de wacht (bestelling niet definitief)",
-        "no_html": "Geen HTML-deel"
-      }
+        "no_html": "Geen HTML-deel",
+        "trade": "Stelt een transactie voor",
+        "trade_exists": "Staat al in je administratie"
+      },
+      "parsedTradeAccount": "Rekening: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "onbekend",
+      "parsedTradeNoAccount": "Geen rekening gevonden voor deze transactie",
+      "parsedTradeCurrency": "Valuta: {currency}"
     }
+  },
+  "trade": {
+    "summary": "{action, select, BUY {Aankoop} other {Verkoop}}: {quantity} aandelen {symbol} voor {total}, gedateerd {date}.",
+    "account": "Rekening genoemd in de e-mail: {account}",
+    "priceMismatch": "De gemiddelde prijs komt niet overeen met de aandelen en het totaal, dus deze transactie wordt niet automatisch toegepast.",
+    "incomplete": "Het profiel kon uit deze e-mail geen volledige transactie lezen.",
+    "totalFromPrice": "het uit de prijs afgeleide totaal",
+    "dateUnknown": "de dag waarop de e-mail binnenkwam",
+    "price": "Gemiddelde prijs in de e-mail: {price} per aandeel",
+    "proposalSecurity": "Effect: {name}",
+    "proposalAccount": "Rekening: {account}",
+    "proposalPrice": "Koers: {price} per aandeel",
+    "proposalCommission": "Provisie: {commission}",
+    "proposalReview": "Er wordt niets geboekt tot je het goedkeurt.",
+    "proposalReviewLink": "Bekijk het in de inbox",
+    "aiWaiting": "De AI-agent heeft de transactie nog niet voorgesteld. Het voorstel verschijnt hier en in de beoordelingsinbox.",
+    "aiBooked": "Geboekt op basis van het voorstel van de AI-agent: zie de transactie hierboven.",
+    "aiNoProposal": "Er wacht geen voorstel van de AI-agent voor deze e-mail.",
+    "currencyFrom": "Valuta: {currency}, {source, select, amount {genoemd door het bedrag} marker {uit een valutamarkering van het profiel} other {uit je effect voor de ticker}}",
+    "bookTo": "Geboekt op: {account}",
+    "bookToNotTradable": "Geboekt op {account}, dat geen open effectenrekening is, dus de transactie kan daar niet worden geboekt.",
+    "bookToUnknown": "Geboekt op een rekening die niet in je lijst staat, dus de transactie kan daar niet worden geboekt."
   }
 }

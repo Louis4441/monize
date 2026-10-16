@@ -6,6 +6,11 @@ import { WizardPreviewStep } from './WizardPreviewStep';
 import type { ParserPreviewItem, ParserPreviewResult } from '@/types/email-receipts';
 
 const api = vi.hoisted(() => ({ preview: vi.fn(), approve: vi.fn(), processBatch: vi.fn() }));
+const accountsApi = vi.hoisted(() => ({ getAll: vi.fn() }));
+vi.mock('@/lib/accounts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/accounts')>()),
+  accountsApi,
+}));
 vi.mock('@/lib/email-receipts-api', () => ({
   emailReceiptsApi: { parsers: { preview: api.preview, approve: api.approve }, receipts: { processBatch: api.processBatch } },
 }));
@@ -25,6 +30,7 @@ const item = (over: Partial<ParserPreviewItem> = {}): ParserPreviewItem => ({
   effectiveDate: '2026-09-01T10:00:00.000Z',
   outcome: 'matched',
   statusReason: null,
+  trade: null,
   parsed: { date: '2026-09-01', total: 25, currency: 'USD', lineCount: 2 },
   match: null,
   expected: { transactionId: 'tx-1', summary: 'Sep 1, 25.00, Allegro' },
@@ -55,6 +61,7 @@ function props(over: Partial<React.ComponentProps<typeof WizardPreviewStep>> = {
   return {
     domain: 'allegro.pl',
     draft: { parserId: 'p-1', revision: 3 },
+    kind: 'receipt' as const,
     answer: null,
     pairs,
     canReviseWithAi: true,
@@ -85,11 +92,41 @@ describe('WizardPreviewStep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.preview.mockResolvedValue(result());
+    accountsApi.getAll.mockResolvedValue([]);
   });
 
   it('previews the draft over the selected samples with what was expected', async () => {
     await renderStep();
     expect(api.preview).toHaveBeenCalledWith('p-1', { selectedReceiptIds: ['r-1', 'r-2'], expected: pairs });
+  });
+
+  it('reads no accounts for a receipt profile', async () => {
+    await renderStep();
+    expect(accountsApi.getAll).not.toHaveBeenCalled();
+  });
+
+  it('shows a trade sample with the trade columns and the account it books to, by name and currency', async () => {
+    accountsApi.getAll.mockResolvedValue([{ id: 'acc-usd', name: 'RRSP', currencyCode: 'USD' }]);
+    api.preview.mockResolvedValue(
+      result({
+        selected: [
+          item({
+            outcome: 'trade',
+            expected: null,
+            agrees: null,
+            trade: { action: 'BUY', symbol: 'VTI', quantity: 3, consistent: true, accountId: 'acc-usd', currency: 'USD' },
+          }),
+          // A guard stopped this one: no trade, and still a trade sample.
+          item({ receiptId: 'r-2', subject: 'Order 2', outcome: 'not_applicable', expected: null, agrees: null, trade: null, parsed: null }),
+        ],
+        others: [],
+        othersTotal: 0,
+      }),
+    );
+    await renderStep(props({ kind: 'trade', pairs: [], selectedReceiptIds: ['r-1', 'r-2'] }));
+    expect(accountsApi.getAll).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('columnheader', { name: 'Agrees' })).not.toBeInTheDocument();
+    expect(screen.getByText('Account: RRSP (USD)')).toBeInTheDocument();
   });
 
   it('shows the selected emails with expected against parsed, and whether they agree', async () => {

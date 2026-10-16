@@ -31,6 +31,42 @@ export interface EmailReceiptTransactionSummary {
 /** A candidate of an ambiguous receipt: the summary plus the text that helps choose. */
 export interface EmailReceiptCandidateSummary extends EmailReceiptTransactionSummary {
   description: string | null;
+  /** A trade email's candidate (an investment transaction): its share count; absent for a bank transaction. */
+  quantity?: number;
+}
+
+/** The investment transaction a trade email accounts for (`investment_transaction_id`). */
+export interface EmailReceiptInvestmentSummary {
+  id: string;
+  /** `YYYY-MM-DD`. */
+  date: string;
+  action: string;
+  symbol: string;
+  quantity: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
+}
+
+/**
+ * The investment transaction an email's open `email_trade` request proposes:
+ * the review card's own preview (the total the commit stores and the price it
+ * derives from it, INV-TRADE-001), never a figure recomputed here.
+ */
+export interface EmailReceiptTradeProposal {
+  accountName: string;
+  /** `YYYY-MM-DD`. */
+  date: string;
+  action: "BUY" | "SELL";
+  symbol: string;
+  securityName: string | null;
+  quantity: number;
+  /** Per share, in the security's currency. */
+  price: number;
+  commission: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
 }
 
 /** One stored email in the list: never its text. */
@@ -59,10 +95,24 @@ export interface EmailReceiptListItem {
   parserId: string | null;
   parserName: string | null;
   aiReviewRequestId: string | null;
+  /**
+   * The email is a brokerage trade confirmation (`tradeSource` says who reads
+   * it): it proposes an investment transaction to create, so bank-transaction
+   * actions do not apply.
+   */
+  isTrade: boolean;
+  /**
+   * Who reads the trade: `profile` (a trade profile's reading is in `trade`),
+   * `ai` (the email stands behind an `email_trade` request with no profile
+   * reading: "Recognize as a trade"), or null for an email that is no trade.
+   */
+  tradeSource: "profile" | "ai" | null;
   displayState: EmailReceiptDisplayState | null;
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
   transaction: EmailReceiptTransactionSummary | null;
+  /** A trade email's ledger row: the one its approval booked, a person linked, or already there; else null. */
+  investmentTransaction: EmailReceiptInvestmentSummary | null;
   createdAt: string;
 }
 
@@ -89,6 +139,23 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
    */
   structuredOrder: SchemaOrgOrder | null;
   parsed: Record<string, unknown> | null;
+  /**
+   * What a profile with a `trade` section read (`ParsedTrade`), or null: such an
+   * email proposes an investment transaction to create, not a split of a bank
+   * transaction, so `parsed` and `candidates` are empty for it.
+   */
+  trade: Record<string, unknown> | null;
+  /**
+   * What the email's `email_trade` request proposes while that proposal waits
+   * for approval (not expired); null otherwise, and for every other email.
+   */
+  tradeProposal: EmailReceiptTradeProposal | null;
+  /**
+   * Who answers the email's `email_trade` request: `profile` for the one a
+   * trade profile queued, `ai` for the one "Recognize as a trade" handed to
+   * the assistant; null when the email's request is not a trade request.
+   */
+  tradeRequestSource: "profile" | "ai" | null;
   candidates: EmailReceiptCandidateSummary[];
 }
 

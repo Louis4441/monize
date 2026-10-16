@@ -3,13 +3,16 @@
 import { useTranslations } from 'next-intl';
 import {
   RECEIPT_TRACE_FIELDS,
+  RECEIPT_TRADE_TRACE_FIELDS,
   type ReceiptTrace,
+  type ReceiptTradeTrace,
   type ReceiptTraceHit,
   type ReceiptTraceItem,
 } from '@/types/email-receipts';
 
 interface ParserTraceListProps {
-  trace: ReceiptTrace;
+  /** A receipt profile's trace, or a trade profile's (which has no items). */
+  trace: ReceiptTrace | ReceiptTradeTrace;
 }
 
 /** The pattern that read line `index` of an item: a record has one per consumed line, the others one for all. */
@@ -49,8 +52,11 @@ export function ParserTraceList({ trace }: ParserTraceListProps) {
     </li>
   );
 
-  const hits = RECEIPT_TRACE_FIELDS.flatMap((field) => {
-    const value = trace[field];
+  const isReceipt = 'items' in trace;
+  const items: ReceiptTraceItem[] = isReceipt ? trace.items : [];
+  const fields: readonly string[] = isReceipt ? RECEIPT_TRACE_FIELDS : RECEIPT_TRADE_TRACE_FIELDS;
+  const hits = fields.flatMap((field) => {
+    const value = (trace as Record<string, ReceiptTraceHit | null | undefined>)[field];
     // A server that predates a field sends none: nothing was read, as for null.
     return !value ? [] : [hit(field, value)];
   });
@@ -58,12 +64,12 @@ export function ParserTraceList({ trace }: ParserTraceListProps) {
   return (
     <div className="text-xs text-gray-600 dark:text-gray-400">
       <p className="font-medium text-gray-900 dark:text-gray-100">{t('heading')}</p>
-      {hits.length === 0 && trace.items.length === 0 ? (
+      {hits.length === 0 && items.length === 0 ? (
         <p>{t('none')}</p>
       ) : (
         <ul className="mt-1 space-y-1 break-words font-mono">
           {hits}
-          {trace.items.map((item, number) => (
+          {items.map((item, number) => (
             <li key={`item-${number}`}>
               <span className="font-medium text-gray-900 dark:text-gray-100">{t('item', { number: number + 1 })}</span>
               <ul className="ml-4 list-disc">

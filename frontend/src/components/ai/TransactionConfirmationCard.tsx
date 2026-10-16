@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { PendingAction } from '@/types/ai';
 import { formatPhoneForDisplay } from '@/lib/phone-number';
@@ -36,6 +37,7 @@ export function TransactionConfirmationCard({
   const t = useTranslations('ai');
   const { formatCurrency, formatCurrencyPrecise, formatQuantity, formatBytes } =
     useNumberFormat();
+  const { formatDate } = useDateFormat();
   const { preview, type, status } = action;
   const redemptionSplit = preview.bondRedemptionSplit ?? null;
 
@@ -190,6 +192,18 @@ export function TransactionConfirmationCard({
       rows.push({
         label: t('confirmAction.bondSeries'),
         value: preview.bondSeriesCode,
+      });
+    // The occurrence approving marks paid, named with its due day so a
+    // schedule with several open occurrences says which one.
+    if (preview.scheduledName)
+      rows.push({
+        label: t('confirmAction.marksPaid'),
+        value: preview.scheduledDueDate
+          ? t('confirmAction.marksPaidDue', {
+              name: preview.scheduledName,
+              date: formatDate(preview.scheduledDueDate),
+            })
+          : preview.scheduledName,
       });
     if (preview.quantity !== undefined && preview.quantity !== null)
       rows.push({

@@ -112,6 +112,7 @@
     "total": "Toplam",
     "cashImpact": "Nakit etkisi",
     "bondSeries": "Seri",
+    "marksPaid": "Ödendi olarak işaretler",
     "accruedInterest": "Birikmiş faiz",
     "redemptionSplit": "İtfa dağılımı",
     "redemptionSplitValue": "Anapara {principal} + faiz {interest} = ödeme {payout}",
@@ -230,7 +231,11 @@
       "category": "Kategoriyi {name} olarak ayarla",
       "payee": "Alıcıyı {name} olarak ayarla",
       "aiReview": "{count, plural, one {# yapay zekâ inceleme isteğini kuyruğa al} other {# yapay zekâ inceleme isteğini kuyruğa al}}"
-    }
+    },
+    "aiCategory": "yapay zekâ önerisi",
+    "tags": "Etiketler",
+    "newTag": "(yeni etiket)",
+    "marksPaidDue": "{name} (vadesi {date})"
   },
   "table": {
     "downloadTitle": "Tabloyu CSV olarak indir",

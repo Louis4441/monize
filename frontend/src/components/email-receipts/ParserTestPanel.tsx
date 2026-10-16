@@ -5,9 +5,11 @@ import { useTranslations } from 'next-intl';
 import { MatchTraceView } from '@/components/email-receipts/MatchTraceView';
 import { ParsedReceiptView } from '@/components/email-receipts/ParsedReceiptView';
 import { ParserTraceList } from '@/components/email-receipts/ParserTraceList';
+import { TradeReadingView } from '@/components/email-receipts/TradeReadingView';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import type { ReceiptParserAccountOption } from '@/hooks/useReceiptParserLookups';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { getErrorMessage } from '@/lib/errors';
@@ -30,6 +32,8 @@ interface ParserTestPanelProps {
   /** A stored email to preselect, such as the one the parser is being written for. */
   initialReceiptId?: string;
   categoryLabels: ReadonlyMap<string, string>;
+  /** The user's accounts, so a trade profile's test names the account it would book to. */
+  accounts?: readonly ReceiptParserAccountOption[];
 }
 
 /**
@@ -39,7 +43,7 @@ interface ParserTestPanelProps {
  * when Test is pressed, so the answer is always about what is on screen at that
  * moment; an earlier result is cleared as soon as the choice of email changes.
  */
-export function ParserTestPanel({ definition, payeeId, initialReceiptId, categoryLabels }: ParserTestPanelProps) {
+export function ParserTestPanel({ definition, payeeId, initialReceiptId, categoryLabels, accounts }: ParserTestPanelProps) {
   const t = useTranslations('emailReceipts.test');
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
@@ -106,6 +110,7 @@ export function ParserTestPanel({ definition, payeeId, initialReceiptId, categor
   };
 
   const match = result?.match;
+  const testedReceipt = receipts?.find((receipt) => receipt.id === receiptId);
 
   return (
     <section aria-labelledby="parser-test-heading" className="space-y-3">
@@ -167,24 +172,39 @@ export function ParserTestPanel({ definition, payeeId, initialReceiptId, categor
               {t(`outcome.${result.outcome}`)}
             </p>
           )}
-          <ParsedReceiptView parsed={result.parsed} categoryLabels={categoryLabels} />
-          {result.trace && <ParserTraceList trace={result.trace} />}
-          <div role="status" className="text-sm text-gray-700 dark:text-gray-300">
-            <p className="font-medium text-gray-900 dark:text-gray-100">{t('matchHeading')}</p>
-            {match?.kind === 'matched' && result.transaction && (
-              <p>
-                {t('matched', {
-                  date: formatDate(result.transaction.date),
-                  amount: formatCurrency(result.transaction.amount),
-                  payee: result.transaction.payeeName ?? t('noPayee'),
-                  how: t(`matchKinds.${match.matchKind}`),
-                })}
-              </p>
-            )}
-            {match?.kind === 'ambiguous' && <p>{t('ambiguous', { count: match.candidateIds.length })}</p>}
-            {match?.kind === 'unmatched' && <p>{t('unmatched', { count: result.candidateCount })}</p>}
-          </div>
-          {result.matchTrace && <MatchTraceView trace={result.matchTrace} />}
+          {result.trade ? (
+            // A trade profile creates an investment transaction: there is no bank transaction to match.
+            <>
+              <TradeReadingView
+                trade={result.trade.parsed}
+                fallbackDate={testedReceipt?.effectiveDate ?? null}
+                accounts={accounts}
+                showReason
+              />
+              {result.trade.trace && <ParserTraceList trace={result.trade.trace} />}
+            </>
+          ) : (
+            <>
+              <ParsedReceiptView parsed={result.parsed} categoryLabels={categoryLabels} />
+              {result.trace && <ParserTraceList trace={result.trace} />}
+              <div role="status" className="text-sm text-gray-700 dark:text-gray-300">
+                <p className="font-medium text-gray-900 dark:text-gray-100">{t('matchHeading')}</p>
+                {match?.kind === 'matched' && result.transaction && (
+                  <p>
+                    {t('matched', {
+                      date: formatDate(result.transaction.date),
+                      amount: formatCurrency(result.transaction.amount),
+                      payee: result.transaction.payeeName ?? t('noPayee'),
+                      how: t(`matchKinds.${match.matchKind}`),
+                    })}
+                  </p>
+                )}
+                {match?.kind === 'ambiguous' && <p>{t('ambiguous', { count: match.candidateIds.length })}</p>}
+                {match?.kind === 'unmatched' && <p>{t('unmatched', { count: result.candidateCount })}</p>}
+              </div>
+              {result.matchTrace && <MatchTraceView trace={result.matchTrace} />}
+            </>
+          )}
         </div>
       )}
     </section>

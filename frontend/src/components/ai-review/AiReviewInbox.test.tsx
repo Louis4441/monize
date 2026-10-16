@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import { render, screen, fireEvent, within, act } from '@/test/render';
 import { AiReviewInbox } from './AiReviewInbox';
-import { makeReviewItem, PROPOSED_ACTION } from './ai-review-fixtures';
+import { makeReviewItem, makeTradeItem, PROPOSED_ACTION, TRADE_ACTION } from './ai-review-fixtures';
 import type { AiReviewItem } from '@/types/ai-review';
 
 const api = vi.hoisted(() => ({ list: vi.fn(), dismiss: vi.fn(), approveBatch: vi.fn() }));
@@ -163,17 +163,28 @@ describe('AiReviewInbox', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
-  it('on a 409 says the request changed and reloads the list', async () => {
+  it('on a 409 shows the server\'s reason and reloads the list', async () => {
     api.list.mockResolvedValueOnce([proposed]).mockResolvedValue([{ ...proposed, status: 'rejected', proposal: undefined }]);
     confirmAction.mockRejectedValue(conflict());
     await renderInbox();
     await click(screen.getByRole('button', { name: 'Approve' }));
 
-    expect(toast.error).toHaveBeenCalledWith('This request changed in the meantime. The list was reloaded.');
+    expect(toast.error).toHaveBeenCalledWith('no longer open');
     expect(api.list).toHaveBeenCalledTimes(2);
     expect(clearAllCache).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(screen.getByText('Rejected', { selector: 'span' })).toBeInTheDocument();
+  });
+
+  it('on a 409 with no message of its own says the request changed', async () => {
+    api.list.mockResolvedValueOnce([proposed]).mockResolvedValue([]);
+    confirmAction.mockRejectedValue(
+      new AxiosError('conflict', '409', undefined, undefined, { status: 409, data: {} } as never),
+    );
+    await renderInbox();
+    await click(screen.getByRole('button', { name: 'Approve' }));
+    expect(toast.error).toHaveBeenCalledWith('This request changed in the meantime. The list was reloaded.');
+    expect(api.list).toHaveBeenCalledTimes(2);
   });
 
   it('shows a proposal that no longer fits as an error with Dismiss only', async () => {
@@ -306,6 +317,18 @@ describe('AiReviewInbox', () => {
       await click(screen.getByRole('button', { name: 'All' }));
       expect(nav.replace).toHaveBeenLastCalledWith('/ai-reviews', { scroll: false });
       expect(api.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('lists a trade confirmation under Email receipts, not under transaction reviews', async () => {
+      api.list.mockResolvedValue([makeTradeItem({ proposal: { action: TRADE_ACTION } }), makeReviewItem({ id: 'rule-1' })]);
+      await renderInbox();
+      await click(screen.getByRole('button', { name: 'Email receipts' }));
+      expect(screen.getByText('Buy 75.9878 shares of XCNS')).toBeInTheDocument();
+      // Its card is the investment one the backend builds, not a bank transaction's.
+      expect(screen.getByText('Create this investment transaction?')).toBeInTheDocument();
+      expect(screen.queryByText('Rule: Allegro orders')).not.toBeInTheDocument();
+      await click(screen.getByRole('button', { name: 'All' }));
+      expect(screen.getByText('Buy 75.9878 shares of XCNS')).toBeInTheDocument();
     });
 
     it('starts from ?kind= and ignores a value that is no kind', async () => {
