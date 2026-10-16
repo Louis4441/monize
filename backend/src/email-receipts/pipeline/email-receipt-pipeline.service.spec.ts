@@ -213,6 +213,7 @@ function setup(over: Partial<World> = {}) {
   const receiptRepo = {
     findOne: jest.fn(async () => world.receipt),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
+    delete: jest.fn().mockResolvedValue({ affected: 1 }),
   };
   const mailboxRepo = { findOne: jest.fn(async () => world.mailbox) };
   const parserRepo = { find: jest.fn(async () => world.parsers) };
@@ -654,6 +655,71 @@ describe("EmailReceiptPipelineService.process", () => {
     });
   });
 
+  describe("a profile that discards its emails (discard)", () => {
+    const discarding = (discard: "ignore" | "delete", extra = {}) =>
+      parserRow({ definition: { ...DEFINITION, discard, ...extra } });
+
+    it("ignore: the email is ignored with profile_ignore, before any guard, and nothing is read or asked", async () => {
+      const h = setup({
+        parsers: [discarding("ignore", { skipIfLine: ["*Widget*"] })],
+      });
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "ignored",
+        statusReason: "profile_ignore",
+        deleted: false,
+      });
+      expect(h.lastUpdate()?.[1]).toMatchObject({
+        status: "ignored",
+        statusReason: "profile_ignore",
+        parserId: "parser-1",
+        parsed: null,
+        transactionId: null,
+      });
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+      expect(h.manager.query).not.toHaveBeenCalledWith(
+        expect.stringContaining("JOIN accounts a"),
+        expect.anything(),
+      );
+    });
+
+    it("delete: the email row is removed with its open requests, and nothing else is written", async () => {
+      const h = setup({ parsers: [discarding("delete")] });
+      const result = await run(h);
+      expect(result).toMatchObject({ deleted: true, unchanged: false });
+      expect(h.receiptRepo.delete).toHaveBeenCalledWith({
+        id: RECEIPT,
+        userId: USER,
+      });
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      expect(
+        h.manager.query.mock.calls.some((c) =>
+          String(c[0]).includes("SET status = 'rejected'"),
+        ),
+      ).toBe(true);
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+    });
+
+    it("a person's own link is a command: the profile does not discard the email", async () => {
+      const h = setup({
+        parsers: [discarding("delete")],
+        linkRow: {
+          id: TX,
+          amount: "-15.0000",
+          description: null,
+          payee_id: null,
+          reference_number: null,
+          is_transfer: false,
+          status: "UNRECONCILED",
+          plain: true,
+        },
+      });
+      const result = await run(h, { link: { transactionId: TX } });
+      expect(result).toMatchObject({ status: "review", deleted: false });
+      expect(h.receiptRepo.delete).not.toHaveBeenCalled();
+    });
+  });
+
   describe("matching", () => {
     it("loads the candidates in one query and says unmatched when none fit", async () => {
       const h = setup({ candidates: [] });
@@ -944,12 +1010,18 @@ describe("EmailReceiptPipelineService.process", () => {
     });
 
     it("a proposal with nothing in it is parse_failed nothing_to_propose, keeping the match", async () => {
-      // Incomplete parse whose summary the transaction already carries.
+      // Incomplete parse whose summary the transaction already carries, its
+      // order number already in the Ref #.
       const h = setup({
         receipt: receiptRow({
           bodyText: "Order number: ABCD1234\nOrder total: 15.00",
         }),
-        candidates: [candidate({ description: "Shop ABCD1234 order" })],
+        candidates: [
+          candidate({
+            description: "Shop ABCD1234 order",
+            reference_number: "ABCD1234",
+          }),
+        ],
       });
       const result = await run(h);
       expect(result).toMatchObject({
@@ -971,7 +1043,8 @@ describe("EmailReceiptPipelineService.process", () => {
       expect(result.statusReason).toBe("amount_differs");
       const input = h.work.submit.mock.calls[0][3];
       expect(input.splits).toBeUndefined();
-      expect(input.description).toContain("Shop ABCD1234");
+      expect(input.description).toContain("Shop: Widget");
+      expect(input.referenceNumber).toBe("ABCD1234");
     });
 
     it("the parser payee's name is proposed only when the transaction has no payee", async () => {
@@ -1011,7 +1084,8 @@ describe("EmailReceiptPipelineService.process", () => {
       const fallback = h.work.submit.mock.calls[1][3];
       expect(fallback.splits).toBeUndefined();
       expect(fallback.categoryName).toBeUndefined();
-      expect(fallback.description).toContain("Shop ABCD1234");
+      expect(fallback.description).toContain("Shop: Widget");
+      expect(fallback.referenceNumber).toBe("ABCD1234");
       expect(result).toMatchObject({
         status: "review",
         statusReason: "proposal_fallback",
@@ -1772,9 +1846,8 @@ describe("EmailReceiptPipelineService.process: the email's own schema.org order"
     });
     await run(h);
     const [, , , input] = h.work.submit.mock.calls[0];
-    expect(input.description).toContain(
-      "shop.example.com ABCD1234: Widget, Gadget",
-    );
+    expect(input.description).toContain("shop.example.com: Widget, Gadget");
+    expect(input.referenceNumber).toBe("ABCD1234");
   });
 
   it("is used when the parser found no total and no paid, and keeps that parser on the receipt", async () => {

@@ -224,7 +224,18 @@
       "approveFailed": "프로필을 승인하지 못했습니다",
       "changedElsewhere": "이 프로필이 다른 곳에서 변경되었습니다. 목록을 다시 불러왔습니다.",
       "deleted": "프로필 삭제됨",
-      "deleteFailed": "프로필을 삭제하지 못했습니다"
+      "deleteFailed": "프로필을 삭제하지 못했습니다",
+      "emailsIgnored": "{count, plural, other {메일 #개를 무시했습니다}}",
+      "emailsDeleted": "{count, plural, other {메일 #개를 삭제했습니다}}",
+      "bulkFailed": "이 프로필의 메일 처리를 마치지 못했습니다. 이미 처리된 메일은 그대로 유지됩니다."
+    },
+    "bulk": {
+      "ignoreTitle": "이 프로필의 메일을 무시할까요?",
+      "ignoreMessage": "{name}이(가) 읽는 메일 {count, plural, other {#개}}를 무시합니다. 이 메일들은 아무것도 제안하지 않으며, 열려 있는 제안은 닫힙니다.{kept, plural, =0 {} other { 이미 적용되었거나 읽을 수 없는 메일 #개는 그대로 유지됩니다.}}",
+      "ignoreConfirm": "메일 무시",
+      "deleteTitle": "이 프로필의 메일을 삭제할까요?",
+      "deleteMessage": "{name}이(가) 읽는 메일 {count, plural, other {#개}}를 열려 있는 제안과 함께 삭제합니다. 이 작업은 되돌릴 수 없습니다.{kept, plural, =0 {} other { 제안이 이미 적용된 메일 #개는 유지됩니다.}}",
+      "deleteConfirm": "메일 삭제"
     },
     "deleteDialog": {
       "title": "프로필을 삭제할까요?",
@@ -245,7 +256,9 @@
       "later": "나중에"
     },
     "reparse": "메일 다시 분석 ({count})",
-    "kindTrade": "증권 거래"
+    "kindTrade": "증권 거래",
+    "discardIgnore": "메일을 무시함",
+    "discardDelete": "메일을 삭제함"
   },
   "editor": {
     "createTitle": "새 프로필",
@@ -279,7 +292,7 @@
         "text": "텍스트",
         "html": "HTML"
       },
-      "globHelp": "각 패턴은 이메일의 한 줄 전체와 대소문자 구분 없이 비교됩니다. 모든 텍스트에는 {star}를 쓰고, 값을 가져오려면 {capture}처럼 중괄호 안에 이름을 쓰세요. 각 필드에는 패턴을 한 줄에 하나씩 최대 {max}개까지 입력할 수 있습니다.",
+      "globHelp": "각 패턴은 이메일의 한 줄 전체와 대소문자 구분 없이 비교됩니다. 모든 텍스트에는 {star}를 쓰고, 값을 가져오려면 {capture}처럼 중괄호 안에 이름을 쓰세요. 각 필드에는 패턴을 한 줄에 하나씩 최대 {max}개까지 입력할 수 있습니다. 연속된 줄과 일치시키려면 줄마다 패턴 하나를 {lineBreak}(으)로 이어 쓰세요. 예: {example}",
       "orderIdLabel": "주문 번호 패턴",
       "orderIdHint": "{capture}을(를) 가져와야 합니다. 예: 주문 번호: {capture}",
       "totalLabel": "합계 패턴",
@@ -426,6 +439,16 @@
       "markerRemove": "표시 {marker} 삭제",
       "markerAdd": "통화 표시 추가",
       "markersMax": "표시는 최대 {max}개입니다."
+    },
+    "discard": {
+      "label": "일치하는 메일",
+      "read": "읽기",
+      "ignore": "무시",
+      "delete": "삭제",
+      "readHelp": "프로필이 일치하는 각 메일을 아래 패턴으로 읽습니다.",
+      "ignoreHelp": "이 프로필과 일치하는 모든 메일은 도착하는 즉시 무시되어 아무것도 제안하지 않습니다. 다룰 일이 없는 발신자를 위한 설정입니다.",
+      "deleteHelp": "이 프로필과 일치하는 모든 메일은 도착하는 즉시 Monize에서 삭제됩니다(메일함에는 남아 있습니다). 삭제한 메일은 되돌릴 수 없습니다.",
+      "noReading": "이 프로필은 아무것도 읽지 않으므로 패턴, 카테고리, 매칭이 필요 없습니다. 위의 발신자 도메인과 제목 단어로 어떤 메일을 가져올지 정합니다."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "에는 합계 또는 가격 패턴이 필요합니다(둘 중 하나 이상)",
       "trade_account_missing": "에는 기본 계좌나 계좌 규칙이 필요합니다",
       "invalid_currency": "은(는) USD 같은 3글자 통화 코드가 아닙니다",
+      "too_many_lines": "이(가) 너무 많은 줄에 걸쳐 있습니다 (최대 {max}줄)",
+      "line_break_not_allowed": "은(는) 하나의 텍스트(품목 이름, 판매자 또는 계좌)와 비교되므로 여러 줄에 걸칠 수 없습니다",
       "invalid_uuid_account": "은(는) 올바른 계좌가 아닙니다"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "이 프로필은 이 메일을 읽지 않습니다. 필수 줄이 하나도 없으므로 해당 발신자의 다음 프로필을 시도합니다.",
       "skip_line": "이 프로필은 이 메일을 제외합니다. 건너뛰기 대상 줄이 포함되어 있습니다.",
       "wait_line": "이 프로필은 이 메일을 보류합니다. 주문이 최종이 아니라는 줄이 있어 나중에 다시 읽습니다.",
+      "discard_ignore": "이 프로필은 이 메일을 무시합니다. 일치하는 모든 메일을 무시합니다.",
+      "discard_delete": "이 프로필은 이 메일을 삭제합니다. 일치하는 모든 메일을 삭제합니다.",
       "no_html": "이 프로필은 메일의 HTML 부분을 읽는데 이 메일에는 없으므로, 읽을 수 없음(HTML 없음)으로 표시됩니다."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "항목 {entry} ({pattern}), {line}번째 줄: {text}",
       "entrySubject": "항목 {entry} ({pattern}), 제목: {text}",
+      "entryLines": "항목 {entry} ({pattern}), {first}번째 줄부터 {last}번째 줄까지:",
+      "blockLine": "{line}번째 줄: {text}",
       "labelled": "항목 {entry}, {labelLine}번째 줄({labelText})의 레이블 {label}, {line}번째 줄의 값 {pattern}: {text}",
       "item": "품목 {number}",
       "itemLine": "{pattern}, {line}번째 줄: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "제안이 거부되어 아무것도 제안하지 않았습니다.",
       "skip_line": "이 프로필이 건너뛰기 대상으로 삼는 줄이 발견되어 메일을 무시했습니다.",
       "wait_line": "주문이 아직 확정되지 않았다는 줄이 있어 이메일을 나중에 다시 읽습니다.",
+      "profile_ignore": "이 메일의 프로필은 일치하는 모든 메일을 무시합니다.",
       "no_html": "이 프로필은 메일의 HTML 부분을 읽는데 이 메일에는 없습니다.",
       "schema_org": "프로필이 필요하지 않았습니다. 주문은 메일의 구조화된 데이터(schema.org)에서 읽었습니다.",
       "item_amount_missing": "품목에 금액이 없고, 이메일에도 그 금액을 정할 단일 합계가 없습니다.",
@@ -1074,6 +1104,7 @@
     "failed": "요청이 실패하여 처리가 중단되었습니다.",
     "failedWithReason": "처리가 중단되었습니다: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count}개 삭제됨",
     "close": "닫기"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "이 프로필에서 읽지 않음",
         "skip_line": "건너뜀 (건너뛰기 줄 발견)",
         "wait_line": "보류 (주문이 최종 아님)",
+        "discard_ignore": "이 프로필이 무시함",
+        "discard_delete": "이 프로필이 삭제함",
         "no_html": "HTML 부분 없음",
         "trade": "거래를 제안함",
         "trade_exists": "이미 원장에 있음"

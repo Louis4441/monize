@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
 import type { ReceiptParserLookups, ReceiptParserLookupsState } from '@/hooks/useReceiptParserLookups';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
@@ -319,7 +320,31 @@ function ParserEditorForm({
         </div>
       </section>
 
-      {mode === 'form' && form.kind === 'trade' ? (
+      {/* A profile for mail that is never wanted: it ignores or deletes what it matches instead of reading it. */}
+      {mode === 'form' && (form.kind === 'receipt' || form.discard !== '') && (
+        <div>
+          <Select
+            id="parser-discard"
+            label={t('discard.label')}
+            value={form.discard}
+            onChange={(e) => change({ discard: e.target.value as ParserFormState['discard'] })}
+            options={[
+              { value: '', label: t('discard.read') },
+              { value: 'ignore', label: t('discard.ignore') },
+              { value: 'delete', label: t('discard.delete') },
+            ]}
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t(form.discard === '' ? 'discard.readHelp' : form.discard === 'ignore' ? 'discard.ignoreHelp' : 'discard.deleteHelp')}
+          </p>
+        </div>
+      )}
+
+      {mode === 'form' && form.discard !== '' ? (
+        <p role="note" className="rounded-lg border border-gray-200 p-3 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+          {t('discard.noReading')}
+        </p>
+      ) : mode === 'form' && form.kind === 'trade' ? (
         <ParserTradeFields
           form={form}
           accounts={lookups.accounts}

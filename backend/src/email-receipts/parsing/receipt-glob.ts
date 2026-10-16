@@ -8,8 +8,9 @@ import {
 } from "../../transaction-rules/rule-glob-capture";
 
 /**
- * Pattern matching for one receipt line. A rule glob captures the SHORTEST run
- * for every capture followed by a literal, which reads `{name} {amount}` on
+ * Pattern matching for one receipt line (and, part by part, for the
+ * consecutive lines a multi-line pattern spans). A rule glob captures the
+ * SHORTEST run for every capture followed by a literal, which reads `{name} {amount}` on
  * "USB-C cable 19.98" as name "USB-C" and amount "cable 19.98". Receipt lines
  * rarely have a delimiter a name cannot contain, so two strategies run in turn:
  *
@@ -140,10 +141,53 @@ function readable(captures: GlobCaptures): GlobCaptures {
 }
 
 /**
+ * The readings of one line by one one-line pattern, in the order they are
+ * tried: the rules' lazy reading, then the greedy one. Lazy, so a caller that
+ * takes the first reading never pays for the second.
+ */
+function* readings(pattern: string, line: string): Generator<GlobCaptures> {
+  if (pattern.length > MAX_GLOB_LENGTH || line.length > MAX_GLOB_LENGTH) {
+    return;
+  }
+  const glob = pattern.replace(LITERAL_STAR_IN_PATTERN, LITERAL_STAR);
+  const text = line.replace(/\*/g, LITERAL_STAR);
+  const lazy = matchGlobWithCaptures(text, glob);
+  if (lazy !== null) yield readable(lazy);
+  const greedy = matchGreedy(text, glob);
+  if (greedy !== null) yield readable(greedy);
+}
+
+/**
+ * The two characters `\n` in a pattern: the break between the lines of a
+ * multi-line pattern. Each part matches one whole line, and the parts match
+ * consecutive lines of the email (blank lines are never lines: see
+ * `normalizeReceiptLines`). A line holds no line break, so the escape cannot
+ * mean a character of the line.
+ */
+export const PATTERN_LINE_BREAK = "\\n";
+
+/** The parts of a pattern, one per line it spans: a one-line pattern is one part. */
+export function patternParts(pattern: string): string[] {
+  return pattern.split(PATTERN_LINE_BREAK);
+}
+
+export const isMultiLinePattern = (pattern: string): boolean =>
+  pattern.includes(PATTERN_LINE_BREAK);
+
+/** The part of a pattern (0 for a one-line pattern) that holds capture `name`; 0 when none does. */
+export function capturePart(pattern: string, name: string): number {
+  const at = patternParts(pattern).findIndex((part) =>
+    parseGlob(part).captureNames.includes(name),
+  );
+  return Math.max(at, 0);
+}
+
+/**
  * Match one line against one pattern: the rules' lazy reading first, then the
  * greedy one, each only as far as `accept` allows. Returns the captured values
  * of the first reading `accept` takes, or null when neither reading is usable.
- * A line or pattern over 500 characters never matches.
+ * A line or pattern over 500 characters never matches, and neither does a
+ * multi-line pattern (one text is one line; `matchReceiptLines` reads lines).
  *
  * `{*}` and `\*` in the pattern are a literal `*`. A captured value is trimmed
  * of leading and trailing whitespace, `*` and `_` (Gmail renders bold as
@@ -154,18 +198,74 @@ export function matchReceiptPattern(
   line: string,
   accept: (captures: GlobCaptures) => boolean,
 ): GlobCaptures | null {
-  if (pattern.length > MAX_GLOB_LENGTH || line.length > MAX_GLOB_LENGTH) {
-    return null;
-  }
-  const glob = pattern.replace(LITERAL_STAR_IN_PATTERN, LITERAL_STAR);
-  const text = line.replace(/\*/g, LITERAL_STAR);
-  const lazy = matchGlobWithCaptures(text, glob);
-  if (lazy !== null) {
-    const read = readable(lazy);
+  if (isMultiLinePattern(pattern)) return null;
+  for (const read of readings(pattern, line)) {
     if (accept(read)) return read;
   }
-  const greedy = matchGreedy(text, glob);
-  if (greedy === null) return null;
-  const read = readable(greedy);
-  return accept(read) ? read : null;
+  return null;
+}
+
+/** What a pattern read at a line: the captures and how many lines it took. */
+export interface ReceiptLinesMatch {
+  captures: GlobCaptures;
+  span: number;
+}
+
+/**
+ * The first combination of the parts' readings, in order (each part's lazy
+ * reading before its greedy one, the first part varying slowest), whose
+ * captures together `accept` takes. A capture name is in one part only (the
+ * validator refuses a duplicate), so merging never overwrites.
+ */
+function firstAccepted(
+  parts: readonly GlobCaptures[][],
+  index: number,
+  merged: GlobCaptures,
+  accept: (captures: GlobCaptures) => boolean,
+): GlobCaptures | null {
+  if (index === parts.length) return accept(merged) ? merged : null;
+  for (const reading of parts[index]) {
+    const next = Object.freeze(
+      Object.assign(
+        Object.create(null) as Record<string, string>,
+        merged,
+        reading,
+      ),
+    );
+    const found = firstAccepted(parts, index + 1, next, accept);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/**
+ * Match a pattern against the lines starting at `lines[at]`: a one-line
+ * pattern against that line (`matchReceiptPattern`), a multi-line one part by
+ * part against it and the lines after it, all of which must lie before `end`
+ * (the end of an item section; the end of the email by default). `accept`
+ * sees the captures of every part together. Each part has at most two
+ * readings and a pattern at most `MAX_PATTERN_LINES` parts, so at most 32
+ * combinations are tried.
+ */
+export function matchReceiptLines(
+  pattern: string,
+  lines: readonly string[],
+  at: number,
+  accept: (captures: GlobCaptures) => boolean,
+  end: number = lines.length,
+): ReceiptLinesMatch | null {
+  const parts = patternParts(pattern);
+  if (at < 0 || at + parts.length > Math.min(end, lines.length)) return null;
+  if (parts.length === 1) {
+    const captures = matchReceiptPattern(pattern, lines[at], accept);
+    return captures === null ? null : { captures, span: 1 };
+  }
+  const read: GlobCaptures[][] = [];
+  for (const [index, part] of parts.entries()) {
+    const found = [...readings(part, lines[at + index])];
+    if (found.length === 0) return null;
+    read.push(found);
+  }
+  const captures = firstAccepted(read, 0, Object.freeze({}), accept);
+  return captures === null ? null : { captures, span: parts.length };
 }

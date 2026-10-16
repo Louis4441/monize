@@ -224,7 +224,18 @@
       "approveFailed": "Não foi possível aprovar o analisador",
       "changedElsewhere": "Este analisador foi alterado em outro lugar. A lista foi recarregada.",
       "deleted": "Analisador excluído",
-      "deleteFailed": "Não foi possível excluir o analisador"
+      "deleteFailed": "Não foi possível excluir o analisador",
+      "emailsIgnored": "{count, plural, one {# e-mail ignorado} other {# e-mails ignorados}}",
+      "emailsDeleted": "{count, plural, one {# e-mail excluído} other {# e-mails excluídos}}",
+      "bulkFailed": "Não foi possível concluir os e-mails deste analisador. Os que já foram tratados continuam assim."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignorar os e-mails deste analisador?",
+      "ignoreMessage": "{count, plural, one {# e-mail lido por {name} será ignorado} other {# e-mails lidos por {name} serão ignorados}}: eles não propõem mais nada e as propostas abertas são fechadas.{kept, plural, =0 {} one { # e-mail já aplicado ou que não pôde ser lido continua como está.} other { # e-mails já aplicados ou que não puderam ser lidos continuam como estão.}}",
+      "ignoreConfirm": "Ignorar e-mails",
+      "deleteTitle": "Excluir os e-mails deste analisador?",
+      "deleteMessage": "{count, plural, one {# e-mail lido por {name} será excluído} other {# e-mails lidos por {name} serão excluídos}}, junto com as propostas abertas. Esta ação não pode ser desfeita.{kept, plural, =0 {} one { # e-mail cuja proposta já foi aplicada continua.} other { # e-mails cujas propostas já foram aplicadas continuam.}}",
+      "deleteConfirm": "Excluir e-mails"
     },
     "deleteDialog": {
       "title": "Excluir o analisador?",
@@ -245,7 +256,9 @@
       "later": "Agora não"
     },
     "reparse": "Reanalisar os e-mails ({count})",
-    "kindTrade": "Operações na bolsa"
+    "kindTrade": "Operações na bolsa",
+    "discardIgnore": "Ignora os seus e-mails",
+    "discardDelete": "Exclui os seus e-mails"
   },
   "editor": {
     "createTitle": "Novo analisador",
@@ -279,7 +292,7 @@
         "text": "Texto",
         "html": "HTML"
       },
-      "globHelp": "Cada padrão é comparado com uma linha inteira do e-mail, sem diferenciar maiúsculas de minúsculas. Use {star} para qualquer texto e um nome entre chaves, como {capture}, para capturar um valor. Cada campo aceita até {max} padrões, um por linha.",
+      "globHelp": "Cada padrão é comparado com uma linha inteira do e-mail, sem diferenciar maiúsculas de minúsculas. Use {star} para qualquer texto e um nome entre chaves, como {capture}, para capturar um valor. Cada campo aceita até {max} padrões, um por linha. Para corresponder a linhas consecutivas, junte um padrão por linha com {lineBreak}, por exemplo {example}.",
       "orderIdLabel": "Padrões do número do pedido",
       "orderIdHint": "Precisa capturar {capture}. Exemplo: Número do pedido: {capture}",
       "totalLabel": "Padrões do total",
@@ -426,6 +439,16 @@
       "markerRemove": "Remover o marcador {marker}",
       "markerAdd": "Adicionar um marcador de moeda",
       "markersMax": "No máximo {max} marcadores."
+    },
+    "discard": {
+      "label": "E-mails correspondentes",
+      "read": "Ler",
+      "ignore": "Ignorar",
+      "delete": "Excluir",
+      "readHelp": "O analisador lê cada e-mail correspondente com os padrões abaixo.",
+      "ignoreHelp": "Cada e-mail que corresponde a este analisador é ignorado quando chega: não propõe nada. Para remetentes com cujos e-mails você nunca quer lidar.",
+      "deleteHelp": "Cada e-mail que corresponde a este analisador é excluído do Monize quando chega (continua na sua caixa de entrada). Um e-mail excluído não pode ser recuperado.",
+      "noReading": "Este analisador não lê nada, então não precisa de padrões, categorias nem correspondência. Os domínios dos remetentes e as palavras do assunto acima decidem quais e-mails ele recebe."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "precisa de padrões do total ou do preço (pelo menos um dos dois)",
       "trade_account_missing": "precisa de uma conta padrão ou de regras de conta",
       "invalid_currency": "não é um código de moeda de 3 letras, como USD",
+      "too_many_lines": "abrange linhas demais (no máximo {max})",
+      "line_break_not_allowed": "é comparado com um único texto (o nome de um item, o comerciante ou uma conta), então não pode abranger várias linhas",
       "invalid_uuid_account": "não é uma conta válida"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "Este analisador não leria este e-mail: nenhuma de suas linhas obrigatórias está nele, então o próximo analisador do remetente seria tentado.",
       "skip_line": "Este analisador deixaria este e-mail de lado: ele contém uma linha que faz o analisador ignorá-lo.",
       "wait_line": "Este analisador seguraria este e-mail: uma linha indica que o pedido ainda não é definitivo, então ele será lido de novo mais tarde.",
+      "discard_ignore": "Este analisador ignoraria este e-mail: ele ignora cada e-mail correspondente.",
+      "discard_delete": "Este analisador excluiria este e-mail: ele exclui cada e-mail correspondente.",
       "no_html": "Este analisador lê a parte HTML do e-mail e este e-mail não tem nenhuma, então ele seria marcado como ilegível (sem HTML)."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "entrada {entry} ({pattern}), linha {line}: {text}",
       "entrySubject": "entrada {entry} ({pattern}), o assunto: {text}",
+      "entryLines": "entrada {entry} ({pattern}), linhas {first} a {last}:",
+      "blockLine": "linha {line}: {text}",
       "labelled": "entrada {entry}, rótulo {label} na linha {labelLine} ({labelText}), valor {pattern} na linha {line}: {text}",
       "item": "Item {number}",
       "itemLine": "{pattern}, linha {line}: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "A proposta foi recusada, então nada foi proposto.",
       "skip_line": "Foi encontrada uma linha que faz este analisador ignorar o e-mail, então ele foi ignorado.",
       "wait_line": "Uma linha indica que o pedido ainda não é definitivo, então o e-mail será lido de novo mais tarde.",
+      "profile_ignore": "O analisador deste e-mail ignora cada e-mail correspondente.",
       "no_html": "Este analisador lê a parte HTML do e-mail e este e-mail não tem nenhuma.",
       "schema_org": "Nenhum analisador foi necessário: o pedido foi lido a partir dos dados estruturados (schema.org) do e-mail.",
       "item_amount_missing": "Um item não tem valor, e o e-mail não tem um total único para atribuir a ele.",
@@ -1074,6 +1104,7 @@
     "failed": "O processamento parou porque uma solicitação falhou.",
     "failedWithReason": "O processamento parou: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} excluídos",
     "close": "Fechar"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "Não lido por este perfil",
         "skip_line": "Ignorado (linha de exclusão encontrada)",
         "wait_line": "Em espera (pedido não final)",
+        "discard_ignore": "Ignorado por este analisador",
+        "discard_delete": "Excluído por este analisador",
         "no_html": "Sem parte HTML",
         "trade": "Propõe uma negociação",
         "trade_exists": "Já está no seu registro"

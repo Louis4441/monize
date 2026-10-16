@@ -224,7 +224,18 @@
       "approveFailed": "Impossibile approvare il profilo",
       "changedElsewhere": "Questo profilo è stato modificato altrove. L'elenco è stato ricaricato.",
       "deleted": "Profilo eliminato",
-      "deleteFailed": "Impossibile eliminare il profilo"
+      "deleteFailed": "Impossibile eliminare il profilo",
+      "emailsIgnored": "{count, plural, one {# email ignorata} other {# email ignorate}}",
+      "emailsDeleted": "{count, plural, one {# email eliminata} other {# email eliminate}}",
+      "bulkFailed": "Impossibile completare le email di questo profilo. Quelle già gestite restano così."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignorare le email di questo profilo?",
+      "ignoreMessage": "{count, plural, one {# email letta da {name} verrà ignorata} other {# email lette da {name} verranno ignorate}}: non proporranno nulla e le proposte aperte verranno chiuse.{kept, plural, =0 {} one { # email già applicata o non leggibile resta com'è.} other { # email già applicate o non leggibili restano come sono.}}",
+      "ignoreConfirm": "Ignora email",
+      "deleteTitle": "Eliminare le email di questo profilo?",
+      "deleteMessage": "{count, plural, one {# email letta da {name} verrà eliminata} other {# email lette da {name} verranno eliminate}}, insieme alle proposte aperte. L'operazione non può essere annullata.{kept, plural, =0 {} one { # email la cui proposta è già stata applicata resta.} other { # email le cui proposte sono già state applicate restano.}}",
+      "deleteConfirm": "Elimina email"
     },
     "deleteDialog": {
       "title": "Eliminare il profilo?",
@@ -245,7 +256,9 @@
       "later": "Non ora"
     },
     "reparse": "Rianalizza le email ({count})",
-    "kindTrade": "Operazioni di borsa"
+    "kindTrade": "Operazioni di borsa",
+    "discardIgnore": "Ignora le sue email",
+    "discardDelete": "Elimina le sue email"
   },
   "editor": {
     "createTitle": "Nuovo profilo",
@@ -279,7 +292,7 @@
         "text": "Testo",
         "html": "HTML"
       },
-      "globHelp": "Ogni modello viene confrontato con un'intera riga dell'email, senza distinguere maiuscole e minuscole. Usa {star} per qualsiasi testo e un nome tra parentesi graffe, come {capture}, per catturare un valore. Ogni campo accetta fino a {max} modelli, uno per riga.",
+      "globHelp": "Ogni modello viene confrontato con un'intera riga dell'email, senza distinguere maiuscole e minuscole. Usa {star} per qualsiasi testo e un nome tra parentesi graffe, come {capture}, per catturare un valore. Ogni campo accetta fino a {max} modelli, uno per riga. Per confrontare righe consecutive, unisci un modello per riga con {lineBreak}, ad esempio {example}.",
       "orderIdLabel": "Modelli del numero d'ordine",
       "orderIdHint": "Deve catturare {capture}. Esempio: Numero d'ordine: {capture}",
       "totalLabel": "Modelli del totale",
@@ -426,6 +439,16 @@
       "markerRemove": "Rimuovi l'indicatore {marker}",
       "markerAdd": "Aggiungi un indicatore di valuta",
       "markersMax": "Al massimo {max} indicatori."
+    },
+    "discard": {
+      "label": "Email corrispondenti",
+      "read": "Leggerle",
+      "ignore": "Ignorarle",
+      "delete": "Eliminarle",
+      "readHelp": "Il profilo legge ogni email corrispondente con i modelli qui sotto.",
+      "ignoreHelp": "Ogni email che corrisponde a questo profilo viene ignorata all'arrivo: non propone nulla. Per i mittenti con le cui email non vuoi mai avere a che fare.",
+      "deleteHelp": "Ogni email che corrisponde a questo profilo viene eliminata da Monize all'arrivo (resta nella tua casella di posta). Un'email eliminata non può essere recuperata.",
+      "noReading": "Questo profilo non legge nulla, quindi non servono modelli, categorie né abbinamento. I domini dei mittenti e le parole dell'oggetto qui sopra decidono quali email prende."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "richiede modelli del totale o del prezzo (almeno uno dei due)",
       "trade_account_missing": "richiede un conto predefinito o regole del conto",
       "invalid_currency": "non è un codice di valuta di 3 lettere, come USD",
+      "too_many_lines": "si estende su troppe righe (al massimo {max})",
+      "line_break_not_allowed": "viene confrontato con un solo testo (il nome di un articolo, il commerciante o un conto), quindi non può estendersi su più righe",
       "invalid_uuid_account": "non è un conto valido"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "Questo profilo non leggerebbe questa email: nessuna delle sue righe obbligatorie è presente, quindi si proverebbe il profilo successivo del mittente.",
       "skip_line": "Questo profilo metterebbe da parte questa email: contiene una riga che il profilo salta.",
       "wait_line": "Questo profilo trattiene questa email: una riga indica che l'ordine non è definitivo, quindi viene riletta più tardi.",
+      "discard_ignore": "Questo profilo ignorerebbe questa email: ignora ogni email corrispondente.",
+      "discard_delete": "Questo profilo eliminerebbe questa email: elimina ogni email corrispondente.",
       "no_html": "Questo profilo legge la parte HTML dell'email e questa email non ne ha, quindi verrebbe contrassegnata come illeggibile (nessun HTML)."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "voce {entry} ({pattern}), riga {line}: {text}",
       "entrySubject": "voce {entry} ({pattern}), l'oggetto: {text}",
+      "entryLines": "voce {entry} ({pattern}), righe da {first} a {last}:",
+      "blockLine": "riga {line}: {text}",
       "labelled": "voce {entry}, etichetta {label} alla riga {labelLine} ({labelText}), valore {pattern} alla riga {line}: {text}",
       "item": "Articolo {number}",
       "itemLine": "{pattern}, riga {line}: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "La proposta è stata rifiutata, quindi non è stato proposto nulla.",
       "skip_line": "È stata trovata una riga su cui questo profilo salta, quindi l'email è stata ignorata.",
       "wait_line": "Una riga indica che l'ordine non è ancora definitivo, quindi l'email verrà riletta più tardi.",
+      "profile_ignore": "Il profilo di questa email ignora ogni email corrispondente.",
       "no_html": "Questo profilo legge la parte HTML dell'email e questa email non ne ha.",
       "schema_org": "Non serviva alcun profilo: l'ordine è stato letto dai dati strutturati (schema.org) dell'email.",
       "item_amount_missing": "Un articolo non ha un importo, e l'email non ha un totale unico da assegnargli.",
@@ -1074,6 +1104,7 @@
     "failed": "L'elaborazione si è interrotta perché una richiesta non è riuscita.",
     "failedWithReason": "L'elaborazione si è interrotta: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} eliminate",
     "close": "Chiudi"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "Non letta da questo profilo",
         "skip_line": "Saltata (trovata una riga da saltare)",
         "wait_line": "In attesa (ordine non definitivo)",
+        "discard_ignore": "Ignorata da questo profilo",
+        "discard_delete": "Eliminata da questo profilo",
         "no_html": "Nessuna parte HTML",
         "trade": "Propone un'operazione",
         "trade_exists": "Già nel registro"

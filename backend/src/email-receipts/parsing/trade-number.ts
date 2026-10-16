@@ -113,6 +113,8 @@ const SYMBOL_CURRENCY: Readonly<Record<string, string>> = {
 /**
  * The dollar signs that say whose dollar they are ("US$2,000.00", "C$ 26.32").
  * Read before the 3-letter codes, so "CDN$" is CAD rather than a code "CDN".
+ * The receipt amount grammar takes the same prefixes as a currency mark
+ * (`DOLLAR_PREFIXES`).
  */
 const PREFIXED_DOLLAR: Readonly<Record<string, string>> = {
   US: "USD",
@@ -125,6 +127,9 @@ const PREFIXED_DOLLAR: Readonly<Record<string, string>> = {
   NZ: "NZD",
   HK: "HKD",
 };
+
+/** The country prefixes of a dollar sign ("US" of "US$"), for the receipt amount grammar. */
+export const DOLLAR_PREFIXES: readonly string[] = Object.keys(PREFIXED_DOLLAR);
 
 /**
  * The currency an amount names, when it names one unambiguously: a dollar

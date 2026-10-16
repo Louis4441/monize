@@ -224,7 +224,18 @@
       "approveFailed": "Le profil n'a pas pu être approuvé",
       "changedElsewhere": "Ce profil a été modifié ailleurs. La liste a été rechargée.",
       "deleted": "Profil supprimé",
-      "deleteFailed": "Le profil n'a pas pu être supprimé"
+      "deleteFailed": "Le profil n'a pas pu être supprimé",
+      "emailsIgnored": "{count, plural, one {# e-mail ignoré} other {# e-mails ignorés}}",
+      "emailsDeleted": "{count, plural, one {# e-mail supprimé} other {# e-mails supprimés}}",
+      "bulkFailed": "Impossible de terminer avec les e-mails de ce profil. Ceux déjà traités restent ainsi."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignorer les e-mails de ce profil ?",
+      "ignoreMessage": "{count, plural, one {# e-mail lu par {name} sera ignoré} other {# e-mails lus par {name} seront ignorés}} : plus rien n'est proposé et les propositions ouvertes sont fermées.{kept, plural, =0 {} one { # e-mail déjà appliqué ou illisible reste tel quel.} other { # e-mails déjà appliqués ou illisibles restent tels quels.}}",
+      "ignoreConfirm": "Ignorer les e-mails",
+      "deleteTitle": "Supprimer les e-mails de ce profil ?",
+      "deleteMessage": "{count, plural, one {# e-mail lu par {name} sera supprimé} other {# e-mails lus par {name} seront supprimés}}, avec les propositions ouvertes. Cette action est irréversible.{kept, plural, =0 {} one { # e-mail dont la proposition a déjà été appliquée est conservé.} other { # e-mails dont les propositions ont déjà été appliquées sont conservés.}}",
+      "deleteConfirm": "Supprimer les e-mails"
     },
     "deleteDialog": {
       "title": "Supprimer le profil ?",
@@ -245,7 +256,9 @@
       "later": "Pas maintenant"
     },
     "reparse": "Relire les e-mails ({count})",
-    "kindTrade": "Opérations boursières"
+    "kindTrade": "Opérations boursières",
+    "discardIgnore": "Ignore ses e-mails",
+    "discardDelete": "Supprime ses e-mails"
   },
   "editor": {
     "createTitle": "Nouveau profil",
@@ -279,7 +292,7 @@
         "text": "Texte",
         "html": "HTML"
       },
-      "globHelp": "Chaque motif est comparé à une ligne entière de l'e-mail, sans tenir compte de la casse. Utilisez {star} pour n'importe quel texte et un nom entre accolades, comme {capture}, pour capturer une valeur. Chaque champ accepte jusqu'à {max} motifs, un par ligne.",
+      "globHelp": "Chaque motif est comparé à une ligne entière de l'e-mail, sans tenir compte de la casse. Utilisez {star} pour n'importe quel texte et un nom entre accolades, comme {capture}, pour capturer une valeur. Chaque champ accepte jusqu'à {max} motifs, un par ligne. Pour faire correspondre des lignes consécutives, reliez un motif par ligne avec {lineBreak}, par exemple {example}.",
       "orderIdLabel": "Motifs du numéro de commande",
       "orderIdHint": "Doit capturer {capture}. Exemple : Numéro de commande : {capture}",
       "totalLabel": "Motifs du total",
@@ -426,6 +439,16 @@
       "markerRemove": "Supprimer le marqueur {marker}",
       "markerAdd": "Ajouter un marqueur de devise",
       "markersMax": "Au plus {max} marqueurs."
+    },
+    "discard": {
+      "label": "E-mails correspondants",
+      "read": "Les lire",
+      "ignore": "Les ignorer",
+      "delete": "Les supprimer",
+      "readHelp": "Le profil lit chaque e-mail correspondant avec les motifs ci-dessous.",
+      "ignoreHelp": "Chaque e-mail correspondant à ce profil est ignoré à son arrivée : il ne propose rien. Pour les expéditeurs dont vous ne voulez jamais traiter le courrier.",
+      "deleteHelp": "Chaque e-mail correspondant à ce profil est supprimé de Monize à son arrivée (il reste dans votre boîte aux lettres). Un e-mail supprimé ne peut pas être récupéré.",
+      "noReading": "Ce profil ne lit rien : il n'a besoin ni de motifs, ni de catégories, ni de rapprochement. Les domaines d'expéditeur et les mots du sujet ci-dessus décident des e-mails qu'il prend."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "a besoin de motifs du total ou du prix (au moins l'un des deux)",
       "trade_account_missing": "a besoin d'un compte par défaut ou de règles de compte",
       "invalid_currency": "n'est pas un code de devise à 3 lettres, comme USD",
+      "too_many_lines": "s'étend sur trop de lignes (au maximum {max})",
+      "line_break_not_allowed": "est comparé à un seul texte (un nom d'article, le marchand ou un compte) et ne peut donc pas s'étendre sur plusieurs lignes",
       "invalid_uuid_account": "n'est pas un compte valide"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "Ce profil ne lirait pas cet e-mail : aucune de ses lignes obligatoires n'y figure, donc le profil suivant de l'expéditeur serait essayé.",
       "skip_line": "Ce profil mettrait cet e-mail de côté : il contient une ligne qui le fait ignorer.",
       "wait_line": "Ce profil retiendrait cet e-mail : une ligne indique que la commande n'est pas définitive, donc il est relu plus tard.",
+      "discard_ignore": "Ce profil ignorerait cet e-mail : il ignore chaque e-mail correspondant.",
+      "discard_delete": "Ce profil supprimerait cet e-mail : il supprime chaque e-mail correspondant.",
       "no_html": "Ce profil lit la partie HTML de l'e-mail, et cet e-mail n'en a pas, donc il serait marqué comme illisible (pas de HTML)."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "entrée {entry} ({pattern}), ligne {line} : {text}",
       "entrySubject": "entrée {entry} ({pattern}), l'objet : {text}",
+      "entryLines": "entrée {entry} ({pattern}), lignes {first} à {last} :",
+      "blockLine": "ligne {line} : {text}",
       "labelled": "entrée {entry}, libellé {label} à la ligne {labelLine} ({labelText}), valeur {pattern} à la ligne {line} : {text}",
       "item": "Article {number}",
       "itemLine": "{pattern}, ligne {line} : {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "La proposition a été refusée, rien n'a donc été proposé.",
       "skip_line": "Une ligne qui fait ignorer l'e-mail à ce profil a été trouvée, donc l'e-mail a été ignoré.",
       "wait_line": "Une ligne indique que la commande n'est pas encore définitive, l'e-mail sera donc relu plus tard.",
+      "profile_ignore": "Le profil de cet e-mail ignore chaque e-mail correspondant.",
       "no_html": "Ce profil lit la partie HTML de l'e-mail, et cet e-mail n'en a pas.",
       "schema_org": "Aucun profil n'était nécessaire : la commande a été lue à partir des données structurées (schema.org) de l'e-mail.",
       "item_amount_missing": "Un article n'a pas de montant, et l'e-mail n'a pas de total unique à lui attribuer.",
@@ -1074,6 +1104,7 @@
     "failed": "Le traitement s'est arrêté car une requête a échoué.",
     "failedWithReason": "Le traitement s'est arrêté : {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} supprimés",
     "close": "Fermer"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "Non lu par ce profil",
         "skip_line": "Ignoré (ligne à ignorer trouvée)",
         "wait_line": "En attente (commande non définitive)",
+        "discard_ignore": "Ignoré par ce profil",
+        "discard_delete": "Supprimé par ce profil",
         "no_html": "Aucune partie HTML",
         "trade": "Propose une opération",
         "trade_exists": "Déjà dans votre registre"

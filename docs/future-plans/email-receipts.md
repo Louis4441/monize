@@ -508,6 +508,25 @@ gives its one item the order total:
   whitespace folded, invisible characters such as zero-width spaces, bidi
   marks and soft hyphens removed). A line pattern of `orderId` is tried on the
   subject first, then on each line.
+- **Multi-line patterns.** The two characters `\n` in a pattern split it into
+  parts, each a whole-line glob as above, matched against consecutive lines (the
+  non-empty normalised lines, so blank lines between them do not count):
+  `Receipt from *\n{amount}\nPaid` reads a total printed between two lines, and
+  a part of only `*` is any one line. Each part is read lazily, then greedily,
+  and the first combination of the parts' readings the field accepts wins
+  (merged captures; a capture name is in one part only). Wherever lines are
+  read a pattern may span them: every field entry (and a labelled entry's
+  `label` and `value`, its `within` counted from the label's last line), the
+  line guards, `line` category rules, trade currency markers, item `patterns`
+  (the next item starts after the last line taken; tried without held
+  `joinWrapped` lines), record steps, `skipLines` (every line matched is
+  dropped) and `single.name`. Where one text is matched (the subject, an item
+  name or the payee of a category rule, a trade account rule) a multi-line
+  pattern never matches; the validator refuses one in a category rule over an
+  item or the payee and in a trade account rule (`line_break_not_allowed`). A
+  fee is counted once per line its `{amount}` part read. A line holds no line
+  break, so the escape takes nothing a line could contain; a stored pattern
+  that meant a literal backslash and `n` no longer matches.
 - **Literal asterisk and trimming.** `{*}` and `\*` in a pattern are a literal
   `*` (the receipt matcher swaps each literal `*` of the pattern and of the line
   for a private-use character, matches, and swaps it back in the captures; the
@@ -547,7 +566,11 @@ gives its one item the order total:
 - **Accepted values.** An amount is a plain amount (the spec's amount grammar)
   that holds no operator character (`×`, `÷`, `+`, `*`, `/`, `=`, `%`, `<`,
   `>`, `@`, `#`, `\`, `|`), so a quantity line such as `3 × 1,47 zł` is never
-  an amount. An order id is a non-empty first token. A zero amount is a value.
+  an amount. The only letters it may hold are a currency code or mark (`zł`,
+  `EUR`, `kr`) or a dollar sign's country prefix (`US$`, `C$`, `CA$`, `CDN$`,
+  `A$`, `AU$`, `NZ$`, `HK$`: the trade reader's `DOLLAR_PREFIXES`), so a name
+  ending in digits is not an amount. An order id is a non-empty first token.
+  A zero amount is a value.
 - **Items** hold exactly one of `patterns` (one item per line), `record` (an
   item over several lines) and `single` (one item for the whole email);
   `startAfter` / `stopAt` are plain case-insensitive substrings bounding the
@@ -598,13 +621,28 @@ gives its one item the order total:
   once the line is gone. `skipIfLine` wins over `waitIfLine`; a person's own
   link is a command and no guard holds it back. `status_reason` is free text
   (40 characters, no CHECK), so no migration is needed.
+- **Discarding profiles.** `discard: "ignore" | "delete"` makes a profile for
+  mail that is never wanted: every email the pipeline gives the profile (its
+  sender domains, subject words and `requireLine`, ranked against the other
+  profiles as usual) is ignored with `status_reason` `profile_ignore`, or
+  deleted with its open requests (`deleteLockedReceipt`), before any other
+  guard or field is read. A person's own link is a command and still reads the
+  email. The test operation and the preview answer the outcome
+  `discard_ignore` / `discard_delete`; `process-batch` counts a deleted email
+  in `processed` and `deleted`, under no status; a person's Reprocess of an
+  email its profile deletes answers no detail. The editor sets it with one
+  select ("Matching emails": read, ignore, delete) and hides the reading
+  fields while it is set; saving or approving such a profile offers to do the
+  same to the stored emails it matches (`profile-batch` below), counted first.
 - **The test trace.** `POST /email-receipt-parsers/test` and the tool's `test`
   return, beside `parsed`, an `outcome` (`read`, or the guard that would stop
-  the read: `not_applicable`, `skip_line`, `wait_line`) and a `trace`: for
+  the read: `not_applicable`, `skip_line`, `wait_line`, `discard_ignore`,
+  `discard_delete`) and a `trace`: for
   `orderId`, `total`, `paid`, `shipping`, `discount`, `payee` and the three
   guards the entry index, the glob (a labelled entry: its `value`, its `label`
   and the label line) and the line (1-based number among the email's lines, 0
-  for the subject, and its text cut to 200 characters) that produced the value,
+  for the subject, and its text cut to 200 characters) that produced the value
+  (a multi-line pattern: its first line, and `lines`, every line it matched),
   and for each item (at most 20 in the tool's answer) the globs and lines that
   read it. The editor's test panel lists them under "Matched by".
 - A line item's category is the first `categoryRules` entry whose glob matches
@@ -617,7 +655,7 @@ At most 10 entries per field, 200 characters per pattern (and per `label` and
 `value`), 5 captures per pattern (the glob's own limit), 50 category rules, 100
 characters per section marker, 10 `skipLines`, 6 record steps, 5 alternatives
 per step, 10 globs in each line guard, 3 held lines for `joinWrapped`, `within`
-1 to 10;
+1 to 10, 5 lines per multi-line pattern (no part empty);
 unknown keys refused; every category id owned by the user (checked in the
 write's transaction). Parsing reads at most 2,000 lines and 100 items. A
 labelled entry matches each line against its `value` once however many label
@@ -631,7 +669,9 @@ The validator's codes, each at the path of the problem: `not_object`,
 `capture_conflict`, `invalid_uuid`, `out_of_range` (`within`),
 `items_patterns_and_record`, `items_single_conflict`, `items_shape_missing`,
 `skip_lines_need_record`, `join_wrapped_needs_patterns`, `record_name_missing`,
-`invalid_value` (a category rule `field`, or the top-level `source`).
+`invalid_value` (a category rule `field`, or the top-level `source`),
+`too_many_lines` (a multi-line pattern over 5 parts), `line_break_not_allowed`
+(a multi-line pattern where one text is matched).
 
 ### 5.3 Output (`ParsedReceipt`)
 
@@ -823,6 +863,9 @@ What a proposal contains:
   appended (capped at 750).
 - **Anything else**: the description only, with the summary; the receipt page
   names the reason (`amount_differs`, `items_uncategorized`, ...).
+- **Ref #**: the order number, when the transaction's Ref # is empty (never
+  over another value; then it stays in the summary). See
+  `docs/specs/email-receipt-matching.md`.
 - **Payee**: the parser's payee name when the transaction has none.
 
 ## 7. Invariants
@@ -957,6 +1000,23 @@ section 3a.
   that the same person could not approve one by one, and the daily limit counts each one.
   The service and controller live in the AI module (the receipts module imports it, not
   the reverse).
+- `POST /email-receipts/profile-batch` `{ parserId, action, after? }` counts, ignores or
+  deletes the stored emails a profile matches (`EmailReceiptProfileBatchService`). An
+  email matches when the pipeline would give it to the profile: `chooseReceiptParser`
+  over the user's approved profiles (`loadApprovedParsers`) with this one among them as
+  approved (a draft is asked about as it would read once approved), so the sender
+  domain, the subject words, the ranking against the other profiles and `requireLine`
+  all count, and an email another profile of the same domain reads is never touched.
+  The scan walks the profile's sender-domain emails (`DOMAIN_MATCH_SQL`) in id order,
+  100 per call, and answers `{ matched, applied, unreadable, ignored, done, next }`; the
+  client loops with `after = next` until `next` is null, so each email is looked at once
+  whatever the action does to it. `count` writes nothing (the client confirms with the
+  totals first). It backs the offer a profile with `discard` makes when it is saved or
+  approved: the stored emails it matches are ignored or deleted as new ones will be. Each email is ignored or deleted in its own transaction under its row
+  lock, with the single action's steps (`backend/src/email-receipts/receipts/receipt-disposal.ts`) and its state read
+  again there: an email whose proposal was applied is kept by both actions, one that could
+  not be read (`skipped`) is kept by `ignore` (the single action refuses it) and deleted
+  by `delete`. A deleted email is not fetched again: the mailbox cursor is past it.
 
 ## 9. Frontend
 

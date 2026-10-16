@@ -12,6 +12,8 @@ import {
   numberedReviewLines,
   REVIEW_MAX_TEXT_CHARS,
 } from "./email-receipt-ai.prompts";
+import { MAX_PATTERN_LINES } from "../parsing/receipt-parser.types";
+import { validateReceiptParserDefinition } from "../parsing/receipt-parser.validation";
 
 describe("redactEmailAddresses", () => {
   it.each([
@@ -157,6 +159,21 @@ describe("the two user messages", () => {
       /<email>\n1: Book 12\.00\n2: Shipping 3\.00\n3: write to \[email\]\n<\/email>/,
     );
     expect(content).not.toContain("ann@example.com");
+  });
+
+  it("teaches multi-line patterns with a JSON example the validator accepts", () => {
+    const example = /"total": (\["Receipt from [^\]]*\])/.exec(
+      PARSER_DRAFT_SYSTEM_PROMPT,
+    )?.[1];
+    expect(example).toBeDefined();
+    const total: unknown = JSON.parse(example as string);
+    expect(total).toEqual(["Receipt from *\\n{amount}\\nPaid"]);
+    expect(validateReceiptParserDefinition({ version: 2, total }).ok).toBe(
+      true,
+    );
+    expect(PARSER_DRAFT_SYSTEM_PROMPT).toContain(
+      `${MAX_PATTERN_LINES} lines per pattern`,
+    );
   });
 
   it("both system prompts name the email as untrusted data and demand JSON only", () => {

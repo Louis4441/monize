@@ -63,7 +63,13 @@ export function ParserSourceField({ form, onChange }: ParserPatternFieldsProps) 
       </div>
 
       <p className="text-sm text-gray-600 dark:text-gray-400">
-        {t('globHelp', { star: '*', capture: '{name}', max: RECEIPT_PARSER_LIMITS.maxPatternsPerField })}
+        {t('globHelp', {
+          star: '*',
+          capture: '{name}',
+          max: RECEIPT_PARSER_LIMITS.maxPatternsPerField,
+          lineBreak: '\\n',
+          example: 'Receipt from *\\n{amount}\\nPaid',
+        })}
       </p>
     </>
   );
@@ -72,7 +78,8 @@ export function ParserSourceField({ form, onChange }: ParserPatternFieldsProps) 
 /**
  * The extraction patterns of a parser: what to read the order id and the
  * amounts from, and how to read the line items. Every pattern is a rule glob
- * matched against one whole line (`*` any text, `{name}` a capture); the hint
+ * matched against one whole line (`*` any text, `{name}` a capture; `\n`
+ * joins the parts of a pattern over consecutive lines); the hint
  * under each box names the captures that field accepts, because the server
  * refuses any other.
  */

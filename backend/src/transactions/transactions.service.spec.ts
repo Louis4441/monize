@@ -9394,6 +9394,34 @@ describe("TransactionsService", () => {
       expect(transactionsRepository.save).not.toHaveBeenCalled();
     });
 
+    describe("reference number (an email receipt's order number)", () => {
+      it("previews a reference number the transaction does not hold, as a change on its own", async () => {
+        transactionsRepository.findOne.mockResolvedValueOnce({
+          ...baseTx,
+          referenceNumber: null,
+        });
+        const preview = await service.previewUpdate("user-1", "tx-1", {
+          referenceNumber: " EX-1 ",
+        });
+        expect(preview.referenceNumber).toBe("EX-1");
+      });
+
+      it("leaves out the reference number the transaction already holds: that is not a change", async () => {
+        transactionsRepository.findOne.mockResolvedValue({
+          ...baseTx,
+          referenceNumber: "EX-1",
+        });
+        const preview = await service.previewUpdate("user-1", "tx-1", {
+          description: "x",
+          referenceNumber: "EX-1",
+        });
+        expect(preview).not.toHaveProperty("referenceNumber");
+        await expect(
+          service.previewUpdate("user-1", "tx-1", { referenceNumber: "EX-1" }),
+        ).rejects.toThrow(/at least one field/);
+      });
+    });
+
     describe("tag names (a proposal's tag is an addition)", () => {
       it("previews a name the user has no tag for as a new tag", async () => {
         transactionsRepository.findOne.mockResolvedValueOnce({ ...baseTx });

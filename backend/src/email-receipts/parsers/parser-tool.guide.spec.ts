@@ -1,6 +1,7 @@
 import {
   MAX_CATEGORY_RULES,
   MAX_PATTERN_LENGTH,
+  MAX_PATTERN_LINES,
   MAX_PATTERNS_PER_FIELD,
   RECEIPT_MATCH_STRATEGIES,
   RECEIPT_MATCH_TEXT_FIELDS,
@@ -260,6 +261,17 @@ describe("the language guide the categories operation returns", () => {
   it("states the arithmetic: gross, net, and which of total and paid must equal which", () => {
     expect(guide).toMatch(/gross = items \+ shipping; net = gross - discount/);
     expect(guide).toMatch(/paid must equal net; total must equal gross or net/);
+  });
+
+  it("teaches multi-line patterns with a JSON example the validator accepts", () => {
+    expect(guide).toContain(`${MAX_PATTERN_LINES} lines per pattern`);
+    const example = /\["Receipt from [^\]]*\]/.exec(guide)?.[0];
+    expect(example).toBeDefined();
+    const total: unknown = JSON.parse(example as string);
+    expect(total).toEqual(["Receipt from *\\n{amount}\\nPaid"]);
+    expect(validateReceiptParserDefinition({ version: 2, total }).ok).toBe(
+      true,
+    );
   });
 
   it("quotes the validator's bounds", () => {

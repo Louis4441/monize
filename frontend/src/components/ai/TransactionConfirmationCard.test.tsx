@@ -133,6 +133,32 @@ describe('TransactionConfirmationCard', () => {
     expect(screen.getByText(/reconciled/i)).toBeInTheDocument();
   });
 
+  it('shows the reference number an update sets, and no row when it sets none', () => {
+    const update = (referenceNumber?: string) =>
+      makeAction({
+        type: 'update_transaction',
+        descriptor: { type: 'update_transaction' },
+        preview: {
+          accountName: 'Checking',
+          amount: -12.5,
+          currencyCode: 'USD',
+          transactionDate: '2026-01-15',
+          payeeName: 'Starbucks',
+          categoryName: 'Dining',
+          ...(referenceNumber === undefined ? {} : { referenceNumber }),
+        },
+      });
+    const { unmount } = render(
+      <TransactionConfirmationCard action={update('EX-20931')} onConfirm={vi.fn()} onCancel={vi.fn()} />,
+    );
+    expect(screen.getByText('Ref #')).toBeInTheDocument();
+    expect(screen.getByText('EX-20931')).toBeInTheDocument();
+    unmount();
+
+    render(<TransactionConfirmationCard action={update()} onConfirm={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.queryByText('Ref #')).not.toBeInTheDocument();
+  });
+
   it('does not warn about reconciliation for a create action', () => {
     render(
       <TransactionConfirmationCard

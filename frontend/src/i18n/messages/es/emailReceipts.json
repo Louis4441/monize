@@ -224,7 +224,18 @@
       "approveFailed": "No se pudo aprobar el perfil",
       "changedElsewhere": "Este perfil se cambió en otro lugar. Se ha vuelto a cargar la lista.",
       "deleted": "Perfil eliminado",
-      "deleteFailed": "No se pudo eliminar el perfil"
+      "deleteFailed": "No se pudo eliminar el perfil",
+      "emailsIgnored": "{count, plural, one {# correo ignorado} other {# correos ignorados}}",
+      "emailsDeleted": "{count, plural, one {# correo eliminado} other {# correos eliminados}}",
+      "bulkFailed": "No se pudo terminar con los correos de este perfil. Los que ya se procesaron se quedan así."
+    },
+    "bulk": {
+      "ignoreTitle": "¿Ignorar los correos de este perfil?",
+      "ignoreMessage": "{count, plural, one {# correo que lee {name} se ignorará} other {# correos que lee {name} se ignorarán}}: no propondrán nada y sus propuestas abiertas se cerrarán.{kept, plural, =0 {} one { # correo que ya se aplicó o que no se pudo leer se queda como está.} other { # correos que ya se aplicaron o que no se pudieron leer se quedan como están.}}",
+      "ignoreConfirm": "Ignorar correos",
+      "deleteTitle": "¿Eliminar los correos de este perfil?",
+      "deleteMessage": "{count, plural, one {# correo que lee {name} se eliminará} other {# correos que lee {name} se eliminarán}}, junto con sus propuestas abiertas. Esto no se puede deshacer.{kept, plural, =0 {} one { # correo cuya propuesta ya se aplicó se queda.} other { # correos cuyas propuestas ya se aplicaron se quedan.}}",
+      "deleteConfirm": "Eliminar correos"
     },
     "deleteDialog": {
       "title": "¿Eliminar el perfil?",
@@ -245,7 +256,9 @@
       "later": "Ahora no"
     },
     "reparse": "Volver a analizar los correos ({count})",
-    "kindTrade": "Operaciones bursátiles"
+    "kindTrade": "Operaciones bursátiles",
+    "discardIgnore": "Ignora sus correos",
+    "discardDelete": "Elimina sus correos"
   },
   "editor": {
     "createTitle": "Nuevo perfil",
@@ -279,7 +292,7 @@
         "text": "Texto",
         "html": "HTML"
       },
-      "globHelp": "Cada patrón se compara con una línea completa del correo, sin distinguir mayúsculas de minúsculas. Usa {star} para cualquier texto y un nombre entre llaves, como {capture}, para capturar un valor. Cada campo admite hasta {max} patrones, uno por línea.",
+      "globHelp": "Cada patrón se compara con una línea completa del correo, sin distinguir mayúsculas de minúsculas. Usa {star} para cualquier texto y un nombre entre llaves, como {capture}, para capturar un valor. Cada campo admite hasta {max} patrones, uno por línea. Para coincidir con líneas consecutivas, une un patrón por línea con {lineBreak}, por ejemplo {example}.",
       "orderIdLabel": "Patrones del número de pedido",
       "orderIdHint": "Debe capturar {capture}. Ejemplo: Número de pedido: {capture}",
       "totalLabel": "Patrones del total",
@@ -426,6 +439,16 @@
       "markerRemove": "Quitar el marcador {marker}",
       "markerAdd": "Añadir un marcador de moneda",
       "markersMax": "Como máximo {max} marcadores."
+    },
+    "discard": {
+      "label": "Correos coincidentes",
+      "read": "Leerlos",
+      "ignore": "Ignorarlos",
+      "delete": "Eliminarlos",
+      "readHelp": "El perfil lee cada correo coincidente con los patrones de abajo.",
+      "ignoreHelp": "Cada correo que coincide con este perfil se ignora al llegar: no propone nada. Para remitentes con cuyo correo nunca quieres tratar.",
+      "deleteHelp": "Cada correo que coincide con este perfil se elimina de Monize al llegar (sigue en tu buzón). Un correo eliminado no se puede recuperar.",
+      "noReading": "Este perfil no lee nada, así que no necesita patrones, categorías ni vinculación. Los dominios de remitente y las palabras del asunto de arriba deciden qué correos toma."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "necesita patrones del total o del precio (al menos uno de los dos)",
       "trade_account_missing": "necesita una cuenta predeterminada o reglas de cuenta",
       "invalid_currency": "no es un código de moneda de 3 letras, como USD",
+      "too_many_lines": "abarca demasiadas líneas (como máximo {max})",
+      "line_break_not_allowed": "se compara con un solo texto (el nombre de un artículo, el comercio o una cuenta), así que no puede abarcar varias líneas",
       "invalid_uuid_account": "no es una cuenta válida"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "Este perfil no leería este correo: ninguna de sus líneas obligatorias está en él, así que se probaría el siguiente perfil del remitente.",
       "skip_line": "Este perfil dejaría este correo aparte: contiene una línea en la que omite.",
       "wait_line": "Este perfil retendría este correo: una línea indica que el pedido no es definitivo, así que se vuelve a leer más tarde.",
+      "discard_ignore": "Este perfil ignoraría este correo: ignora cada correo que coincide.",
+      "discard_delete": "Este perfil eliminaría este correo: elimina cada correo que coincide.",
       "no_html": "Este perfil lee la parte HTML del correo, y este correo no la tiene, así que se marcaría como ilegible (sin HTML)."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "entrada {entry} ({pattern}), línea {line}: {text}",
       "entrySubject": "entrada {entry} ({pattern}), el asunto: {text}",
+      "entryLines": "entrada {entry} ({pattern}), líneas {first} a {last}:",
+      "blockLine": "línea {line}: {text}",
       "labelled": "entrada {entry}, etiqueta {label} en la línea {labelLine} ({labelText}), valor {pattern} en la línea {line}: {text}",
       "item": "Artículo {number}",
       "itemLine": "{pattern}, línea {line}: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "Se rechazó la propuesta, así que no se propuso nada.",
       "skip_line": "Se encontró una línea en la que este perfil omite, así que el correo se ignoró.",
       "wait_line": "Una línea indica que el pedido todavía no es definitivo, así que el correo se leerá de nuevo más adelante.",
+      "profile_ignore": "El perfil de este correo ignora cada correo que coincide.",
       "no_html": "Este perfil lee la parte HTML del correo, y este correo no la tiene.",
       "schema_org": "No hizo falta ningún perfil: el pedido se leyó de los datos estructurados (schema.org) del correo.",
       "item_amount_missing": "Un artículo no tiene importe y el correo no tiene un único total que asignarle.",
@@ -1074,6 +1104,7 @@
     "failed": "El procesamiento se detuvo porque falló una solicitud.",
     "failedWithReason": "El procesamiento se detuvo: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} eliminados",
     "close": "Cerrar"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "No lo lee este perfil",
         "skip_line": "Omitido (se encontró una línea de omisión)",
         "wait_line": "En espera (pedido no definitivo)",
+        "discard_ignore": "Ignorado por este perfil",
+        "discard_delete": "Eliminado por este perfil",
         "no_html": "Sin parte HTML",
         "trade": "Propone una operación",
         "trade_exists": "Ya está en tu registro"

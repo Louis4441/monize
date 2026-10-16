@@ -224,7 +224,18 @@
       "approveFailed": "プロフィールを承認できませんでした",
       "changedElsewhere": "このプロフィールは別の場所で変更されました。一覧を再読み込みしました。",
       "deleted": "プロフィールを削除しました",
-      "deleteFailed": "プロフィールを削除できませんでした"
+      "deleteFailed": "プロフィールを削除できませんでした",
+      "emailsIgnored": "{count, plural, other {# 件のメールを無視しました}}",
+      "emailsDeleted": "{count, plural, other {# 件のメールを削除しました}}",
+      "bulkFailed": "このプロフィールのメールの処理を完了できませんでした。処理済みのメールはそのままです。"
+    },
+    "bulk": {
+      "ignoreTitle": "このプロフィールのメールを無視しますか?",
+      "ignoreMessage": "{name} が読み取る {count, plural, other {# 件のメール}}を無視します。これらは何も提案せず、未処理の提案は閉じられます。{kept, plural, =0 {} other {すでに適用済み、または読み取れなかった # 件のメールはそのまま残ります。}}",
+      "ignoreConfirm": "メールを無視",
+      "deleteTitle": "このプロフィールのメールを削除しますか?",
+      "deleteMessage": "{name} が読み取る {count, plural, other {# 件のメール}}を、未処理の提案とともに削除します。この操作は元に戻せません。{kept, plural, =0 {} other {提案がすでに適用済みの # 件のメールは残ります。}}",
+      "deleteConfirm": "メールを削除"
     },
     "deleteDialog": {
       "title": "プロフィールを削除しますか?",
@@ -245,7 +256,9 @@
       "later": "後で"
     },
     "reparse": "メールを再解析 ({count})",
-    "kindTrade": "証券取引"
+    "kindTrade": "証券取引",
+    "discardIgnore": "メールを無視",
+    "discardDelete": "メールを削除"
   },
   "editor": {
     "createTitle": "新規プロフィール",
@@ -279,7 +292,7 @@
         "text": "テキスト",
         "html": "HTML"
       },
-      "globHelp": "各パターンは、メールの1行全体と照合されます (大文字と小文字は区別しません)。任意のテキストには {star} を、値を取り込むには {capture} のように波かっこで囲んだ名前を使います。各フィールドには最大 {max} 個のパターンを、1行に1つずつ指定できます。",
+      "globHelp": "各パターンは、メールの1行全体と照合されます (大文字と小文字は区別しません)。任意のテキストには {star} を、値を取り込むには {capture} のように波かっこで囲んだ名前を使います。各フィールドには最大 {max} 個のパターンを、1行に1つずつ指定できます。連続する行に一致させるには、1行ごとのパターンを {lineBreak} でつなぎます (例: {example})。",
       "orderIdLabel": "注文番号のパターン",
       "orderIdHint": "{capture} を取り込む必要があります。例: 注文番号: {capture}",
       "totalLabel": "合計のパターン",
@@ -426,6 +439,16 @@
       "markerRemove": "マーカー {marker} を削除",
       "markerAdd": "通貨マーカーを追加",
       "markersMax": "マーカーは最大 {max} 件です。"
+    },
+    "discard": {
+      "label": "一致するメール",
+      "read": "読み取る",
+      "ignore": "無視する",
+      "delete": "削除する",
+      "readHelp": "プロフィールは一致する各メールを下のパターンで読み取ります。",
+      "ignoreHelp": "このプロフィールに一致するメールは、届いた時点ですべて無視され、何も提案しません。扱う必要のない送信元向けです。",
+      "deleteHelp": "このプロフィールに一致するメールは、届いた時点ですべて Monize から削除されます (メールボックスには残ります)。削除したメールは元に戻せません。",
+      "noReading": "このプロフィールは何も読み取らないため、パターン、カテゴリ、照合は不要です。上の送信元ドメインと件名の語句で、どのメールを扱うかが決まります。"
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "には合計または価格のパターンが必要です (少なくともどちらか一方)",
       "trade_account_missing": "には既定の口座または口座のルールが必要です",
       "invalid_currency": "は USD のような 3 文字の通貨コードではありません",
+      "too_many_lines": "の行数が多すぎます (最大 {max} 行)",
+      "line_break_not_allowed": "は 1 つのテキスト (商品名、販売者、口座) と照合されるため、複数の行にまたがることはできません",
       "invalid_uuid_account": "は有効な口座ではありません"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "このプロフィールはこのメールを読み取りません。必須の行がどれも含まれていないため、その送信者の次のプロフィールが試されます。",
       "skip_line": "このプロフィールはこのメールを脇に置きます。スキップ対象の行が含まれています。",
       "wait_line": "このプロフィールはこのメールを保留します。注文が確定していないことを示す行があるため、後でもう一度読み取られます。",
+      "discard_ignore": "このプロフィールはこのメールを無視します。一致するメールはすべて無視されます。",
+      "discard_delete": "このプロフィールはこのメールを削除します。一致するメールはすべて削除されます。",
       "no_html": "このプロフィールはメールのHTML部分を読み取りますが、このメールにはHTML部分がないため、読み取り不可 (HTMLなし) として記録されます。"
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "項目 {entry} ({pattern})、{line} 行目: {text}",
       "entrySubject": "項目 {entry} ({pattern})、件名: {text}",
+      "entryLines": "項目 {entry} ({pattern})、{first} 行目から {last} 行目:",
+      "blockLine": "{line} 行目: {text}",
       "labelled": "項目 {entry}、{labelLine} 行目 ({labelText}) のラベル {label}、{line} 行目の値 {pattern}: {text}",
       "item": "明細 {number}",
       "itemLine": "{pattern}、{line} 行目: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "提案が拒否されたため、何も提案されませんでした。",
       "skip_line": "このプロフィールがスキップ対象とする行が見つかったため、メールは無視されました。",
       "wait_line": "注文がまだ確定していないことを示す行があるため、メールは後でもう一度読み取られます。",
+      "profile_ignore": "このメールのプロフィールは、一致するメールをすべて無視します。",
       "no_html": "このプロフィールはメールのHTML部分を読み取りますが、このメールにはHTML部分がありません。",
       "schema_org": "プロフィールは不要でした。注文はメール内の構造化データ (schema.org) から読み取られました。",
       "item_amount_missing": "明細に金額がなく、メールにも割り当てられる単一の合計がありません。",
@@ -1074,6 +1104,7 @@
     "failed": "リクエストが失敗したため、処理を停止しました。",
     "failedWithReason": "処理を停止しました: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} 件削除",
     "close": "閉じる"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "このプロフィールでは読み取れません",
         "skip_line": "スキップ (スキップ行を検出)",
         "wait_line": "保留 (注文が未確定)",
+        "discard_ignore": "このプロフィールで無視",
+        "discard_delete": "このプロフィールで削除",
         "no_html": "HTML部分なし",
         "trade": "取引を提案",
         "trade_exists": "台帳に記帳済み"

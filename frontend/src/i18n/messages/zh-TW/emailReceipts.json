@@ -224,7 +224,18 @@
       "approveFailed": "無法核准解析器",
       "changedElsewhere": "此解析器已在別處被修改。清單已重新載入。",
       "deleted": "解析器已刪除",
-      "deleteFailed": "無法刪除解析器"
+      "deleteFailed": "無法刪除解析器",
+      "emailsIgnored": "{count, plural, other {已忽略 # 封郵件}}",
+      "emailsDeleted": "{count, plural, other {已刪除 # 封郵件}}",
+      "bulkFailed": "無法處理完此解析器的郵件。已處理的郵件維持不變。"
+    },
+    "bulk": {
+      "ignoreTitle": "忽略此解析器的郵件？",
+      "ignoreMessage": "{name} 讀取的 {count, plural, other {# 封郵件}}將被忽略：它們不再提出任何提議，未完成的提議將被關閉。{kept, plural, =0 {} other {已套用或無法讀取的 # 封郵件維持不變。}}",
+      "ignoreConfirm": "忽略郵件",
+      "deleteTitle": "刪除此解析器的郵件？",
+      "deleteMessage": "{name} 讀取的 {count, plural, other {# 封郵件}}將連同未完成的提議一起刪除。此操作無法復原。{kept, plural, =0 {} other {提議已套用的 # 封郵件將保留。}}",
+      "deleteConfirm": "刪除郵件"
     },
     "deleteDialog": {
       "title": "刪除解析器？",
@@ -245,7 +256,9 @@
       "later": "暫不處理"
     },
     "reparse": "重新解析郵件（{count}）",
-    "kindTrade": "證券交易"
+    "kindTrade": "證券交易",
+    "discardIgnore": "忽略其郵件",
+    "discardDelete": "刪除其郵件"
   },
   "editor": {
     "createTitle": "新增解析器",
@@ -279,7 +292,7 @@
         "text": "文字",
         "html": "HTML"
       },
-      "globHelp": "每個模式都會與郵件的整整一行比對，不區分大小寫。用 {star} 比對任意文字，用大括號中的名稱（例如 {capture}）擷取一個值。每個欄位最多可填 {max} 個模式，每行一個。",
+      "globHelp": "每個模式都會與郵件的整整一行比對，不區分大小寫。用 {star} 比對任意文字，用大括號中的名稱（例如 {capture}）擷取一個值。每個欄位最多可填 {max} 個模式，每行一個。要比對連續的幾行，請用 {lineBreak} 把每行的模式連接起來，例如 {example}。",
       "orderIdLabel": "訂單編號模式",
       "orderIdHint": "必須擷取 {capture}。範例：訂單編號：{capture}",
       "totalLabel": "合計模式",
@@ -426,6 +439,16 @@
       "markerRemove": "刪除標記 {marker}",
       "markerAdd": "新增貨幣標記",
       "markersMax": "最多 {max} 個標記。"
+    },
+    "discard": {
+      "label": "相符的郵件",
+      "read": "讀取",
+      "ignore": "忽略",
+      "delete": "刪除",
+      "readHelp": "解析器使用下方的模式讀取每封相符的郵件。",
+      "ignoreHelp": "與此解析器相符的每封郵件抵達時都會被忽略：它不會提出任何提議。適用於你永遠不想處理其郵件的寄件者。",
+      "deleteHelp": "與此解析器相符的每封郵件抵達時都會從 Monize 中刪除（仍保留在你的信箱中）。刪除的郵件無法復原。",
+      "noReading": "此解析器不讀取任何內容，因此不需要模式、類別或比對。上方的寄件者網域和主旨字詞決定它接收哪些郵件。"
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "需要合計或價格模式（至少其一）",
       "trade_account_missing": "需要預設帳戶或帳戶規則",
       "invalid_currency": "不是 3 個字母的貨幣代碼，例如 USD",
+      "too_many_lines": "跨越的行數過多（最多 {max} 行）",
+      "line_break_not_allowed": "只與一段文字（商品名稱、商家或帳戶）比對，因此不能跨越多行",
       "invalid_uuid_account": "不是有效的帳戶"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "此解析器不會讀取這封郵件：郵件中沒有任何必要的行，因此會嘗試該寄件者的下一個解析器。",
       "skip_line": "此解析器會將這封郵件排除在外：郵件中含有它要略過的行。",
       "wait_line": "此解析器會暫緩處理這封郵件：有一行表示訂單尚未最終確定，因此稍後會再次讀取。",
+      "discard_ignore": "此解析器會忽略這封郵件：它會忽略每封相符的郵件。",
+      "discard_delete": "此解析器會刪除這封郵件：它會刪除每封相符的郵件。",
       "no_html": "此解析器讀取郵件的 HTML 部分，而這封郵件沒有 HTML，因此會被標記為無法讀取（無 HTML）。"
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "項目 {entry}（{pattern}），第 {line} 行：{text}",
       "entrySubject": "項目 {entry}（{pattern}），主旨：{text}",
+      "entryLines": "項目 {entry}（{pattern}），第 {first} 至 {last} 行：",
+      "blockLine": "第 {line} 行：{text}",
       "labelled": "項目 {entry}，第 {labelLine} 行（{labelText}）上的標籤 {label}，第 {line} 行上的值 {pattern}：{text}",
       "item": "明細 {number}",
       "itemLine": "{pattern}，第 {line} 行：{text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "提議被拒絕，因此沒有提出任何提議。",
       "skip_line": "發現了此解析器要略過的行，因此該郵件已被忽略。",
       "wait_line": "有一行表示訂單尚未最終確定，因此稍後會再次讀取該郵件。",
+      "profile_ignore": "這封郵件的解析器會忽略每封相符的郵件。",
       "no_html": "此解析器讀取郵件的 HTML 部分，而這封郵件沒有 HTML。",
       "schema_org": "無需解析器：訂單是從郵件中的結構化資料（schema.org）讀取的。",
       "item_amount_missing": "某個明細沒有金額，而郵件中也沒有可分配給它的單一合計。",
@@ -1074,6 +1104,7 @@
     "failed": "處理已停止，因為有請求失敗。",
     "failedWithReason": "處理已停止：{reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "已刪除 {count} 封",
     "close": "關閉"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "此設定檔未讀取",
         "skip_line": "已略過（發現略過行）",
         "wait_line": "已擱置（訂單尚未最終確定）",
+        "discard_ignore": "已被此解析器忽略",
+        "discard_delete": "已被此解析器刪除",
         "no_html": "沒有 HTML 部分",
         "trade": "提出一筆交易",
         "trade_exists": "已在帳本中"

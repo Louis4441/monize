@@ -405,6 +405,38 @@ describe("choosing between accounts the broker prints alike, by currency", () =>
     });
   });
 
+  it("takes a multi-line currency marker only when its lines follow each other", () => {
+    const definition: ReceiptTradeDefinition = {
+      ...byCurrency,
+      currencyMarkers: [{ match: "Currency\\nUSD", currency: "USD" }],
+    };
+    const traced = parseTradeLinesTraced(
+      definition,
+      lines(`${WEALTHSIMPLE_BUY_BODY}\nCurrency\nUSD`),
+    );
+    expect(traced.trade.currency).toBe("USD");
+    expect(traced.trace.currency?.lines?.map((l) => l.text)).toEqual([
+      "Currency",
+      "USD",
+    ]);
+    expect(
+      parseTradeLines(
+        definition,
+        lines(`${WEALTHSIMPLE_BUY_BODY}\nCurrency\nsee below\nUSD`),
+      ).currency,
+    ).toBeNull();
+  });
+
+  it("reads a field with a multi-line pattern", () => {
+    const definition: ReceiptTradeDefinition = {
+      ...trade,
+      total: ["Average price: *\\nTotal cost: {amount}"],
+    };
+    expect(
+      parseTradeLines(definition, lines(WEALTHSIMPLE_BUY_BODY)).total,
+    ).toBe(20_000_000);
+  });
+
   it("prefers the amounts' currency over a marker", () => {
     const definition: ReceiptTradeDefinition = {
       ...byCurrency,
@@ -481,6 +513,17 @@ describe("validating a trade profile", () => {
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.definition).toEqual(WEALTHSIMPLE_TRADE_DEFINITION);
+  });
+
+  it("refuses a multi-line account rule: the account text is one text", () => {
+    const input = valid();
+    const section = input.trade as Record<string, unknown>;
+    section.accountRules = [
+      { match: "Account\\nRRSP", accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID },
+    ];
+    expect(codes(input)).toEqual([
+      "trade.accountRules[0].match:line_break_not_allowed",
+    ]);
   });
 
   it("refuses a receipt field beside the trade section", () => {

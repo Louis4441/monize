@@ -14,7 +14,12 @@ const CTX = {
     [CAT_SHIP, "Postage"],
   ]) as ReadonlyMap<string, string>,
 };
-const tx = (amount: number) => ({ amount, description: "x", payeeId: null });
+const tx = (amount: number) => ({
+  amount,
+  description: "x",
+  payeeId: null,
+  referenceNumber: null,
+});
 
 const receipt = (over: Partial<ParsedReceipt> = {}): ParsedReceipt => ({
   orderId: null,

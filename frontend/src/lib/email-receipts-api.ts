@@ -34,6 +34,8 @@ import type {
   EmailReceiptStatus,
   ProcessEmailReceiptsPayload,
   ProcessEmailReceiptsResult,
+  ProfileBatchPayload,
+  ProfileBatchResult,
   TestEmailReceiptMailboxPayload,
   TestEmailReceiptParserPayload,
   UpdateEmailReceiptMailboxSettingsPayload,
@@ -297,14 +299,25 @@ export const emailReceiptsApi = {
       return response.data;
     },
 
+    /**
+     * Count, ignore or delete one page of the stored emails a profile matches.
+     * Send the answer's `next` back as `after` until it is null
+     * (`sweepProfileEmails` does).
+     */
+    profileBatch: async (payload: ProfileBatchPayload): Promise<ProfileBatchResult> => {
+      const response = await apiClient.post<ProfileBatchResult>(`${RECEIPTS}/profile-batch`, payload);
+      return response.data;
+    },
+
     get: async (id: string): Promise<EmailReceiptDetail> => {
       const response = await apiClient.get<EmailReceiptDetail>(`${RECEIPTS}/${id}`);
       return response.data;
     },
 
-    reprocess: async (id: string): Promise<EmailReceiptDetail> => {
-      const response = await apiClient.post<EmailReceiptDetail>(`${RECEIPTS}/${id}/reprocess`);
-      return response.data;
+    /** Null (an empty answer) when the email is gone: its profile deletes every email it matches. */
+    reprocess: async (id: string): Promise<EmailReceiptDetail | null> => {
+      const response = await apiClient.post<EmailReceiptDetail | '' | null>(`${RECEIPTS}/${id}/reprocess`);
+      return response.data === '' || response.data === null ? null : response.data;
     },
 
     link: async (id: string, transactionId: string): Promise<EmailReceiptDetail> => {

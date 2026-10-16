@@ -1,12 +1,18 @@
 import type { GlobCaptures } from "../../transaction-rules/rule-glob-capture";
 import { isStrictReceiptAmount, parseReceiptAmount } from "./receipt-amount";
-import { matchReceiptPattern } from "./receipt-glob";
+import {
+  capturePart,
+  matchReceiptLines,
+  matchReceiptPattern,
+  type ReceiptLinesMatch,
+} from "./receipt-glob";
 import { readItems, type RawItem } from "./receipt-items";
 import { parseToleranceUnits } from "./receipt-match-config";
 import {
   normalizeLine,
   normalizeReceiptLines,
   traceLine,
+  traceMatch,
   traceSubject,
 } from "./receipt-lines";
 import {
@@ -17,6 +23,7 @@ import {
   ParsedReceipt,
   ParsedReceiptItem,
   ParsedReceiptReason,
+  ReceiptDiscardMode,
   ReceiptFieldEntry,
   ReceiptLabelledPattern,
   ReceiptParserDefinition,
@@ -28,8 +35,9 @@ import {
  * The receipt parser (design 5): one definition, the subject and the text of
  * one email in, what the email says out. Pure: no database, no clock, no
  * regular expression over email text (every pattern is a rule glob matched
- * against one line at a time), and integer arithmetic only (amounts are
- * 1/10000 units).
+ * against one line at a time; a multi-line pattern, parts joined by `\n`,
+ * matches its parts against consecutive lines), and integer arithmetic only
+ * (amounts are 1/10000 units).
  *
  * - PRIORITY BY ORDER: a field's entries are tried in array order, each over
  *   the whole email, so `total: [specific, general]` prefers the specific one
@@ -65,18 +73,24 @@ function lookahead(entry: ReceiptLabelledPattern): number {
     : DEFAULT_LABEL_WITHIN;
 }
 
-/** What an entry read: the captures, the line they came from and, for a labelled entry, its label line. */
+/**
+ * What an entry read: the captures, the line they came from (the first, for a
+ * multi-line pattern) and how many lines the pattern took and, for a labelled
+ * entry, its label line.
+ */
 interface Found {
   captures: GlobCaptures;
   line: number;
+  span: number;
   labelLine?: number;
 }
 
 /**
  * A labelled entry: for each line matching `label`, the first of the next
- * `within` lines whose `value` matches and is accepted; none, then the next
- * line matching the label. A line's reading by `value` is cached, so however
- * many label lines look at it, each line is matched once.
+ * `within` lines (counted from the label's last line) whose `value` matches
+ * and is accepted; none, then the next line matching the label. A line's
+ * reading by `value` is cached, so however many label lines look at it, each
+ * line is matched once.
  */
 function findLabelled(
   entry: ReceiptLabelledPattern,
@@ -84,19 +98,26 @@ function findLabelled(
   accept: (captures: GlobCaptures) => boolean,
 ): Found | null {
   const within = lookahead(entry);
-  const read = new Map<number, GlobCaptures | null>();
+  const read = new Map<number, ReceiptLinesMatch | null>();
   for (let at = 0; at < lines.length; at++) {
-    if (matchReceiptPattern(entry.label, lines[at], () => true) === null) {
-      continue;
-    }
-    const last = Math.min(lines.length - 1, at + within);
-    for (let next = at + 1; next <= last; next++) {
-      let captures = read.get(next);
-      if (captures === undefined) {
-        captures = matchReceiptPattern(entry.value, lines[next], accept);
-        read.set(next, captures);
+    const label = matchReceiptLines(entry.label, lines, at, () => true);
+    if (label === null) continue;
+    const labelEnd = at + label.span - 1;
+    const last = Math.min(lines.length - 1, labelEnd + within);
+    for (let next = labelEnd + 1; next <= last; next++) {
+      let value = read.get(next);
+      if (value === undefined) {
+        value = matchReceiptLines(entry.value, lines, next, accept);
+        read.set(next, value);
       }
-      if (captures !== null) return { captures, line: next, labelLine: at };
+      if (value !== null) {
+        return {
+          captures: value.captures,
+          line: next,
+          span: value.span,
+          labelLine: at,
+        };
+      }
     }
   }
   return null;
@@ -110,8 +131,8 @@ function findEntry(
 ): Found | null {
   if (typeof entry === "string") {
     for (let i = 0; i < lines.length; i++) {
-      const captures = matchReceiptPattern(entry, lines[i], accept);
-      if (captures !== null) return { captures, line: i };
+      const found = matchReceiptLines(entry, lines, i, accept);
+      if (found !== null) return { ...found, line: i };
     }
     return null;
   }
@@ -125,7 +146,11 @@ function hitOf(
   lines: readonly string[],
 ): ReceiptTraceHit {
   if (typeof entry === "string") {
-    return { entry: index, pattern: entry, line: traceLine(lines, found.line) };
+    return {
+      entry: index,
+      pattern: entry,
+      ...traceMatch(lines, found.line, found.span),
+    };
   }
   return {
     entry: index,
@@ -134,7 +159,7 @@ function hitOf(
     ...(found.labelLine === undefined
       ? {}
       : { labelLine: traceLine(lines, found.labelLine) }),
-    line: traceLine(lines, found.line),
+    ...traceMatch(lines, found.line, found.span),
   };
 }
 
@@ -197,8 +222,9 @@ export function readAmount(
  * Every fee: each entry, in order, over the whole email, contributes the first
  * amount it accepts (an entry that finds none adds nothing). Unlike the other
  * fields the entries are not alternatives: a deposit and a packing charge are
- * two entries and two fees. A fee that reads at a line another entry already
- * read is the same fee and is counted once.
+ * two entries and two fees. A fee whose amount is on a line another entry
+ * already read an amount from is the same fee and is counted once (for a
+ * multi-line pattern, the line its `{amount}` part matched).
  */
 function readFees(
   entries: readonly ReceiptFieldEntry[] | undefined,
@@ -208,11 +234,15 @@ function readFees(
   const out: Read<number>[] = [];
   const seen = new Set<number>();
   for (let index = 0; index < entries.length; index++) {
-    const found = findEntry(entries[index], lines, hasStrictAmount);
-    if (found === null || seen.has(found.line)) continue;
+    const entry = entries[index];
+    const found = findEntry(entry, lines, hasStrictAmount);
+    if (found === null) continue;
+    const pattern = typeof entry === "string" ? entry : entry.value;
+    const amountLine = found.line + capturePart(pattern, "amount");
+    if (seen.has(amountLine)) continue;
     const value = parseReceiptAmount(found.captures.amount);
     if (value === null) continue;
-    seen.add(found.line);
+    seen.add(amountLine);
     out.push({ value, hit: hitOf(entries[index], index, found, lines) });
   }
   return out;
@@ -231,8 +261,8 @@ function readPayee(
 /**
  * The first entry, in array order, that finds an identifier (an order id or a
  * bank reference: the same rules for both). A line pattern reads the subject
- * first, then each line; a labelled entry reads lines only (a subject is one
- * line, with nothing near it to be a label for).
+ * first, then each line; a labelled entry and a multi-line pattern read lines
+ * only (a subject is one line, with nothing near it).
  */
 function readIdentifier(
   entries: readonly ReceiptFieldEntry[] | undefined,
@@ -272,11 +302,12 @@ function findGuard(
   if (!Array.isArray(globs)) return null;
   for (let entry = 0; entry < globs.length; entry++) {
     for (let i = 0; i < lines.length; i++) {
-      if (matchReceiptPattern(globs[entry], lines[i], () => true) !== null) {
+      const found = matchReceiptLines(globs[entry], lines, i, () => true);
+      if (found !== null) {
         return {
           entry,
           pattern: globs[entry],
-          line: traceLine(lines, i),
+          ...traceMatch(lines, i, found.span),
         };
       }
     }
@@ -311,15 +342,30 @@ export function readLineGuards(
 
 /**
  * What the pipeline would do with an email under a parser: `read` it, or pass
- * over / set aside / hold it by a guard, or fail it because the parser reads the
- * HTML part (`source: "html"`) and the email has none (`no_html`).
+ * over / set aside / hold it by a guard, ignore or delete it because the
+ * profile discards its emails (`discard_ignore`, `discard_delete`), or fail it
+ * because the parser reads the HTML part (`source: "html"`) and the email has
+ * none (`no_html`).
  */
 export type ReceiptOutcome =
-  "read" | "not_applicable" | "skip_line" | "wait_line" | "no_html";
+  | "read"
+  | "not_applicable"
+  | "skip_line"
+  | "wait_line"
+  | "discard_ignore"
+  | "discard_delete"
+  | "no_html";
 
-/** `requireLine` unmet: another parser would be tried; else `skipIfLine`, then `waitIfLine`, else the email is read. */
-export function receiptOutcome(guards: ReceiptLineGuards): ReceiptOutcome {
+/**
+ * `requireLine` unmet: another parser would be tried; else the profile's
+ * `discard`, then `skipIfLine`, then `waitIfLine`, else the email is read.
+ */
+export function receiptOutcome(
+  guards: ReceiptLineGuards,
+  discard?: ReceiptDiscardMode,
+): ReceiptOutcome {
   if (!guards.applies) return "not_applicable";
+  if (discard !== undefined) return `discard_${discard}`;
   if (guards.skipIfLine !== null) return "skip_line";
   if (guards.waitIfLine !== null) return "wait_line";
   return "read";
@@ -336,6 +382,12 @@ interface CategoryContext {
 
 const matchesGlob = (glob: string, text: string): boolean =>
   matchReceiptPattern(glob, text, () => true) !== null;
+
+/** Whether some run of lines matches a glob (a multi-line one spans several). */
+const anyLineMatches = (glob: string, lines: readonly string[]): boolean =>
+  lines.some(
+    (_, at) => matchReceiptLines(glob, lines, at, () => true) !== null,
+  );
 
 /**
  * The category of an item: the first rule, in order, that covers it (its name
@@ -359,7 +411,7 @@ function itemCategory(
     } else if (field === "line") {
       let known = ctx.lineMatches.get(index);
       if (known === undefined) {
-        known = ctx.lines.some((line) => matchesGlob(rule.match, line));
+        known = anyLineMatches(rule.match, ctx.lines);
         ctx.lineMatches.set(index, known);
       }
       covers = known;
@@ -541,7 +593,8 @@ export function parseReceiptLinesTraced(
   return {
     parsed: { ...parsed, complete: reason === null, reason },
     trace,
-    outcome: sourceLines === null ? "no_html" : receiptOutcome(guards),
+    outcome:
+      sourceLines === null ? "no_html" : receiptOutcome(guards, def.discard),
   };
 }
 

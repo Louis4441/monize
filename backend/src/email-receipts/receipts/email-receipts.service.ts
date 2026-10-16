@@ -1,13 +1,7 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
-import { tr } from "../../i18n/translate";
 import { EmailReceipt } from "../entities/email-receipt.entity";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
 import { orderFromStructuredData } from "../parsing/schema-org-order";
@@ -15,10 +9,14 @@ import { EmailReceiptTradeLinkService } from "./email-receipt-trade-link.service
 import { EmailReceiptPipelineService } from "../pipeline/email-receipt-pipeline.service";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
 import {
-  closeReceiptRequests,
-  currentReceiptRequestStatus,
-  lockReceiptTransaction,
-} from "../pipeline/receipt-requests.util";
+  deleteLockedReceipt,
+  ignoreLockedReceipt,
+  lockReceipt,
+  receiptApplied,
+  receiptAppliedConflict,
+  receiptNotFound,
+  receiptSkippedConflict,
+} from "./receipt-disposal";
 import {
   EMAIL_RECEIPT_PROCESSABLE_STATUSES,
   EMAIL_RECEIPTS_BULK_REPROCESS_DEFAULT_LIMIT,
@@ -86,6 +84,8 @@ export interface ProcessBatchResult {
   processed: number;
   /** Where the processed emails ended, by their new status. */
   byOutcome: Partial<Record<EmailReceiptStatus, number>>;
+  /** Processed emails that are gone: their profile deletes every email it matches. */
+  deleted: number;
   /** Emails that raised an error and were passed over (they are not retried by this run). */
   failed: number;
   /** Matching emails this run has not touched yet; 0 ends the run. */
@@ -608,6 +608,7 @@ export class EmailReceiptsService {
 
     const byOutcome: ProcessBatchResult["byOutcome"] = {};
     let processed = 0;
+    let deleted = 0;
     let failed = 0;
     const budget = { remaining: EMAIL_RECEIPTS_BATCH_AI_CATEGORY_CALLS };
     for (const id of selected.ids) {
@@ -616,7 +617,10 @@ export class EmailReceiptsService {
           onlyWhenStatusIn: statuses,
           aiCategoryBudget: budget,
         });
-        if (!result.unchanged) {
+        if (result.deleted) {
+          processed++;
+          deleted++;
+        } else if (!result.unchanged) {
           processed++;
           byOutcome[result.status] = (byOutcome[result.status] ?? 0) + 1;
         }
@@ -645,6 +649,7 @@ export class EmailReceiptsService {
     return {
       processed,
       byOutcome,
+      deleted,
       failed,
       remaining: Number(left?.remaining ?? 0),
       since: selected.since,
@@ -721,10 +726,17 @@ export class EmailReceiptsService {
     return detail;
   }
 
-  /** Back to the top of the pipeline (design section 6); a closed request is not reopened. */
-  async reprocess(userId: string, id: string): Promise<EmailReceiptDetail> {
-    await this.pipeline.process(userId, id);
-    return this.get(userId, id);
+  /**
+   * Back to the top of the pipeline (design section 6); a closed request is not
+   * reopened. Null when the email is gone: its profile deletes every email it
+   * matches.
+   */
+  async reprocess(
+    userId: string,
+    id: string,
+  ): Promise<EmailReceiptDetail | null> {
+    const result = await this.pipeline.process(userId, id);
+    return result.deleted ? null : this.get(userId, id);
   }
 
   /**
@@ -762,25 +774,11 @@ export class EmailReceiptsService {
     await withScopedDb(this.dataSource, async (m) => {
       const receipt = await this.lockReceipt(m, userId, id);
       if (receipt.status === "ignored") return;
-      if (receipt.status === "skipped") {
-        throw new ConflictException(
-          tr(
-            "errors.emailReceipts.receiptSkipped",
-            "This email could not be read (it was too large or could not be decoded), so there is nothing to process.",
-          ),
-        );
+      if (receipt.status === "skipped") throw receiptSkippedConflict();
+      if (await receiptApplied(m, userId, receipt)) {
+        throw receiptAppliedConflict();
       }
-      await this.refuseWhenApplied(m, userId, receipt);
-      if (receipt.transactionId) {
-        await lockReceiptTransaction(m, receipt.transactionId);
-      }
-      await closeReceiptRequests(m, userId, id);
-      await m
-        .getRepository(EmailReceipt)
-        .update(
-          { id, userId },
-          { status: "ignored", statusReason: null, aiReviewRequestId: null },
-        );
+      await ignoreLockedReceipt(m, userId, receipt);
     });
     return this.get(userId, id);
   }
@@ -789,11 +787,7 @@ export class EmailReceiptsService {
   async remove(userId: string, id: string): Promise<void> {
     await withScopedDb(this.dataSource, async (m) => {
       const receipt = await this.lockReceipt(m, userId, id);
-      if (receipt.transactionId) {
-        await lockReceiptTransaction(m, receipt.transactionId);
-      }
-      await closeReceiptRequests(m, userId, id);
-      await m.getRepository(EmailReceipt).delete({ id, userId });
+      await deleteLockedReceipt(m, userId, receipt);
     });
   }
 
@@ -868,6 +862,7 @@ export class EmailReceiptsService {
 
     const byOutcome: ProcessBatchResult["byOutcome"] = {};
     let processed = 0;
+    let deleted = 0;
     let failed = 0;
     const budget = { remaining: EMAIL_RECEIPTS_BATCH_AI_CATEGORY_CALLS };
     for (const id of selected.ids) {
@@ -878,7 +873,10 @@ export class EmailReceiptsService {
             : {}),
           aiCategoryBudget: budget,
         });
-        if (result.unchanged) {
+        if (result.deleted) {
+          processed++;
+          deleted++;
+        } else if (result.unchanged) {
           // Left alone, so not written: touch it or the run would take it again.
           await this.touch(userId, id);
         } else {
@@ -900,7 +898,14 @@ export class EmailReceiptsService {
         since: selected.since,
       }),
     );
-    return { processed, byOutcome, failed, remaining, since: selected.since };
+    return {
+      processed,
+      byOutcome,
+      deleted,
+      failed,
+      remaining,
+      since: selected.since,
+    };
   }
 
   /**
@@ -926,32 +931,9 @@ export class EmailReceiptsService {
     userId: string,
     id: string,
   ): Promise<EmailReceipt> {
-    const receipt = await m.getRepository(EmailReceipt).findOne({
-      where: { id, userId },
-      lock: { mode: "pessimistic_write" },
-    });
+    const receipt = await lockReceipt(m, userId, id);
     if (!receipt) throw receiptNotFound(id);
     return receipt;
-  }
-
-  private async refuseWhenApplied(
-    m: EntityManager,
-    userId: string,
-    receipt: EmailReceipt,
-  ): Promise<void> {
-    const status = await currentReceiptRequestStatus(
-      m,
-      userId,
-      receipt.aiReviewRequestId,
-    );
-    if (status === "applied") {
-      throw new ConflictException(
-        tr(
-          "errors.emailReceipts.receiptApplied",
-          "This email's proposal has already been applied to a transaction.",
-        ),
-      );
-    }
   }
 
   private async readDetail(
@@ -1054,10 +1036,4 @@ export class EmailReceiptsService {
         : [];
     });
   }
-}
-
-function receiptNotFound(id: string): NotFoundException {
-  return new NotFoundException(
-    tr("errors.emailReceipts.receiptNotFound", `Email ${id} not found`, { id }),
-  );
 }

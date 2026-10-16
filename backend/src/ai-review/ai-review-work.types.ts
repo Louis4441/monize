@@ -94,6 +94,12 @@ export interface AiReviewProposalInput {
    */
   tagNames?: string[];
   /**
+   * The reference number ("Ref #") to set: an email receipt's order number,
+   * proposed only when the transaction's Ref # is empty. Set only by the
+   * email-receipts module; the agents' tools do not take it.
+   */
+  referenceNumber?: string;
+  /**
    * The investment transaction a trade-confirmation email reports, for a
    * request of kind `email_trade` only (and required there). The account is
    * named, as in the chat's investment tool; the ticker must be one of the

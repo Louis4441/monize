@@ -196,6 +196,37 @@ export class ProcessBatchEmailReceiptsDto {
   since?: string;
 }
 
+/**
+ * What `POST /email-receipts/profile-batch` does with the emails a profile
+ * matches: `count` reads only, `ignore` and `delete` act on them.
+ */
+export const EMAIL_RECEIPT_PROFILE_BATCH_ACTIONS = [
+  "count",
+  "ignore",
+  "delete",
+] as const;
+export type EmailReceiptProfileBatchAction =
+  (typeof EMAIL_RECEIPT_PROFILE_BATCH_ACTIONS)[number];
+
+/** Body of `POST /email-receipts/profile-batch`. */
+export class ProfileBatchEmailReceiptsDto {
+  @ApiProperty({ description: "The profile whose emails are acted on." })
+  @IsUUID()
+  parserId: string;
+
+  @ApiProperty({ enum: EMAIL_RECEIPT_PROFILE_BATCH_ACTIONS })
+  @IsIn(EMAIL_RECEIPT_PROFILE_BATCH_ACTIONS)
+  action: EmailReceiptProfileBatchAction;
+
+  @ApiPropertyOptional({
+    description:
+      "The `next` the previous call of this run answered: the scan goes on after that email. Absent on the first call.",
+  })
+  @IsOptional()
+  @IsUUID()
+  after?: string;
+}
+
 export const EMAIL_RECEIPT_BULK_ACTIONS = ["delete", "ignore"] as const;
 export type EmailReceiptBulkAction =
   (typeof EMAIL_RECEIPT_BULK_ACTIONS)[number];

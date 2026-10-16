@@ -15,6 +15,7 @@ import {
   ListEmailReceiptDomainsDto,
   ListEmailReceiptsDto,
   ProcessBatchEmailReceiptsDto,
+  ProfileBatchEmailReceiptsDto,
 } from "./dto/email-receipts.dto";
 import { EmailReceiptsController } from "./email-receipts.controller";
 
@@ -38,9 +39,11 @@ describe("EmailReceiptsController", () => {
     remove: jest.fn(),
   };
   const ai = { askAi: jest.fn() };
+  const profileBatches = { run: jest.fn() };
   const controller = new EmailReceiptsController(
     receipts as never,
     ai as never,
+    profileBatches as never,
   );
   const proto = EmailReceiptsController.prototype as unknown as Record<
     string,
@@ -317,6 +320,49 @@ describe("EmailReceiptsController", () => {
     expect(
       Reflect.getMetadata("THROTTLER:LIMITdefault", proto.processBatch),
     ).toBe(30);
+  });
+
+  it("runs a profile's bulk action for the JWT user with the fields of the body", async () => {
+    profileBatches.run.mockResolvedValue({ matched: 0 });
+    await controller.profileBatch(req, {
+      parserId: ID,
+      action: "ignore",
+      after: ID,
+      userId: "someone-else",
+    } as never);
+    expect(profileBatches.run).toHaveBeenCalledWith("user-1", ID, "ignore", ID);
+    const names = Object.getOwnPropertyNames(EmailReceiptsController.prototype);
+    expect(names.indexOf("profileBatch")).toBeLessThan(names.indexOf("get"));
+    expect(
+      Reflect.getMetadata("THROTTLER:LIMITdefault", proto.profileBatch),
+    ).toBe(60);
+  });
+
+  describe("the profile-batch body", () => {
+    const check = async (body: object) =>
+      validate(plainToInstance(ProfileBatchEmailReceiptsDto, body), {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+
+    it.each([
+      { parserId: ID, action: "count" },
+      { parserId: ID, action: "ignore", after: ID },
+      { parserId: ID, action: "delete" },
+    ])("accepts %j", async (body) => {
+      expect(await check(body)).toHaveLength(0);
+    });
+
+    it.each([
+      {},
+      { action: "count" },
+      { parserId: "not-a-uuid", action: "count" },
+      { parserId: ID, action: "archive" },
+      { parserId: ID, action: "count", after: "x" },
+      { parserId: ID, action: "count", userId: "someone-else" },
+    ])("refuses %j", async (body) => {
+      expect((await check(body)).length).toBeGreaterThan(0);
+    });
   });
 
   describe("the process-batch body", () => {
@@ -607,6 +653,7 @@ describe("EmailReceiptsController", () => {
           "overview",
           "statusCounts",
           "processBatch",
+          "profileBatch",
           "bulk",
           "bulkCount",
           "bulkReprocess",
@@ -645,6 +692,7 @@ describe("the selection routes under bulk/", () => {
   const controller = new EmailReceiptsController(
     receipts as never,
     { askAi: jest.fn() } as never,
+    { run: jest.fn() } as never,
   );
   const proto = EmailReceiptsController.prototype as unknown as Record<
     string,

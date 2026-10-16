@@ -224,7 +224,18 @@
       "approveFailed": "Could not approve the profile",
       "changedElsewhere": "This profile was changed elsewhere. The list has been reloaded.",
       "deleted": "Profile deleted",
-      "deleteFailed": "Could not delete the profile"
+      "deleteFailed": "Could not delete the profile",
+      "emailsIgnored": "{count, plural, one {# email ignored} other {# emails ignored}}",
+      "emailsDeleted": "{count, plural, one {# email deleted} other {# emails deleted}}",
+      "bulkFailed": "Could not finish with this profile's emails. The ones already handled stay that way."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignore this profile's emails?",
+      "ignoreMessage": "{count, plural, one {# email} other {# emails}} that {name} reads will be ignored: they propose nothing, and their open proposals are closed.{kept, plural, =0 {} one { # email that was already applied or could not be read stays as it is.} other { # emails that were already applied or could not be read stay as they are.}}",
+      "ignoreConfirm": "Ignore emails",
+      "deleteTitle": "Delete this profile's emails?",
+      "deleteMessage": "{count, plural, one {# email} other {# emails}} that {name} reads will be deleted, with their open proposals. This cannot be undone.{kept, plural, =0 {} one { # email whose proposal was already applied stays.} other { # emails whose proposals were already applied stay.}}",
+      "deleteConfirm": "Delete emails"
     },
     "deleteDialog": {
       "title": "Delete the profile?",
@@ -245,7 +256,9 @@
       "later": "Not now"
     },
     "reparse": "Re-parse emails ({count})",
-    "kindTrade": "Brokerage trades"
+    "kindTrade": "Brokerage trades",
+    "discardIgnore": "Ignores its emails",
+    "discardDelete": "Deletes its emails"
   },
   "editor": {
     "createTitle": "New profile",
@@ -279,7 +292,7 @@
         "text": "Text",
         "html": "HTML"
       },
-      "globHelp": "Each pattern is matched against one whole line of the email, ignoring case. Use {star} for any text and a name in braces, such as {capture}, to capture a value. Each field takes up to {max} patterns, one per line.",
+      "globHelp": "Each pattern is matched against one whole line of the email, ignoring case. Use {star} for any text and a name in braces, such as {capture}, to capture a value. Each field takes up to {max} patterns, one per line. To match consecutive lines, join one pattern per line with {lineBreak}, for example {example}.",
       "orderIdLabel": "Order number patterns",
       "orderIdHint": "Must capture {capture}. Example: Order number: {capture}",
       "totalLabel": "Total patterns",
@@ -426,6 +439,16 @@
       "markerRemove": "Remove marker {marker}",
       "markerAdd": "Add a currency marker",
       "markersMax": "At most {max} markers."
+    },
+    "discard": {
+      "label": "Matching emails",
+      "read": "Read them",
+      "ignore": "Ignore them",
+      "delete": "Delete them",
+      "readHelp": "The profile reads each email it matches with the patterns below.",
+      "ignoreHelp": "Every email this profile matches is ignored as it arrives: it proposes nothing. For senders whose mail you never want to deal with.",
+      "deleteHelp": "Every email this profile matches is deleted from Monize as it arrives (it stays in your mailbox). A deleted email cannot be brought back.",
+      "noReading": "This profile reads nothing, so it needs no patterns, categories or matching. The sender domains and subject words above decide which emails it takes."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "needs total or price patterns (at least one of the two)",
       "trade_account_missing": "needs a default account, or account rules",
       "invalid_currency": "is not a 3-letter currency code, such as USD",
+      "too_many_lines": "spans too many lines (at most {max})",
+      "line_break_not_allowed": "is matched against one text (an item name, the merchant or an account), so it cannot span several lines",
       "invalid_uuid_account": "is not a valid account"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "This profile would not read this email: none of its required lines is in it, so the next profile for the sender would be tried.",
       "skip_line": "This profile would set this email aside: a line it skips on is in it.",
       "wait_line": "This profile would hold this email: a line says the order is not final, so it is read again later.",
+      "discard_ignore": "This profile would ignore this email: it ignores every email it matches.",
+      "discard_delete": "This profile would delete this email: it deletes every email it matches.",
       "no_html": "This profile reads the HTML part of the email, and this email has none, so it would be marked as unreadable (no HTML)."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "entry {entry} ({pattern}), line {line}: {text}",
       "entrySubject": "entry {entry} ({pattern}), the subject: {text}",
+      "entryLines": "entry {entry} ({pattern}), lines {first} to {last}:",
+      "blockLine": "line {line}: {text}",
       "labelled": "entry {entry}, label {label} on line {labelLine} ({labelText}), value {pattern} on line {line}: {text}",
       "item": "Item {number}",
       "itemLine": "{pattern}, line {line}: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "The proposal was refused, so nothing was proposed.",
       "skip_line": "A line this profile skips on was found, so the email was ignored.",
       "wait_line": "A line says the order is not final yet, so the email will be read again later.",
+      "profile_ignore": "This email's profile ignores every email it matches.",
       "no_html": "This profile reads the HTML part of the email, and this email has none.",
       "schema_org": "No profile was needed: the order was read from the structured data (schema.org) in the email.",
       "item_amount_missing": "An item has no amount, and the email has no single total to give it.",
@@ -1074,6 +1104,7 @@
     "failed": "Processing stopped because a request failed.",
     "failedWithReason": "Processing stopped: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} deleted",
     "close": "Close"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "Not read by this profile",
         "skip_line": "Skipped (skip line found)",
         "wait_line": "On hold (order not final)",
+        "discard_ignore": "Ignored by this profile",
+        "discard_delete": "Deleted by this profile",
         "no_html": "No HTML part",
         "trade": "Proposes a trade",
         "trade_exists": "Already in your ledger"

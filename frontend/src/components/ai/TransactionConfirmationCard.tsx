@@ -130,6 +130,12 @@ export function TransactionConfirmationCard({
         label: t('confirmAction.description'),
         value: preview.description,
       });
+    // The reference number the approval sets (an email receipt's order number).
+    if (preview.referenceNumber)
+      rows.push({
+        label: t('confirmAction.referenceNumber'),
+        value: preview.referenceNumber,
+      });
     // Tags the approval adds (the transaction keeps its own); a name the user has no tag for yet is marked new.
     if (preview.tagNames && preview.tagNames.length > 0)
       rows.push({

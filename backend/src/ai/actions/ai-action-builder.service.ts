@@ -609,6 +609,9 @@ export class AiActionBuilderService {
       ...(splits ? { splits: splits.map(toSplitRowDescriptor) } : {}),
       ...(attachments?.length ? { attachments } : {}),
       ...(preview.tagNames?.length ? { tagNames: [...preview.tagNames] } : {}),
+      ...(preview.referenceNumber === undefined
+        ? {}
+        : { referenceNumber: preview.referenceNumber }),
       ...(options.aiReviewRequestId
         ? { aiReviewRequestId: options.aiReviewRequestId }
         : {}),
@@ -644,6 +647,9 @@ export class AiActionBuilderService {
                 : {}),
             }
           : {}),
+        ...(preview.referenceNumber === undefined
+          ? {}
+          : { referenceNumber: preview.referenceNumber }),
       },
     };
   }

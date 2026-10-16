@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   listDomains: vi.fn(),
   listUncovered: vi.fn(),
   processBatch: vi.fn(),
+  profileBatch: vi.fn(),
 }));
 const payeesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
 const categoriesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
@@ -26,7 +27,13 @@ const exchangeRatesApi = vi.hoisted(() => ({ getCurrencies: vi.fn() }));
 vi.mock('@/lib/email-receipts-api', () => ({
   emailReceiptsApi: {
     parsers: { list: api.list, approve: api.approve, remove: api.remove, create: api.create, update: api.update, test: api.test },
-    receipts: { list: api.receiptsList, listDomains: api.listDomains, listUncovered: api.listUncovered, processBatch: api.processBatch },
+    receipts: {
+      list: api.receiptsList,
+      listDomains: api.listDomains,
+      listUncovered: api.listUncovered,
+      processBatch: api.processBatch,
+      profileBatch: api.profileBatch,
+    },
   },
 }));
 vi.mock('@/lib/payees', async (importOriginal) => ({
@@ -438,6 +445,94 @@ describe('ParsersSection', () => {
       expect(api.list).toHaveBeenCalledTimes(2);
       await click(screen.getByRole('button', { name: 'close wizard' }));
       expect(onWizardDomainChange).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe("a profile that discards its emails", () => {
+    const page = (over: Record<string, unknown> = {}) => ({
+      matched: 0,
+      applied: 0,
+      unreadable: 0,
+      ignored: 0,
+      done: 0,
+      next: null,
+      ...over,
+    });
+    const ignoring = makeParser({
+      id: 'p-9',
+      name: 'Newsletters',
+      definition: { version: 2, discard: 'ignore' },
+    });
+    const deleting = makeParser({
+      id: 'p-8',
+      name: 'Spam shop',
+      definition: { version: 2, discard: 'delete' },
+    });
+
+    it('marks the profile on its row, and offers no bulk action in the menu', async () => {
+      api.list.mockResolvedValue([ignoring, deleting]);
+      await renderSection();
+      expect(within(screen.getByRole('row', { name: /Newsletters/ })).getByText('Ignores its emails')).toBeInTheDocument();
+      expect(within(screen.getByRole('row', { name: /Spam shop/ })).getByText('Deletes its emails')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
+    });
+
+    it('after a save, counts the stored emails it matches and offers to ignore them, every page', async () => {
+      api.list.mockResolvedValue([ignoring]);
+      api.update.mockResolvedValue(ignoring);
+      api.profileBatch
+        .mockResolvedValueOnce(page({ matched: 3, applied: 1, next: 'c-1' }))
+        .mockResolvedValueOnce(page({ matched: 2, ignored: 1 }))
+        .mockResolvedValueOnce(page({ matched: 3, done: 2, next: 'c-1' }))
+        .mockResolvedValueOnce(page({ matched: 2, done: 1 }));
+      await renderSection();
+      await click(within(screen.getByRole('row', { name: /Newsletters/ })).getByRole('button', { name: 'Edit' }));
+      await click(screen.getByRole('button', { name: 'Save profile' }));
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent("Ignore this profile's emails?");
+      expect(dialog).toHaveTextContent(
+        '3 emails that Newsletters reads will be ignored: they propose nothing, and their open proposals are closed. 1 email that was already applied or could not be read stays as it is.',
+      );
+      expect(api.profileBatch).toHaveBeenNthCalledWith(2, { parserId: 'p-9', action: 'count', after: 'c-1' });
+
+      await click(within(dialog).getByRole('button', { name: 'Ignore emails' }));
+      expect(api.profileBatch).toHaveBeenNthCalledWith(3, { parserId: 'p-9', action: 'ignore' });
+      expect(api.profileBatch).toHaveBeenNthCalledWith(4, { parserId: 'p-9', action: 'ignore', after: 'c-1' });
+      expect(toast.success).toHaveBeenCalledWith('3 emails ignored');
+    });
+
+    it('deletes nothing when the person says not now', async () => {
+      api.list.mockResolvedValue([deleting]);
+      api.update.mockResolvedValue(deleting);
+      api.profileBatch.mockResolvedValueOnce(page({ matched: 2 }));
+      await renderSection();
+      await click(within(screen.getByRole('row', { name: /Spam shop/ })).getByRole('button', { name: 'Edit' }));
+      await click(screen.getByRole('button', { name: 'Save profile' }));
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent("Delete this profile's emails?");
+      expect(dialog).toHaveTextContent('2 emails that Spam shop reads will be deleted, with their open proposals. This cannot be undone.');
+      await click(within(dialog).getByRole('button', { name: 'Not now' }));
+      expect(api.profileBatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks nothing when no stored email is left to act on, or the count fails', async () => {
+      api.list.mockResolvedValue([deleting]);
+      api.update.mockResolvedValue(deleting);
+      api.profileBatch.mockResolvedValueOnce(page({ matched: 1, applied: 1 })).mockRejectedValueOnce(new Error('boom'));
+      await renderSection();
+      for (let i = 0; i < 2; i++) {
+        await click(within(screen.getByRole('row', { name: /Spam shop/ })).getByRole('button', { name: 'Edit' }));
+        await click(screen.getByRole('button', { name: 'Save profile' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      }
+    });
+
+    it('offers nothing for a profile that reads its emails, or a draft', async () => {
+      api.update.mockResolvedValue(approved);
+      await renderSection();
+      await click(within(screen.getByRole('row', { name: /Allegro parser/ })).getByRole('button', { name: 'Edit' }));
+      await click(screen.getByRole('button', { name: 'Save profile' }));
+      expect(api.profileBatch).not.toHaveBeenCalled();
     });
   });
 });

@@ -23,7 +23,6 @@ import {
   EmailReceiptMailbox,
   type EmailReceiptAiMode,
 } from "../entities/email-receipt-mailbox.entity";
-import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import {
   EmailReceipt,
   type EmailReceiptMatchKind,
@@ -61,6 +60,8 @@ import {
   EmailReceiptTradeService,
   RECEIPT_TRADE_EXISTS_REASON,
 } from "./email-receipt-trade.service";
+import { deleteLockedReceipt } from "../receipts/receipt-disposal";
+import { loadApprovedParsers } from "./approved-parsers";
 import { chooseReceiptParser } from "./choose-receipt-parser";
 import { describeFailure, isRefusal, refusalNote } from "./receipt-failure";
 import { loadLinkableTransaction } from "./linkable-transaction";
@@ -87,6 +88,8 @@ import {
  */
 export const RECEIPT_SKIP_LINE_REASON = "skip_line";
 export const RECEIPT_WAIT_LINE_REASON = "wait_line";
+/** The `ignored` reason of an email whose profile ignores every email it matches (`discard: "ignore"`). */
+export const RECEIPT_PROFILE_IGNORE_REASON = "profile_ignore";
 /**
  * The `status_reason` of a `parse_failed` receipt whose parser reads the HTML
  * part (`source: "html"`) when the email stored none.
@@ -99,9 +102,6 @@ export const RECEIPT_NO_HTML_REASON = "no_html";
  * `items_uncategorized`, ...), which `parsed.source` records either way.
  */
 export const RECEIPT_SCHEMA_ORG_REASON = "schema_org";
-
-/** At most this many approved parsers are considered for one email. */
-const MAX_PARSERS_CONSIDERED = 1000;
 
 /** What `process` does and refuses, by who asked. */
 export interface ProcessReceiptOptions {
@@ -149,6 +149,8 @@ export interface ProcessReceiptResult {
   autoApplied: boolean;
   /** The row was left as it was (see `onlyWhenStatusIn`). */
   unchanged: boolean;
+  /** The row is gone: its profile deletes every email it matches (`discard: "delete"`). */
+  deleted: boolean;
 }
 
 // The gate of spec section 7 lives in its own file; re-exported for its callers.
@@ -340,11 +342,7 @@ export class EmailReceiptPipelineService {
     const aiMode: EmailReceiptAiMode = mailbox?.aiMode ?? "off";
     const autoApplyOn = mailbox?.autoApply ?? false;
 
-    const parsers = await m.getRepository(EmailReceiptParser).find({
-      where: { userId, status: "approved" },
-      order: { createdAt: "ASC", id: "ASC" },
-      take: MAX_PARSERS_CONSIDERED,
-    });
+    const parsers = await loadApprovedParsers(m, userId);
     const keptLink = {
       transactionId: link?.id ?? null,
       candidateIds: [],
@@ -387,6 +385,28 @@ export class EmailReceiptPipelineService {
     let structured: ParsedReceipt | null = null;
     if (choice.kind === "chosen") {
       const { definition, guards } = choice;
+      // A profile for mail that is never wanted: nothing is read, nothing is
+      // asked, before any guard. (A person's own link is a command and is never
+      // held back by the profile.)
+      if (!link && definition.discard === "ignore") {
+        return this.finish(m, userId, receipt, {
+          status: "ignored",
+          reason: RECEIPT_PROFILE_IGNORE_REASON,
+          parserId: choice.parser.id,
+          parsed: null,
+          requestId: null,
+          transactionId: null,
+          candidateIds: [],
+          matchKind: null,
+        });
+      }
+      if (!link && definition.discard === "delete") {
+        await deleteLockedReceipt(m, userId, receipt);
+        return {
+          result: { ...unchanged(receipt), unchanged: false, deleted: true },
+          autoApply: null,
+        };
+      }
       // A line the parser was told to skip on: nothing to read, nothing to ask.
       // (A person's own link is a command and is never held back by a guard.)
       if (!link && guards.skipIfLine !== null) {
@@ -562,6 +582,7 @@ export class EmailReceiptPipelineService {
         amount: hit.amount,
         description: hit.description,
         payeeId: hit.payeeId,
+        referenceNumber: hit.referenceNumber,
       };
       matchKind = match.matchKind;
     }
@@ -979,6 +1000,7 @@ export class EmailReceiptPipelineService {
         requestId: stored.requestId,
         autoApplied: false,
         unchanged: false,
+        deleted: false,
       },
       autoApply: null,
     };
@@ -1045,6 +1067,7 @@ function unchanged(receipt: EmailReceipt): ProcessReceiptResult {
     requestId: receipt.aiReviewRequestId,
     autoApplied: false,
     unchanged: true,
+    deleted: false,
   };
 }
 

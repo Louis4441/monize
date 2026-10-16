@@ -60,6 +60,33 @@ describe('ParserTraceList', () => {
     );
   });
 
+  it('lists every line a multi-line pattern matched', () => {
+    render(
+      <ParserTraceList
+        trace={{
+          ...empty,
+          total: {
+            entry: 0,
+            pattern: 'Receipt from *\\n{amount}\\nPaid',
+            line: { line: 2, text: 'Receipt from Anthropic, PBC' },
+            lines: [
+              { line: 2, text: 'Receipt from Anthropic, PBC' },
+              { line: 3, text: '$333' },
+              { line: 4, text: 'Paid' },
+            ],
+          },
+        }}
+      />,
+    );
+    const [hit, ...lines] = screen.getAllByRole('listitem');
+    expect(hit).toHaveTextContent('Total entry 1 (Receipt from *\\n{amount}\\nPaid), lines 2 to 4:');
+    expect(lines.map((line) => line.textContent)).toEqual([
+      'line 2: Receipt from Anthropic, PBC',
+      'line 3: $333',
+      'line 4: Paid',
+    ]);
+  });
+
   it('names the subject when the order number came from it', () => {
     render(
       <ParserTraceList

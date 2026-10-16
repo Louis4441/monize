@@ -392,6 +392,7 @@ export class AiReviewWorkService {
       input.categoryName === undefined &&
       input.payeeName === undefined &&
       input.description === undefined &&
+      input.referenceNumber === undefined &&
       (input.tagNames === undefined || input.tagNames.length === 0)
     ) {
       throw new BadRequestException(
@@ -446,6 +447,7 @@ export class AiReviewWorkService {
       categoryName: input.categoryName,
       payeeName: input.payeeName,
       description: input.description,
+      referenceNumber: input.referenceNumber,
       tagNames: input.tagNames,
       categorySource: input.categorySource,
     });

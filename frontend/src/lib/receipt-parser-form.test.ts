@@ -6,6 +6,7 @@ import {
   buildParserDefinition,
   buildParserPayload,
   definitionToFormFields,
+  discardModeOf,
   emptyParserForm,
   formCanRepresent,
   formatDefinitionJson,
@@ -51,6 +52,13 @@ describe('splitting', () => {
 describe('buildParserDefinition', () => {
   it('is only the version for an empty form', () => {
     expect(buildParserDefinition(emptyParserForm())).toEqual({ version: 2 });
+  });
+
+  it('keeps a multi-line pattern (parts joined by \\n) as one pattern, and shows it in the form again', () => {
+    const multiLine = 'Receipt from *\\n{amount}\\nPaid';
+    const definition = buildParserDefinition(emptyParserForm({ total: `${multiLine}\nTotal {amount}` }));
+    expect(definition.total).toEqual([multiLine, 'Total {amount}']);
+    expect(formCanRepresent(definition)).toBe(true);
   });
 
   it('builds every part of the definition', () => {
@@ -120,6 +128,33 @@ describe('buildParserPayload', () => {
   });
 });
 
+describe('discard', () => {
+  it('writes the mode it holds, for a receipt or a trade profile, and leaves it out when it reads', () => {
+    expect(buildParserDefinition(emptyParserForm({ discard: 'ignore' }))).toEqual({ version: 2, discard: 'ignore' });
+    expect(buildParserDefinition(emptyParserForm({ kind: 'trade', discard: 'delete' })).discard).toBe('delete');
+    expect(buildParserDefinition(emptyParserForm())).not.toHaveProperty('discard');
+  });
+
+  it('reads it back, and the form can show a definition that holds one', () => {
+    for (const discard of ['ignore', 'delete'] as const) {
+      expect(definitionToFormFields({ version: 2, discard }).discard).toBe(discard);
+      expect(formCanRepresent({ version: 2, total: ['Total {amount}'], discard })).toBe(true);
+    }
+    expect(definitionToFormFields({ version: 2 }).discard).toBe('');
+  });
+
+  it('sends a definition with a mode the form has no option for to the JSON editor', () => {
+    expect(formCanRepresent({ version: 2, discard: 'archive' })).toBe(false);
+  });
+
+  it('names the mode of a stored definition, or none', () => {
+    expect(discardModeOf({ version: 2, discard: 'delete' })).toBe('delete');
+    expect(discardModeOf({ version: 2 })).toBeNull();
+    expect(discardModeOf({ version: 2, discard: 'archive' })).toBeNull();
+    expect(discardModeOf(null)).toBeNull();
+  });
+});
+
 describe('parserToForm', () => {
   const parser = (overrides: Partial<EmailReceiptParser> = {}): EmailReceiptParser => ({
     id: 'p-1',
@@ -179,6 +214,15 @@ describe('parseValidationProblems', () => {
       { path: 'items.patterns[1]', code: 'capture_conflict' },
       { path: 'categoryRules[2].categoryId', code: 'invalid_uuid' },
       { path: '', code: 'not_object' },
+    ]);
+  });
+
+  it('reads the multi-line codes, not the shorter code they start with', () => {
+    expect(
+      parseValidationProblems('x: total[0]: too_many_lines; categoryRules[1].match: line_break_not_allowed'),
+    ).toEqual([
+      { path: 'total[0]', code: 'too_many_lines' },
+      { path: 'categoryRules[1].match', code: 'line_break_not_allowed' },
     ]);
   });
 

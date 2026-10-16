@@ -16,6 +16,8 @@ export interface ProcessTotals {
   /** Emails that raised an error and were passed over. */
   failed: number;
   byOutcome: Partial<Record<EmailReceiptStatus, number>>;
+  /** Processed emails their profile deleted: they have no status to end in. */
+  deleted: number;
 }
 
 export type ProcessRunState =
@@ -26,14 +28,19 @@ export type ProcessRunState =
   /** A call failed: what had been done stays done, and the reason is the server's. */
   | { status: 'failed'; totals: ProcessTotals; message: string | null };
 
-const EMPTY: ProcessTotals = { processed: 0, failed: 0, byOutcome: {} };
+const EMPTY: ProcessTotals = { processed: 0, failed: 0, byOutcome: {}, deleted: 0 };
 
 const add = (totals: ProcessTotals, answer: Awaited<ReturnType<typeof emailReceiptsApi.receipts.processBatch>>): ProcessTotals => {
   const byOutcome = { ...totals.byOutcome };
   for (const [status, count] of Object.entries(answer.byOutcome) as Array<[EmailReceiptStatus, number]>) {
     byOutcome[status] = (byOutcome[status] ?? 0) + count;
   }
-  return { processed: totals.processed + answer.processed, failed: totals.failed + answer.failed, byOutcome };
+  return {
+    processed: totals.processed + answer.processed,
+    failed: totals.failed + answer.failed,
+    byOutcome,
+    deleted: totals.deleted + (answer.deleted ?? 0),
+  };
 };
 
 /**

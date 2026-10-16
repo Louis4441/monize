@@ -22,9 +22,9 @@ const patternFor = (item: ReceiptTraceItem, index: number): string =>
 /**
  * Which entry and which line read each value of a test, as a compact list: the
  * field, the entry index and glob, and the line number and text that produced
- * it (a labelled entry names its label line too), then each item's lines. A
- * field that read nothing is not listed. Every text is shown as text, never as
- * markup.
+ * it (a labelled entry names its label line too; a multi-line pattern lists
+ * every line it matched), then each item's lines. A field that read nothing is
+ * not listed. Every text is shown as text, never as markup.
  */
 export function ParserTraceList({ trace }: ParserTraceListProps) {
   const t = useTranslations('emailReceipts.test.matchedBy');
@@ -46,6 +46,22 @@ export function ParserTraceList({ trace }: ParserTraceListProps) {
         </span>
       ) : value.line.line === 0 ? (
         <span>{t('entrySubject', { entry: value.entry + 1, pattern: value.pattern, text: value.line.text })}</span>
+      ) : value.lines !== undefined && value.lines.length > 1 ? (
+        <>
+          <span>
+            {t('entryLines', {
+              entry: value.entry + 1,
+              pattern: value.pattern,
+              first: value.lines[0].line,
+              last: value.lines[value.lines.length - 1].line,
+            })}
+          </span>
+          <ul className="ml-4 list-disc">
+            {value.lines.map((line) => (
+              <li key={`${field}-${line.line}`}>{t('blockLine', { line: line.line, text: line.text })}</li>
+            ))}
+          </ul>
+        </>
       ) : (
         <span>{t('entryLine', { entry: value.entry + 1, pattern: value.pattern, line: value.line.line, text: value.line.text })}</span>
       )}

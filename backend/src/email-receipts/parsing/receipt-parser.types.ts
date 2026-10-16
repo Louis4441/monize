@@ -17,6 +17,8 @@ export const MAX_PATTERNS_PER_FIELD = 10;
 export const MAX_PATTERN_LENGTH = 200;
 export const MAX_CATEGORY_RULES = 50;
 export const MAX_SECTION_MARKER_LENGTH = 100;
+/** Consecutive lines one multi-line pattern (parts joined by `\n`) may span. */
+export const MAX_PATTERN_LINES = 5;
 /** Parsing reads at most this many lines of an email. */
 export const MAX_PARSE_LINES = 2000;
 /** Parsing keeps at most this many line items. */
@@ -313,7 +315,20 @@ export interface ReceiptParserDefinition {
   skipIfLine?: string[];
   /** A line matching one of these leaves the receipt `unmatched` (`wait_line`) for a later re-read. */
   waitIfLine?: string[];
+  /**
+   * The profile's emails are never read: every email the pipeline gives this
+   * profile is ignored or deleted (see {@link RECEIPT_DISCARD_MODES}), before
+   * any guard or field. For senders whose mail is never wanted.
+   */
+  discard?: ReceiptDiscardMode;
 }
+
+/**
+ * What a profile does with the emails it matches instead of reading them:
+ * `ignore` marks each one `ignored` (`profile_ignore`), `delete` removes it.
+ */
+export const RECEIPT_DISCARD_MODES = ["ignore", "delete"] as const;
+export type ReceiptDiscardMode = (typeof RECEIPT_DISCARD_MODES)[number];
 
 /** One line item as read from the email. */
 export interface ParsedReceiptItem {
@@ -397,14 +412,16 @@ export interface ReceiptTraceHit {
   /** A labelled entry's `label` glob and the line it matched. */
   label?: string;
   labelLine?: ReceiptTraceLine;
-  /** The line the value was read from. */
+  /** The line the value was read from; for a multi-line pattern, the first line it matched. */
   line: ReceiptTraceLine;
+  /** A multi-line pattern: every line it matched, first to last (absent for a one-line match). */
+  lines?: ReceiptTraceLine[];
 }
 
 /** What read one item: the glob(s) and the line(s) that produced it. */
 export interface ReceiptTraceItem {
   mode: "patterns" | "record" | "single";
-  /** The item's glob (patterns, single) or one per consumed step (record). */
+  /** The item's glob (patterns, single) or, for a record, the glob of each line in `lines` (a multi-line step's glob once per line it took). */
   patterns: string[];
   /** The lines the item was read from (a joined item lists each of them). */
   lines: ReceiptTraceLine[];

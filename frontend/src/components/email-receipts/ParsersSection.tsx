@@ -10,6 +10,7 @@ import { ParserJsonDialog } from '@/components/email-receipts/ParserJsonDialog';
 import { ProcessStatus } from '@/components/email-receipts/ProcessStatus';
 import { ProfileWizard } from '@/components/email-receipts/ProfileWizard';
 import { UncoveredDomainsSection } from '@/components/email-receipts/UncoveredDomainsSection';
+import { useProfileDiscardOffer } from '@/components/email-receipts/useProfileDiscardOffer';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -22,7 +23,7 @@ import { useProcessStoredEmails } from '@/hooks/useProcessStoredEmails';
 import { useReceiptParserLookups } from '@/hooks/useReceiptParserLookups';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { processableForDomains } from '@/lib/email-receipts-format';
-import { isTradeDefinition } from '@/lib/receipt-parser-form';
+import { discardModeOf, isTradeDefinition } from '@/lib/receipt-parser-form';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
@@ -62,6 +63,8 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
   // The approved profile and how many stored emails of its senders could be processed now.
   const [processOffer, setProcessOffer] = useState<{ parser: EmailReceiptParser; count: number } | null>(null);
   const { state: processState, run: runProcess, cancel: cancelProcess, dismiss: dismissProcess } = useProcessStoredEmails();
+  // A profile that ignores or deletes its emails offers to do so to the stored ones it matches.
+  const discardOffer = useProfileDiscardOffer(() => void load());
   // Only the newest load may write the list (a reload after a 409 must not be
   // overwritten by a slower answer to an earlier request).
   const latestLoad = useRef(0);
@@ -113,7 +116,9 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
       const approved = await emailReceiptsApi.parsers.approve(parser.id, parser.revision);
       setParsers((prev) => prev && prev.map((p) => (p.id === approved.id ? approved : p)));
       toast.success(t('toasts.approved'));
-      void offerProcessing(approved);
+      // A profile that discards its emails offers that instead of reading the stored ones.
+      if (discardModeOf(approved.definition) !== null) void discardOffer.offer(approved);
+      else void offerProcessing(approved);
     } catch (error) {
       if (isConflict(error)) {
         toast.error(t('toasts.changedElsewhere'));
@@ -148,9 +153,10 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
     void load();
   };
 
-  const handleSaved = () => {
+  const handleSaved = (saved: EmailReceiptParser) => {
     setEditor({ kind: 'closed' });
     void load();
+    void discardOffer.offer(saved);
   };
 
   const handleConflict = () => {
@@ -259,6 +265,9 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
                     <Badge variant={parser.source === 'ai' ? 'purple' : 'gray'}>{t(`source.${parser.source}`)}</Badge>
                     {/* A trade profile books investment transactions, not bank-transaction splits. */}
                     {isTradeDefinition(parser.definition) && <Badge variant="blue">{t('kindTrade')}</Badge>}
+                    {/* A profile for mail that is never wanted: it ignores or deletes what it matches. */}
+                    {discardModeOf(parser.definition) === 'ignore' && <Badge variant="gray">{t('discardIgnore')}</Badge>}
+                    {discardModeOf(parser.definition) === 'delete' && <Badge variant="red">{t('discardDelete')}</Badge>}
                     {!parser.definitionValid && <Badge variant="red">{t('invalid')}</Badge>}
                   </div>
                 </Td>
@@ -349,6 +358,8 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
         onConfirm={confirmProcess}
         onCancel={() => setProcessOffer(null)}
       />
+
+      {discardOffer.dialog}
 
       <ConfirmDialog
         isOpen={deleteTarget !== null}

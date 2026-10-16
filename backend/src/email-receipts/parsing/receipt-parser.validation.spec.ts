@@ -5,6 +5,7 @@ import {
 import {
   MAX_CATEGORY_RULES,
   MAX_PATTERN_LENGTH,
+  MAX_PATTERN_LINES,
   MAX_PATTERNS_PER_FIELD,
   MAX_SECTION_MARKER_LENGTH,
 } from "./receipt-parser.types";
@@ -1084,6 +1085,111 @@ describe("validateReceiptParserDefinition: the lines source", () => {
   it("refuses anything else as invalid_value, whatever its type", () => {
     for (const source of ["pdf", "HTML", "", " text", 5, null, true, [], {}]) {
       expect(codesAt({ version: 2, source }, "source")).toEqual([
+        "invalid_value",
+      ]);
+    }
+  });
+});
+
+describe("validateReceiptParserDefinition: multi-line patterns", () => {
+  it("accepts parts joined by \\n wherever the email's lines are read", () => {
+    const input = {
+      version: 2,
+      total: ["Receipt from *\\n{amount}\\nPaid"],
+      orderId: [{ label: "Order\\nNumber", value: "{orderid}\\n*" }],
+      items: { patterns: ["{name}\\n{amount}"] },
+      requireLine: ["Receipt\\n*"],
+      categoryRules: [{ match: "Gift\\n*", categoryId: UUID_A, field: "line" }],
+    };
+    expect(validateReceiptParserDefinition(input)).toEqual({
+      ok: true,
+      definition: input,
+    });
+  });
+
+  it("accepts up to MAX_PATTERN_LINES parts and refuses one more", () => {
+    const parts = (n: number) =>
+      [...Array(n - 1).fill("*"), "{amount}"].join("\\n");
+    expect(
+      validateReceiptParserDefinition({
+        version: 2,
+        total: [parts(MAX_PATTERN_LINES)],
+      }).ok,
+    ).toBe(true);
+    expect(
+      codesAt(
+        { version: 2, total: [parts(MAX_PATTERN_LINES + 1)] },
+        "total[0]",
+      ),
+    ).toEqual(["too_many_lines"]);
+  });
+
+  it("refuses an empty part: it could only match an empty line", () => {
+    for (const pattern of [
+      "Total\\n\\n{amount}",
+      "{amount}\\n",
+      "\\n{amount}",
+    ]) {
+      expect(codesAt({ version: 2, total: [pattern] }, "total[0]")).toEqual([
+        "empty",
+      ]);
+    }
+  });
+
+  it("checks captures over every part together", () => {
+    expect(
+      codesAt({ version: 2, total: ["{amount}\\n{amount}"] }, "total[0]"),
+    ).toEqual(["duplicate_capture"]);
+    expect(codesAt({ version: 2, total: ["Total\\n*"] }, "total[0]")).toEqual([
+      "capture_missing",
+    ]);
+    expect(
+      codesAt({ version: 2, total: ["{amount}\\n{name}"] }, "total[0]"),
+    ).toEqual(["capture_not_allowed"]);
+    // A capture cut by a line break is two halves of literal text, not a capture.
+    expect(
+      codesAt({ version: 2, total: ["Total {amo\\nunt}"] }, "total[0]"),
+    ).toEqual(["capture_missing"]);
+  });
+
+  it("refuses a multi-line category rule over an item name or the payee", () => {
+    for (const field of [undefined, "item", "payee"]) {
+      const rule = { match: "Gift\\n*", categoryId: UUID_A, field };
+      expect(
+        codesAt(
+          { version: 2, categoryRules: [rule] },
+          "categoryRules[0].match",
+        ),
+      ).toEqual(["line_break_not_allowed"]);
+    }
+  });
+});
+
+describe("validateReceiptParserDefinition: discard", () => {
+  it.each(["ignore", "delete"])(
+    "accepts %s, alone or beside anything else",
+    (discard) => {
+      for (const input of [
+        { version: 2, discard },
+        { ...valid(), discard },
+      ]) {
+        expect(validateReceiptParserDefinition(input)).toEqual({
+          ok: true,
+          definition: input,
+        });
+      }
+    },
+  );
+
+  it("is compatible with a trade section", () => {
+    expect(
+      codesAt({ version: 2, discard: "ignore", trade: {} }, "discard"),
+    ).toEqual([]);
+  });
+
+  it("refuses anything else as invalid_value, whatever its type", () => {
+    for (const discard of ["archive", "IGNORE", "", true, 1, null, [], {}]) {
+      expect(codesAt({ version: 2, discard }, "discard")).toEqual([
         "invalid_value",
       ]);
     }

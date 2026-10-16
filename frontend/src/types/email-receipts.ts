@@ -363,6 +363,33 @@ export const EMAIL_RECEIPT_PROCESSABLE_STATUSES = [
 ] as const;
 export type EmailReceiptProcessableStatus = (typeof EMAIL_RECEIPT_PROCESSABLE_STATUSES)[number];
 
+/** What `POST /email-receipts/profile-batch` does with the emails a profile matches: `count` writes nothing. */
+export type ProfileBatchAction = 'count' | 'ignore' | 'delete';
+
+/** `POST /email-receipts/profile-batch`. */
+export interface ProfileBatchPayload {
+  parserId: string;
+  action: ProfileBatchAction;
+  /** The `next` the previous call answered; omit on the first call. */
+  after?: string;
+}
+
+/** What one page of a profile's bulk action found and did. */
+export interface ProfileBatchResult {
+  /** Emails of the page the profile matches (as the pipeline chooses the profile). */
+  matched: number;
+  /** Of those, the ones whose proposal was already applied: kept by both actions. */
+  applied: number;
+  /** Of those, the ones that could not be read: kept by `ignore`. */
+  unreadable: number;
+  /** Of those, the ones already ignored. */
+  ignored: number;
+  /** Emails this call ignored or deleted (0 for `count`). */
+  done: number;
+  /** Send back as `after`; null ends the scan. */
+  next: string | null;
+}
+
 /** `POST /email-receipts/process-batch`. */
 export interface ProcessEmailReceiptsPayload {
   domain?: string;
@@ -377,6 +404,8 @@ export interface ProcessEmailReceiptsResult {
   processed: number;
   /** Where the processed emails ended, by their new status (a status with none is absent). */
   byOutcome: Partial<Record<EmailReceiptStatus, number>>;
+  /** Processed emails that are gone: their profile deletes every email it matches. Absent from a server that predates it. */
+  deleted?: number;
   /** Emails that raised an error and were passed over. */
   failed: number;
   /** Matching emails this run has not touched yet; 0 ends the run. */
@@ -618,6 +647,8 @@ export const EMAIL_RECEIPT_BULK_MAX_IDS = 500;
 export const RECEIPT_PARSER_LIMITS = {
   maxPatternsPerField: 10,
   maxPatternLength: 200,
+  /** Consecutive lines one multi-line pattern (parts joined by `\n`) may span. */
+  maxPatternLines: 5,
   maxCategoryRules: 50,
   maxSectionMarkerLength: 100,
   maxSkipLines: 10,
@@ -758,6 +789,10 @@ export interface ReceiptTradeDefinition {
 }
 
 /** A parser definition, version 2 (`definition` of an `email_receipt_parsers` row). */
+/** What a profile does with the emails it matches instead of reading them: ignore them, or delete them. */
+export const RECEIPT_DISCARD_MODES = ['ignore', 'delete'] as const;
+export type ReceiptDiscardMode = (typeof RECEIPT_DISCARD_MODES)[number];
+
 export interface ReceiptParserDefinition {
   version: 2;
   /** The lines the patterns read: the email's text (default) or its HTML part. */
@@ -795,6 +830,8 @@ export interface ReceiptParserDefinition {
   requireLine?: string[];
   skipIfLine?: string[];
   waitIfLine?: string[];
+  /** What the profile does with every email it matches instead of reading it; absent: it reads them. */
+  discard?: ReceiptDiscardMode;
 }
 
 /** One problem the server's validator found: where, and a machine-readable code. */
@@ -926,7 +963,10 @@ export interface ReceiptTraceHit {
   /** A labelled entry's label glob and the line it matched. */
   label?: string;
   labelLine?: ReceiptTraceLine;
+  /** The line the value was read from; for a multi-line pattern, the first line it matched. */
   line: ReceiptTraceLine;
+  /** A multi-line pattern: every line it matched, first to last (absent for a one-line match). */
+  lines?: ReceiptTraceLine[];
 }
 
 export interface ReceiptTraceItem {
@@ -971,7 +1011,14 @@ export type ReceiptTradeTrace = Record<Exclude<ReceiptTradeTraceField, 'currency
 };
 
 /** What the pipeline would do with the email under this parser (`no_html`: it reads the HTML part and the email has none). */
-export type ReceiptOutcome = 'read' | 'not_applicable' | 'skip_line' | 'wait_line' | 'no_html';
+export type ReceiptOutcome =
+  | 'read'
+  | 'not_applicable'
+  | 'skip_line'
+  | 'wait_line'
+  | 'discard_ignore'
+  | 'discard_delete'
+  | 'no_html';
 
 export interface EmailReceiptParserTestResult {
   /**
@@ -1061,6 +1108,8 @@ export const PARSER_PREVIEW_OUTCOMES = [
   'not_applicable',
   'skip_line',
   'wait_line',
+  'discard_ignore',
+  'discard_delete',
   'no_html',
   'trade',
   'trade_exists',

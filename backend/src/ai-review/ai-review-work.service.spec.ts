@@ -1078,6 +1078,18 @@ describe("AiReviewWorkService.submit with tag names (email-receipts design 5.5)"
     );
   });
 
+  it("hands a reference number to the update preparation and accepts one alone", async () => {
+    const { service, requests, prep } = setup();
+    requests.submitProposal.mockResolvedValue(request({ status: "proposed" }));
+    await expect(
+      service.submit(USER, "agent-1", REQ, { referenceNumber: "EX-1" }),
+    ).resolves.toBeDefined();
+    expect(prep.prepareUpdate).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({ referenceNumber: "EX-1" }),
+    );
+  });
+
   it("accepts a proposal that only adds a tag", async () => {
     const { service, requests } = setup();
     requests.submitProposal.mockResolvedValue(request({ status: "proposed" }));

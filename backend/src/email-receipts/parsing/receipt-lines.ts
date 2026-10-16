@@ -98,6 +98,28 @@ export function traceLine(
   };
 }
 
+/** The `span` lines from line `at` on, traced. */
+export function traceLines(
+  lines: readonly string[],
+  at: number,
+  span: number,
+): ReceiptTraceLine[] {
+  return Array.from({ length: span }, (_, k) => traceLine(lines, at + k));
+}
+
+/**
+ * The trace of a match at line `at` that took `span` lines: its first line,
+ * and every line it took when that is more than one (a multi-line pattern).
+ */
+export function traceMatch(
+  lines: readonly string[],
+  at: number,
+  span: number,
+): { line: ReceiptTraceLine; lines?: ReceiptTraceLine[] } {
+  const line = traceLine(lines, at);
+  return span <= 1 ? { line } : { line, lines: traceLines(lines, at, span) };
+}
+
 /** The subject as a traced line (line 0). */
 export function traceSubject(subject: string): ReceiptTraceLine {
   return {

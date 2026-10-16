@@ -676,6 +676,35 @@ describe("AiActionBuilderService", () => {
     });
   });
 
+  it("signs the reference number an update sets and shows it on the card", () => {
+    const preview: UpdateTransactionPreview = {
+      transactionId: "t1",
+      accountId: "a1",
+      accountName: "Checking",
+      amount: -75,
+      transactionDate: "2025-04-01",
+      payeeId: null,
+      payeeName: null,
+      payeeMatched: false,
+      payeeWillBeCreated: false,
+      categoryId: null,
+      categoryName: null,
+      description: "d",
+      currencyCode: "USD",
+      isReconciled: false,
+      referenceNumber: "EX-1",
+    };
+    const action = builder.buildUpdateTransaction("u1", preview);
+    expect(action.descriptor).toMatchObject({ referenceNumber: "EX-1" });
+    expect(signing.sign).toHaveBeenLastCalledWith(action.descriptor);
+    expect(action.preview).toMatchObject({ referenceNumber: "EX-1" });
+
+    const { referenceNumber: _unused, ...unchanged } = preview;
+    const plain = builder.buildUpdateTransaction("u1", unchanged);
+    expect(plain.descriptor).not.toHaveProperty("referenceNumber");
+    expect(plain.preview).not.toHaveProperty("referenceNumber");
+  });
+
   it("carries no tag keys when the update adds none", () => {
     const preview: UpdateTransactionPreview = {
       transactionId: "t1",

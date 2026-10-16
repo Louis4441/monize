@@ -32,6 +32,7 @@ import { EmailReceiptsAttentionAlertService } from "./poll/email-receipts-attent
 import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
 import { EmailReceiptsController } from "./receipts/email-receipts.controller";
 import { EmailReceiptsService } from "./receipts/email-receipts.service";
+import { EmailReceiptProfileBatchService } from "./receipts/email-receipt-profile-batch.service";
 
 /**
  * Email receipts (docs/future-plans/email-receipts.md): a user's dedicated IMAP
@@ -94,6 +95,7 @@ import { EmailReceiptsService } from "./receipts/email-receipts.service";
     EmailReceiptImportService,
     EmailReceiptsAttentionAlertService,
     EmailReceiptsService,
+    EmailReceiptProfileBatchService,
     EmailReceiptAiService,
     EmailReceiptCategoryAiService,
     // Runs the assistant over the wizard's samples; needs AiQueryService, so it

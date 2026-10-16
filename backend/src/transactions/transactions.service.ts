@@ -344,6 +344,8 @@ export interface UpdateTransactionPreview {
   tagNames?: string[];
   /** The subset of `tagNames` the user has no tag for yet: confirm creates them. */
   newTagNames?: string[];
+  /** The reference number ("Ref #") the edit sets; absent when it leaves it as it is. */
+  referenceNumber?: string;
   /** `"ai"` when the AI chose `categoryName` (display only; set by the review queue, never by this service). */
   categorySource?: "ai";
 }
@@ -943,6 +945,8 @@ export class TransactionsService {
        * change.
        */
       tagNames?: readonly string[];
+      /** The reference number to set; the value the transaction holds already is not a change. */
+      referenceNumber?: string;
     },
   ): Promise<UpdateTransactionPreview> {
     const existing = await this.findOne(userId, transactionId);
@@ -979,6 +983,13 @@ export class TransactionsService {
       transactionId,
       input.tagNames ?? [],
     );
+    const referenceNumber =
+      input.referenceNumber === undefined
+        ? undefined
+        : stripHtml(input.referenceNumber)?.trim() || undefined;
+    const referenceChanges =
+      referenceNumber !== undefined &&
+      referenceNumber !== (existing.referenceNumber ?? null);
     const hasChange =
       input.amount !== undefined ||
       input.transactionDate !== undefined ||
@@ -986,6 +997,7 @@ export class TransactionsService {
       input.categoryId !== undefined ||
       input.description !== undefined ||
       tagChange.tagNames.length > 0 ||
+      referenceChanges ||
       // A splits-only replacement changes the transaction even though no
       // scalar field does.
       input.splitsAccompany === true;
@@ -1067,6 +1079,7 @@ export class TransactionsService {
       description,
       currencyCode: existing.currencyCode,
       isReconciled: existing.isReconciled,
+      ...(referenceChanges ? { referenceNumber } : {}),
       ...(tagChange.tagNames.length > 0
         ? {
             tagNames: tagChange.tagNames,

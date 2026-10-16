@@ -142,7 +142,7 @@ export function describeProblemPath(path: string, t: Translator): string {
   return path;
 }
 
-/** The bound a `too_many` or `too_long` code refers to at this path. */
+/** The bound a `too_many`, `too_many_lines` or `too_long` code refers to at this path. */
 function boundFor(code: string, path: string): number {
   if (code === 'too_many') {
     if (path.startsWith('categoryRules')) return RECEIPT_PARSER_LIMITS.maxCategoryRules;
@@ -154,6 +154,7 @@ function boundFor(code: string, path: string): number {
     if (path === 'items.record') return RECEIPT_PARSER_LIMITS.maxRecordSteps;
     return RECEIPT_PARSER_LIMITS.maxPatternsPerField;
   }
+  if (code === 'too_many_lines') return RECEIPT_PARSER_LIMITS.maxPatternLines;
   if (code === 'out_of_range') {
     if (path === 'match.daysBefore') return RECEIPT_PARSER_LIMITS.maxDaysBefore;
     if (path === 'match.daysAfter') return RECEIPT_PARSER_LIMITS.maxDaysAfter;

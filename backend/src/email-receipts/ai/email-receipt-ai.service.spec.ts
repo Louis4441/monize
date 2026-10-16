@@ -736,7 +736,8 @@ describe("EmailReceiptAiService.processAiRequest", () => {
           { categoryName: "Books", amount: -12, memo: "Widget" },
           { categoryName: "Books", amount: -3, memo: "Cable" },
         ],
-        description: "CARD PURCHASE | shop.example.com A-1: Widget, Cable",
+        description: "CARD PURCHASE | shop.example.com: Widget, Cable",
+        referenceNumber: "A-1",
       },
     );
     expect(h.requests.release).not.toHaveBeenCalled();

@@ -334,6 +334,8 @@ export interface PendingActionPreview {
   tagNames?: string[];
   /** The subset of `tagNames` the approval creates because the user has no such tag yet. */
   newTagNames?: string[];
+  /** update_transaction: the reference number ("Ref #") the approval sets; absent when it is left as it is. */
+  referenceNumber?: string;
   name?: string | null;
   /** Payee website, as the commit would store it. */
   website?: string | null;

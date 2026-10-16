@@ -224,7 +224,18 @@
       "approveFailed": "Het profiel kon niet worden goedgekeurd",
       "changedElsewhere": "Dit profiel is elders gewijzigd. De lijst is opnieuw geladen.",
       "deleted": "Profiel verwijderd",
-      "deleteFailed": "Het profiel kon niet worden verwijderd"
+      "deleteFailed": "Het profiel kon niet worden verwijderd",
+      "emailsIgnored": "{count, plural, one {# e-mail genegeerd} other {# e-mails genegeerd}}",
+      "emailsDeleted": "{count, plural, one {# e-mail verwijderd} other {# e-mails verwijderd}}",
+      "bulkFailed": "De e-mails van dit profiel konden niet allemaal worden verwerkt. Wat al verwerkt is, blijft zo."
+    },
+    "bulk": {
+      "ignoreTitle": "De e-mails van dit profiel negeren?",
+      "ignoreMessage": "{count, plural, one {# e-mail die {name} inleest, wordt} other {# e-mails die {name} inleest, worden}} genegeerd: ze stellen niets meer voor en hun open voorstellen worden gesloten.{kept, plural, =0 {} one { # e-mail die al is toegepast of niet kon worden gelezen, blijft zoals hij is.} other { # e-mails die al zijn toegepast of niet konden worden gelezen, blijven zoals ze zijn.}}",
+      "ignoreConfirm": "E-mails negeren",
+      "deleteTitle": "De e-mails van dit profiel verwijderen?",
+      "deleteMessage": "{count, plural, one {# e-mail die {name} inleest, wordt} other {# e-mails die {name} inleest, worden}} verwijderd, samen met hun open voorstellen. Dit kan niet ongedaan worden gemaakt.{kept, plural, =0 {} one { # e-mail waarvan het voorstel al is toegepast, blijft.} other { # e-mails waarvan het voorstel al is toegepast, blijven.}}",
+      "deleteConfirm": "E-mails verwijderen"
     },
     "deleteDialog": {
       "title": "Het profiel verwijderen?",
@@ -245,7 +256,9 @@
       "later": "Niet nu"
     },
     "reparse": "E-mails opnieuw inlezen ({count})",
-    "kindTrade": "Beurstransacties"
+    "kindTrade": "Beurstransacties",
+    "discardIgnore": "Negeert zijn e-mails",
+    "discardDelete": "Verwijdert zijn e-mails"
   },
   "editor": {
     "createTitle": "Nieuw profiel",
@@ -279,7 +292,7 @@
         "text": "Tekst",
         "html": "HTML"
       },
-      "globHelp": "Elk patroon wordt vergeleken met één hele regel van de e-mail, hoofdletters worden genegeerd. Gebruik {star} voor willekeurige tekst en een naam tussen accolades, zoals {capture}, om een waarde vast te leggen. Elk veld accepteert maximaal {max} patronen, één per regel.",
+      "globHelp": "Elk patroon wordt vergeleken met één hele regel van de e-mail, hoofdletters worden genegeerd. Gebruik {star} voor willekeurige tekst en een naam tussen accolades, zoals {capture}, om een waarde vast te leggen. Elk veld accepteert maximaal {max} patronen, één per regel. Om opeenvolgende regels te vergelijken, verbind je één patroon per regel met {lineBreak}, bijvoorbeeld {example}.",
       "orderIdLabel": "Patronen voor het ordernummer",
       "orderIdHint": "Moet {capture} vastleggen. Voorbeeld: Ordernummer: {capture}",
       "totalLabel": "Patronen voor het totaal",
@@ -426,6 +439,16 @@
       "markerRemove": "Markering {marker} verwijderen",
       "markerAdd": "Valutamarkering toevoegen",
       "markersMax": "Hooguit {max} markeringen."
+    },
+    "discard": {
+      "label": "Overeenkomende e-mails",
+      "read": "Inlezen",
+      "ignore": "Negeren",
+      "delete": "Verwijderen",
+      "readHelp": "Het profiel leest elke overeenkomende e-mail in met de patronen hieronder.",
+      "ignoreHelp": "Elke e-mail die bij dit profiel past, wordt bij aankomst genegeerd: hij stelt niets voor. Voor afzenders met wier e-mail je nooit iets wilt doen.",
+      "deleteHelp": "Elke e-mail die bij dit profiel past, wordt bij aankomst uit Monize verwijderd (hij blijft in je mailbox). Een verwijderde e-mail kan niet worden teruggehaald.",
+      "noReading": "Dit profiel leest niets in, dus het heeft geen patronen, categorieën of koppeling nodig. De afzenderdomeinen en onderwerpwoorden hierboven bepalen welke e-mails het neemt."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "heeft patronen voor het totaal of de prijs nodig (minstens een van de twee)",
       "trade_account_missing": "heeft een standaardrekening of rekeningregels nodig",
       "invalid_currency": "is geen valutacode van 3 letters, zoals USD",
+      "too_many_lines": "beslaat te veel regels (maximaal {max})",
+      "line_break_not_allowed": "wordt vergeleken met één tekst (een artikelnaam, de verkoper of een rekening) en kan dus niet meerdere regels beslaan",
       "invalid_uuid_account": "is geen geldige rekening"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "Dit profiel zou deze e-mail niet lezen: geen van de vereiste regels komt erin voor, dus het volgende profiel voor de afzender zou worden geprobeerd.",
       "skip_line": "Dit profiel zou deze e-mail terzijde leggen: er staat een regel in waarop het overslaat.",
       "wait_line": "Dit profiel zou deze e-mail vasthouden: een regel zegt dat de bestelling nog niet definitief is, dus hij wordt later opnieuw gelezen.",
+      "discard_ignore": "Dit profiel zou deze e-mail negeren: het negeert elke overeenkomende e-mail.",
+      "discard_delete": "Dit profiel zou deze e-mail verwijderen: het verwijdert elke overeenkomende e-mail.",
       "no_html": "Dit profiel leest het HTML-deel van de e-mail en deze e-mail heeft er geen, dus hij zou als onleesbaar (geen HTML) worden gemarkeerd."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "vermelding {entry} ({pattern}), regel {line}: {text}",
       "entrySubject": "vermelding {entry} ({pattern}), het onderwerp: {text}",
+      "entryLines": "vermelding {entry} ({pattern}), regels {first} tot en met {last}:",
+      "blockLine": "regel {line}: {text}",
       "labelled": "vermelding {entry}, label {label} op regel {labelLine} ({labelText}), waarde {pattern} op regel {line}: {text}",
       "item": "Artikel {number}",
       "itemLine": "{pattern}, regel {line}: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "Het voorstel is geweigerd, dus er is niets voorgesteld.",
       "skip_line": "Er is een regel gevonden waarop dit profiel overslaat, dus de e-mail is genegeerd.",
       "wait_line": "Een regel zegt dat de bestelling nog niet definitief is, dus de e-mail wordt later opnieuw gelezen.",
+      "profile_ignore": "Het profiel van deze e-mail negeert elke overeenkomende e-mail.",
       "no_html": "Dit profiel leest het HTML-deel van de e-mail en deze e-mail heeft er geen.",
       "schema_org": "Er was geen profiel nodig: de bestelling is gelezen uit de gestructureerde gegevens (schema.org) in de e-mail.",
       "item_amount_missing": "Een artikel heeft geen bedrag en de e-mail heeft geen enkel totaal om het te geven.",
@@ -1074,6 +1104,7 @@
     "failed": "De verwerking is gestopt omdat een verzoek is mislukt.",
     "failedWithReason": "De verwerking is gestopt: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} verwijderd",
     "close": "Sluiten"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "Niet gelezen door dit profiel",
         "skip_line": "Overgeslagen (overslaanregel gevonden)",
         "wait_line": "In de wacht (bestelling niet definitief)",
+        "discard_ignore": "Genegeerd door dit profiel",
+        "discard_delete": "Verwijderd door dit profiel",
         "no_html": "Geen HTML-deel",
         "trade": "Stelt een transactie voor",
         "trade_exists": "Staat al in je administratie"

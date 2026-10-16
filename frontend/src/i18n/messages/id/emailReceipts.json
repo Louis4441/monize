@@ -224,7 +224,18 @@
       "approveFailed": "Profil tidak dapat disetujui",
       "changedElsewhere": "Profil ini diubah di tempat lain. Daftar telah dimuat ulang.",
       "deleted": "Profil dihapus",
-      "deleteFailed": "Profil tidak dapat dihapus"
+      "deleteFailed": "Profil tidak dapat dihapus",
+      "emailsIgnored": "{count, plural, other {# surel diabaikan}}",
+      "emailsDeleted": "{count, plural, other {# surel dihapus}}",
+      "bulkFailed": "Tidak dapat menyelesaikan surel profil ini. Surel yang sudah ditangani tetap seperti itu."
+    },
+    "bulk": {
+      "ignoreTitle": "Abaikan surel profil ini?",
+      "ignoreMessage": "{count, plural, other {# surel}} yang dibaca {name} akan diabaikan: surel tersebut tidak mengusulkan apa pun, dan usulan terbukanya ditutup.{kept, plural, =0 {} other { # surel yang sudah diterapkan atau tidak dapat dibaca tetap seperti semula.}}",
+      "ignoreConfirm": "Abaikan surel",
+      "deleteTitle": "Hapus surel profil ini?",
+      "deleteMessage": "{count, plural, other {# surel}} yang dibaca {name} akan dihapus beserta usulan terbukanya. Tindakan ini tidak dapat dibatalkan.{kept, plural, =0 {} other { # surel yang usulannya sudah diterapkan tetap ada.}}",
+      "deleteConfirm": "Hapus surel"
     },
     "deleteDialog": {
       "title": "Hapus profil?",
@@ -245,7 +256,9 @@
       "later": "Nanti saja"
     },
     "reparse": "Urai ulang surel ({count})",
-    "kindTrade": "Transaksi pialang"
+    "kindTrade": "Transaksi pialang",
+    "discardIgnore": "Mengabaikan surelnya",
+    "discardDelete": "Menghapus surelnya"
   },
   "editor": {
     "createTitle": "Profil baru",
@@ -279,7 +292,7 @@
         "text": "Teks",
         "html": "HTML"
       },
-      "globHelp": "Setiap pola dicocokkan dengan satu baris penuh pada surel, tanpa membedakan huruf besar dan kecil. Gunakan {star} untuk teks apa pun dan sebuah nama dalam kurung kurawal, seperti {capture}, untuk menangkap nilai. Setiap bidang menerima hingga {max} pola, satu per baris.",
+      "globHelp": "Setiap pola dicocokkan dengan satu baris penuh pada surel, tanpa membedakan huruf besar dan kecil. Gunakan {star} untuk teks apa pun dan sebuah nama dalam kurung kurawal, seperti {capture}, untuk menangkap nilai. Setiap bidang menerima hingga {max} pola, satu per baris. Untuk mencocokkan baris yang berurutan, gabungkan satu pola per baris dengan {lineBreak}, misalnya {example}.",
       "orderIdLabel": "Pola nomor pesanan",
       "orderIdHint": "Harus menangkap {capture}. Contoh: Nomor pesanan: {capture}",
       "totalLabel": "Pola total",
@@ -426,6 +439,16 @@
       "markerRemove": "Hapus penanda {marker}",
       "markerAdd": "Tambah penanda mata uang",
       "markersMax": "Paling banyak {max} penanda."
+    },
+    "discard": {
+      "label": "Surel yang cocok",
+      "read": "Baca",
+      "ignore": "Abaikan",
+      "delete": "Hapus",
+      "readHelp": "Profil membaca setiap surel yang cocok dengan pola di bawah.",
+      "ignoreHelp": "Setiap surel yang cocok dengan profil ini diabaikan saat tiba: surel tersebut tidak mengusulkan apa pun. Untuk pengirim yang surelnya tidak pernah ingin Anda urus.",
+      "deleteHelp": "Setiap surel yang cocok dengan profil ini dihapus dari Monize saat tiba (tetap ada di kotak surel Anda). Surel yang dihapus tidak dapat dikembalikan.",
+      "noReading": "Profil ini tidak membaca apa pun, jadi tidak memerlukan pola, kategori, atau pencocokan. Domain pengirim dan kata subjek di atas menentukan surel mana yang diambilnya."
     }
   },
   "problems": {
@@ -535,6 +558,8 @@
       "trade_amount_missing": "memerlukan pola total atau harga (setidaknya salah satunya)",
       "trade_account_missing": "memerlukan akun bawaan atau aturan akun",
       "invalid_currency": "bukan kode mata uang 3 huruf, seperti USD",
+      "too_many_lines": "mencakup terlalu banyak baris (maksimal {max})",
+      "line_break_not_allowed": "dicocokkan dengan satu teks (nama item, pedagang, atau akun), jadi tidak dapat mencakup beberapa baris",
       "invalid_uuid_account": "bukan akun yang valid"
     }
   },
@@ -566,6 +591,8 @@
       "not_applicable": "Profil ini tidak akan membaca surel ini: tidak ada baris wajibnya yang ada di dalamnya, sehingga profil berikutnya untuk pengirim akan dicoba.",
       "skip_line": "Profil ini akan menyisihkan surel ini: di dalamnya ada baris yang membuatnya dilewati.",
       "wait_line": "Profil ini akan menahan surel ini: sebuah baris menyatakan pesanan belum final, sehingga surel dibaca ulang nanti.",
+      "discard_ignore": "Profil ini akan mengabaikan surel ini: profil ini mengabaikan setiap surel yang cocok.",
+      "discard_delete": "Profil ini akan menghapus surel ini: profil ini menghapus setiap surel yang cocok.",
       "no_html": "Profil ini membaca bagian HTML surel, dan surel ini tidak memilikinya, sehingga akan ditandai tidak dapat dibaca (tanpa HTML)."
     },
     "matchedBy": {
@@ -593,6 +620,8 @@
       },
       "entryLine": "entri {entry} ({pattern}), baris {line}: {text}",
       "entrySubject": "entri {entry} ({pattern}), subjek: {text}",
+      "entryLines": "entri {entry} ({pattern}), baris {first} sampai {last}:",
+      "blockLine": "baris {line}: {text}",
       "labelled": "entri {entry}, label {label} di baris {labelLine} ({labelText}), nilai {pattern} di baris {line}: {text}",
       "item": "Item {number}",
       "itemLine": "{pattern}, baris {line}: {text}"
@@ -899,6 +928,7 @@
       "proposal_refused": "Usulan ditolak, jadi tidak ada yang diusulkan.",
       "skip_line": "Ditemukan baris yang membuat profil ini melewati surel, sehingga surel diabaikan.",
       "wait_line": "Sebuah baris menyatakan pesanan belum final, jadi surel akan dibaca lagi nanti.",
+      "profile_ignore": "Profil surel ini mengabaikan setiap surel yang cocok.",
       "no_html": "Profil ini membaca bagian HTML surel, dan surel ini tidak memilikinya.",
       "schema_org": "Tidak perlu profil: pesanan dibaca dari data terstruktur (schema.org) di surel.",
       "item_amount_missing": "Sebuah item tidak memiliki jumlah, dan surel tidak memiliki total tunggal untuk diberikan kepadanya.",
@@ -1074,6 +1104,7 @@
     "failed": "Pemrosesan berhenti karena sebuah permintaan gagal.",
     "failedWithReason": "Pemrosesan berhenti: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} dihapus",
     "close": "Tutup"
   },
   "overview": {
@@ -1279,6 +1310,8 @@
         "not_applicable": "Tidak dibaca oleh profil ini",
         "skip_line": "Dilewati (baris lewati ditemukan)",
         "wait_line": "Ditahan (pesanan belum final)",
+        "discard_ignore": "Diabaikan oleh profil ini",
+        "discard_delete": "Dihapus oleh profil ini",
         "no_html": "Tidak ada bagian HTML",
         "trade": "Mengusulkan perdagangan",
         "trade_exists": "Sudah ada di buku besar"
