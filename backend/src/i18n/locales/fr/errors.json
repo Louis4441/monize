@@ -389,6 +389,7 @@
     "bulkCountChanged": "Le nombre d'e-mails correspondants est passé de {{ expected }} à {{ current }}. Rien n'a été modifié. Vérifiez le nouveau nombre et réessayez.",
     "bulkTooManyIds": "Vous pouvez choisir {{ max }} e-mails au maximum un par un. Sélectionnez moins d'e-mails, ou sélectionnez tous ceux qui correspondent au filtre.",
     "bulkTooManyMatches": "Plus de {{ max }} e-mails correspondent. Affinez le filtre, par exemple en choisissant un état ou un expéditeur, puis réessayez.",
+    "bulkTooManyApprovable": "Plus de {{ max }} propositions correspondent. Affinez la sélection, par exemple en choisissant un expéditeur ou une période, puis réessayez.",
     "aiOff": "L'IA est désactivée pour cette boîte mail. Modifiez d'abord le mode IA dans les paramètres de la boîte mail.",
     "pollBusy": "La boîte mail est en cours de lecture. Réessayez dans une minute.",
     "importNoFile": "Choisissez au moins un fichier .eml, .mbox, .msg ou .zip à importer.",

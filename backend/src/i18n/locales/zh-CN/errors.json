@@ -389,6 +389,7 @@
     "bulkCountChanged": "符合条件的邮件数量已从 {{ expected }} 变为 {{ current }}。未做任何更改。请核对新数量后重试。",
     "bulkTooManyIds": "逐个选择最多只能选 {{ max }} 封邮件。请少选一些，或选择符合筛选条件的全部邮件。",
     "bulkTooManyMatches": "符合条件的邮件超过 {{ max }} 封。请缩小筛选范围，例如选择状态或发件人，然后重试。",
+    "bulkTooManyApprovable": "符合条件的提案超过 {{ max }} 条。请缩小选择范围，例如选择发件人或日期范围，然后重试。",
     "aiOff": "此邮箱已关闭 AI。请先在邮箱设置中更改 AI 模式。",
     "pollBusy": "此邮箱正在读取中。请一分钟后重试。",
     "importNoFile": "请至少选择一个 .eml、.mbox、.msg 或 .zip 文件进行导入。",

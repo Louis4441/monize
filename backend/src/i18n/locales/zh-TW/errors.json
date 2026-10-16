@@ -389,6 +389,7 @@
     "bulkCountChanged": "符合條件的郵件數量已從 {{ expected }} 變為 {{ current }}。未做任何變更。請核對新數量後重試。",
     "bulkTooManyIds": "逐一選取最多只能選 {{ max }} 封郵件。請少選一些，或選取符合篩選條件的全部郵件。",
     "bulkTooManyMatches": "符合條件的郵件超過 {{ max }} 封。請縮小篩選範圍，例如選擇狀態或寄件者，然後重試。",
+    "bulkTooManyApprovable": "符合條件的提案超過 {{ max }} 筆。請縮小選取範圍，例如選擇寄件者或日期範圍，然後重試。",
     "aiOff": "此信箱已關閉 AI。請先在信箱設定中變更 AI 模式。",
     "pollBusy": "此信箱正在讀取中。請一分鐘後重試。",
     "importNoFile": "請至少選擇一個 .eml、.mbox、.msg 或 .zip 檔案進行匯入。",

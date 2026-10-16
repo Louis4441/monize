@@ -389,6 +389,7 @@
     "bulkCountChanged": "Liczba pasujących wiadomości zmieniła się z {{ expected }} na {{ current }}. Nic nie zmieniono. Sprawdź nową liczbę i spróbuj ponownie.",
     "bulkTooManyIds": "Pojedynczo można wybrać maksymalnie {{ max }} wiadomości. Wybierz mniej wiadomości albo zaznacz wszystkie pasujące do filtra.",
     "bulkTooManyMatches": "Pasuje więcej niż {{ max }} wiadomości. Zawęź filtr, na przykład przez wybór statusu lub nadawcy, i spróbuj ponownie.",
+    "bulkTooManyApprovable": "Pasuje więcej niż {{ max }} propozycji. Zawęź wybór, na przykład przez wybór nadawcy lub zakresu dat, i spróbuj ponownie.",
     "aiOff": "AI jest wyłączone dla tej skrzynki pocztowej. Najpierw zmień tryb AI w ustawieniach skrzynki.",
     "pollBusy": "Skrzynka pocztowa jest właśnie odczytywana. Spróbuj ponownie za minutę.",
     "importNoFile": "Wybierz co najmniej jeden plik .eml, .mbox, .msg lub .zip do importu.",

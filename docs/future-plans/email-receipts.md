@@ -1040,6 +1040,10 @@ section 3a.
   a `skipped` email or one whose proposal was applied is `notIgnorable`. The route is
   owner-only like the others and throttled to 10 a minute. "Prepare a profile with AI"
   stays limited to one to five emails of one sender and never works on a filter.
+  The filter also takes `excludeStatuses`, `excludeDomains`, `receivedFrom` and
+  `receivedTo`, and `POST /email-receipts/bulk/count`, `bulk/reprocess` and
+  `bulk/approvable` act on the same selection (`receiptSelectionClause`); the plan
+  is `docs/future-plans/email-receipts-bulk-actions.md`.
 - `/ai-reviews`: an `email_receipt` row shows the sender and subject instead of
   the rule name, and a `pending` one says it waits for an AI agent (with a link
   to the AI settings). An `email_parser_draft` row reads "Parser draft from N

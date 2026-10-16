@@ -18,7 +18,11 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { OwnerOnly } from "../../delegation/decorators/delegate-access.decorator";
 import { EmailReceiptAiService } from "../ai/email-receipt-ai.service";
 import {
+  ApprovableEmailReceiptsDto,
   AskAiEmailReceiptDto,
+  BulkReprocessEmailReceiptsDto,
+  CountEmailReceiptsDto,
+  BulkEmailReceiptFilterDto,
   BulkEmailReceiptsDto,
   EmailReceiptStatusCountsDto,
   ListEmailReceiptDomainsDto,
@@ -27,6 +31,26 @@ import {
   ProcessBatchEmailReceiptsDto,
 } from "./dto/email-receipts.dto";
 import { EmailReceiptsService } from "./email-receipts.service";
+import type { ReceiptBulkTarget } from "./receipt-bulk";
+
+/** The emails a request names: its ids, or the filter as the DTO carries it. */
+function targetOf(dto: {
+  ids?: string[];
+  filter?: BulkEmailReceiptFilterDto;
+}): ReceiptBulkTarget {
+  return dto.ids !== undefined
+    ? { ids: dto.ids }
+    : {
+        filter: {
+          status: dto.filter?.status,
+          domain: dto.filter?.domain,
+          excludeStatuses: dto.filter?.excludeStatuses,
+          excludeDomains: dto.filter?.excludeDomains,
+          receivedFrom: dto.filter?.receivedFrom,
+          receivedTo: dto.filter?.receivedTo,
+        },
+      };
+}
 
 /**
  * The stored order-confirmation emails (design sections 6 and 8): the list, one
@@ -144,16 +168,58 @@ export class EmailReceiptsController {
     return this.receipts.bulk(
       req.user.id,
       dto.action,
-      dto.ids !== undefined
-        ? { ids: dto.ids }
-        : {
-            filter: {
-              status: dto.filter?.status,
-              domain: dto.filter?.domain,
-            },
-          },
+      targetOf(dto),
       dto.expectedCount,
     );
+  }
+
+  // Declared before `:id`, so the literal segment is matched first.
+  @Post("bulk/count")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
+  @ApiOperation({
+    summary:
+      "How many stored emails a filter selects (the state, the sender domain, what is taken out and the received dates), capped just above the bulk limit",
+  })
+  bulkCount(
+    @Request() req: { user: { id: string } },
+    @Body() dto: CountEmailReceiptsDto,
+  ) {
+    return this.receipts.countSelection(req.user.id, dto.filter);
+  }
+
+  // Declared before `:id`, so the literal segment is matched first.
+  @Post("bulk/reprocess")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
+  @ApiOperation({
+    summary:
+      'Run the pipeline over up to `limit` of the selected emails (by id or filter), oldest first, each once per run; answers where they ended and how many are left. Call again with the returned `since` until `remaining` is 0. `onlyStatuses: ["ignored"]` restores ignored emails',
+  })
+  bulkReprocess(
+    @Request() req: { user: { id: string } },
+    @Body() dto: BulkReprocessEmailReceiptsDto,
+  ) {
+    return this.receipts.reprocessSelection(req.user.id, targetOf(dto), {
+      onlyStatuses: dto.onlyStatuses,
+      since: dto.since,
+      limit: dto.limit,
+    });
+  }
+
+  // Declared before `:id`, so the literal segment is matched first.
+  @Post("bulk/approvable")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @ApiOperation({
+    summary:
+      "The request ids of the selected emails whose proposal can be approved (at most 2,000; more is a 400) and how many trade emails were left out",
+  })
+  bulkApprovable(
+    @Request() req: { user: { id: string } },
+    @Body() dto: ApprovableEmailReceiptsDto,
+  ) {
+    return this.receipts.approvableSelection(req.user.id, targetOf(dto));
   }
 
   @Get(":id")

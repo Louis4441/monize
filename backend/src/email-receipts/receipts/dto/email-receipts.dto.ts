@@ -19,6 +19,10 @@ import {
   ValidateNested,
 } from "class-validator";
 import {
+  IsCalendarDate,
+  isCalendarDate,
+} from "../../../common/validators/is-calendar-date.validator";
+import {
   IsReceiptDomain,
   normalizeReceiptDomain,
 } from "../../parsers/dto/receipt-domain.validator";
@@ -200,7 +204,38 @@ export const EMAIL_RECEIPTS_BULK_MAX_IDS = 500;
 /** Most emails one bulk request may act on when it names a filter. */
 export const EMAIL_RECEIPTS_BULK_MAX_MATCHES = 20000;
 
-/** The state and sender domain of the list, as one bulk request names them. */
+/** Most states one filter may take out (the number of states there are). */
+export const EMAIL_RECEIPTS_BULK_MAX_EXCLUDED_STATUSES =
+  EMAIL_RECEIPT_STATUSES.length;
+/** Most sender domains one filter may take out. */
+export const EMAIL_RECEIPTS_BULK_MAX_EXCLUDED_DOMAINS = 50;
+/** Most proposals one approval listing returns. */
+export const EMAIL_RECEIPTS_APPROVABLE_MAX = 2000;
+/** Most emails one reprocess call runs. */
+export const EMAIL_RECEIPTS_BULK_REPROCESS_MAX_LIMIT = 25;
+export const EMAIL_RECEIPTS_BULK_REPROCESS_DEFAULT_LIMIT = 10;
+
+/** A `YYYY-MM-DD` that is not before the one named by `other` (checked only when both are real dates). */
+function IsNotBefore(other: string) {
+  return function decorate(object: object, propertyName: string): void {
+    registerDecorator({
+      name: "isNotBefore",
+      target: object.constructor,
+      propertyName,
+      validator: {
+        validate: (value: unknown, args) => {
+          const from = (args?.object as Record<string, unknown>)[other];
+          return (
+            !isCalendarDate(value) || !isCalendarDate(from) || from <= value
+          );
+        },
+        defaultMessage: () => `${propertyName} must not be before ${other}`,
+      },
+    });
+  };
+}
+
+/** The state and sender domain of the list, as one bulk request names them, and what is taken out of it. */
 export class BulkEmailReceiptFilterDto {
   @ApiPropertyOptional({ enum: EMAIL_RECEIPT_STATUSES })
   @IsOptional()
@@ -216,6 +251,53 @@ export class BulkEmailReceiptFilterDto {
   @Transform(({ value }) => normalizeReceiptDomain(value))
   @IsReceiptDomain()
   domain?: string;
+
+  @ApiPropertyOptional({
+    enum: EMAIL_RECEIPT_STATUSES,
+    isArray: true,
+    description: "States taken out of the selection.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(EMAIL_RECEIPTS_BULK_MAX_EXCLUDED_STATUSES)
+  @ArrayUnique()
+  @IsIn(EMAIL_RECEIPT_STATUSES, { each: true })
+  excludeStatuses?: EmailReceiptStatus[];
+
+  @ApiPropertyOptional({
+    isArray: true,
+    type: String,
+    maxItems: EMAIL_RECEIPTS_BULK_MAX_EXCLUDED_DOMAINS,
+    description:
+      "Sender domains taken out of the selection, each with its sub-domains. Lower-cased and trimmed.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(EMAIL_RECEIPTS_BULK_MAX_EXCLUDED_DOMAINS)
+  @ArrayUnique()
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value.map(normalizeReceiptDomain) : value,
+  )
+  @IsReceiptDomain({ each: true })
+  excludeDomains?: string[];
+
+  @ApiPropertyOptional({
+    example: "2026-01-31",
+    description: "Only emails received on or after this UTC day (YYYY-MM-DD).",
+  })
+  @IsOptional()
+  @IsCalendarDate()
+  receivedFrom?: string;
+
+  @ApiPropertyOptional({
+    example: "2026-12-31",
+    description:
+      "Only emails received on or before this UTC day (YYYY-MM-DD); not before `receivedFrom`.",
+  })
+  @IsOptional()
+  @IsCalendarDate()
+  @IsNotBefore("receivedFrom")
+  receivedTo?: string;
 }
 
 /** The property must be absent when `other` is present: a request names ids or a filter, never both. */
@@ -285,3 +367,83 @@ export class BulkEmailReceiptsDto {
   @Max(EMAIL_RECEIPTS_BULK_MAX_MATCHES)
   expectedCount: number;
 }
+
+/** Exactly one of `ids` and `filter` names the emails: the target of a bulk command. */
+export abstract class ReceiptSelectionTargetDto {
+  @ApiPropertyOptional({
+    description: "The emails to act on, by id. Send this or `filter`.",
+    maxItems: EMAIL_RECEIPTS_BULK_MAX_IDS,
+  })
+  @ValidateIf(
+    (o: ReceiptSelectionTargetDto) =>
+      o.ids !== undefined || o.filter === undefined,
+  )
+  @IsAbsentWhen("filter")
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(EMAIL_RECEIPTS_BULK_MAX_IDS)
+  @ArrayUnique()
+  @IsUUID("all", { each: true })
+  ids?: string[];
+
+  @ApiPropertyOptional({
+    type: BulkEmailReceiptFilterDto,
+    description:
+      "Every email matching this filter, as the list reads them. Send this or `ids`.",
+  })
+  @ValidateIf(
+    (o: ReceiptSelectionTargetDto) =>
+      o.filter !== undefined || o.ids === undefined,
+  )
+  @IsObject()
+  @ValidateNested()
+  @Type(() => BulkEmailReceiptFilterDto)
+  filter?: BulkEmailReceiptFilterDto;
+}
+
+/** Body of `POST /email-receipts/bulk/count`: how many emails a filter selects. */
+export class CountEmailReceiptsDto {
+  @ApiProperty({ type: BulkEmailReceiptFilterDto })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => BulkEmailReceiptFilterDto)
+  filter: BulkEmailReceiptFilterDto;
+}
+
+/** Body of `POST /email-receipts/bulk/reprocess`. */
+export class BulkReprocessEmailReceiptsDto extends ReceiptSelectionTargetDto {
+  @ApiPropertyOptional({
+    enum: EMAIL_RECEIPT_STATUSES,
+    isArray: true,
+    description:
+      'Only emails in these states ("restore ignored" is ["ignored"]); an email whose state changed meanwhile is left alone.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(EMAIL_RECEIPT_STATUSES.length)
+  @ArrayUnique()
+  @IsIn(EMAIL_RECEIPT_STATUSES, { each: true })
+  onlyStatuses?: EmailReceiptStatus[];
+
+  @ApiPropertyOptional({
+    description:
+      "The `since` the previous call of this run answered: only emails not touched since then are taken.",
+  })
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  since?: string;
+
+  @ApiPropertyOptional({
+    minimum: 1,
+    maximum: EMAIL_RECEIPTS_BULK_REPROCESS_MAX_LIMIT,
+    default: EMAIL_RECEIPTS_BULK_REPROCESS_DEFAULT_LIMIT,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(EMAIL_RECEIPTS_BULK_REPROCESS_MAX_LIMIT)
+  limit?: number;
+}
+
+/** Body of `POST /email-receipts/bulk/approvable`. */
+export class ApprovableEmailReceiptsDto extends ReceiptSelectionTargetDto {}

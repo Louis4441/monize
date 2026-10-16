@@ -389,6 +389,7 @@
     "bulkCountChanged": "Số email khớp đã đổi từ {{ expected }} thành {{ current }}. Chưa có gì bị thay đổi. Hãy kiểm tra số mới và thử lại.",
     "bulkTooManyIds": "Chỉ có thể chọn từng email một, tối đa {{ max }} email. Hãy chọn ít email hơn, hoặc chọn tất cả email khớp với bộ lọc.",
     "bulkTooManyMatches": "Có hơn {{ max }} email khớp. Hãy thu hẹp bộ lọc, ví dụ bằng cách chọn trạng thái hoặc người gửi, rồi thử lại.",
+    "bulkTooManyApprovable": "Có hơn {{ max }} đề xuất khớp. Hãy thu hẹp lựa chọn, ví dụ bằng cách chọn người gửi hoặc khoảng ngày, rồi thử lại.",
     "aiOff": "AI đang tắt cho hộp thư này. Hãy đổi chế độ AI trong cài đặt hộp thư trước.",
     "pollBusy": "Hộp thư đang được đọc. Hãy thử lại sau một phút.",
     "importNoFile": "Chọn ít nhất một tệp .eml, .mbox, .msg hoặc .zip để nhập.",

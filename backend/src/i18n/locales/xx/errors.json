@@ -389,6 +389,7 @@
     "bulkCountChanged": "[XX-The number of matching emails changed from {{ expected }} to {{ current }}. Nothing was changed. Check the new number and try again.-XX]",
     "bulkTooManyIds": "[XX-At most {{ max }} emails can be chosen one by one. Select fewer emails, or select all that match the filter.-XX]",
     "bulkTooManyMatches": "[XX-More than {{ max }} emails match. Narrow the filter, for example by choosing a state or a sender domain, and try again.-XX]",
+    "bulkTooManyApprovable": "[XX-More than {{ max }} proposals match. Narrow the selection, for example by choosing a sender domain or a date range, and try again.-XX]",
     "aiOff": "[XX-The AI is turned off for this mailbox. Change the AI mode in the mailbox settings first.-XX]",
     "pollBusy": "[XX-The mailbox is being read right now. Try again in a minute.-XX]",
     "importNoFile": "[XX-Choose at least one .eml, .mbox, .msg or .zip file to import.-XX]",

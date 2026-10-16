@@ -389,6 +389,7 @@
     "bulkCountChanged": "Jumlah email yang cocok berubah dari {{ expected }} menjadi {{ current }}. Tidak ada yang diubah. Periksa jumlah baru dan coba lagi.",
     "bulkTooManyIds": "Paling banyak {{ max }} email dapat dipilih satu per satu. Pilih lebih sedikit email, atau pilih semua yang cocok dengan filter.",
     "bulkTooManyMatches": "Lebih dari {{ max }} email cocok. Persempit filter, misalnya dengan memilih status atau pengirim, lalu coba lagi.",
+    "bulkTooManyApprovable": "Lebih dari {{ max }} usulan cocok. Persempit pilihan, misalnya dengan memilih pengirim atau rentang tanggal, lalu coba lagi.",
     "aiOff": "AI dimatikan untuk kotak surat ini. Ubah dulu mode AI di pengaturan kotak surat.",
     "pollBusy": "Kotak surat sedang dibaca. Coba lagi dalam semenit.",
     "importNoFile": "Pilih setidaknya satu file .eml, .mbox, .msg, atau .zip untuk diimpor.",
