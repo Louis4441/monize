@@ -236,8 +236,8 @@ export interface ParserToolSaveResult {
   fromDomains: string[];
   /** The payee the name resolved to, or null when none did (nothing is created). */
   payee: { id: string; name: string } | null;
-  /** The matching the saved profile effectively has (defaults filled in). */
-  match: ReturnType<typeof effectiveMatchDefinition>;
+  /** The matching the saved profile effectively has (defaults filled in); null for a trade profile, which matches no bank transaction. */
+  match: ReturnType<typeof effectiveMatchDefinition> | null;
   /** True when the request named by `requestId` is now `proposed`. */
   requestProposed: boolean;
 }
@@ -666,7 +666,10 @@ export class EmailReceiptParserToolsService {
         revision: saved.revision,
         fromDomains: saved.fromDomains,
         payee: payee ? { id: payee.id, name: payee.name } : null,
-        match: effectiveMatchDefinition(definition),
+        match:
+          definition.trade === undefined
+            ? effectiveMatchDefinition(definition)
+            : null,
         requestProposed,
       };
     });

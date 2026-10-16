@@ -643,6 +643,19 @@ describe("EmailReceiptParserToolsService.saveDraft", () => {
       requestProposed: false,
       payee: null,
     });
+    expect(result.match).toMatchObject({ by: expect.any(Array) });
+  });
+
+  it("reports no matching for a trade profile, which matches no bank transaction", async () => {
+    const { service } = setup();
+
+    const result = await service.saveDraft(USER, CALLER, {
+      name: "Wealthsimple trades",
+      fromDomains: ["wealthsimple.com"],
+      definition: WEALTHSIMPLE_TRADE_DEFINITION,
+    });
+
+    expect(result.match).toBeNull();
   });
 
   it("validates the definition with the one validator, and writes nothing when it is refused", async () => {
