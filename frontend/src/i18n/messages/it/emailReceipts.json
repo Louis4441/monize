@@ -766,6 +766,11 @@
         "mixedKinds": "Le email selezionate mescolano conferme di operazioni ed email di ordini. Un profilo legge un solo tipo, quindi seleziona solo conferme di operazioni o solo email di ordini."
       }
     },
+    "pager": {
+      "itemName": "e-mail",
+      "total": "{count, plural, one {# e-mail} other {# e-mail}}",
+      "page": "Pagina {page}"
+    },
     "draft": {
       "failed": "Impossibile avviare la preparazione di un profilo",
       "queued": "In coda: la richiesta attende un agente nella posta di revisione IA. Nessun assistente è disponibile a rispondere ora.",

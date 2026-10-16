@@ -766,6 +766,11 @@
         "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin."
       }
     },
+    "pager": {
+      "itemName": "e-posta",
+      "total": "{count, plural, one {# e-posta} other {# e-posta}}",
+      "page": "Sayfa {page}"
+    },
     "draft": {
       "failed": "Ayrıştırıcı taslağı oluşturma başlatılamadı",
       "queued": "Kuyruğa alındı: istek, bir ajan için yapay zekâ inceleme kutusunda bekliyor. Şu anda yanıt verebilecek bir asistan yok.",

@@ -766,6 +766,11 @@
         "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos."
       }
     },
+    "pager": {
+      "itemName": "correos",
+      "total": "{count, plural, one {# correo} other {# correos}}",
+      "page": "Página {page}"
+    },
     "draft": {
       "failed": "No se pudo iniciar la redacción de un perfil",
       "queued": "En cola: la solicitud espera a un agente en la bandeja de revisión de IA. Ahora no hay ningún asistente disponible para responder.",

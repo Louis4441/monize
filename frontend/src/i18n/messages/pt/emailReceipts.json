@@ -766,6 +766,11 @@
         "mixedKinds": "Os e-mails selecionados misturam confirmações de negociação e e-mails de encomenda. Um perfil lê um só tipo, por isso selecione apenas confirmações de negociação ou apenas e-mails de encomenda."
       }
     },
+    "pager": {
+      "itemName": "e-mails",
+      "total": "{count, plural, one {# e-mail} other {# e-mails}}",
+      "page": "Página {page}"
+    },
     "draft": {
       "failed": "Não foi possível iniciar a redação de um analisador",
       "queued": "Em fila: o pedido aguarda um agente na caixa de revisão de IA. Nenhum assistente está disponível para responder agora.",

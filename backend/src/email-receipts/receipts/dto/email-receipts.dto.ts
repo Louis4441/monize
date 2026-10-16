@@ -29,6 +29,7 @@ import {
 
 export const EMAIL_RECEIPTS_DEFAULT_LIST_LIMIT = 50;
 export const EMAIL_RECEIPTS_MAX_LIST_LIMIT = 200;
+export const EMAIL_RECEIPTS_MAX_LIST_OFFSET = 100000;
 
 /**
  * The statuses "process in bulk" can act on again: an email waiting to be read,
@@ -76,6 +77,19 @@ export class ListEmailReceiptsDto {
   @Min(1)
   @Max(EMAIL_RECEIPTS_MAX_LIST_LIMIT)
   limit?: number;
+
+  @ApiPropertyOptional({
+    description: "Emails to skip, in the list's order (for paging).",
+    minimum: 0,
+    maximum: EMAIL_RECEIPTS_MAX_LIST_OFFSET,
+    default: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(EMAIL_RECEIPTS_MAX_LIST_OFFSET)
+  offset?: number;
 }
 
 /** Query of `GET /email-receipts/domains`. */

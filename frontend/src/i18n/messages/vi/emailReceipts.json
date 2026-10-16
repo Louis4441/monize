@@ -766,6 +766,11 @@
         "mixedKinds": "Các email đã chọn trộn lẫn xác nhận giao dịch và email đơn hàng. Một hồ sơ chỉ đọc một loại, vì vậy hãy chỉ chọn xác nhận giao dịch hoặc chỉ chọn email đơn hàng."
       }
     },
+    "pager": {
+      "itemName": "email",
+      "total": "{count, plural, other {# email}}",
+      "page": "Trang {page}"
+    },
     "draft": {
       "failed": "Không thể bắt đầu soạn trình phân tích",
       "queued": "Đã xếp hàng: yêu cầu chờ trong hộp thư xem xét của AI cho một tác nhân. Hiện không có trợ lý nào để trả lời.",

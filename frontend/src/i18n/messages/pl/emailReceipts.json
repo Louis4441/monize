@@ -766,6 +766,11 @@
         "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami."
       }
     },
+    "pager": {
+      "itemName": "e-maili",
+      "total": "{count, plural, one {# e-mail} few {# e-maile} many {# e-maili} other {# e-maila}}",
+      "page": "Strona {page}"
+    },
     "draft": {
       "failed": "Nie udało się rozpocząć przygotowywania parsera",
       "queued": "W kolejce: prośba czeka na agenta w skrzynce przeglądów AI. Żaden asystent nie może teraz odpowiedzieć.",

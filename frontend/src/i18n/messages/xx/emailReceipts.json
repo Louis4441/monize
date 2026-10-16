@@ -766,6 +766,11 @@
         "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]"
       }
     },
+    "pager": {
+      "itemName": "[XX-emails-XX]",
+      "total": "[XX-{count, plural, one {# email} other {# emails}}-XX]",
+      "page": "[XX-Page {page}-XX]"
+    },
     "draft": {
       "failed": "[XX-Could not start drafting a profile-XX]",
       "queued": "[XX-Queued: the request waits in the AI review inbox for an agent. No assistant is available to answer now.-XX]",

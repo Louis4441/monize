@@ -138,8 +138,18 @@ export const emailReceiptsApi = {
 
   receipts: {
     /** `domain` keeps the emails from that sender domain or one of its sub-domains; it combines with `status`. */
-    list: async (status?: EmailReceiptStatus, limit?: number, domain?: string): Promise<EmailReceiptListItem[]> => {
-      const params = { ...(status ? { status } : {}), ...(domain ? { domain } : {}), ...(limit ? { limit } : {}) };
+    list: async (
+      status?: EmailReceiptStatus,
+      limit?: number,
+      domain?: string,
+      offset?: number,
+    ): Promise<EmailReceiptListItem[]> => {
+      const params = {
+        ...(status ? { status } : {}),
+        ...(domain ? { domain } : {}),
+        ...(limit ? { limit } : {}),
+        ...(offset ? { offset } : {}),
+      };
       const response = await apiClient.get<EmailReceiptListItem[]>(RECEIPTS, {
         params: Object.keys(params).length > 0 ? params : undefined,
       });

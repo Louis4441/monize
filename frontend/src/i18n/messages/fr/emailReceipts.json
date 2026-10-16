@@ -766,6 +766,11 @@
         "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande."
       }
     },
+    "pager": {
+      "itemName": "e-mails",
+      "total": "{count, plural, one {# e-mail} other {# e-mails}}",
+      "page": "Page {page}"
+    },
     "draft": {
       "failed": "Impossible de démarrer la rédaction d'un profil",
       "queued": "En file d'attente : la demande attend un agent dans la boîte de révision par l'IA. Aucun assistant n'est disponible pour répondre maintenant.",

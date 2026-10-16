@@ -46,10 +46,16 @@ describe("EmailReceiptsController", () => {
 
   it("lists for the JWT user with the status and limit of the query", async () => {
     receipts.list.mockResolvedValue([]);
-    await controller.list(req, { status: "review", limit: 10 } as never);
-    expect(receipts.list).toHaveBeenCalledWith("user-1", {
+    await controller.list(req, {
       status: "review",
       limit: 10,
+      offset: 50,
+    } as never);
+    expect(receipts.list).toHaveBeenCalledWith("user-1", {
+      status: "review",
+      domain: undefined,
+      limit: 10,
+      offset: 50,
     });
   });
 
@@ -64,6 +70,7 @@ describe("EmailReceiptsController", () => {
       status: "review",
       domain: "shop.example.com",
       limit: undefined,
+      offset: undefined,
     });
   });
 
@@ -203,6 +210,21 @@ describe("EmailReceiptsController", () => {
     ])("refuses the domain %j", async (domain) => {
       expect((await check({ domain })).errors.length).toBeGreaterThan(0);
     });
+
+    it("accepts an offset from 0 to 100000, read from the query string", async () => {
+      expect((await check({})).dto.offset).toBeUndefined();
+      expect((await check({ offset: "50" })).dto.offset).toBe(50);
+      for (const offset of [0, 100000]) {
+        expect((await check({ offset })).errors).toHaveLength(0);
+      }
+    });
+
+    it.each([-1, 100001, 1.5, "abc"])(
+      "refuses the offset %j",
+      async (offset) => {
+        expect((await check({ offset })).errors.length).toBeGreaterThan(0);
+      },
+    );
 
     it("refuses a key the query does not have", async () => {
       expect((await check({ userId: "x" })).errors.length).toBeGreaterThan(0);

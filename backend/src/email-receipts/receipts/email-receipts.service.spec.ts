@@ -192,7 +192,7 @@ describe("EmailReceiptsService.list", () => {
       "ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id DESC",
     );
     expect(sql).not.toContain("body_text");
-    expect(params).toEqual([USER, "review", null, null, 20]);
+    expect(params).toEqual([USER, "review", null, null, 20, 0]);
     expect(items[0]).toEqual({
       id: ID,
       fromAddress: "orders@shop.example.com",
@@ -247,6 +247,7 @@ describe("EmailReceiptsService.list", () => {
         "shop.example.com",
         "%.shop.example.com",
         50,
+        0,
       ]);
     });
 
@@ -289,6 +290,7 @@ describe("EmailReceiptsService.list", () => {
         "shop.example.com",
         "%.shop.example.com",
         7,
+        0,
       ]);
     });
   });
@@ -330,11 +332,27 @@ describe("EmailReceiptsService.list", () => {
       null,
       null,
       50,
+      0,
     ]);
     await service.list(USER, { limit: 9999 });
     expect(manager.query.mock.calls[1][1][4]).toBe(200);
     await service.list(USER, { limit: 0 });
     expect(manager.query.mock.calls[2][1][4]).toBe(1);
+  });
+
+  it("skips `offset` emails after the stable order, as a parameter, and clamps it to 0..100000", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([]);
+    await service.list(USER, { limit: 50, offset: 100 });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(
+      /ORDER BY COALESCE\(r\.original_sent_at, r\.received_at\) DESC, r\.id DESC\s+LIMIT \$5 OFFSET \$6/,
+    );
+    expect(params[5]).toBe(100);
+    await service.list(USER, { offset: -5 });
+    expect(manager.query.mock.calls[1][1][5]).toBe(0);
+    await service.list(USER, { offset: 10_000_000 });
+    expect(manager.query.mock.calls[2][1][5]).toBe(100000);
   });
 
   it("carries why a request was closed", async () => {

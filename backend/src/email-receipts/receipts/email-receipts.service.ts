@@ -25,6 +25,7 @@ import {
   EMAIL_RECEIPTS_DEFAULT_LIST_LIMIT,
   EMAIL_RECEIPTS_MAX_BATCH_LIMIT,
   EMAIL_RECEIPTS_MAX_LIST_LIMIT,
+  EMAIL_RECEIPTS_MAX_LIST_OFFSET,
 } from "./dto/email-receipts.dto";
 import { describeFailure } from "../pipeline/receipt-failure";
 import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
@@ -669,6 +670,7 @@ export class EmailReceiptsService {
       status?: EmailReceiptStatus;
       domain?: string;
       limit?: number;
+      offset?: number;
     } = {},
   ): Promise<EmailReceiptListItem[]> {
     const limit = Math.min(
@@ -677,6 +679,10 @@ export class EmailReceiptsService {
         1,
       ),
       EMAIL_RECEIPTS_MAX_LIST_LIMIT,
+    );
+    const offset = Math.min(
+      Math.max(Math.trunc(options.offset ?? 0), 0),
+      EMAIL_RECEIPTS_MAX_LIST_OFFSET,
     );
     const { domain, domainLike } = receiptDomainParams(options.domain);
     const rows = await withScopedDb(this.dataSource, async (m) =>
@@ -688,8 +694,8 @@ export class EmailReceiptsService {
               AND ($2::varchar IS NULL OR r.status = $2::varchar)
               AND ${receiptDomainClause(3, 4)}
             ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id DESC
-            LIMIT $5`,
-          [userId, options.status ?? null, domain, domainLike, limit],
+            LIMIT $5 OFFSET $6`,
+          [userId, options.status ?? null, domain, domainLike, limit, offset],
         ),
       ),
     );

@@ -766,6 +766,11 @@
         "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan."
       }
     },
+    "pager": {
+      "itemName": "email",
+      "total": "{count, plural, other {# email}}",
+      "page": "Halaman {page}"
+    },
     "draft": {
       "failed": "Tidak dapat memulai pembuatan draf profil",
       "queued": "Diantrekan: permintaan menunggu di kotak masuk peninjauan AI untuk sebuah agen. Saat ini tidak ada asisten yang dapat menjawab.",

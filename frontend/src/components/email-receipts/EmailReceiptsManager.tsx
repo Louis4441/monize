@@ -22,6 +22,7 @@ import { Button, buttonClassName } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ListBottomPager } from '@/components/ui/ListBottomPager';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RowActions, type RowAction } from '@/components/ui/row-actions';
 import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
@@ -39,7 +40,6 @@ import {
   draftBlock,
   isReceiptActionable,
   normalizeDomainFilter,
-  parserDraftKind,
   senderDomain,
 } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
@@ -56,17 +56,20 @@ import {
 
 const logger = createLogger('EmailReceipts');
 
+/** Emails per page: the server's default limit, which the request leaves unsent, so only the offset is. */
+const PAGE_SIZE = 50;
+
 const FILTERS = ['all', ...EMAIL_RECEIPT_STATUSES] as const;
 type ReceiptFilter = (typeof FILTERS)[number];
 
 /** States from which the detail dialog can link the email to a transaction. */
 const LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['ambiguous', 'unmatched', 'no_parser', 'parse_failed'];
 
-
-/** The list answers one pair of filters (state and sender domain, `''` for all); `items === null` is a request that failed. */
+/** The list answers one pair of filters (state and sender domain, `''` for all) and one page of it; `items === null` is a request that failed. */
 interface LoadedList {
   filter: ReceiptFilter;
   domain: string;
+  page: number;
   items: EmailReceiptListItem[] | null;
 }
 
@@ -129,6 +132,8 @@ export function EmailReceiptsManager() {
   // The sender domain filter starts from `?domain=` and is written back to it;
   // a value that is no host name is no filter.
   const [domain, setDomain] = useState<string>(() => normalizeDomainFilter(searchParams.get('domain')));
+  // The page of the list (1-based). It belongs to the filters: every handler that changes one returns to page 1.
+  const [page, setPage] = useState(1);
   // The sender domains with their counts for the filter; null while unknown or failed (the select then offers only "All" and the current one).
   const [domains, setDomains] = useState<EmailReceiptDomainCount[] | null>(null);
   // The same counts within the state the reader is on, for every state but "All"; null while unknown or failed.
@@ -159,25 +164,36 @@ export function EmailReceiptsManager() {
   const latestCloud = useRef(0);
   const latestCounts = useRef(0);
   const latestMatching = useRef(0);
-  const currentFilters = useRef({ filter, domain });
+  const currentFilters = useRef({ filter, domain, page });
   useEffect(() => {
-    currentFilters.current = { filter, domain };
-  }, [filter, domain]);
+    currentFilters.current = { filter, domain, page };
+  }, [filter, domain, page]);
 
-  const load = useCallback(async (forFilter: ReceiptFilter, forDomain: string) => {
+  const load = useCallback(async (forFilter: ReceiptFilter, forDomain: string, forPage: number) => {
     const request = ++latestLoad.current;
+    const status = forFilter === 'all' ? undefined : forFilter;
+    const sender = forDomain === '' ? undefined : forDomain;
     try {
-      const items = await emailReceiptsApi.receipts.list(
-        forFilter === 'all' ? undefined : forFilter,
-        undefined,
-        forDomain === '' ? undefined : forDomain,
-      );
+      const items = await emailReceiptsApi.receipts.list(status, undefined, sender, (forPage - 1) * PAGE_SIZE);
       if (request !== latestLoad.current) return;
-      setLoaded({ filter: forFilter, domain: forDomain, items });
+      if (items.length === 0 && forPage > 1) {
+        // The page no longer exists (its emails were deleted or left the filter): go to the last one that does.
+        let lastPage = forPage - 1;
+        try {
+          const total = await emailReceiptsApi.receipts.countMatching(status, sender);
+          lastPage = Math.max(1, Math.min(lastPage, Math.ceil(total / PAGE_SIZE)));
+        } catch (error) {
+          logger.error(error);
+        }
+        if (request !== latestLoad.current) return;
+        setPage(lastPage);
+        return;
+      }
+      setLoaded({ filter: forFilter, domain: forDomain, page: forPage, items });
     } catch (error) {
       if (request !== latestLoad.current) return;
       logger.error(error);
-      setLoaded({ filter: forFilter, domain: forDomain, items: null });
+      setLoaded({ filter: forFilter, domain: forDomain, page: forPage, items: null });
     }
   }, []);
 
@@ -247,13 +263,17 @@ export function EmailReceiptsManager() {
     void loadCounts();
     void loadMatching(currentFilters.current.filter, currentFilters.current.domain);
     void loadCloud(currentFilters.current.filter);
-    await load(currentFilters.current.filter, currentFilters.current.domain);
+    await load(currentFilters.current.filter, currentFilters.current.domain, currentFilters.current.page);
   }, [load, loadDomains, loadCounts, loadCloud, loadMatching]);
 
   useEffect(() => {
-    void load(filter, domain);
+    void load(filter, domain, page);
+  }, [filter, domain, page, load]);
+
+  // The total belongs to the filters alone, so turning a page does not count again.
+  useEffect(() => {
     void loadMatching(filter, domain);
-  }, [filter, domain, load, loadMatching]);
+  }, [filter, domain, loadMatching]);
 
   useEffect(() => {
     void loadDomains();
@@ -269,10 +289,17 @@ export function EmailReceiptsManager() {
     setAllMatching(null);
   }, []);
 
+  // Ticked rows belong to the page they are on; "every email matching the filter" covers all pages and survives paging.
+  const changePage = (next: number) => {
+    setPage(next);
+    setSelectedIds(new Set());
+  };
+
   const bulk = useReceiptBulkActions({ reload, onDone: clearSelection });
 
   const changeDomain = (next: string) => {
     setDomain(next);
+    setPage(1);
     clearSelection();
     const params = new URLSearchParams(searchParams.toString());
     // Without a domain a legacy `/email-receipts?domain=` link would fall back to the Overview, so the tab is named.
@@ -527,13 +554,21 @@ export function EmailReceiptsManager() {
     return orderActionsForCard(actions, leadActionKey(filter, receipt));
   };
 
-  const current = loaded !== null && loaded.filter === filter && loaded.domain === domain ? loaded : null;
+  const current =
+    loaded !== null && loaded.filter === filter && loaded.domain === domain && loaded.page === page ? loaded : null;
   const pageItems = current?.items ?? [];
   // What is ticked AND still on screen: an email a reload dropped is not selected.
   const selected = pageItems.filter((receipt) => selectedIds.has(receipt.id));
   const selectedDomains = distinctSenderDomains(selected);
   const matchingTotal = matching !== null && matching.filter === filter && matching.domain === domain ? matching.total : null;
   const allMatchingCount = allMatching !== null ? (matchingTotal ?? allMatching) : null;
+
+  // Pages come from the total the server counted for this filter. Unknown (the count failed) is not zero: Next stays open while the page came back full.
+  const totalPages = matchingTotal !== null ? Math.max(1, Math.ceil(matchingTotal / PAGE_SIZE)) : null;
+  const unknownTotalPager =
+    matchingTotal === null && current !== null && current.items !== null && (page > 1 || current.items.length >= PAGE_SIZE)
+      ? current.items
+      : null;
 
   // The tag cloud counts within the state on screen; "All" reads the unfiltered list.
   const cloudDomains = filter === 'all' ? domains : cloud !== null && cloud.filter === filter ? cloud.items : null;
@@ -724,6 +759,7 @@ export function EmailReceiptsManager() {
               aria-pressed={filter === option}
               onClick={() => {
                 setFilter(option);
+                setPage(1);
                 clearSelection();
               }}
               className={segmentClass(filter === option)}
@@ -788,6 +824,34 @@ export function EmailReceiptsManager() {
       )}
 
       <Card className="overflow-hidden">{body}</Card>
+
+      {totalPages !== null && matchingTotal !== null && (
+        <ListBottomPager
+          currentPage={Math.min(page, totalPages)}
+          totalPages={totalPages}
+          totalItems={matchingTotal}
+          pageSize={PAGE_SIZE}
+          onPageChange={changePage}
+          itemName={t('pager.itemName')}
+          totalLabel={t('pager.total', { count: matchingTotal })}
+        />
+      )}
+      {unknownTotalPager !== null && (
+        <div className="flex items-center justify-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => changePage(page - 1)}>
+            {tc('pagination.previousPage')}
+          </Button>
+          <span>{t('pager.page', { page })}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={unknownTotalPager.length < PAGE_SIZE}
+            onClick={() => changePage(page + 1)}
+          >
+            {tc('pagination.nextPage')}
+          </Button>
+        </div>
+      )}
 
       {detailId !== null && (
         <EmailReceiptDetailDialog

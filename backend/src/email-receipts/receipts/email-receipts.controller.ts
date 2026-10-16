@@ -60,6 +60,7 @@ export class EmailReceiptsController {
       status: query.status,
       domain: query.domain,
       limit: query.limit,
+      offset: query.offset,
     });
   }
 

@@ -766,6 +766,11 @@
         "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails."
       }
     },
+    "pager": {
+      "itemName": "E-Mails",
+      "total": "{count, plural, one {# E-Mail} other {# E-Mails}}",
+      "page": "Seite {page}"
+    },
     "draft": {
       "failed": "Das Entwerfen eines Profils konnte nicht gestartet werden",
       "queued": "In die Warteschlange gestellt: Die Anfrage wartet im KI-Prüfungseingang auf einen Agenten. Derzeit steht kein Assistent zur Verfügung, der antworten kann.",

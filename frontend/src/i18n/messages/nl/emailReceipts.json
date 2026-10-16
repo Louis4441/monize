@@ -766,6 +766,11 @@
         "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails."
       }
     },
+    "pager": {
+      "itemName": "e-mails",
+      "total": "{count, plural, one {# e-mail} other {# e-mails}}",
+      "page": "Pagina {page}"
+    },
     "draft": {
       "failed": "Het opstellen van een profiel kon niet worden gestart",
       "queued": "In de wachtrij: het verzoek wacht in het AI-controlepostvak op een agent. Er is nu geen assistent beschikbaar om te antwoorden.",

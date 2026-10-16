@@ -147,6 +147,16 @@ describe('emailReceiptsApi', () => {
       expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: { status: 'unmatched', limit: 20 } });
     });
 
+    it('sends an offset for a later page, and none for the first', async () => {
+      client.get.mockResolvedValue({ data: [] });
+      await emailReceiptsApi.receipts.list('review', undefined, 'shop.example.com', 100);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', {
+        params: { status: 'review', domain: 'shop.example.com', offset: 100 },
+      });
+      await emailReceiptsApi.receipts.list(undefined, undefined, undefined, 0);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: undefined });
+    });
+
     it('lists with a sender domain beside the status, and reads the domain counts', async () => {
       client.get.mockResolvedValue({ data: [] });
       await emailReceiptsApi.receipts.list(undefined, undefined, 'shop.example.com');
