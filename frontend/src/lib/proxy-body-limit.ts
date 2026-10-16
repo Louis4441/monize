@@ -86,10 +86,12 @@ export const LARGE_UPLOAD_ROUTES: readonly LargeUploadRoute[] = [
     limitBytes: () => 30 * MIB,
   },
   // The receipts archive import: the backend refuses a declared body above
-  // `EMAIL_IMPORT_REQUEST_LIMIT_MB` (100 MB); this cuts an undeclared one there.
+  // `EMAIL_IMPORT_REQUEST_LIMIT_MB` (26 MB); this cuts an undeclared one there.
+  // Kept to one file's worth: Next hands a route handler the body without
+  // backpressure, so the frontend buffers what the backend has not read yet.
   {
     pattern: /^\/api\/v1\/email-receipts\/mailbox\/import\/?$/,
-    limitBytes: () => 100 * MIB,
+    limitBytes: () => 26 * MIB,
   },
   // A file and its unprocessed original, 10 MB each (`MAX_ATTACHMENT_BYTES`).
   {

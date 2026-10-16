@@ -307,10 +307,14 @@ describe("MailboxImportCard", () => {
     render(<MailboxImportCard />);
     await pick([big]);
     await importNow();
-    expect(api.importFiles).toHaveBeenCalledTimes(1);
-    const sent = api.importFiles.mock.calls[0][0] as File[];
-    expect(sent.map((f) => f.name)).toEqual(["monize-1.mbox", "monize-2.mbox"]);
-    expect(sent.every((f) => f.size <= PART_MAX_BYTES)).toBe(true);
+    // One part per request: the frontend buffers a request's body.
+    expect(api.importFiles).toHaveBeenCalledTimes(2);
+    const sent = api.importFiles.mock.calls.map((call) => call[0] as File[]);
+    expect(sent.map((files) => files.map((f) => f.name))).toEqual([
+      ["monize-1.mbox"],
+      ["monize-2.mbox"],
+    ]);
+    expect(sent.flat().every((f) => f.size <= PART_MAX_BYTES)).toBe(true);
     expect(
       screen.getByText("monize.mbox: 4 stored, 0 duplicates, 0 skipped"),
     ).toBeInTheDocument();

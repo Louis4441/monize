@@ -101,7 +101,7 @@ describe("LARGE_UPLOAD_ROUTES", () => {
     expect(limitFor("/api/v1/ai/query")).toBe(30 * MIB);
     expect(limitFor("/api/v1/ai/query/stream")).toBe(30 * MIB);
     expect(limitFor("/api/v1/transactions/0c1e/attachments")).toBe(21 * MIB);
-    expect(limitFor("/api/v1/email-receipts/mailbox/import")).toBe(100 * MIB);
+    expect(limitFor("/api/v1/email-receipts/mailbox/import")).toBe(26 * MIB);
   });
 
   it.each([

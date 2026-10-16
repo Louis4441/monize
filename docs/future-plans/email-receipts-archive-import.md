@@ -68,7 +68,7 @@ Out (follow-ups, each its own agreement):
    `maxMessageBytes`, `undecodable`). The fallback arrival time of an mbox
    message is the date on its `From ` separator line, else the upload time.
 4. **Bounded.** Per request: at most 20 files, 25 MB each (multer limits, a
-   translated 413), at most 100 MB in total (multer holds the files in memory:
+   translated 413), at most 26 MB in total, one file's worth (multer holds the files in memory:
    the backend refuses a declared `Content-Length` above it before multer
    reads the body, and the frontend's streaming route for this path,
    `LARGE_UPLOAD_ROUTES` in `frontend/src/lib/proxy-body-limit.ts`, cuts an
@@ -137,7 +137,10 @@ as they are (decision 4).
 
 1. **Upload planner** (`frontend/src/lib/email-import/`). The selected files are
    turned into a list of upload parts, then packed into requests: at most 20
-   parts, 99 MiB and 5,000 messages per request, each part at most 24 MiB. The
+   parts, 24 MiB and 5,000 messages per request, each part at most 24 MiB
+   (one full part per request: Next.js hands the streaming route the body
+   without backpressure, so the frontend buffers what the backend has not read
+   yet, and a 99 MiB request OOM-killed a frontend pod limited to 300 MiB). The
    20-file pick limit goes away; one selection may hold up to 1 GiB in total.
 2. **Large `.mbox`** (above 24 MiB): scanned in 4 MiB slices
    (`Blob.slice().arrayBuffer()`) for separators by the backend's rule (a line

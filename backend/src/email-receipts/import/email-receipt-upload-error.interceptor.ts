@@ -17,13 +17,15 @@ export const EMAIL_IMPORT_FILE_LIMIT_BYTES =
 /** Most files of one archive import request. */
 export const EMAIL_IMPORT_MAX_FILES = 20;
 /**
- * Largest whole import request, in MB. multer keeps the files in memory, and 20
- * files of 25 MB would hold 500 MB for one request, so the declared body size
- * is refused above this before multer reads a byte. A body of undeclared length
+ * Largest whole import request, in MB: one 25 MB file and its multipart
+ * framing. multer keeps the files in memory, and the frontend's route buffers
+ * what the backend has not read yet (Next.js gives it no backpressure), so the
+ * declared body size is refused above this before multer reads a byte; the
+ * browser sends one part per request. A body of undeclared length
  * (an HTTP/3 edge relays one) is bounded by the frontend's streaming route for
  * this path (`LARGE_UPLOAD_ROUTES`), which cuts it off at the same ceiling.
  */
-export const EMAIL_IMPORT_REQUEST_LIMIT_MB = 100;
+export const EMAIL_IMPORT_REQUEST_LIMIT_MB = 26;
 export const EMAIL_IMPORT_REQUEST_LIMIT_BYTES =
   EMAIL_IMPORT_REQUEST_LIMIT_MB * 1024 * 1024;
 

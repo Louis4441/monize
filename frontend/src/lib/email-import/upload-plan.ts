@@ -11,8 +11,13 @@ const MIB = 1024 * 1024;
 /** A part stays under the server's 25 MiB per-file limit, with room for the framing. */
 export const PART_MAX_BYTES = 24 * MIB;
 export const REQUEST_MAX_PARTS = 20;
-/** The server refuses 100 MiB; 1 MiB of it is left for the multipart framing. */
-export const REQUEST_MAX_BYTES = 99 * MIB;
+/**
+ * One request holds at most one full part. The frontend's route for this upload
+ * buffers what the backend has not read yet (Next.js hands it the body without
+ * backpressure), so a request's size is what the frontend may hold at once; the
+ * server refuses a body above 26 MiB.
+ */
+export const REQUEST_MAX_BYTES = PART_MAX_BYTES;
 export const REQUEST_MAX_MESSAGES = 5000;
 /** One selection may hold this much in total; checked before anything is read. */
 export const SELECTION_MAX_BYTES = 1024 * MIB;

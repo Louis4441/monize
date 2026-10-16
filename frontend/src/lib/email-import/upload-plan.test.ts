@@ -31,7 +31,7 @@ describe("constants", () => {
   it("stay under the server's limits", () => {
     expect(PART_MAX_BYTES).toBe(24 * 1024 * 1024);
     expect(PART_MAX_BYTES).toBeLessThan(25 * 1024 * 1024);
-    expect(REQUEST_MAX_BYTES).toBe(99 * 1024 * 1024);
+    expect(REQUEST_MAX_BYTES).toBe(24 * 1024 * 1024);
     expect(REQUEST_MAX_PARTS).toBe(20);
     expect(REQUEST_MAX_MESSAGES).toBe(5000);
     expect(SELECTION_MAX_BYTES).toBe(1024 * 1024 * 1024);
@@ -189,19 +189,14 @@ describe("packRequests", () => {
     expect(packRequests(parts).map((r) => r.length)).toEqual([20, 20, 1]);
   });
 
-  it("holds at most 99 MiB per request, at exactly the limit", () => {
+  it("holds at most 24 MiB per request, at exactly the limit", () => {
     const MB = 1024 * 1024;
-    const parts = [
-      fakePart(24 * MB, 1),
-      fakePart(24 * MB, 1),
-      fakePart(24 * MB, 1),
-      fakePart(24 * MB, 1),
-    ];
-    expect(packRequests(parts).map((r) => r.length)).toEqual([4]);
-    const over = [...parts, fakePart(3 * MB + 1, 1)];
-    expect(packRequests(over).map((r) => r.length)).toEqual([4, 1]);
-    const exact = [...parts, fakePart(3 * MB, 1)];
-    expect(packRequests(exact).map((r) => r.length)).toEqual([5]);
+    const full = [fakePart(24 * MB, 1), fakePart(24 * MB, 1)];
+    expect(packRequests(full).map((r) => r.length)).toEqual([1, 1]);
+    const halves = [fakePart(12 * MB, 1), fakePart(12 * MB, 1)];
+    expect(packRequests(halves).map((r) => r.length)).toEqual([2]);
+    const over = [...halves, fakePart(1, 1)];
+    expect(packRequests(over).map((r) => r.length)).toEqual([2, 1]);
   });
 
   it("holds at most 5,000 known messages per request and counts an unknown count as one", () => {
