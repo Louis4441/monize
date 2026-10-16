@@ -2831,8 +2831,10 @@ export class ScheduledTransactionsService {
           securityId: trade.securityId,
         })
         .andWhere(
-          "st.nextDueDate BETWEEN (:date::date - :days::int) AND (:date::date + :days::int)",
-          { date: trade.date, days: TRADE_SCHEDULE_WINDOW_DAYS },
+          // Not `:date::date`: TypeORM reads the cast's `::date` as a second use
+          // of a parameter named `date` and emits `$5:$5`, a syntax error.
+          "st.nextDueDate BETWEEN (:tradeDate::date - :days::int) AND (:tradeDate::date + :days::int)",
+          { tradeDate: trade.date, days: TRADE_SCHEDULE_WINDOW_DAYS },
         )
         .andWhere("COALESCE(st.investmentCommission, 0) = :commission", {
           commission: trade.commission,

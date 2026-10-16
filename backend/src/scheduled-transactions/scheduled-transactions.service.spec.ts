@@ -2512,6 +2512,12 @@ describe("ScheduledTransactionsService", () => {
       const clauses = qb.andWhere.mock.calls
         .map((c) => String(c[0]))
         .join("\n");
+      // A parameter named like its own cast (`:date::date`) is mangled by TypeORM.
+      expect(clauses).not.toMatch(/:(\w+)::\1\b/);
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining(":tradeDate::date"),
+        expect.objectContaining({ tradeDate: "2026-10-15" }),
+      );
       expect(clauses).toContain("st.isInvestment = true");
       expect(clauses).toContain("st.isActive = true");
       expect(clauses).toContain("st.accountId = :accountId");
