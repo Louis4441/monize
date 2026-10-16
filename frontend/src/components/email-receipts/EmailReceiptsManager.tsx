@@ -768,6 +768,8 @@ export function EmailReceiptsManager() {
           prefill={{
             name: parserFor.fromDomain || senderDomain(parserFor.fromAddress),
             fromDomains: parserFor.fromDomain || senderDomain(parserFor.fromAddress),
+            // A profile made from a trade confirmation starts as a trade profile.
+            kind: parserFor.isTrade ? 'trade' : 'receipt',
           }}
           initialReceiptId={parserFor.id}
           lookups={lookups}

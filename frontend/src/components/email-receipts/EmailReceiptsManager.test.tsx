@@ -785,6 +785,17 @@ describe('EmailReceiptsManager', () => {
       const dialog = screen.getByRole('dialog', { name: 'New profile' });
       expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('shop.example');
       expect((within(dialog).getByLabelText('Sender domains') as HTMLTextAreaElement).value).toBe('shop.example');
+      expect(within(dialog).getByRole('button', { name: 'Order receipt' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('starts a profile made from a trade confirmation as a trade profile, still switchable', async () => {
+      api.list.mockResolvedValue([{ ...noParser, isTrade: true, tradeSource: 'ai' as const }]);
+      await renderManager();
+      await runAction('Order no profile', 'Create profile');
+      const dialog = screen.getByRole('dialog', { name: 'New profile' });
+      expect(within(dialog).getByRole('button', { name: 'Brokerage trade' })).toHaveAttribute('aria-pressed', 'true');
+      await click(within(dialog).getByRole('button', { name: 'Order receipt' }));
+      expect(within(dialog).getByRole('button', { name: 'Order receipt' })).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('refreshes the list when a profile was created, and closes the editor', async () => {
