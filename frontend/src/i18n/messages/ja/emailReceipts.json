@@ -758,6 +758,34 @@
       "pageSelected": "このページの {count} 件がすべて選択されています。",
       "selectAllMatching": "このフィルターに一致する {total} 件をすべて選択",
       "allMatchingSelected": "このフィルターに一致する {total} 件のメールがすべて選択されています。",
+      "reprocessButton": "再処理 ({count})",
+      "restoreButton": "無視を元に戻す ({count})",
+      "restoreButtonAll": "無視を元に戻す",
+      "approveButton": "提案を承認 ({count})",
+      "approveButtonAll": "提案を承認",
+      "progress": "処理済み: {processed}、残り: {remaining}",
+      "progressStarting": "開始中",
+      "stop": "停止",
+      "narrowedSelected": "{total} 件のメールを選択中: このフィルターに一致するすべて(下で除外したものを除く)。",
+      "deselect": {
+        "label": "選択解除の条件",
+        "state": "状態: {state}",
+        "sender": "送信者: {domain}",
+        "before": "指定日より前に受信",
+        "after": "指定日より後に受信",
+        "beforeLabel": "この日より前に受信したメールの選択を解除",
+        "afterLabel": "この日より後に受信したメールの選択を解除",
+        "apply": "選択を解除",
+        "cancel": "キャンセル"
+      },
+      "exclusion": {
+        "label": "選択から除外",
+        "state": "状態が {state} ではない",
+        "sender": "{domain} からではない",
+        "from": "{date} 以降に受信",
+        "to": "{date} 以前に受信",
+        "remove": "戻す: {label}"
+      },
       "draftBlocked": {
         "tooMany": "プロフィールは最大 {max} 件のメールから準備できます。{max} 件以下を選択してください。",
         "differentSenders": "選択したメールは異なる送信者 ({domains}) からのものです。プロフィールは1つの送信者のメールを読み取るため、1つの送信者のメールを選択してください。",
@@ -792,7 +820,14 @@
         "message": "{scope, select, both {{domain} から届いた、状態が「{status}」の} domain {{domain} から届いた} status {状態が「{status}」の} other {}}{count, plural, one {# 件のメール} other {# 件のメール}}を無視しますか? 提案は行われなくなり、未処理のレビュー依頼は閉じられます。取引に関連付けられたメールは変更されません。",
         "confirm": "無視"
       },
-      "countChanged": "一致するメールは現在 {count} 件です。何も変更されていません。件数を確認して、もう一度確定してください。"
+      "countChanged": "一致するメールは現在 {count} 件です。何も変更されていません。件数を確認して、もう一度確定してください。",
+      "approve": {
+        "title": "提案を承認しますか?",
+        "message": "{count, plural, one {# 件の提案を承認} other {# 件の提案を承認}}しますか? 各提案は AI レビュー受信箱の確定ボタンと同じ方法で適用されます。",
+        "trades": "{count, plural, one {# 件の取引メールは対象外です。AI レビュー受信箱のカードで承認してください。} other {# 件の取引メールは対象外です。AI レビュー受信箱のカードで承認してください。}}",
+        "confirm": "承認"
+      },
+      "narrowedNote": "選択から除外したメールは変更されません。"
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {# 件のメールを無視しました。} other {# 件のメールを無視しました。}}",
         "unchanged": "{count, plural, one {# 件のメールは既に無視されていました。} other {# 件のメールは既に無視されていました。}}",
         "notIgnorable": "{count, plural, one {# 件のメールは無視できませんでした。読み取れないか、提案が既に適用されています。} other {# 件のメールは無視できませんでした。読み取れないか、提案が既に適用されています。}}",
-        "skippedLinked": "{count, plural, one {取引に関連付けられた # 件のメールは残しました。} other {取引に関連付けられた # 件のメールは残しました。}}"
+        "skippedLinked": "{count, plural, one {取引に関連付けられた # 件のメールは残しました。} other {取引に関連付けられた # 件のメールは残しました。}}",
+        "reprocessed": "{count, plural, one {# 件のメールを再処理しました。} other {# 件のメールを再処理しました。}}",
+        "restored": "{count, plural, one {無視された # 件のメールを再度読み込みました。} other {無視された # 件のメールを再度読み込みました。}}",
+        "reprocessFailed": "{count, plural, one {# 件のメールが失敗しました。} other {# 件のメールが失敗しました。}}",
+        "stopped": "{count, plural, one {停止しました。# 件のメールが未処理です。} other {停止しました。# 件のメールが未処理です。}}",
+        "approved": "{count, plural, one {# 件の提案を承認しました。} other {# 件の提案を承認しました。}}",
+        "approveFailed": "{count, plural, one {# 件の提案を承認できませんでした。} other {# 件の提案を承認できませんでした。}}"
       },
       "deleteFailed": "メールを削除できませんでした",
       "ignoreFailed": "メールを無視できませんでした",
-      "noneLeft": "一致するメールはもうありません。何も変更されていません。"
+      "noneLeft": "一致するメールはもうありません。何も変更されていません。",
+      "reprocessFailed": "メールを再処理できませんでした",
+      "approveFailed": "提案を承認できませんでした",
+      "noApprovable": "この選択には承認できる提案がありません。",
+      "narrowFailed": "メールを数えられませんでした。変更は適用されていません。"
     }
   },
   "detail": {

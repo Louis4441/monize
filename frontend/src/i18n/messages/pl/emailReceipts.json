@@ -758,6 +758,34 @@
       "pageSelected": "Zaznaczono wszystkie wiadomości na tej stronie: {count}.",
       "selectAllMatching": "Zaznacz wszystkie wiadomości pasujące do filtra: {total}.",
       "allMatchingSelected": "Zaznaczono wszystkie wiadomości pasujące do filtra: {total}.",
+      "reprocessButton": "Przetwórz ponownie ({count})",
+      "restoreButton": "Przywróć zignorowane ({count})",
+      "restoreButtonAll": "Przywróć zignorowane",
+      "approveButton": "Zatwierdź propozycje ({count})",
+      "approveButtonAll": "Zatwierdź propozycje",
+      "progress": "Przetworzono: {processed}, zostało: {remaining}",
+      "progressStarting": "Start",
+      "stop": "Zatrzymaj",
+      "narrowedSelected": "Zaznaczono {total} wiadomości: wszystkie pasujące do tego filtra, oprócz wyłączonych poniżej.",
+      "deselect": {
+        "label": "Odznacz według",
+        "state": "Stan: {state}",
+        "sender": "Nadawca: {domain}",
+        "before": "Odebrane przed dniem",
+        "after": "Odebrane po dniu",
+        "beforeLabel": "Odznacz wiadomości odebrane przed dniem",
+        "afterLabel": "Odznacz wiadomości odebrane po dniu",
+        "apply": "Odznacz",
+        "cancel": "Anuluj"
+      },
+      "exclusion": {
+        "label": "Wyłączone z zaznaczenia",
+        "state": "Nie w stanie {state}",
+        "sender": "Nie od {domain}",
+        "from": "Odebrane {date} lub później",
+        "to": "Odebrane {date} lub wcześniej",
+        "remove": "Przywróć: {label}"
+      },
       "draftBlocked": {
         "tooMany": "Parser można przygotować z maksymalnie {max} wiadomości. Zaznacz {max} wiadomości lub mniej.",
         "differentSenders": "Zaznaczone wiadomości pochodzą od różnych nadawców ({domains}). Parser odczytuje wiadomości jednego nadawcy, więc zaznacz wiadomości od jednego nadawcy.",
@@ -792,7 +820,14 @@
         "message": "{count, plural, one {Zignorować # wiadomość} few {Zignorować # wiadomości} many {Zignorować # wiadomości} other {Zignorować # wiadomości}}{scope, select, both { od {domain} ze statusem {status}} domain { od {domain}} status { ze statusem {status}} other {}}? Wiadomości nie będą niczego proponować. Ich otwarte żądania przeglądu zostaną odrzucone. Wiadomości powiązane z transakcją pozostają bez zmian.",
         "confirm": "Zignoruj"
       },
-      "countChanged": "Liczba pasujących wiadomości wynosi teraz {count}. Nic nie zmieniono. Sprawdź liczbę i potwierdź ponownie."
+      "countChanged": "Liczba pasujących wiadomości wynosi teraz {count}. Nic nie zmieniono. Sprawdź liczbę i potwierdź ponownie.",
+      "approve": {
+        "title": "Zatwierdzić propozycje?",
+        "message": "{count, plural, one {Zatwierdzić # propozycję} few {Zatwierdzić # propozycje} many {Zatwierdzić # propozycji} other {Zatwierdzić # propozycji}}? Każdą zastosuje się tak, jak robi to przycisk Potwierdź w skrzynce przeglądu AI.",
+        "trades": "{count, plural, one {# wiadomość o transakcji giełdowej jest pominięta. Zatwierdź ją na jej karcie w skrzynce przeglądu AI.} few {# wiadomości o transakcjach giełdowych są pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.} many {# wiadomości o transakcjach giełdowych jest pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.} other {# wiadomości o transakcjach giełdowych jest pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.}}",
+        "confirm": "Zatwierdź"
+      },
+      "narrowedNote": "Wiadomości wyłączone z zaznaczenia pozostają bez zmian."
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {Zignorowano # wiadomość.} few {Zignorowano # wiadomości.} many {Zignorowano # wiadomości.} other {Zignorowano # wiadomości.}}",
         "unchanged": "{count, plural, one {# wiadomość była już zignorowana.} few {# wiadomości były już zignorowane.} many {# wiadomości było już zignorowanych.} other {# wiadomości było już zignorowanych.}}",
         "notIgnorable": "{count, plural, one {Nie można zignorować # wiadomości: nie można jej odczytać albo jej propozycja jest już zastosowana.} few {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.} many {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.} other {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.}}",
-        "skippedLinked": "{count, plural, one {Zachowano # wiadomość powiązaną z transakcją.} few {Zachowano # wiadomości powiązane z transakcją.} many {Zachowano # wiadomości powiązanych z transakcją.} other {Zachowano # wiadomości powiązanych z transakcją.}}"
+        "skippedLinked": "{count, plural, one {Zachowano # wiadomość powiązaną z transakcją.} few {Zachowano # wiadomości powiązane z transakcją.} many {Zachowano # wiadomości powiązanych z transakcją.} other {Zachowano # wiadomości powiązanych z transakcją.}}",
+        "reprocessed": "{count, plural, one {Ponownie przetworzono # wiadomość.} few {Ponownie przetworzono # wiadomości.} many {Ponownie przetworzono # wiadomości.} other {Ponownie przetworzono # wiadomości.}}",
+        "restored": "{count, plural, one {Ponownie odczytano # zignorowaną wiadomość.} few {Ponownie odczytano # zignorowane wiadomości.} many {Ponownie odczytano # zignorowanych wiadomości.} other {Ponownie odczytano # zignorowanych wiadomości.}}",
+        "reprocessFailed": "{count, plural, one {# wiadomość nie powiodła się.} few {# wiadomości nie powiodły się.} many {# wiadomości nie powiodło się.} other {# wiadomości nie powiodło się.}}",
+        "stopped": "{count, plural, one {Zatrzymano. # wiadomość czeka na przetworzenie.} few {Zatrzymano. # wiadomości czekają na przetworzenie.} many {Zatrzymano. # wiadomości czeka na przetworzenie.} other {Zatrzymano. # wiadomości czeka na przetworzenie.}}",
+        "approved": "{count, plural, one {Zatwierdzono # propozycję.} few {Zatwierdzono # propozycje.} many {Zatwierdzono # propozycji.} other {Zatwierdzono # propozycji.}}",
+        "approveFailed": "{count, plural, one {# propozycji nie udało się zatwierdzić.} few {# propozycji nie udało się zatwierdzić.} many {# propozycji nie udało się zatwierdzić.} other {# propozycji nie udało się zatwierdzić.}}"
       },
       "deleteFailed": "Nie można usunąć wiadomości",
       "ignoreFailed": "Nie można zignorować wiadomości",
-      "noneLeft": "Żadna wiadomość już nie pasuje. Nic nie zmieniono."
+      "noneLeft": "Żadna wiadomość już nie pasuje. Nic nie zmieniono.",
+      "reprocessFailed": "Nie udało się ponownie przetworzyć wiadomości",
+      "approveFailed": "Nie udało się zatwierdzić propozycji",
+      "noApprovable": "W tym zaznaczeniu nie ma propozycji do zatwierdzenia.",
+      "narrowFailed": "Nie udało się policzyć wiadomości. Zmiana nie została zastosowana."
     }
   },
   "detail": {

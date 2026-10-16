@@ -758,6 +758,34 @@
       "pageSelected": "此页面上的 {count} 封邮件已全部选中。",
       "selectAllMatching": "选择符合此筛选条件的全部 {total} 封邮件。",
       "allMatchingSelected": "符合此筛选条件的全部 {total} 封邮件已选中。",
+      "reprocessButton": "重新处理({count})",
+      "restoreButton": "恢复已忽略({count})",
+      "restoreButtonAll": "恢复已忽略",
+      "approveButton": "批准提案({count})",
+      "approveButtonAll": "批准提案",
+      "progress": "已处理:{processed},剩余:{remaining}",
+      "progressStarting": "正在开始",
+      "stop": "停止",
+      "narrowedSelected": "已选择 {total} 封邮件:所有符合此筛选条件的邮件,不包括下面排除的邮件。",
+      "deselect": {
+        "label": "按以下条件取消选择",
+        "state": "状态:{state}",
+        "sender": "发件人:{domain}",
+        "before": "在某天之前收到",
+        "after": "在某天之后收到",
+        "beforeLabel": "取消选择在此日期之前收到的邮件",
+        "afterLabel": "取消选择在此日期之后收到的邮件",
+        "apply": "取消选择",
+        "cancel": "取消"
+      },
+      "exclusion": {
+        "label": "已从选择中排除",
+        "state": "状态不是{state}",
+        "sender": "不是来自 {domain}",
+        "from": "收到时间在 {date} 或之后",
+        "to": "收到时间在 {date} 或之前",
+        "remove": "恢复:{label}"
+      },
       "draftBlocked": {
         "tooMany": "最多可用 {max} 封邮件准备解析器。请选择不超过 {max} 封邮件。",
         "differentSenders": "所选邮件来自不同的发件人（{domains}）。解析器只读取一个发件人的邮件，请选择同一发件人的邮件。",
@@ -792,7 +820,14 @@
         "message": "要忽略{scope, select, both {来自 {domain}、状态为“{status}”的} domain {来自 {domain} 的} status {状态为“{status}”的} other {}}{count, plural, one {# 封邮件} other {# 封邮件}}吗？它们将不再提出任何建议，其未处理的审核请求将被关闭。与交易关联的邮件保持不变。",
         "confirm": "忽略"
       },
-      "countChanged": "符合条件的邮件现在有 {count} 封。未做任何更改。请核对数量后再次确认。"
+      "countChanged": "符合条件的邮件现在有 {count} 封。未做任何更改。请核对数量后再次确认。",
+      "approve": {
+        "title": "批准提案?",
+        "message": "{count, plural, one {批准 # 项提案} other {批准 # 项提案}}?每项提案的应用方式与 AI 审核收件箱中的“确认”按钮相同。",
+        "trades": "{count, plural, one {已跳过 # 封交易邮件。请在 AI 审核收件箱中对应的卡片上批准。} other {已跳过 # 封交易邮件。请在 AI 审核收件箱中对应的卡片上批准。}}",
+        "confirm": "批准"
+      },
+      "narrowedNote": "从选择中排除的邮件不会被更改。"
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {已忽略 # 封邮件。} other {已忽略 # 封邮件。}}",
         "unchanged": "{count, plural, one {# 封邮件之前已被忽略。} other {# 封邮件之前已被忽略。}}",
         "notIgnorable": "{count, plural, one {# 封邮件无法忽略：无法读取，或其建议已被应用。} other {# 封邮件无法忽略：无法读取，或其建议已被应用。}}",
-        "skippedLinked": "{count, plural, one {已保留 # 封与交易关联的邮件。} other {已保留 # 封与交易关联的邮件。}}"
+        "skippedLinked": "{count, plural, one {已保留 # 封与交易关联的邮件。} other {已保留 # 封与交易关联的邮件。}}",
+        "reprocessed": "{count, plural, one {已重新处理 # 封邮件。} other {已重新处理 # 封邮件。}}",
+        "restored": "{count, plural, one {已重新读取 # 封已忽略的邮件。} other {已重新读取 # 封已忽略的邮件。}}",
+        "reprocessFailed": "{count, plural, one {# 封邮件失败。} other {# 封邮件失败。}}",
+        "stopped": "{count, plural, one {已停止。有 # 封邮件未处理。} other {已停止。有 # 封邮件未处理。}}",
+        "approved": "{count, plural, one {已批准 # 项提案。} other {已批准 # 项提案。}}",
+        "approveFailed": "{count, plural, one {# 项提案无法批准。} other {# 项提案无法批准。}}"
       },
       "deleteFailed": "无法删除邮件",
       "ignoreFailed": "无法忽略邮件",
-      "noneLeft": "已没有符合条件的邮件。未做任何更改。"
+      "noneLeft": "已没有符合条件的邮件。未做任何更改。",
+      "reprocessFailed": "无法重新处理这些邮件",
+      "approveFailed": "无法批准这些提案",
+      "noApprovable": "此选择中没有可批准的提案。",
+      "narrowFailed": "无法统计邮件数量。更改未应用。"
     }
   },
   "detail": {

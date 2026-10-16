@@ -758,6 +758,34 @@
       "pageSelected": "Alle {count} e-mails op deze pagina zijn geselecteerd.",
       "selectAllMatching": "Selecteer alle {total} e-mails die bij dit filter passen.",
       "allMatchingSelected": "Alle {total} e-mails die bij dit filter passen, zijn geselecteerd.",
+      "reprocessButton": "Opnieuw verwerken ({count})",
+      "restoreButton": "Genegeerde herstellen ({count})",
+      "restoreButtonAll": "Genegeerde herstellen",
+      "approveButton": "Voorstellen goedkeuren ({count})",
+      "approveButtonAll": "Voorstellen goedkeuren",
+      "progress": "Verwerkt: {processed}, nog te gaan: {remaining}",
+      "progressStarting": "Starten",
+      "stop": "Stoppen",
+      "narrowedSelected": "{total} e-mails zijn geselecteerd: alle e-mails die bij dit filter passen, behalve de hieronder uitgesloten.",
+      "deselect": {
+        "label": "Deselecteren op",
+        "state": "Status: {state}",
+        "sender": "Afzender: {domain}",
+        "before": "Ontvangen vóór een dag",
+        "after": "Ontvangen na een dag",
+        "beforeLabel": "E-mails deselecteren die vóór deze dag zijn ontvangen",
+        "afterLabel": "E-mails deselecteren die na deze dag zijn ontvangen",
+        "apply": "Deselecteren",
+        "cancel": "Annuleren"
+      },
+      "exclusion": {
+        "label": "Uit de selectie gehaald",
+        "state": "Niet in status {state}",
+        "sender": "Niet van {domain}",
+        "from": "Ontvangen op of na {date}",
+        "to": "Ontvangen op of vóór {date}",
+        "remove": "Terugzetten: {label}"
+      },
       "draftBlocked": {
         "tooMany": "Een profiel wordt voorbereid met maximaal {max} e-mails. Selecteer {max} e-mails of minder.",
         "differentSenders": "De geselecteerde e-mails komen van verschillende afzenders ({domains}). Een profiel leest de e-mails van één afzender, dus selecteer e-mails van één afzender.",
@@ -792,7 +820,14 @@
         "message": "{count, plural, one {# e-mail negeren} other {# e-mails negeren}}{scope, select, both { van {domain} met de status {status}} domain { van {domain}} status { met de status {status}} other {}}? Ze stellen dan niets meer voor en hun openstaande beoordelingsverzoeken worden afgewezen. E-mails die aan een transactie zijn gekoppeld, blijven ongewijzigd.",
         "confirm": "Negeren"
       },
-      "countChanged": "Het aantal passende e-mails is nu {count}. Er is niets gewijzigd. Controleer het aantal en bevestig opnieuw."
+      "countChanged": "Het aantal passende e-mails is nu {count}. Er is niets gewijzigd. Controleer het aantal en bevestig opnieuw.",
+      "approve": {
+        "title": "Voorstellen goedkeuren?",
+        "message": "{count, plural, one {# voorstel goedkeuren} other {# voorstellen goedkeuren}}? Elk voorstel wordt toegepast zoals de knop Bevestigen in de AI-beoordelingsinbox.",
+        "trades": "{count, plural, one {# handels-e-mail wordt overgeslagen. Keur hem goed op zijn kaart in de AI-beoordelingsinbox.} other {# handels-e-mails worden overgeslagen. Keur ze goed op hun kaarten in de AI-beoordelingsinbox.}}",
+        "confirm": "Goedkeuren"
+      },
+      "narrowedNote": "E-mails die uit de selectie zijn gehaald, blijven ongewijzigd."
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {# e-mail genegeerd.} other {# e-mails genegeerd.}}",
         "unchanged": "{count, plural, one {# e-mail was al genegeerd.} other {# e-mails waren al genegeerd.}}",
         "notIgnorable": "{count, plural, one {# e-mail kon niet worden genegeerd: hij kon niet worden gelezen, of zijn voorstel is al toegepast.} other {# e-mails konden niet worden genegeerd: ze konden niet worden gelezen, of hun voorstellen zijn al toegepast.}}",
-        "skippedLinked": "{count, plural, one {# e-mail die aan een transactie is gekoppeld, is bewaard.} other {# e-mails die aan een transactie zijn gekoppeld, zijn bewaard.}}"
+        "skippedLinked": "{count, plural, one {# e-mail die aan een transactie is gekoppeld, is bewaard.} other {# e-mails die aan een transactie zijn gekoppeld, zijn bewaard.}}",
+        "reprocessed": "{count, plural, one {# e-mail opnieuw verwerkt.} other {# e-mails opnieuw verwerkt.}}",
+        "restored": "{count, plural, one {# genegeerde e-mail opnieuw gelezen.} other {# genegeerde e-mails opnieuw gelezen.}}",
+        "reprocessFailed": "{count, plural, one {# e-mail mislukt.} other {# e-mails mislukt.}}",
+        "stopped": "{count, plural, one {Gestopt. # e-mail is niet verwerkt.} other {Gestopt. # e-mails zijn niet verwerkt.}}",
+        "approved": "{count, plural, one {# voorstel goedgekeurd.} other {# voorstellen goedgekeurd.}}",
+        "approveFailed": "{count, plural, one {# voorstel kon niet worden goedgekeurd.} other {# voorstellen konden niet worden goedgekeurd.}}"
       },
       "deleteFailed": "De e-mails konden niet worden verwijderd",
       "ignoreFailed": "De e-mails konden niet worden genegeerd",
-      "noneLeft": "Er zijn geen passende e-mails meer. Er is niets gewijzigd."
+      "noneLeft": "Er zijn geen passende e-mails meer. Er is niets gewijzigd.",
+      "reprocessFailed": "De e-mails konden niet opnieuw worden verwerkt",
+      "approveFailed": "De voorstellen konden niet worden goedgekeurd",
+      "noApprovable": "Geen enkel voorstel in deze selectie kan worden goedgekeurd.",
+      "narrowFailed": "De e-mails konden niet worden geteld. De wijziging is niet toegepast."
     }
   },
   "detail": {

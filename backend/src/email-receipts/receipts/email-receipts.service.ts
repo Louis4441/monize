@@ -21,6 +21,8 @@ import {
 } from "../pipeline/receipt-requests.util";
 import {
   EMAIL_RECEIPT_PROCESSABLE_STATUSES,
+  EMAIL_RECEIPTS_BULK_REPROCESS_DEFAULT_LIMIT,
+  EMAIL_RECEIPTS_BULK_REPROCESS_MAX_LIMIT,
   EMAIL_RECEIPTS_DEFAULT_BATCH_LIMIT,
   EMAIL_RECEIPTS_DEFAULT_LIST_LIMIT,
   EMAIL_RECEIPTS_MAX_BATCH_LIMIT,
@@ -30,8 +32,16 @@ import {
 import { describeFailure } from "../pipeline/receipt-failure";
 import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
 import { readTradeProposal } from "./email-receipt-trade-proposal";
-import { bulkActOnReceipts } from "./receipt-bulk";
+import { bulkActOnReceipts, refuseTooManyIds } from "./receipt-bulk";
+import {
+  approvableRequests,
+  countSelected,
+  reprocessCandidates,
+  reprocessRemaining,
+  reprocessSince,
+} from "./receipt-bulk-queries";
 import type { ReceiptBulkResult, ReceiptBulkTarget } from "./receipt-bulk";
+import type { ReceiptSelectionFilter } from "./receipt-filter";
 import { receiptDomainClause, receiptDomainParams } from "./receipt-filter";
 import type { EmailReceiptBulkAction } from "./dto/email-receipts.dto";
 import type {
@@ -801,6 +811,111 @@ export class EmailReceiptsService {
   ): Promise<ReceiptBulkResult> {
     return withScopedDb(this.dataSource, (m) =>
       bulkActOnReceipts(m, userId, action, target, expectedCount),
+    );
+  }
+
+  /**
+   * How many emails a filter selects, through the predicate the bulk commands
+   * lock their rows with. Capped at `EMAIL_RECEIPTS_BULK_MAX_MATCHES + 1`.
+   */
+  async countSelection(
+    userId: string,
+    filter: ReceiptSelectionFilter,
+  ): Promise<{ count: number }> {
+    const count = await withScopedDb(this.dataSource, (m) =>
+      countSelected(m, userId, filter),
+    );
+    return { count };
+  }
+
+  /**
+   * One chunk of "reprocess the selection": at most `limit` eligible emails
+   * (not `skipped`, not `pending`, no applied request; in `onlyStatuses` when
+   * given), oldest first, each once per run (`updated_at < since`, as
+   * `processBatch`). With `onlyStatuses` the pipeline leaves an email whose state
+   * changed since it was read alone (`onlyWhenStatusIn`); without it the command
+   * is the row action's. The client calls again until `remaining` is 0.
+   */
+  async reprocessSelection(
+    userId: string,
+    target: ReceiptBulkTarget,
+    options: {
+      onlyStatuses?: readonly EmailReceiptStatus[];
+      since?: string;
+      limit?: number;
+    } = {},
+  ): Promise<ProcessBatchResult> {
+    refuseTooManyIds(target);
+    const onlyStatuses = options.onlyStatuses ?? [];
+    const limit = Math.min(
+      Math.max(
+        Math.trunc(
+          options.limit ?? EMAIL_RECEIPTS_BULK_REPROCESS_DEFAULT_LIMIT,
+        ),
+        1,
+      ),
+      EMAIL_RECEIPTS_BULK_REPROCESS_MAX_LIMIT,
+    );
+    const selected = await withScopedDb(this.dataSource, async (m) => {
+      const since = await reprocessSince(m, options.since);
+      const ids = await reprocessCandidates(m, userId, target, {
+        onlyStatuses,
+        since,
+        limit,
+      });
+      return { since, ids };
+    });
+
+    const byOutcome: ProcessBatchResult["byOutcome"] = {};
+    let processed = 0;
+    let failed = 0;
+    const budget = { remaining: EMAIL_RECEIPTS_BATCH_AI_CATEGORY_CALLS };
+    for (const id of selected.ids) {
+      try {
+        const result = await this.pipeline.process(userId, id, {
+          ...(onlyStatuses.length > 0
+            ? { onlyWhenStatusIn: onlyStatuses }
+            : {}),
+          aiCategoryBudget: budget,
+        });
+        if (result.unchanged) {
+          // Left alone, so not written: touch it or the run would take it again.
+          await this.touch(userId, id);
+        } else {
+          processed++;
+          byOutcome[result.status] = (byOutcome[result.status] ?? 0) + 1;
+        }
+      } catch (error) {
+        failed++;
+        this.logger.warn(
+          `Bulk reprocessing could not process email ${id} (${describeFailure(error)})`,
+        );
+        await this.touch(userId, id);
+      }
+    }
+
+    const remaining = await withScopedDb(this.dataSource, (m) =>
+      reprocessRemaining(m, userId, target, {
+        onlyStatuses,
+        since: selected.since,
+      }),
+    );
+    return { processed, byOutcome, failed, remaining, since: selected.since };
+  }
+
+  /**
+   * The proposals a bulk approval would send to `approve-batch`: the request ids
+   * of the selected non-trade emails in `review` with a proposed request, and how
+   * many trade emails were left out. Refuses before anything is read for the
+   * client to act on when more than 2,000 match.
+   */
+  async approvableSelection(
+    userId: string,
+    target: ReceiptBulkTarget,
+  ): Promise<{ requestIds: string[]; trades: number }> {
+    refuseTooManyIds(target);
+    return withScopedDb(this.dataSource, (m) =>
+      approvableRequests(m, userId, target),
     );
   }
 

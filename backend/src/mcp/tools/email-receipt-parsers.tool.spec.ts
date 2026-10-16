@@ -1,4 +1,4 @@
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { McpEmailReceiptParserTools } from "./email-receipt-parsers.tool";
 import { mcpTestCtx, McpTestContext } from "../testing/mcp-test-context";
 import { EMAIL_RECEIPT_PARSER_TOOL_DESCRIPTION } from "../../email-receipts/parsers/parser-tool.guide";
@@ -24,6 +24,8 @@ describe("McpEmailReceiptParserTools", () => {
       }),
       testDefinition: jest.fn(),
       saveDraft: jest.fn(),
+      listParsers: jest.fn().mockResolvedValue([{ id: R1, name: "Shop" }]),
+      getParser: jest.fn().mockResolvedValue({ id: R1, name: "Shop" }),
     };
     tool = new McpEmailReceiptParserTools(parsers as never);
     const server = {
@@ -81,6 +83,40 @@ describe("McpEmailReceiptParserTools", () => {
       expect((await call({ operation: "categories" }, "write")).isError).toBe(
         true,
       );
+    });
+  });
+
+  describe("get", () => {
+    it("lists the saved parsers with the read scope only", async () => {
+      const result = await call({ operation: "get" }, "read");
+
+      expect(parsers.listParsers).toHaveBeenCalledWith("u1");
+      expect(parsers.getParser).not.toHaveBeenCalled();
+      expect(result.structuredContent).toEqual({
+        parsers: [{ id: R1, name: "Shop" }],
+      });
+    });
+
+    it("reads one parser in full with the read scope only", async () => {
+      const result = await call({ operation: "get", parserId: R1 }, "read");
+
+      expect(parsers.getParser).toHaveBeenCalledWith("u1", R1);
+      expect(parsers.listParsers).not.toHaveBeenCalled();
+      expect(result.structuredContent).toMatchObject({ id: R1 });
+      expect(parsers.saveDraft).not.toHaveBeenCalled();
+    });
+
+    it("refuses without the read scope", async () => {
+      expect((await call({ operation: "get" }, "write")).isError).toBe(true);
+      expect(parsers.listParsers).not.toHaveBeenCalled();
+    });
+
+    it("returns a missing parser as a tool error", async () => {
+      parsers.getParser.mockRejectedValue(new NotFoundException("gone"));
+
+      expect(
+        (await call({ operation: "get", parserId: R2 }, "read")).isError,
+      ).toBe(true);
     });
   });
 

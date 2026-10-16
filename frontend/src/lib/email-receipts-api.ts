@@ -1,7 +1,14 @@
 import apiClient from './api';
 import { clearAllCache } from './apiCache';
+import { AI_REVIEW_APPROVE_BATCH_MAX } from '@/types/email-receipts';
 import type {
+  EmailReceiptApproveResult,
+  EmailReceiptBulkApprovable,
+  EmailReceiptBulkFilter,
   EmailReceiptBulkPayload,
+  EmailReceiptBulkReprocessPayload,
+  EmailReceiptBulkReprocessResult,
+  EmailReceiptBulkScope,
   EmailReceiptBulkResult,
   EmailReceiptDomainCount,
   CreateEmailReceiptParserPayload,
@@ -208,6 +215,56 @@ export const emailReceiptsApi = {
     bulk: async (payload: EmailReceiptBulkPayload): Promise<EmailReceiptBulkResult> => {
       const response = await apiClient.post<EmailReceiptBulkResult>(`${RECEIPTS}/bulk`, payload);
       return response.data;
+    },
+
+    /** How many emails a narrowed filter selects, the number a bulk command acts on. */
+    bulkCount: async (filter: EmailReceiptBulkFilter): Promise<number> => {
+      const response = await apiClient.post<{ count: number }>(`${RECEIPTS}/bulk/count`, { filter });
+      return response.data.count;
+    },
+
+    /**
+     * Reprocess up to `limit` emails of a selection (oldest first, each once per
+     * run). Call again with the answer's `since` until `remaining` is 0.
+     */
+    bulkReprocess: async (payload: EmailReceiptBulkReprocessPayload): Promise<EmailReceiptBulkReprocessResult> => {
+      const response = await apiClient.post<EmailReceiptBulkReprocessResult>(`${RECEIPTS}/bulk/reprocess`, payload);
+      return response.data;
+    },
+
+    /** The review requests of the selection's proposals that can be approved, and how many trade emails were left out. */
+    bulkApprovable: async (scope: EmailReceiptBulkScope): Promise<EmailReceiptBulkApprovable> => {
+      const response = await apiClient.post<EmailReceiptBulkApprovable>(`${RECEIPTS}/bulk/approvable`, scope);
+      return response.data;
+    },
+
+    /**
+     * Approve many proposals by the review inbox's batch route, 100 requests a
+     * call. A call that fails counts all its requests as failed and the rest
+     * still run. It edits transactions, so every cached balance is dropped.
+     */
+    approveRequests: async (ids: readonly string[]): Promise<EmailReceiptApproveResult> => {
+      let approved = 0;
+      let failed = 0;
+      try {
+        for (let start = 0; start < ids.length; start += AI_REVIEW_APPROVE_BATCH_MAX) {
+          const chunk = ids.slice(start, start + AI_REVIEW_APPROVE_BATCH_MAX);
+          try {
+            const response = await apiClient.post<{ results: { id: string; ok: boolean; error?: string }[] }>(
+              '/ai-review-requests/approve-batch',
+              { ids: chunk },
+            );
+            const ok = response.data.results.filter((r) => r.ok).length;
+            approved += ok;
+            failed += chunk.length - ok;
+          } catch {
+            failed += chunk.length;
+          }
+        }
+      } finally {
+        clearAllCache();
+      }
+      return { approved, failed };
     },
 
     /**

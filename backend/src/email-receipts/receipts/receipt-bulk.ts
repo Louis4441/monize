@@ -9,12 +9,12 @@ import {
   EMAIL_RECEIPTS_BULK_MAX_MATCHES,
 } from "./dto/email-receipts.dto";
 import type { EmailReceiptBulkAction } from "./dto/email-receipts.dto";
-import { receiptDomainClause, receiptDomainParams } from "./receipt-filter";
+import { receiptSelectionClause } from "./receipt-filter";
+import type { ReceiptSelectionFilter } from "./receipt-filter";
 
 /** Which emails a bulk command names: by id, or by the list's own filter. */
 export type ReceiptBulkTarget =
-  | { ids: readonly string[] }
-  | { filter: { status?: EmailReceiptStatus; domain?: string } };
+  { ids: readonly string[] } | { filter: ReceiptSelectionFilter };
 
 /** What a bulk command did; the four counts partition the matching emails. */
 export interface ReceiptBulkResult {
@@ -51,6 +51,19 @@ export function receiptBulkCountChanged(
   });
 }
 
+/** Refuses, before anything is read, a target that names more ids than one request may. */
+export function refuseTooManyIds(target: ReceiptBulkTarget): void {
+  if ("ids" in target && target.ids.length > EMAIL_RECEIPTS_BULK_MAX_IDS) {
+    throw new BadRequestException(
+      tr(
+        "errors.emailReceipts.bulkTooManyIds",
+        "At most {{ max }} emails can be chosen one by one. Select fewer emails, or select all that match the filter.",
+        { max: EMAIL_RECEIPTS_BULK_MAX_IDS },
+      ),
+    );
+  }
+}
+
 /**
  * Delete or ignore many of one user's emails in the caller's transaction
  * (`withScopedDb`). Every check that can refuse runs before the first write:
@@ -70,15 +83,7 @@ export async function bulkActOnReceipts(
   target: ReceiptBulkTarget,
   expectedCount: number,
 ): Promise<ReceiptBulkResult> {
-  if ("ids" in target && target.ids.length > EMAIL_RECEIPTS_BULK_MAX_IDS) {
-    throw new BadRequestException(
-      tr(
-        "errors.emailReceipts.bulkTooManyIds",
-        "At most {{ max }} emails can be chosen one by one. Select fewer emails, or select all that match the filter.",
-        { max: EMAIL_RECEIPTS_BULK_MAX_IDS },
-      ),
-    );
-  }
+  refuseTooManyIds(target);
   const rows = await lockMatchingRows(m, userId, target);
   if (rows.length > EMAIL_RECEIPTS_BULK_MAX_MATCHES) {
     throw new BadRequestException(
@@ -147,7 +152,7 @@ export async function bulkActOnReceipts(
 
 /**
  * The target's rows, locked. A filter reads the list's own predicate
- * (`receiptDomainClause`) and takes one row past the limit, so a request that
+ * (`receiptSelectionClause`) and takes one row past the limit, so a request that
  * matches too many is refused without reading them all.
  */
 async function lockMatchingRows(
@@ -171,23 +176,16 @@ async function lockMatchingRows(
       ),
     );
   }
-  const { domain, domainLike } = receiptDomainParams(target.filter.domain);
+  const selection = receiptSelectionClause(target.filter, 3);
   return returnedRows<LockedRow>(
     await m.query(
       `${select}
           WHERE r.user_id = $1
-            AND ($2::varchar IS NULL OR r.status = $2::varchar)
-            AND ${receiptDomainClause(3, 4)}
+            AND ${selection.sql}
           ORDER BY r.id
-          LIMIT $5
+          LIMIT $2
             FOR UPDATE OF r`,
-      [
-        userId,
-        target.filter.status ?? null,
-        domain,
-        domainLike,
-        EMAIL_RECEIPTS_BULK_MAX_MATCHES + 1,
-      ],
+      [userId, EMAIL_RECEIPTS_BULK_MAX_MATCHES + 1, ...selection.params],
     ),
   );
 }

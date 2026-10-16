@@ -1570,7 +1570,7 @@ export class ToolExecutorService {
 
   /**
    * The receipt-parser tool for the in-app assistant: the same door the MCP tool
-   * uses (`EmailReceiptParserToolsService`). `test` and `categories` read;
+   * uses (`EmailReceiptParserToolsService`). `test`, `categories` and `get` read;
    * `save_draft` stores a DRAFT parser (it reads no mail until the user approves
    * it in the settings screen, and never touches the ledger, INV-RECEIPT-003), so
    * it needs no confirmation card: the user's approval of the draft is the
@@ -1593,6 +1593,25 @@ export class ToolExecutorService {
         return {
           data: found,
           summary: `Found ${found.totalCount} categor${found.totalCount === 1 ? "y" : "ies"}${found.truncated ? " (list cut)" : ""}.`,
+          sources,
+        };
+      }
+      if (operation === "get") {
+        if (typeof input.parserId === "string") {
+          const parser = await this.receiptParsers.getParser(
+            userId,
+            input.parserId,
+          );
+          return {
+            data: parser,
+            summary: `Read the ${parser.status} parser "${parser.name}" (revision ${parser.revision}).`,
+            sources,
+          };
+        }
+        const parsers = await this.receiptParsers.listParsers(userId);
+        return {
+          data: { parsers },
+          summary: `Found ${parsers.length} parser${parsers.length === 1 ? "" : "s"}.`,
           sources,
         };
       }

@@ -758,6 +758,34 @@
       "pageSelected": "[XX-All {count} on this page are selected.-XX]",
       "selectAllMatching": "[XX-Select all {total} matching this filter.-XX]",
       "allMatchingSelected": "[XX-All {total} emails matching this filter are selected.-XX]",
+      "reprocessButton": "[XX-Reprocess ({count})-XX]",
+      "restoreButton": "[XX-Restore ignored ({count})-XX]",
+      "restoreButtonAll": "[XX-Restore ignored-XX]",
+      "approveButton": "[XX-Approve proposals ({count})-XX]",
+      "approveButtonAll": "[XX-Approve proposals-XX]",
+      "progress": "[XX-Processed {processed}, {remaining} left-XX]",
+      "progressStarting": "[XX-Starting-XX]",
+      "stop": "[XX-Stop-XX]",
+      "narrowedSelected": "[XX-{total} emails are selected: every email matching this filter, except those taken out below.-XX]",
+      "deselect": {
+        "label": "[XX-Deselect by-XX]",
+        "state": "[XX-State: {state}-XX]",
+        "sender": "[XX-Sender: {domain}-XX]",
+        "before": "[XX-Received before a day-XX]",
+        "after": "[XX-Received after a day-XX]",
+        "beforeLabel": "[XX-Deselect emails received before-XX]",
+        "afterLabel": "[XX-Deselect emails received after-XX]",
+        "apply": "[XX-Deselect-XX]",
+        "cancel": "[XX-Cancel-XX]"
+      },
+      "exclusion": {
+        "label": "[XX-Taken out of the selection-XX]",
+        "state": "[XX-Not in state {state}-XX]",
+        "sender": "[XX-Not from {domain}-XX]",
+        "from": "[XX-Received on or after {date}-XX]",
+        "to": "[XX-Received on or before {date}-XX]",
+        "remove": "[XX-Put back: {label}-XX]"
+      },
       "draftBlocked": {
         "tooMany": "[XX-A profile can be prepared from at most {max} emails. Select {max} or fewer emails to use it.-XX]",
         "differentSenders": "[XX-The selected emails come from different senders ({domains}). A profile reads one sender's emails, so select emails from one sender.-XX]",
@@ -792,7 +820,14 @@
         "message": "[XX-{count, plural, one {Ignore # email} other {Ignore # emails}}{scope, select, both { from {domain} in the state {status}} domain { from {domain}} status { in the state {status}} other {}}? They will propose nothing, and their open review requests will be dismissed. Emails linked to a transaction are kept as they are.-XX]",
         "confirm": "[XX-Ignore-XX]"
       },
-      "countChanged": "[XX-The number of matching emails is now {count}. Nothing was changed. Check the number and confirm again.-XX]"
+      "countChanged": "[XX-The number of matching emails is now {count}. Nothing was changed. Check the number and confirm again.-XX]",
+      "approve": {
+        "title": "[XX-Approve proposals?-XX]",
+        "message": "[XX-{count, plural, one {Approve # proposal} other {Approve # proposals}}? Each one is applied as the Confirm button in the AI review inbox does.-XX]",
+        "trades": "[XX-{count, plural, one {# trade email is left out. Approve it on its card in the AI review inbox.} other {# trade emails are left out. Approve them on their cards in the AI review inbox.}}-XX]",
+        "confirm": "[XX-Approve-XX]"
+      },
+      "narrowedNote": "[XX-Emails taken out of the selection are not touched.-XX]"
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "[XX-{count, plural, one {# email ignored.} other {# emails ignored.}}-XX]",
         "unchanged": "[XX-{count, plural, one {# email was already ignored.} other {# emails were already ignored.}}-XX]",
         "notIgnorable": "[XX-{count, plural, one {# email could not be ignored: it could not be read, or its proposal was already applied.} other {# emails could not be ignored: they could not be read, or their proposals were already applied.}}-XX]",
-        "skippedLinked": "[XX-{count, plural, one {# email linked to a transaction was kept.} other {# emails linked to a transaction were kept.}}-XX]"
+        "skippedLinked": "[XX-{count, plural, one {# email linked to a transaction was kept.} other {# emails linked to a transaction were kept.}}-XX]",
+        "reprocessed": "[XX-{count, plural, one {# email reprocessed.} other {# emails reprocessed.}}-XX]",
+        "restored": "[XX-{count, plural, one {# ignored email read again.} other {# ignored emails read again.}}-XX]",
+        "reprocessFailed": "[XX-{count, plural, one {# email failed.} other {# emails failed.}}-XX]",
+        "stopped": "[XX-Stopped. {count, plural, one {# email was left unprocessed.} other {# emails were left unprocessed.}}-XX]",
+        "approved": "[XX-{count, plural, one {# proposal approved.} other {# proposals approved.}}-XX]",
+        "approveFailed": "[XX-{count, plural, one {# proposal could not be approved.} other {# proposals could not be approved.}}-XX]"
       },
       "deleteFailed": "[XX-Could not delete the emails-XX]",
       "ignoreFailed": "[XX-Could not ignore the emails-XX]",
-      "noneLeft": "[XX-No emails match any more. Nothing was changed.-XX]"
+      "noneLeft": "[XX-No emails match any more. Nothing was changed.-XX]",
+      "reprocessFailed": "[XX-Could not reprocess the emails-XX]",
+      "approveFailed": "[XX-Could not approve the proposals-XX]",
+      "noApprovable": "[XX-No proposals in this selection can be approved.-XX]",
+      "narrowFailed": "[XX-Could not count the emails. The change was not applied.-XX]"
     }
   },
   "detail": {

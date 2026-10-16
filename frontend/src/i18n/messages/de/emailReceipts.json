@@ -758,6 +758,34 @@
       "pageSelected": "Alle {count} E-Mails auf dieser Seite sind ausgewählt.",
       "selectAllMatching": "Alle {total} E-Mails auswählen, die zu diesem Filter passen.",
       "allMatchingSelected": "Alle {total} E-Mails, die zu diesem Filter passen, sind ausgewählt.",
+      "reprocessButton": "Erneut verarbeiten ({count})",
+      "restoreButton": "Ignorierte wiederherstellen ({count})",
+      "restoreButtonAll": "Ignorierte wiederherstellen",
+      "approveButton": "Vorschläge genehmigen ({count})",
+      "approveButtonAll": "Vorschläge genehmigen",
+      "progress": "Verarbeitet: {processed}, übrig: {remaining}",
+      "progressStarting": "Start",
+      "stop": "Stopp",
+      "narrowedSelected": "{total} E-Mails sind ausgewählt: alle E-Mails dieses Filters, außer den unten herausgenommenen.",
+      "deselect": {
+        "label": "Abwählen nach",
+        "state": "Status: {state}",
+        "sender": "Absender: {domain}",
+        "before": "Empfangen vor einem Tag",
+        "after": "Empfangen nach einem Tag",
+        "beforeLabel": "E-Mails abwählen, die vor diesem Tag empfangen wurden",
+        "afterLabel": "E-Mails abwählen, die nach diesem Tag empfangen wurden",
+        "apply": "Abwählen",
+        "cancel": "Abbrechen"
+      },
+      "exclusion": {
+        "label": "Aus der Auswahl herausgenommen",
+        "state": "Nicht im Status {state}",
+        "sender": "Nicht von {domain}",
+        "from": "Empfangen am {date} oder später",
+        "to": "Empfangen am {date} oder früher",
+        "remove": "Zurücknehmen: {label}"
+      },
       "draftBlocked": {
         "tooMany": "Ein Profil kann aus höchstens {max} E-Mails erstellt werden. Wähle {max} oder weniger E-Mails aus.",
         "differentSenders": "Die ausgewählten E-Mails stammen von verschiedenen Absendern ({domains}). Ein Profil liest die E-Mails eines Absenders, wähle also E-Mails von einem Absender.",
@@ -792,7 +820,14 @@
         "message": "{count, plural, one {# E-Mail ignorieren} other {# E-Mails ignorieren}}{scope, select, both { von {domain} im Status {status}} domain { von {domain}} status { im Status {status}} other {}}? Sie schlagen dann nichts mehr vor, und ihre offenen Prüfanfragen werden verworfen. E-Mails, die mit einer Transaktion verknüpft sind, bleiben unverändert.",
         "confirm": "Ignorieren"
       },
-      "countChanged": "Die Anzahl der passenden E-Mails ist jetzt {count}. Es wurde nichts geändert. Prüfe die Zahl und bestätige erneut."
+      "countChanged": "Die Anzahl der passenden E-Mails ist jetzt {count}. Es wurde nichts geändert. Prüfe die Zahl und bestätige erneut.",
+      "approve": {
+        "title": "Vorschläge genehmigen?",
+        "message": "{count, plural, one {# Vorschlag genehmigen} other {# Vorschläge genehmigen}}? Jeder wird so angewendet wie mit der Schaltfläche Bestätigen im KI-Prüfeingang.",
+        "trades": "{count, plural, one {# Trade-E-Mail wird ausgelassen. Genehmigen Sie sie auf ihrer Karte im KI-Prüfeingang.} other {# Trade-E-Mails werden ausgelassen. Genehmigen Sie sie auf ihren Karten im KI-Prüfeingang.}}",
+        "confirm": "Genehmigen"
+      },
+      "narrowedNote": "E-Mails, die aus der Auswahl herausgenommen wurden, bleiben unverändert."
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {# E-Mail ignoriert.} other {# E-Mails ignoriert.}}",
         "unchanged": "{count, plural, one {# E-Mail war bereits ignoriert.} other {# E-Mails waren bereits ignoriert.}}",
         "notIgnorable": "{count, plural, one {# E-Mail konnte nicht ignoriert werden: Sie konnte nicht gelesen werden, oder ihr Vorschlag wurde bereits angewendet.} other {# E-Mails konnten nicht ignoriert werden: Sie konnten nicht gelesen werden, oder ihre Vorschläge wurden bereits angewendet.}}",
-        "skippedLinked": "{count, plural, one {# E-Mail, die mit einer Transaktion verknüpft ist, wurde behalten.} other {# E-Mails, die mit einer Transaktion verknüpft sind, wurden behalten.}}"
+        "skippedLinked": "{count, plural, one {# E-Mail, die mit einer Transaktion verknüpft ist, wurde behalten.} other {# E-Mails, die mit einer Transaktion verknüpft sind, wurden behalten.}}",
+        "reprocessed": "{count, plural, one {# E-Mail erneut verarbeitet.} other {# E-Mails erneut verarbeitet.}}",
+        "restored": "{count, plural, one {# ignorierte E-Mail erneut gelesen.} other {# ignorierte E-Mails erneut gelesen.}}",
+        "reprocessFailed": "{count, plural, one {# E-Mail fehlgeschlagen.} other {# E-Mails fehlgeschlagen.}}",
+        "stopped": "{count, plural, one {Gestoppt. # E-Mail blieb unverarbeitet.} other {Gestoppt. # E-Mails blieben unverarbeitet.}}",
+        "approved": "{count, plural, one {# Vorschlag genehmigt.} other {# Vorschläge genehmigt.}}",
+        "approveFailed": "{count, plural, one {# Vorschlag konnte nicht genehmigt werden.} other {# Vorschläge konnten nicht genehmigt werden.}}"
       },
       "deleteFailed": "E-Mails konnten nicht gelöscht werden",
       "ignoreFailed": "E-Mails konnten nicht ignoriert werden",
-      "noneLeft": "Keine E-Mails passen mehr. Es wurde nichts geändert."
+      "noneLeft": "Keine E-Mails passen mehr. Es wurde nichts geändert.",
+      "reprocessFailed": "Die E-Mails konnten nicht erneut verarbeitet werden",
+      "approveFailed": "Die Vorschläge konnten nicht genehmigt werden",
+      "noApprovable": "In dieser Auswahl kann kein Vorschlag genehmigt werden.",
+      "narrowFailed": "Die E-Mails konnten nicht gezählt werden. Die Änderung wurde nicht übernommen."
     }
   },
   "detail": {

@@ -544,7 +544,49 @@ export type EmailReceiptBulkAction = 'delete' | 'ignore';
 export interface EmailReceiptBulkFilter {
   status?: EmailReceiptStatus;
   domain?: string;
+  /** States taken out of the selection (the server takes each state once). */
+  excludeStatuses?: EmailReceiptStatus[];
+  /** Sender domains taken out of the selection, each with its sub-domains (the server's bound is 50). */
+  excludeDomains?: string[];
+  /** `YYYY-MM-DD`, inclusive, on the UTC day of `receivedAt`: earlier emails are out of the selection. */
+  receivedFrom?: string;
+  /** `YYYY-MM-DD`, inclusive, on the UTC day of `receivedAt`: later emails are out of the selection. */
+  receivedTo?: string;
 }
+
+/** The emails a bulk command names: the ticked rows' ids, or the list's (narrowed) filter. */
+export type EmailReceiptBulkScope = { ids: string[] } | { filter: EmailReceiptBulkFilter };
+
+/** Body of `POST /email-receipts/bulk/reprocess`: one call runs at most `limit` emails; send the answer's `since` back to continue. */
+export type EmailReceiptBulkReprocessPayload = EmailReceiptBulkScope & {
+  onlyStatuses?: EmailReceiptStatus[];
+  since?: string;
+  limit?: number;
+};
+
+/** What one reprocess call did, and how many eligible emails are left in the run. */
+export interface EmailReceiptBulkReprocessResult {
+  processed: number;
+  failed: number;
+  byOutcome: Record<string, number>;
+  remaining: number;
+  since: string;
+}
+
+/** `POST /email-receipts/bulk/approvable`: the proposals a selection can approve and the trade emails left out. */
+export interface EmailReceiptBulkApprovable {
+  requestIds: string[];
+  trades: number;
+}
+
+/** What approving many proposals did. */
+export interface EmailReceiptApproveResult {
+  approved: number;
+  failed: number;
+}
+
+/** Most review requests one `approve-batch` call takes (the server's bound). */
+export const AI_REVIEW_APPROVE_BATCH_MAX = 100;
 
 /**
  * Body of `POST /email-receipts/bulk`: the emails by id, or by the list's

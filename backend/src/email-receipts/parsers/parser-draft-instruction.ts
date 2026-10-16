@@ -54,6 +54,8 @@ export interface WizardInstructionSample {
 
 /** What the person is revising, when the wizard sends a draft back. */
 export interface WizardInstructionRevision {
+  /** Never dropped: the agent reads the draft in full with `get` and this id. */
+  parserId: string;
   name: string;
   definition: unknown;
   feedback: string | null;
@@ -86,7 +88,8 @@ const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
  *
  * The column is 1000 characters, so detail is dropped in steps (category
  * splits, payee, the note, the draft summary) until it fits; the order and
- * every transaction's id, date, amount and currency are never dropped. Pure.
+ * every transaction's id, date, amount and currency and the revised
+ * draft's parserId are never dropped. Pure.
  */
 export function buildWizardParserDraftInstruction(input: {
   domain: string;
@@ -115,7 +118,8 @@ export function buildWizardParserDraftInstruction(input: {
           ? ` ${cut(oneLine(JSON.stringify(input.revision.definition ?? {})), level.definition)}`
           : "";
       lines.push(
-        `Revise the current draft "${cut(oneLine(input.revision.name), 40)}".${summary}`,
+        `Revise the current draft "${cut(oneLine(input.revision.name), 40)}" ` +
+          `(read it in full: get parserId ${input.revision.parserId}).${summary}`,
       );
       if (input.revision.feedback) {
         lines.push(

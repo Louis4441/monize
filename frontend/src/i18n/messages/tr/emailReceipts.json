@@ -758,6 +758,34 @@
       "pageSelected": "Bu sayfadaki {count} e-postanın tümü seçildi.",
       "selectAllMatching": "Bu filtreye uyan {total} e-postanın tümünü seç.",
       "allMatchingSelected": "Bu filtreye uyan {total} e-postanın tümü seçildi.",
+      "reprocessButton": "Yeniden işle ({count})",
+      "restoreButton": "Yok sayılanları geri yükle ({count})",
+      "restoreButtonAll": "Yok sayılanları geri yükle",
+      "approveButton": "Önerileri onayla ({count})",
+      "approveButtonAll": "Önerileri onayla",
+      "progress": "İşlenen: {processed}, kalan: {remaining}",
+      "progressStarting": "Başlıyor",
+      "stop": "Durdur",
+      "narrowedSelected": "{total} e-posta seçildi: bu filtreyle eşleşen tümü, aşağıda çıkarılanlar hariç.",
+      "deselect": {
+        "label": "Seçimi şuna göre kaldır",
+        "state": "Durum: {state}",
+        "sender": "Gönderen: {domain}",
+        "before": "Bir günden önce alınanlar",
+        "after": "Bir günden sonra alınanlar",
+        "beforeLabel": "Şu günden önce alınan e-postaların seçimini kaldır",
+        "afterLabel": "Şu günden sonra alınan e-postaların seçimini kaldır",
+        "apply": "Seçimi kaldır",
+        "cancel": "İptal"
+      },
+      "exclusion": {
+        "label": "Seçimden çıkarıldı",
+        "state": "{state} durumunda değil",
+        "sender": "{domain} göndericisinden değil",
+        "from": "{date} tarihinde veya sonra alınanlar",
+        "to": "{date} tarihinde veya önce alınanlar",
+        "remove": "Geri al: {label}"
+      },
       "draftBlocked": {
         "tooMany": "Bir ayrıştırıcı en çok {max} e-postadan hazırlanabilir. En fazla {max} e-posta seçin.",
         "differentSenders": "Seçilen e-postalar farklı göndericilerden geliyor ({domains}). Bir ayrıştırıcı tek bir göndericinin e-postalarını okur, bu yüzden tek bir göndericinin e-postalarını seçin.",
@@ -792,7 +820,14 @@
         "message": "{scope, select, both {{domain} alanından gelen, {status} durumundaki } domain {{domain} alanından gelen } status {{status} durumundaki } other {}}{count, plural, one {# e-posta} other {# e-posta}} yoksayılsın mı? Hiçbir şey önermezler ve açık inceleme istekleri kapatılır. Bir işlemle bağlantılı e-postalar olduğu gibi kalır.",
         "confirm": "Yoksay"
       },
-      "countChanged": "Uyan e-posta sayısı şimdi {count}. Hiçbir şey değiştirilmedi. Sayıyı kontrol edin ve yeniden onaylayın."
+      "countChanged": "Uyan e-posta sayısı şimdi {count}. Hiçbir şey değiştirilmedi. Sayıyı kontrol edin ve yeniden onaylayın.",
+      "approve": {
+        "title": "Öneriler onaylansın mı?",
+        "message": "{count, plural, one {# öneri onaylansın} other {# öneri onaylansın}} mı? Her biri, yapay zekâ inceleme gelen kutusundaki Onayla düğmesinin yaptığı gibi uygulanır.",
+        "trades": "{count, plural, one {# işlem e-postası dışarıda bırakıldı. Yapay zekâ inceleme gelen kutusunda kendi kartından onaylayın.} other {# işlem e-postası dışarıda bırakıldı. Yapay zekâ inceleme gelen kutusunda kendi kartlarından onaylayın.}}",
+        "confirm": "Onayla"
+      },
+      "narrowedNote": "Seçimden çıkarılan e-postalar değiştirilmez."
     },
     "bulk": {
       "result": {
@@ -800,11 +835,21 @@
         "ignored": "{count, plural, one {# e-posta yoksayıldı.} other {# e-posta yoksayıldı.}}",
         "unchanged": "{count, plural, one {# e-posta zaten yoksayılmıştı.} other {# e-posta zaten yoksayılmıştı.}}",
         "notIgnorable": "{count, plural, one {# e-posta yoksayılamadı: okunamadı veya önerisi zaten uygulanmıştı.} other {# e-posta yoksayılamadı: okunamadılar veya önerileri zaten uygulanmıştı.}}",
-        "skippedLinked": "{count, plural, one {Bir işlemle bağlantılı # e-posta korundu.} other {Bir işlemle bağlantılı # e-posta korundu.}}"
+        "skippedLinked": "{count, plural, one {Bir işlemle bağlantılı # e-posta korundu.} other {Bir işlemle bağlantılı # e-posta korundu.}}",
+        "reprocessed": "{count, plural, one {# e-posta yeniden işlendi.} other {# e-posta yeniden işlendi.}}",
+        "restored": "{count, plural, one {Yok sayılan # e-posta yeniden okundu.} other {Yok sayılan # e-posta yeniden okundu.}}",
+        "reprocessFailed": "{count, plural, one {# e-posta başarısız oldu.} other {# e-posta başarısız oldu.}}",
+        "stopped": "{count, plural, one {Durduruldu. # e-posta işlenmeden kaldı.} other {Durduruldu. # e-posta işlenmeden kaldı.}}",
+        "approved": "{count, plural, one {# öneri onaylandı.} other {# öneri onaylandı.}}",
+        "approveFailed": "{count, plural, one {# öneri onaylanamadı.} other {# öneri onaylanamadı.}}"
       },
       "deleteFailed": "E-postalar silinemedi",
       "ignoreFailed": "E-postalar yoksayılamadı",
-      "noneLeft": "Artık uyan e-posta yok. Hiçbir şey değiştirilmedi."
+      "noneLeft": "Artık uyan e-posta yok. Hiçbir şey değiştirilmedi.",
+      "reprocessFailed": "E-postalar yeniden işlenemedi",
+      "approveFailed": "Öneriler onaylanamadı",
+      "noApprovable": "Bu seçimdeki hiçbir öneri onaylanamaz.",
+      "narrowFailed": "E-postalar sayılamadı. Değişiklik uygulanmadı."
     }
   },
   "detail": {

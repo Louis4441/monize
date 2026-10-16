@@ -1224,7 +1224,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
       properties: {
         operation: {
           type: "string",
-          enum: ["test", "save_draft", "categories"],
+          enum: ["test", "save_draft", "categories", "get"],
         },
         definition: {
           type: "object",
@@ -1252,6 +1252,8 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
         },
         parserId: {
           type: "string",
+          description:
+            "get: one parser. save_draft: the draft to update (with expectedRevision).",
         },
         expectedRevision: {
           type: "integer",

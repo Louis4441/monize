@@ -389,6 +389,7 @@
     "bulkCountChanged": "Het aantal passende e-mails is gewijzigd van {{ expected }} naar {{ current }}. Er is niets gewijzigd. Controleer het nieuwe aantal en probeer het opnieuw.",
     "bulkTooManyIds": "Je kunt maximaal {{ max }} e-mails een voor een kiezen. Kies minder e-mails, of selecteer alle e-mails die bij het filter passen.",
     "bulkTooManyMatches": "Meer dan {{ max }} e-mails passen. Maak het filter smaller, bijvoorbeeld met een status of een afzender, en probeer het opnieuw.",
+    "bulkTooManyApprovable": "Meer dan {{ max }} voorstellen passen. Maak de selectie smaller, bijvoorbeeld met een afzender of een datumbereik, en probeer het opnieuw.",
     "aiOff": "De AI is uitgeschakeld voor deze mailbox. Wijzig eerst de AI-modus in de mailboxinstellingen.",
     "pollBusy": "De mailbox wordt op dit moment gelezen. Probeer het over een minuut opnieuw.",
     "importNoFile": "Kies minstens één .eml-, .mbox-, .msg- of .zip-bestand om te importeren.",

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { isUUID } from "class-validator";
 import { DataSource, EntityManager, In, QueryDeepPartialEntity } from "typeorm";
 import { AiReviewRequestsService } from "../../ai-review/ai-review-requests.service";
 import { loadQualifiedCategoryNames } from "../../categories/category-name.util";
@@ -10,6 +11,11 @@ import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { roundMoney } from "../../common/round.util";
 import { tr } from "../../i18n/translate";
+import {
+  toParserView,
+  type EmailReceiptParserView,
+} from "./email-receipt-parser.view";
+import { Payee } from "../../payees/entities/payee.entity";
 import { PayeesService } from "../../payees/payees.service";
 import {
   EmailReceiptParser,
@@ -209,6 +215,27 @@ export interface ParserToolCategories {
   guide: string;
 }
 
+/** One saved parser in the `get` list: enough to pick one, and read it with its id. */
+export interface ParserToolSummary {
+  id: string;
+  name: string;
+  fromDomains: string[];
+  subjectContains: string[];
+  status: EmailReceiptParser["status"];
+  source: EmailReceiptParser["source"];
+  revision: number;
+  definitionValid: boolean;
+  updatedAt: string;
+}
+
+/** One saved parser in full: the view a person's editor reads, plus the payee's name. */
+export type ParserToolDetail = Omit<
+  EmailReceiptParserView,
+  "reprocessableCount"
+> & {
+  payeeName: string | null;
+};
+
 export interface ParserToolSaveInput {
   /** The claimed parser-draft request this draft answers, when there is one. */
   requestId?: string;
@@ -344,6 +371,71 @@ export class EmailReceiptParserToolsService {
       truncated: all.length > PARSER_TOOL_MAX_CATEGORIES,
       guide: EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE,
     };
+  }
+
+  /**
+   * Every parser of the user's (at most `MAX_PARSERS_PER_USER`), newest change
+   * first, as a summary. Reads only.
+   */
+  async listParsers(userId: string): Promise<ParserToolSummary[]> {
+    const rows = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(EmailReceiptParser).find({
+        where: { userId },
+        order: { updatedAt: "DESC", id: "DESC" },
+        take: MAX_PARSERS_PER_USER,
+      }),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      fromDomains: row.fromDomains,
+      subjectContains: row.subjectContains,
+      status: row.status,
+      source: row.source,
+      revision: row.revision,
+      definitionValid: validateReceiptParserDefinition(row.definition).ok,
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+  }
+
+  /**
+   * One parser of the user's, in any status, as a person's editor reads it: the
+   * definition names categories by qualified name (`saveDraft` and
+   * `testDefinition` resolve them back), so it can be edited and saved as a NEW
+   * draft. Reads only. Not the user's, or absent: 404.
+   */
+  async getParser(userId: string, parserId: string): Promise<ParserToolDetail> {
+    return withScopedDb(this.dataSource, async (m) => {
+      // The MCP schema holds no uuid pattern (its byte budget); a malformed id
+      // is an absent parser, not a database error.
+      const row = isUUID(parserId)
+        ? await m
+            .getRepository(EmailReceiptParser)
+            .findOne({ where: { id: parserId, userId } })
+        : null;
+      if (!row) {
+        throw new NotFoundException(
+          tr(
+            "errors.emailReceipts.parserNotFound",
+            `Receipt parser ${parserId} not found`,
+            { id: parserId },
+          ),
+        );
+      }
+      const { reprocessableCount: _unused, ...view } = toParserView(
+        row,
+        await loadQualifiedCategoryNames(m, userId),
+      );
+      let payeeName: string | null = null;
+      if (row.payeeId) {
+        const payee = await m.getRepository(Payee).findOne({
+          where: { id: row.payeeId, userId },
+          select: { name: true },
+        });
+        payeeName = payee?.name ?? null;
+      }
+      return { ...view, payeeName };
+    });
   }
 
   /**
