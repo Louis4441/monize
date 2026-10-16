@@ -212,7 +212,7 @@
         "text": "Text",
         "html": "HTML"
       },
-      "globHelp": "Jedes Muster wird mit einer ganzen Zeile der E-Mail verglichen, Groß- und Kleinschreibung wird ignoriert. Verwende {star} für beliebigen Text und einen Namen in geschweiften Klammern, etwa {capture}, um einen Wert zu erfassen. Jedes Feld nimmt bis zu {max} Muster auf, eines pro Zeile.",
+      "globHelp": "Jedes Muster wird mit einer ganzen Zeile der E-Mail verglichen, Groß- und Kleinschreibung wird ignoriert. Verwende {star} für beliebigen Text und einen Namen in geschweiften Klammern, etwa {capture}, um einen Wert zu erfassen. Jedes Feld nimmt bis zu {max} Muster auf, eines pro Zeile. Um aufeinanderfolgende Zeilen zu erfassen, verbinde ein Muster pro Zeile mit {lineBreak}, etwa {example}.",
       "orderIdLabel": "Muster für die Bestellnummer",
       "orderIdHint": "Muss {capture} erfassen. Beispiel: Bestellnummer: {capture}",
       "totalLabel": "Muster für die Summe",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "braucht Muster für die Summe oder den Preis (mindestens eines von beiden)",
       "trade_account_missing": "braucht ein Standardkonto oder Kontoregeln",
       "invalid_currency": "ist kein dreistelliger Währungscode wie USD",
+      "too_many_lines": "erstreckt sich über zu viele Zeilen (höchstens {max})",
+      "line_break_not_allowed": "wird mit einem einzelnen Text verglichen (einem Artikelnamen, dem Händler oder einem Konto) und kann sich daher nicht über mehrere Zeilen erstrecken",
       "invalid_uuid_account": "ist kein gültiges Konto"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "Eintrag {entry} ({pattern}), Zeile {line}: {text}",
       "entrySubject": "Eintrag {entry} ({pattern}), der Betreff: {text}",
+      "entryLines": "Eintrag {entry} ({pattern}), Zeilen {first} bis {last}:",
+      "blockLine": "Zeile {line}: {text}",
       "labelled": "Eintrag {entry}, Beschriftung {label} in Zeile {labelLine} ({labelText}), Wert {pattern} in Zeile {line}: {text}",
       "item": "Position {number}",
       "itemLine": "{pattern}, Zeile {line}: {text}"

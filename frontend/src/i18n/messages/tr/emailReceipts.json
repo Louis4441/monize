@@ -212,7 +212,7 @@
         "text": "Metin",
         "html": "HTML"
       },
-      "globHelp": "Her desen, e-postanın tek bir satırının tamamıyla büyük/küçük harf ayrımı yapılmadan eşleştirilir. Herhangi bir metin için {star}, bir değeri yakalamak için ise {capture} gibi küme parantezi içinde bir ad kullanın. Her alan en fazla {max} desen alır, satır başına bir tane.",
+      "globHelp": "Her desen, e-postanın tek bir satırının tamamıyla büyük/küçük harf ayrımı yapılmadan eşleştirilir. Herhangi bir metin için {star}, bir değeri yakalamak için ise {capture} gibi küme parantezi içinde bir ad kullanın. Her alan en fazla {max} desen alır, satır başına bir tane. Ardışık satırları eşleştirmek için her satırın desenini {lineBreak} ile birleştirin, örneğin {example}.",
       "orderIdLabel": "Sipariş numarası desenleri",
       "orderIdHint": "{capture} değerini yakalamalıdır. Örnek: Sipariş numarası: {capture}",
       "totalLabel": "Toplam desenleri",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "toplam veya fiyat desenleri gerekiyor (ikisinden en az biri)",
       "trade_account_missing": "varsayılan hesap veya hesap kuralları gerekiyor",
       "invalid_currency": "USD gibi 3 harfli bir para birimi kodu değil",
+      "too_many_lines": "çok fazla satıra yayılıyor (en fazla {max})",
+      "line_break_not_allowed": "tek bir metinle (bir kalem adı, satıcı veya bir hesap) eşleştirilir, bu yüzden birden fazla satıra yayılamaz",
       "invalid_uuid_account": "geçerli bir hesap değil"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "girdi {entry} ({pattern}), {line}. satır: {text}",
       "entrySubject": "girdi {entry} ({pattern}), konu: {text}",
+      "entryLines": "girdi {entry} ({pattern}), {first}. ile {last}. satırlar:",
+      "blockLine": "{line}. satır: {text}",
       "labelled": "girdi {entry}, {labelLine}. satırdaki {label} etiketi ({labelText}), {line}. satırdaki {pattern} değeri: {text}",
       "item": "Kalem {number}",
       "itemLine": "{pattern}, {line}. satır: {text}"

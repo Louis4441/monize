@@ -212,7 +212,7 @@
         "text": "文字",
         "html": "HTML"
       },
-      "globHelp": "每個模式都會與郵件的整整一行比對，不區分大小寫。用 {star} 比對任意文字，用大括號中的名稱（例如 {capture}）擷取一個值。每個欄位最多可填 {max} 個模式，每行一個。",
+      "globHelp": "每個模式都會與郵件的整整一行比對，不區分大小寫。用 {star} 比對任意文字，用大括號中的名稱（例如 {capture}）擷取一個值。每個欄位最多可填 {max} 個模式，每行一個。要比對連續的幾行，請用 {lineBreak} 把每行的模式連接起來，例如 {example}。",
       "orderIdLabel": "訂單編號模式",
       "orderIdHint": "必須擷取 {capture}。範例：訂單編號：{capture}",
       "totalLabel": "合計模式",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "需要合計或價格模式（至少其一）",
       "trade_account_missing": "需要預設帳戶或帳戶規則",
       "invalid_currency": "不是 3 個字母的貨幣代碼，例如 USD",
+      "too_many_lines": "跨越的行數過多（最多 {max} 行）",
+      "line_break_not_allowed": "只與一段文字（商品名稱、商家或帳戶）比對，因此不能跨越多行",
       "invalid_uuid_account": "不是有效的帳戶"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "項目 {entry}（{pattern}），第 {line} 行：{text}",
       "entrySubject": "項目 {entry}（{pattern}），主旨：{text}",
+      "entryLines": "項目 {entry}（{pattern}），第 {first} 至 {last} 行：",
+      "blockLine": "第 {line} 行：{text}",
       "labelled": "項目 {entry}，第 {labelLine} 行（{labelText}）上的標籤 {label}，第 {line} 行上的值 {pattern}：{text}",
       "item": "明細 {number}",
       "itemLine": "{pattern}，第 {line} 行：{text}"

@@ -212,7 +212,7 @@
         "text": "テキスト",
         "html": "HTML"
       },
-      "globHelp": "各パターンは、メールの1行全体と照合されます (大文字と小文字は区別しません)。任意のテキストには {star} を、値を取り込むには {capture} のように波かっこで囲んだ名前を使います。各フィールドには最大 {max} 個のパターンを、1行に1つずつ指定できます。",
+      "globHelp": "各パターンは、メールの1行全体と照合されます (大文字と小文字は区別しません)。任意のテキストには {star} を、値を取り込むには {capture} のように波かっこで囲んだ名前を使います。各フィールドには最大 {max} 個のパターンを、1行に1つずつ指定できます。連続する行に一致させるには、1行ごとのパターンを {lineBreak} でつなぎます (例: {example})。",
       "orderIdLabel": "注文番号のパターン",
       "orderIdHint": "{capture} を取り込む必要があります。例: 注文番号: {capture}",
       "totalLabel": "合計のパターン",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "には合計または価格のパターンが必要です (少なくともどちらか一方)",
       "trade_account_missing": "には既定の口座または口座のルールが必要です",
       "invalid_currency": "は USD のような 3 文字の通貨コードではありません",
+      "too_many_lines": "の行数が多すぎます (最大 {max} 行)",
+      "line_break_not_allowed": "は 1 つのテキスト (商品名、販売者、口座) と照合されるため、複数の行にまたがることはできません",
       "invalid_uuid_account": "は有効な口座ではありません"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "項目 {entry} ({pattern})、{line} 行目: {text}",
       "entrySubject": "項目 {entry} ({pattern})、件名: {text}",
+      "entryLines": "項目 {entry} ({pattern})、{first} 行目から {last} 行目:",
+      "blockLine": "{line} 行目: {text}",
       "labelled": "項目 {entry}、{labelLine} 行目 ({labelText}) のラベル {label}、{line} 行目の値 {pattern}: {text}",
       "item": "明細 {number}",
       "itemLine": "{pattern}、{line} 行目: {text}"

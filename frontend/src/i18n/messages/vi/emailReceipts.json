@@ -212,7 +212,7 @@
         "text": "Văn bản",
         "html": "HTML"
       },
-      "globHelp": "Mỗi mẫu được so khớp với toàn bộ một dòng của email, không phân biệt hoa thường. Dùng {star} cho văn bản bất kỳ và một tên đặt trong dấu ngoặc nhọn, chẳng hạn {capture}, để lấy một giá trị. Mỗi trường nhận tối đa {max} mẫu, mỗi dòng một mẫu.",
+      "globHelp": "Mỗi mẫu được so khớp với toàn bộ một dòng của email, không phân biệt hoa thường. Dùng {star} cho văn bản bất kỳ và một tên đặt trong dấu ngoặc nhọn, chẳng hạn {capture}, để lấy một giá trị. Mỗi trường nhận tối đa {max} mẫu, mỗi dòng một mẫu. Để khớp các dòng liên tiếp, nối mỗi dòng một mẫu bằng {lineBreak}, chẳng hạn {example}.",
       "orderIdLabel": "Mẫu mã đơn hàng",
       "orderIdHint": "Phải lấy {capture}. Ví dụ: Mã đơn hàng: {capture}",
       "totalLabel": "Mẫu tổng cộng",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "cần mẫu tổng tiền hoặc giá (ít nhất một trong hai)",
       "trade_account_missing": "cần tài khoản mặc định hoặc quy tắc tài khoản",
       "invalid_currency": "không phải mã tiền tệ 3 chữ cái, như USD",
+      "too_many_lines": "trải qua quá nhiều dòng (tối đa {max})",
+      "line_break_not_allowed": "được so khớp với một văn bản duy nhất (tên mặt hàng, người bán hoặc một tài khoản), nên không thể trải qua nhiều dòng",
       "invalid_uuid_account": "không phải tài khoản hợp lệ"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "mục {entry} ({pattern}), dòng {line}: {text}",
       "entrySubject": "mục {entry} ({pattern}), tiêu đề: {text}",
+      "entryLines": "mục {entry} ({pattern}), dòng {first} đến {last}:",
+      "blockLine": "dòng {line}: {text}",
       "labelled": "mục {entry}, nhãn {label} ở dòng {labelLine} ({labelText}), giá trị {pattern} ở dòng {line}: {text}",
       "item": "Mục hàng {number}",
       "itemLine": "{pattern}, dòng {line}: {text}"

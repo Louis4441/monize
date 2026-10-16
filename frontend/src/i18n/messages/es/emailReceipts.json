@@ -212,7 +212,7 @@
         "text": "Texto",
         "html": "HTML"
       },
-      "globHelp": "Cada patrón se compara con una línea completa del correo, sin distinguir mayúsculas de minúsculas. Usa {star} para cualquier texto y un nombre entre llaves, como {capture}, para capturar un valor. Cada campo admite hasta {max} patrones, uno por línea.",
+      "globHelp": "Cada patrón se compara con una línea completa del correo, sin distinguir mayúsculas de minúsculas. Usa {star} para cualquier texto y un nombre entre llaves, como {capture}, para capturar un valor. Cada campo admite hasta {max} patrones, uno por línea. Para coincidir con líneas consecutivas, une un patrón por línea con {lineBreak}, por ejemplo {example}.",
       "orderIdLabel": "Patrones del número de pedido",
       "orderIdHint": "Debe capturar {capture}. Ejemplo: Número de pedido: {capture}",
       "totalLabel": "Patrones del total",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "necesita patrones del total o del precio (al menos uno de los dos)",
       "trade_account_missing": "necesita una cuenta predeterminada o reglas de cuenta",
       "invalid_currency": "no es un código de moneda de 3 letras, como USD",
+      "too_many_lines": "abarca demasiadas líneas (como máximo {max})",
+      "line_break_not_allowed": "se compara con un solo texto (el nombre de un artículo, el comercio o una cuenta), así que no puede abarcar varias líneas",
       "invalid_uuid_account": "no es una cuenta válida"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "entrada {entry} ({pattern}), línea {line}: {text}",
       "entrySubject": "entrada {entry} ({pattern}), el asunto: {text}",
+      "entryLines": "entrada {entry} ({pattern}), líneas {first} a {last}:",
+      "blockLine": "línea {line}: {text}",
       "labelled": "entrada {entry}, etiqueta {label} en la línea {labelLine} ({labelText}), valor {pattern} en la línea {line}: {text}",
       "item": "Artículo {number}",
       "itemLine": "{pattern}, línea {line}: {text}"

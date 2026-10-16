@@ -212,7 +212,7 @@
         "text": "Texte",
         "html": "HTML"
       },
-      "globHelp": "Chaque motif est comparé à une ligne entière de l'e-mail, sans tenir compte de la casse. Utilisez {star} pour n'importe quel texte et un nom entre accolades, comme {capture}, pour capturer une valeur. Chaque champ accepte jusqu'à {max} motifs, un par ligne.",
+      "globHelp": "Chaque motif est comparé à une ligne entière de l'e-mail, sans tenir compte de la casse. Utilisez {star} pour n'importe quel texte et un nom entre accolades, comme {capture}, pour capturer une valeur. Chaque champ accepte jusqu'à {max} motifs, un par ligne. Pour faire correspondre des lignes consécutives, reliez un motif par ligne avec {lineBreak}, par exemple {example}.",
       "orderIdLabel": "Motifs du numéro de commande",
       "orderIdHint": "Doit capturer {capture}. Exemple : Numéro de commande : {capture}",
       "totalLabel": "Motifs du total",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "a besoin de motifs du total ou du prix (au moins l'un des deux)",
       "trade_account_missing": "a besoin d'un compte par défaut ou de règles de compte",
       "invalid_currency": "n'est pas un code de devise à 3 lettres, comme USD",
+      "too_many_lines": "s'étend sur trop de lignes (au maximum {max})",
+      "line_break_not_allowed": "est comparé à un seul texte (un nom d'article, le marchand ou un compte) et ne peut donc pas s'étendre sur plusieurs lignes",
       "invalid_uuid_account": "n'est pas un compte valide"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "entrée {entry} ({pattern}), ligne {line} : {text}",
       "entrySubject": "entrée {entry} ({pattern}), l'objet : {text}",
+      "entryLines": "entrée {entry} ({pattern}), lignes {first} à {last} :",
+      "blockLine": "ligne {line} : {text}",
       "labelled": "entrée {entry}, libellé {label} à la ligne {labelLine} ({labelText}), valeur {pattern} à la ligne {line} : {text}",
       "item": "Article {number}",
       "itemLine": "{pattern}, ligne {line} : {text}"

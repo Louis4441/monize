@@ -212,7 +212,7 @@
         "text": "Tekst",
         "html": "HTML"
       },
-      "globHelp": "Elk patroon wordt vergeleken met één hele regel van de e-mail, hoofdletters worden genegeerd. Gebruik {star} voor willekeurige tekst en een naam tussen accolades, zoals {capture}, om een waarde vast te leggen. Elk veld accepteert maximaal {max} patronen, één per regel.",
+      "globHelp": "Elk patroon wordt vergeleken met één hele regel van de e-mail, hoofdletters worden genegeerd. Gebruik {star} voor willekeurige tekst en een naam tussen accolades, zoals {capture}, om een waarde vast te leggen. Elk veld accepteert maximaal {max} patronen, één per regel. Om opeenvolgende regels te vergelijken, verbind je één patroon per regel met {lineBreak}, bijvoorbeeld {example}.",
       "orderIdLabel": "Patronen voor het ordernummer",
       "orderIdHint": "Moet {capture} vastleggen. Voorbeeld: Ordernummer: {capture}",
       "totalLabel": "Patronen voor het totaal",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "heeft patronen voor het totaal of de prijs nodig (minstens een van de twee)",
       "trade_account_missing": "heeft een standaardrekening of rekeningregels nodig",
       "invalid_currency": "is geen valutacode van 3 letters, zoals USD",
+      "too_many_lines": "beslaat te veel regels (maximaal {max})",
+      "line_break_not_allowed": "wordt vergeleken met één tekst (een artikelnaam, de verkoper of een rekening) en kan dus niet meerdere regels beslaan",
       "invalid_uuid_account": "is geen geldige rekening"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "vermelding {entry} ({pattern}), regel {line}: {text}",
       "entrySubject": "vermelding {entry} ({pattern}), het onderwerp: {text}",
+      "entryLines": "vermelding {entry} ({pattern}), regels {first} tot en met {last}:",
+      "blockLine": "regel {line}: {text}",
       "labelled": "vermelding {entry}, label {label} op regel {labelLine} ({labelText}), waarde {pattern} op regel {line}: {text}",
       "item": "Artikel {number}",
       "itemLine": "{pattern}, regel {line}: {text}"

@@ -212,7 +212,7 @@
         "text": "Testo",
         "html": "HTML"
       },
-      "globHelp": "Ogni modello viene confrontato con un'intera riga dell'email, senza distinguere maiuscole e minuscole. Usa {star} per qualsiasi testo e un nome tra parentesi graffe, come {capture}, per catturare un valore. Ogni campo accetta fino a {max} modelli, uno per riga.",
+      "globHelp": "Ogni modello viene confrontato con un'intera riga dell'email, senza distinguere maiuscole e minuscole. Usa {star} per qualsiasi testo e un nome tra parentesi graffe, come {capture}, per catturare un valore. Ogni campo accetta fino a {max} modelli, uno per riga. Per confrontare righe consecutive, unisci un modello per riga con {lineBreak}, ad esempio {example}.",
       "orderIdLabel": "Modelli del numero d'ordine",
       "orderIdHint": "Deve catturare {capture}. Esempio: Numero d'ordine: {capture}",
       "totalLabel": "Modelli del totale",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "richiede modelli del totale o del prezzo (almeno uno dei due)",
       "trade_account_missing": "richiede un conto predefinito o regole del conto",
       "invalid_currency": "non è un codice di valuta di 3 lettere, come USD",
+      "too_many_lines": "si estende su troppe righe (al massimo {max})",
+      "line_break_not_allowed": "viene confrontato con un solo testo (il nome di un articolo, il commerciante o un conto), quindi non può estendersi su più righe",
       "invalid_uuid_account": "non è un conto valido"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "voce {entry} ({pattern}), riga {line}: {text}",
       "entrySubject": "voce {entry} ({pattern}), l'oggetto: {text}",
+      "entryLines": "voce {entry} ({pattern}), righe da {first} a {last}:",
+      "blockLine": "riga {line}: {text}",
       "labelled": "voce {entry}, etichetta {label} alla riga {labelLine} ({labelText}), valore {pattern} alla riga {line}: {text}",
       "item": "Articolo {number}",
       "itemLine": "{pattern}, riga {line}: {text}"

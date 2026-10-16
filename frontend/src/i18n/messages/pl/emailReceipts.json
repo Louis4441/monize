@@ -212,7 +212,7 @@
         "text": "Tekst",
         "html": "HTML"
       },
-      "globHelp": "Każdy wzorzec jest porównywany z całym wierszem wiadomości, bez rozróżniania wielkości liter. Użyj {star} dla dowolnego tekstu oraz nazwy w nawiasach klamrowych, na przykład {capture}, aby przechwycić wartość. Każde pole przyjmuje do {max} wzorców, po jednym w wierszu.",
+      "globHelp": "Każdy wzorzec jest porównywany z całym wierszem wiadomości, bez rozróżniania wielkości liter. Użyj {star} dla dowolnego tekstu oraz nazwy w nawiasach klamrowych, na przykład {capture}, aby przechwycić wartość. Każde pole przyjmuje do {max} wzorców, po jednym w wierszu. Aby dopasować kolejne wiersze, połącz po jednym wzorcu na wiersz za pomocą {lineBreak}, na przykład {example}.",
       "orderIdLabel": "Wzorce numeru zamówienia",
       "orderIdHint": "Musi przechwytywać {capture}. Przykład: Numer zamówienia: {capture}",
       "totalLabel": "Wzorce sumy",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "wymaga wzorców sumy lub ceny (co najmniej jednego z nich)",
       "trade_account_missing": "wymaga konta domyślnego lub reguł konta",
       "invalid_currency": "nie jest 3-literowym kodem waluty, takim jak USD",
+      "too_many_lines": "obejmuje zbyt wiele wierszy (najwyżej {max})",
+      "line_break_not_allowed": "jest porównywany z jednym tekstem (nazwą pozycji, sprzedawcą lub kontem), więc nie może obejmować kilku wierszy",
       "invalid_uuid_account": "nie jest prawidłowym kontem"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "wpis {entry} ({pattern}), wiersz {line}: {text}",
       "entrySubject": "wpis {entry} ({pattern}), temat: {text}",
+      "entryLines": "wpis {entry} ({pattern}), wiersze od {first} do {last}:",
+      "blockLine": "wiersz {line}: {text}",
       "labelled": "wpis {entry}, etykieta {label} w wierszu {labelLine} ({labelText}), wartość {pattern} w wierszu {line}: {text}",
       "item": "Pozycja {number}",
       "itemLine": "{pattern}, wiersz {line}: {text}"

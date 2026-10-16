@@ -212,7 +212,7 @@
         "text": "文本",
         "html": "HTML"
       },
-      "globHelp": "每个模式都会与邮件的整整一行匹配，不区分大小写。用 {star} 匹配任意文本，用花括号中的名称（例如 {capture}）捕获一个值。每个字段最多可填 {max} 个模式，每行一个。",
+      "globHelp": "每个模式都会与邮件的整整一行匹配，不区分大小写。用 {star} 匹配任意文本，用花括号中的名称（例如 {capture}）捕获一个值。每个字段最多可填 {max} 个模式，每行一个。要匹配连续的几行，请用 {lineBreak} 把每行的模式连接起来，例如 {example}。",
       "orderIdLabel": "订单号模式",
       "orderIdHint": "必须捕获 {capture}。示例：订单号：{capture}",
       "totalLabel": "合计模式",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "需要合计或价格模式（至少其一）",
       "trade_account_missing": "需要默认账户或账户规则",
       "invalid_currency": "不是 3 个字母的货币代码，例如 USD",
+      "too_many_lines": "跨越的行数过多（最多 {max} 行）",
+      "line_break_not_allowed": "只与一段文本（商品名称、商家或账户）匹配，因此不能跨越多行",
       "invalid_uuid_account": "不是有效的账户"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "条目 {entry}（{pattern}），第 {line} 行：{text}",
       "entrySubject": "条目 {entry}（{pattern}），主题：{text}",
+      "entryLines": "条目 {entry}（{pattern}），第 {first} 至 {last} 行：",
+      "blockLine": "第 {line} 行：{text}",
       "labelled": "条目 {entry}，第 {labelLine} 行（{labelText}）上的标签 {label}，第 {line} 行上的值 {pattern}：{text}",
       "item": "明细 {number}",
       "itemLine": "{pattern}，第 {line} 行：{text}"
