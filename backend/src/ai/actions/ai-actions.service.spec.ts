@@ -1351,6 +1351,20 @@ describe("AiActionsService", () => {
       expect(transactions.update.mock.calls[0][2].tagIds).toBeUndefined();
     });
 
+    it("hands update() the reference number the card sets, and no key when it sets none", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(reviewDescriptor({ referenceNumber: "EX-1" })),
+      );
+      expect(transactions.update.mock.calls[0][2].referenceNumber).toBe("EX-1");
+
+      // A key present but undefined would clear the Ref # the transaction holds.
+      await service.confirm(USER, dtoFor(reviewDescriptor()));
+      expect(transactions.update.mock.calls[1][2]).not.toHaveProperty(
+        "referenceNumber",
+      );
+    });
+
     it("passes no tag names when the card has none", async () => {
       await service.confirm(USER, dtoFor(reviewDescriptor()));
       expect(transactions.update.mock.calls[0][3]).not.toHaveProperty(

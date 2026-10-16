@@ -92,6 +92,12 @@ export interface UpdateRowInput {
    * Standard edits only: a transfer ignores it.
    */
   tagNames?: string[];
+  /**
+   * The reference number ("Ref #") to set. Set by the review queue from an
+   * email receipt's order number; the chat and MCP tools do not send it.
+   * Standard edits only: a transfer ignores it.
+   */
+  referenceNumber?: string;
   /** `"ai"` marks `categoryName` as chosen by the AI, on the confirmation card only. */
   categorySource?: "ai";
 }
@@ -563,6 +569,7 @@ export class TransactionToolPrepService {
         // amount change (Truth table B).
         splitsAccompany: item.splits !== undefined,
         tagNames: item.tagNames,
+        referenceNumber: item.referenceNumber,
       },
     );
     // Validate splits against the effective amount the edit will leave on the

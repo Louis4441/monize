@@ -944,12 +944,18 @@ describe("EmailReceiptPipelineService.process", () => {
     });
 
     it("a proposal with nothing in it is parse_failed nothing_to_propose, keeping the match", async () => {
-      // Incomplete parse whose summary the transaction already carries.
+      // Incomplete parse whose summary the transaction already carries, its
+      // order number already in the Ref #.
       const h = setup({
         receipt: receiptRow({
           bodyText: "Order number: ABCD1234\nOrder total: 15.00",
         }),
-        candidates: [candidate({ description: "Shop ABCD1234 order" })],
+        candidates: [
+          candidate({
+            description: "Shop ABCD1234 order",
+            reference_number: "ABCD1234",
+          }),
+        ],
       });
       const result = await run(h);
       expect(result).toMatchObject({
@@ -971,7 +977,8 @@ describe("EmailReceiptPipelineService.process", () => {
       expect(result.statusReason).toBe("amount_differs");
       const input = h.work.submit.mock.calls[0][3];
       expect(input.splits).toBeUndefined();
-      expect(input.description).toContain("Shop ABCD1234");
+      expect(input.description).toContain("Shop: Widget");
+      expect(input.referenceNumber).toBe("ABCD1234");
     });
 
     it("the parser payee's name is proposed only when the transaction has no payee", async () => {
@@ -1011,7 +1018,8 @@ describe("EmailReceiptPipelineService.process", () => {
       const fallback = h.work.submit.mock.calls[1][3];
       expect(fallback.splits).toBeUndefined();
       expect(fallback.categoryName).toBeUndefined();
-      expect(fallback.description).toContain("Shop ABCD1234");
+      expect(fallback.description).toContain("Shop: Widget");
+      expect(fallback.referenceNumber).toBe("ABCD1234");
       expect(result).toMatchObject({
         status: "review",
         statusReason: "proposal_fallback",
@@ -1772,9 +1780,8 @@ describe("EmailReceiptPipelineService.process: the email's own schema.org order"
     });
     await run(h);
     const [, , , input] = h.work.submit.mock.calls[0];
-    expect(input.description).toContain(
-      "shop.example.com ABCD1234: Widget, Gadget",
-    );
+    expect(input.description).toContain("shop.example.com: Widget, Gadget");
+    expect(input.referenceNumber).toBe("ABCD1234");
   });
 
   it("is used when the parser found no total and no paid, and keeps that parser on the receipt", async () => {

@@ -28,12 +28,14 @@ export async function loadLinkableTransaction(
     amount: string | number;
     description: string | null;
     payee_id: string | null;
+    reference_number: string | null;
     is_transfer: boolean;
     status: string | null;
     plain: boolean;
   }>(
     await m.query(
-      `SELECT t.id, t.amount, t.description, t.payee_id, t.is_transfer, t.status,
+      `SELECT t.id, t.amount, t.description, t.payee_id, t.reference_number,
+              t.is_transfer, t.status,
               ${investmentLinkedTransactionExclusion("t")} AS plain
          FROM transactions t
         WHERE t.id = $1
@@ -79,5 +81,6 @@ export async function loadLinkableTransaction(
     amount: Number(row.amount),
     description: row.description,
     payeeId: row.payee_id,
+    referenceNumber: row.reference_number,
   };
 }

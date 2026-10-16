@@ -212,6 +212,15 @@ to 300 characters with `...`. It is appended to an existing description with
 ` | ` (`composeDescription`, 750 cap); an existing description that already
 contains the summary is left as it is and the proposal carries no description.
 
+**Order number in the Ref #**: the order number goes in the transaction's
+reference number, not the summary. The proposal sets `referenceNumber` when
+the Ref # is empty; when the Ref # already holds the order number
+(case-insensitive) it sets nothing and the summary still leaves it out. A Ref #
+holding something else (a cheque or bank reference) is never overwritten, and
+an order number over 100 characters cannot be stored there: in both cases the
+order number stays in the summary. Every proposal kind carries it, a
+description-only one included.
+
 **Payee**: when the email names a merchant (`ParsedReceipt.payee`), `payeeName`
 is that merchant when the transaction has no payee OR its payee is the parser's
 own (the gateway, such as PayU); a transaction with another payee is left

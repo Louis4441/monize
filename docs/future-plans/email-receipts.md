@@ -846,6 +846,9 @@ What a proposal contains:
   appended (capped at 750).
 - **Anything else**: the description only, with the summary; the receipt page
   names the reason (`amount_differs`, `items_uncategorized`, ...).
+- **Ref #**: the order number, when the transaction's Ref # is empty (never
+  over another value; then it stays in the summary). See
+  `docs/specs/email-receipt-matching.md`.
 - **Payee**: the parser's payee name when the transaction has none.
 
 ## 7. Invariants

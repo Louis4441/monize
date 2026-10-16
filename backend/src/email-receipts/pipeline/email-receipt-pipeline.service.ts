@@ -562,6 +562,7 @@ export class EmailReceiptPipelineService {
         amount: hit.amount,
         description: hit.description,
         payeeId: hit.payeeId,
+        referenceNumber: hit.referenceNumber,
       };
       matchKind = match.matchKind;
     }

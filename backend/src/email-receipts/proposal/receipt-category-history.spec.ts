@@ -131,7 +131,7 @@ describe("applyCategoryHistory", () => {
     );
     const proposal = buildReceiptProposal(
       out,
-      { amount: -15, description: null, payeeId: null },
+      { amount: -15, description: null, payeeId: null, referenceNumber: null },
       { parserName: "Shop", payeeName: null, categoryNames: CATEGORIES },
     );
     expect(proposal.kind).toBe("itemized");

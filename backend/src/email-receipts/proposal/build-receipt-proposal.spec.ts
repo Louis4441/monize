@@ -32,6 +32,10 @@ const TX = {
   amount: -37.97,
   description: null as string | null,
   payeeId: null as string | null,
+  // A Ref # the bank wrote: the order number is not put over it and stays in
+  // the description summary. "the order number and the Ref #" below covers
+  // an empty Ref #, where the order number goes instead.
+  referenceNumber: "CHQ-1001" as string | null,
 };
 
 /** The spec section 5 receipt, already parsed: items 19.98 + 15.00, shipping 4.99, discount 2.00. */
@@ -560,7 +564,12 @@ describe("buildReceiptProposal: a proposal that would carry nothing", () => {
   it("keeps amount_differs as the reason", () => {
     const result = buildReceiptProposal(
       example(),
-      { amount: -1, description: SUMMARY, payeeId: "payee-1" },
+      {
+        amount: -1,
+        description: SUMMARY,
+        payeeId: "payee-1",
+        referenceNumber: "CHQ-1001",
+      },
       CTX,
     );
     expect(result).toEqual({
@@ -659,7 +668,11 @@ describe("buildReceiptProposal: the payee", () => {
   const gateway = "payee-payu";
   const parsedWith = (payee: string | null) => single({ payee });
   const ctx = { ...CTX, parserPayeeId: gateway, payeeName: "PayU" };
-  const tx = { amount: -12.5, description: null as string | null };
+  const tx = {
+    amount: -12.5,
+    description: null as string | null,
+    referenceNumber: "CHQ-1001",
+  };
 
   it("proposes the merchant the email names when the transaction has no payee", () => {
     const proposal = buildReceiptProposal(
@@ -841,5 +854,69 @@ describe("buildReceiptProposal: categories the AI chose (design 5.6)", () => {
     expect(marked?.splits?.map((s) => [s.categoryName, s.amount])).toEqual(
       plain?.splits?.map((s) => [s.categoryName, s.amount]),
     );
+  });
+});
+
+describe("buildReceiptProposal: the order number and the Ref #", () => {
+  const withRef = (referenceNumber: string | null) => ({
+    ...TX,
+    referenceNumber,
+  });
+  const ITEMS = "Example Shop: USB-C cable x2, Phone case";
+
+  it("puts the order number in an empty Ref # and leaves it out of the description", () => {
+    for (const empty of [null, "", "  "]) {
+      const proposal = buildReceiptProposal(example(), withRef(empty), CTX);
+      expect(proposal.input).toMatchObject({
+        referenceNumber: "EX-20931",
+        description: ITEMS,
+      });
+    }
+  });
+
+  it("adds nothing when the Ref # already holds the order number, ignoring case", () => {
+    for (const held of ["EX-20931", "ex-20931", "Order EX-20931"]) {
+      const proposal = buildReceiptProposal(example(), withRef(held), CTX);
+      expect(proposal.input).not.toHaveProperty("referenceNumber");
+      expect(proposal.input).toMatchObject({ description: ITEMS });
+    }
+  });
+
+  it("never overwrites another Ref #: the order number stays in the description", () => {
+    const proposal = buildReceiptProposal(example(), withRef("CHQ-1001"), CTX);
+    expect(proposal.input).not.toHaveProperty("referenceNumber");
+    expect(proposal.input).toMatchObject({ description: SUMMARY });
+  });
+
+  it("keeps an order number too long for the Ref # in the description", () => {
+    const long = "X".repeat(101);
+    const proposal = buildReceiptProposal(
+      example({ orderId: long }),
+      withRef(null),
+      CTX,
+    );
+    expect(proposal.input).not.toHaveProperty("referenceNumber");
+    expect(proposal.input?.description).toContain(long);
+  });
+
+  it("sets the Ref # on a description-only proposal too", () => {
+    const proposal = buildReceiptProposal(
+      example({ complete: false, reason: "no_items" }),
+      withRef(null),
+      CTX,
+    );
+    expect(proposal).toMatchObject({
+      kind: "description_only",
+      input: { referenceNumber: "EX-20931" },
+    });
+  });
+
+  it("proposes nothing for the Ref # when the email has no order number", () => {
+    const proposal = buildReceiptProposal(
+      example({ orderId: null }),
+      withRef(null),
+      CTX,
+    );
+    expect(proposal.input).not.toHaveProperty("referenceNumber");
   });
 });

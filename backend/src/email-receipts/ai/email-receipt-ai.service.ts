@@ -557,6 +557,7 @@ export class EmailReceiptAiService {
           amount: Number(transaction.amount),
           description: transaction.description,
           payeeId: transaction.payeeId ?? null,
+          referenceNumber: transaction.referenceNumber ?? null,
         },
         {
           parserName: found.receipt.fromDomain || "Email",

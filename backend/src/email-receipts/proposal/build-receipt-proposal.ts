@@ -23,6 +23,8 @@ import type {
 
 /** The summary appended to a description is cut to this many characters. */
 export const RECEIPT_SUMMARY_MAX_LENGTH = 300;
+/** The longest reference number a transaction holds (`transactions.reference_number`). */
+const REFERENCE_NUMBER_MAX_LENGTH = 100;
 const MONEY_UNITS = 10000;
 const ELLIPSIS = "...";
 const DESCRIPTION_SEPARATOR = " | ";
@@ -38,6 +40,8 @@ export interface ReceiptProposalTransaction {
   amount: number;
   description: string | null;
   payeeId: string | null;
+  /** The transaction's reference number ("Ref #"), as stored. */
+  referenceNumber: string | null;
 }
 
 export interface ReceiptProposalContext {
@@ -93,12 +97,44 @@ function itemMemo(item: ParsedReceiptItem): string {
 }
 
 /**
- * `"{parser} {orderId}: item1 x2, item2"`. The order id part is left out when
- * the email had none, and so is the item list when it had no items. Cut to 300
- * characters with `...`.
+ * Where the order number goes. It belongs in the transaction's reference
+ * number: proposed there when the Ref # is empty, and nothing to do when the
+ * Ref # already holds it (case-insensitive). A Ref # holding something else (a
+ * cheque or bank reference) is never overwritten, and an order number too long
+ * for the column cannot go there; in both cases it stays in the description
+ * summary, so it is not lost.
  */
-function buildSummary(parsed: ParsedReceipt, parserName: string): string {
-  const head = [clean(parserName), parsed.orderId ? clean(parsed.orderId) : ""]
+function placeOrderId(
+  parsed: ParsedReceipt,
+  tx: ReceiptProposalTransaction,
+): { referenceNumber?: string; inReference: boolean } {
+  const orderId = parsed.orderId ? clean(parsed.orderId) : "";
+  if (orderId === "") return { inReference: false };
+  const existing = (tx.referenceNumber ?? "").trim();
+  if (existing.toLowerCase().includes(orderId.toLowerCase())) {
+    return { inReference: true };
+  }
+  if (existing === "" && orderId.length <= REFERENCE_NUMBER_MAX_LENGTH) {
+    return { referenceNumber: orderId, inReference: true };
+  }
+  return { inReference: false };
+}
+
+/**
+ * `"{parser} {orderId}: item1 x2, item2"`. The order id part is left out when
+ * the email had none or it goes in the reference number (`withOrderId` false),
+ * and so is the item list when it had no items. Cut to 300 characters with
+ * `...`.
+ */
+function buildSummary(
+  parsed: ParsedReceipt,
+  parserName: string,
+  withOrderId: boolean,
+): string {
+  const head = [
+    clean(parserName),
+    withOrderId && parsed.orderId ? clean(parsed.orderId) : "",
+  ]
     .filter((part) => part !== "")
     .join(" ");
   const items = parsed.items
@@ -210,7 +246,8 @@ const expectedAmount = (parsed: ParsedReceipt): number | null =>
  *
  * A complete parse whose total equals the transaction amount becomes one
  * category (a single line) or splits (two or more lines), each signed like the
- * transaction and the discount the opposite way, plus the description summary.
+ * transaction and the discount the opposite way, plus the description summary
+ * and the order number in the Ref # (see `placeOrderId`).
  * Anything else, including a category the user no longer has, becomes a
  * description-only proposal with the reason. The split lines equal the
  * transaction amount by construction (the parser is complete only when the
@@ -221,12 +258,16 @@ export function buildReceiptProposal(
   tx: ReceiptProposalTransaction,
   ctx: ReceiptProposalContext,
 ): ReceiptProposal {
-  const summary = buildSummary(parsed, ctx.parserName);
+  const orderId = placeOrderId(parsed, tx);
+  const summary = buildSummary(parsed, ctx.parserName, !orderId.inReference);
   const description = buildDescription(tx.description, summary);
   const payeeName = proposedPayeeName(parsed, tx, ctx);
   const common: AiReviewProposalInput = {
     ...(payeeName === undefined ? {} : { payeeName }),
     ...(description === null ? {} : { description }),
+    ...(orderId.referenceNumber === undefined
+      ? {}
+      : { referenceNumber: orderId.referenceNumber }),
   };
 
   const descriptionOnly = (

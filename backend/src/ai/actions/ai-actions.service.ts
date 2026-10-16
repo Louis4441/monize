@@ -768,6 +768,10 @@ export class AiActionsService {
         ? undefined
         : (descriptor.categoryId ?? undefined),
       description: descriptor.description ?? undefined,
+      // Only when the card sets one: a key present but undefined would clear it.
+      ...(descriptor.referenceNumber === undefined
+        ? {}
+        : { referenceNumber: descriptor.referenceNumber }),
       // Splits ride inside the same DTO so update() rebuilds the set in the
       // same transaction, under the same row lock, as the scalar fields
       // (invariant I1) -- never as a separate follow-up write.

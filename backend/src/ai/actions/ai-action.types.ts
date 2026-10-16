@@ -485,6 +485,11 @@ export interface UpdateTransactionDescriptor extends BaseDescriptor {
    */
   tagNames?: string[];
   /**
+   * The reference number ("Ref #") this edit sets; absent: left as it is.
+   * Signed with the rest, so a client cannot set one the card did not show.
+   */
+  referenceNumber?: string;
+  /**
    * The AI review request this edit answers. Not part of the change (nothing on
    * the transaction reads it) and not an envelope field: it is signed with the
    * rest, so a client cannot point an approval at another request, and confirm
@@ -977,6 +982,8 @@ export interface AiActionPreview {
   tagNames?: string[];
   /** The subset of `tagNames` the approval creates because the user has no such tag yet. */
   newTagNames?: string[];
+  /** update_transaction: the reference number ("Ref #") the approval sets (display mirror of the descriptor's). */
+  referenceNumber?: string;
   // create_investment_transaction display fields.
   investmentAction?: InvestmentAction;
   symbol?: string | null;
