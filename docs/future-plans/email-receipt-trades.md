@@ -20,8 +20,9 @@ apply it unattended, under a stricter gate than a receipt's.
 
 Out of scope: dividends, reinvestments, splits, transfers, option and crypto
 confirmations (the reader knows `buy` and `sell` only); several fills in one
-email; the profile form editor (a trade profile is written in the profile
-editor's JSON mode, by the wizard or by the assistant).
+email. A trade profile is written in the profile editor's form (a kind switch
+shows the trade fields, the account rules with their currency and the
+currency markers), in its JSON mode, by the wizard or by the assistant.
 
 ## 2. Decisions
 
@@ -48,7 +49,9 @@ editor's JSON mode, by the wizard or by the assistant).
    suffix: `XCNS` finds `XCNS.TO`), never by name or fragment, and never by a
    guess between several; an exact symbol wins only over listings in its own
    currency, else the one the account already trades decides. An email whose
-   amounts name a currency other than the security's is refused.
+   amounts name a currency other than the security's is refused. Two accounts
+   the email prints alike (an RRSP in CAD and one in USD) are told apart by the
+   trade's currency (section 3.2), never by a guess.
 5. **A trade already in the ledger is not proposed again.** The same account,
    direction, security, day and exact share count (VOID rows ignored), on a row
    no other email accounts for (`email_receipts.investment_transaction_id`),
@@ -97,12 +100,14 @@ only). The capture each takes: `action`, `symbol`, `quantity`, `date`, `account`
 | `total` or `price` | one of them | The executed total (commission included for a buy), or the average price per share (up to 8 decimals); a sign or parentheses on a total are dropped (a debit is still the total) |
 | `commission` | no | Commission; a buy's total includes it, a sell's proceeds are net of it |
 | `date` | no | `YYYY-MM-DD` (also of an ISO timestamp, or `YYYY/MM/DD`), `Month D, YYYY` or `D Month YYYY` in English or French, or a numeric day and month only when which is the day is certain; time and zone are ignored (the broker's own day). Without it, the day the email was sent (the shop's day for a forward) in the user's timezone |
-| `account` + `accountRules` | one of this or `defaultAccountId` | The account text and the rules that map it (first match wins) |
+| `account` + `accountRules` | one of `accountRules` or `defaultAccountId` | The account text and the rules that map it (first match wins); a rule may name a `currency` (section 3.2) |
+| `currencyMarkers` | no | `[{match, currency}]`: a capture-free glob tried on every line, and the 3-letter currency it names (section 3.2) |
 
 Bounds: the receipt parser's (200 characters a pattern, 10 entries a field), at
-most 20 `accountRules`. The validator's new codes: `trade_conflict` (a receipt
+most 20 `accountRules` and 20 `currencyMarkers`. The validator's new codes: `trade_conflict` (a receipt
 field beside `trade`), `trade_amount_missing` (neither `total` nor `price`),
-`trade_account_missing` (no way to decide the account); plus the existing
+`trade_account_missing` (no way to decide the account), `invalid_currency` (a
+rule's or a marker's `currency` that is not a 3-letter upper-case code); plus the existing
 `empty`, `invalid_uuid`, `capture_not_allowed` and `unknown_key` at the
 `trade.*` paths.
 
@@ -111,7 +116,7 @@ field beside `trade`), `trade_amount_missing` (neither `total` nor `price`),
 `complete` is true only when the action, symbol, quantity and an amount were read
 and an account was decided. The first missing thing is the reason
 (`trade_no_action`, `trade_no_symbol`, `trade_no_quantity`, `trade_no_amount`,
-`trade_no_account`), and the email is `parse_failed` with it.
+`trade_no_account`, `trade_no_currency`), and the email is `parse_failed` with it.
 
 `consistent` cross-checks the email against itself when it states a price and a
 total. With `q` shares, a price written with `d` decimals, a total `T` and a
@@ -135,6 +140,49 @@ consistent. A price of $31.00 gives 2355.62: inconsistent.
 An email that states only a price is proposed with the total that price implies,
 to the ledger's four decimals (`75.9878 * 26.32 = 1999.9989`); it is never
 `consistent` and so never auto-applies.
+
+### 3.2 Accounts the email prints alike: the trade's currency
+
+A broker may print the same account text for two accounts that differ only in
+currency (Wealthsimple's "Account: RRSP" for a CAD and a USD RRSP). An account
+rule may then name a `currency`:
+
+```json
+"accountRules": [
+  { "match": "RRSP", "currency": "USD", "accountId": "<USD RRSP>" },
+  { "match": "RRSP", "currency": "CAD", "accountId": "<CAD RRSP>" }
+],
+"currencyMarkers": [{ "match": "*U.S. dollars*", "currency": "USD" }]
+```
+
+The trade's currency is, in order: the currency the total (else the price)
+names (a code, `US$`, `C$`/`CA$`/`CDN$`, `A$`, `NZ$`, `HK$`, `€`, `£`, `¥`; a
+bare `$` names none); else the first `currencyMarkers` entry whose glob matches
+any line; else, only when a rule needs it, the currency of the user's security
+for the ticker, when all its listings share one (`readTradeEmail`,
+`backend/src/email-receipts/pipeline/trade-reading.ts`, the one reading behind
+the pipeline, the test and the preview). `currencySource` on the reading says
+which (`amount`, `marker`, `security`).
+
+Rules are tried in array order. A rule whose glob matches and that names no
+currency applies; one that names the trade's currency applies; one that names
+another is skipped; one that names a currency while the trade's is unknown
+stops the search with no account and the reason `trade_no_currency`, never a
+guess. With no account text the rules are tried against the empty text, so a
+`*` rule (one per currency) maps emails that print no account. An email-read
+currency also narrows the ticker's listings (`SHOP` in USD beside `SHOP.TO` in
+CAD), and the card still refuses a currency the security does not trade in.
+
+Truth table (rules as above, a TFSA rule with no currency after them):
+
+| Account text | Email currency | Security currency | Account | Reason |
+|---|---|---|---|---|
+| RRSP | USD (`US$2,000.00`) | any | USD RRSP | |
+| RRSP | none, marker "U.S. dollars" hits | any | USD RRSP | |
+| RRSP | none | CAD (one listing) | CAD RRSP | |
+| RRSP | none | listings in CAD and USD | none | `trade_no_currency` |
+| RRSP | EUR | any | none | `trade_no_account` |
+| TFSA | none | unknown | TFSA | |
 
 ## 4. Pipeline
 
@@ -229,7 +277,7 @@ agent can answer it.
 - **Test and the assistant's tool.** `POST /email-receipt-parsers/test` and the
   `email_receipt_parsers` tool's `test` return, for a trade profile, `trade` (what
   it read, `complete`, `consistent`) and its trace, and no match. `categories`
-  also returns `investmentAccounts` (id and name) for `accountRules`; the language
+  also returns `investmentAccounts` (id, name and currency) for `accountRules`; the language
   guide it returns teaches the trade section.
 - **Preview.** A complete trade is the outcome `trade`; an incomplete one is
   `parse_failed` with the `trade_*` reason; each item carries `trade` (direction,
@@ -273,6 +321,7 @@ second is proposed, never auto-applied, and the person approving sees both.
 |---|---|
 | Reader (`parse-trade.spec.ts`) | The Wealthsimple email; a sell; each incomplete reason; price-only and total-only; the consistency table; share-count, direction and date grammars |
 | Validator (same file) | Valid profile; each new code; wrong capture; unknown key in a rule |
+| Currency (`parse-trade.spec.ts`, `trade-reading.spec.ts`, `securities.service.spec.ts`) | Prefixed dollar signs; a marker and its trace; amounts before a marker; the security's currency only when a rule needs it, and none for listings in two currencies; a `*` rule without account text; `invalid_currency`; listings narrowed by the email's currency |
 | Pipeline (`email-receipt-pipeline.service.spec.ts`, `email-receipt-trade.service.spec.ts`) | Branch to the trade service; no bank-transaction lookup; request closed when none is held; duplicate; conflict; refusal; each auto-apply gate condition |
 | Queue (`ai-review-requests.service.spec.ts`) | `enqueueTrade` conflict clause; `markTradeApplied` predicate and 409 |
 | Card (`ai-review-work.service.spec.ts`) | Strict ticker; total passed as the fact, no price; refusals; inbox rebuild; approval; agents cannot answer the kind |

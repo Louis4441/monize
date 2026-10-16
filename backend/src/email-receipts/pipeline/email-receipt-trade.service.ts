@@ -18,10 +18,7 @@ import type {
   EmailReceiptStatus,
 } from "../entities/email-receipt.entity";
 import { effectiveReceiptDate } from "../imap/forwarded-receipt";
-import {
-  parseTradeLines,
-  tradeExecutedTotalUnits,
-} from "../parsing/parse-trade";
+import { tradeExecutedTotalUnits } from "../parsing/parse-trade";
 import type {
   ParsedTrade,
   ReceiptTradeDefinition,
@@ -29,6 +26,7 @@ import type {
 import { isRefusal, refusalNote } from "./receipt-failure";
 import { RECEIPT_TRADE_INSTRUCTION } from "./receipt-instructions";
 import { closeReceiptRequests } from "./receipt-requests.util";
+import { readTradeEmail } from "./trade-reading";
 
 /** The `status_reason` of an email whose trade is already in the ledger. */
 export const RECEIPT_TRADE_EXISTS_REASON = "trade_exists";
@@ -78,7 +76,12 @@ export class EmailReceiptTradeService {
     receipt: EmailReceipt,
     context: TradeContext,
   ): Promise<TradeOutcome> {
-    const trade = parseTradeLines(context.definition, context.lines);
+    const { trade } = await readTradeEmail(
+      m,
+      userId,
+      context.definition,
+      context.lines,
+    );
     const outcome = (
       status: EmailReceiptStatus,
       reason: string | null,

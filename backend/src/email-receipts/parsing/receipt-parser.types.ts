@@ -173,6 +173,8 @@ export interface ReceiptMatchDefinition {
 
 /** The most account rules a trade section may hold. */
 export const MAX_TRADE_ACCOUNT_RULES = 20;
+/** The most currency markers a trade section may hold. */
+export const MAX_TRADE_CURRENCY_MARKERS = 20;
 /** The most decimals a share quantity may have (the `investment_transactions.quantity` scale). */
 export const MAX_TRADE_QUANTITY_DECIMALS = 8;
 
@@ -181,10 +183,26 @@ export const MAX_TRADE_QUANTITY_DECIMALS = 8;
  * matches the text the `account` entries read wins; `defaultAccountId` covers
  * the rest. The ids are UUIDs of the user's INVESTMENT accounts; ownership and
  * type are checked when the proposal is built, in the proposal's transaction.
+ * A rule with a `currency` applies only to a trade in that currency, so two
+ * accounts the broker prints alike (an RRSP in CAD and one in USD) are told
+ * apart; a trade whose currency cannot be told reads no account.
  */
 export interface ReceiptTradeAccountRule {
   match: string;
   accountId: string;
+  /** A 3-letter ISO code; absent means any currency. */
+  currency?: string;
+}
+
+/**
+ * A text that names the trade's currency somewhere in the email ("*US$*",
+ * "*U.S. dollars*"): a capture-free glob tried on every line, markers in array
+ * order. Consulted when the amounts name no currency themselves.
+ */
+export interface ReceiptTradeCurrencyMarker {
+  match: string;
+  /** A 3-letter ISO code. */
+  currency: string;
 }
 
 /**
@@ -215,6 +233,8 @@ export interface ReceiptTradeDefinition {
   account?: ReceiptFieldEntry[];
   accountRules?: ReceiptTradeAccountRule[];
   defaultAccountId?: string;
+  /** Texts that name the currency when the amounts do not (for currency rules). */
+  currencyMarkers?: ReceiptTradeCurrencyMarker[];
 }
 
 /**
@@ -416,7 +436,11 @@ export type ParsedTradeReason =
   | "trade_no_symbol"
   | "trade_no_quantity"
   | "trade_no_amount"
-  | "trade_no_account";
+  | "trade_no_account"
+  | "trade_no_currency";
+
+/** Where a trade's currency was read: the amounts, a currency marker, or the user's security. */
+export type ParsedTradeCurrencySource = "amount" | "marker" | "security";
 
 /**
  * What a `trade` profile read from one email. `quantity` is a share count with
@@ -435,11 +459,15 @@ export interface ParsedTrade {
   price: number | null;
   commission: number | null;
   /**
-   * The currency the total (else the price) names, as a 3-letter code, when it
-   * names one unambiguously ("USD 2,000.00"; a bare `$` names none). Checked
-   * against the security's currency when the card is built.
+   * The trade's currency as a 3-letter code: the one the total (else the
+   * price) names unambiguously ("USD 2,000.00", "US$2,000.00"; a bare `$`
+   * names none), else the first currency marker that matches a line, else
+   * (only when an account rule needs it) the currency of the user's security
+   * for the ticker. An email-read currency is checked against the security's
+   * when the card is built.
    */
   currency?: string | null;
+  currencySource?: ParsedTradeCurrencySource | null;
   /** The trade's day, else null (the proposal then uses the email's day). */
   date: string | null;
   /** The account text the email printed, when the profile reads one. */
@@ -461,4 +489,6 @@ export interface ReceiptTradeTrace {
   commission: ReceiptTraceHit | null;
   date: ReceiptTraceHit | null;
   account: ReceiptTraceHit | null;
+  /** The currency marker that named the currency (`entry` indexes `currencyMarkers`). */
+  currency: ReceiptTraceHit | null;
 }

@@ -148,12 +148,12 @@ function buildTradePrompt(
     "",
     "These emails are brokerage trade confirmations. The profile holds a trade section (and nothing for items, totals or categories); it makes each email propose ONE investment transaction to create.",
     "Use the email_receipt_parsers tool. The loop:",
-    "1. operation categories: read the language guide (the trade section) and the user's investmentAccounts (ids).",
+    "1. operation categories: read the language guide (the trade section) and the user's investmentAccounts (ids and currencies).",
     `2. Write the definition, then operation test with receiptIds = [${samples
       .map((s) => `"${s.receiptId}"`)
       .join(
         ", ",
-      )}]. Each email reports its trade (complete, consistent). Map the account text the emails print (for example RRSP) to the matching investment account id with accountRules; if the emails print no account, use defaultAccountId and say so in your answer.`,
+      )}]. Each email reports its trade (complete, consistent). Map the account text the emails print (for example RRSP) to the matching investment account id with accountRules; when two accounts share that text in different currencies (an RRSP in CAD and one in USD), give each its own rule with its currency, and add currencyMarkers when the emails name the currency only in words. If the emails print no account, use defaultAccountId and say so in your answer.`,
     "3. Fix the definition and test again until every sample is complete and consistent (allComplete true). Add requireLine with a line the confirmations always hold so the profile does not read other mail from the sender.",
     revision
       ? `4. Then operation save_draft with parserId "${revision.parserId}" and expectedRevision ${revision.revision}, so the existing draft is UPDATED. fromDomains: ["${domain}"].`

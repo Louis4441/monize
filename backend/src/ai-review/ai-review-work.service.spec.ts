@@ -93,7 +93,7 @@ function setup() {
   };
   const investments = { previewCreateInvestmentTransaction: jest.fn() };
   const securities = { resolveByTradeSymbol: jest.fn() };
-  const accounts = { resolveBrokerageByName: jest.fn() };
+  const accounts = { resolveBrokerageByNameOrId: jest.fn() };
   const scheduled = {
     findInvestmentOccurrenceForTrade: jest.fn().mockResolvedValue(null),
   };
@@ -1291,6 +1291,7 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       USER,
       "XCNS",
       ACCOUNT,
+      null,
     );
     // The resolved symbol, not the email's text, goes to the preview; the total
     // is passed as the fact and no price is supplied (INV-TRADE-001).
@@ -1493,14 +1494,14 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       h.requests.submitProposal.mockResolvedValue(
         tradeRequest({ status: "proposed" }),
       );
-      h.accounts.resolveBrokerageByName.mockResolvedValue({
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
         match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
         candidates: [],
       });
       const result = await h.service.submit(USER, "agent-1", REQ, {
         trade: agentTrade,
       });
-      expect(h.accounts.resolveBrokerageByName).toHaveBeenCalledWith(
+      expect(h.accounts.resolveBrokerageByNameOrId).toHaveBeenCalledWith(
         USER,
         "RRSP",
       );
@@ -1518,6 +1519,43 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       expect(result.action).toBe(tradeCard);
     });
 
+    it("keeps the agent's description and checks the currency it read against the security's", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: { ...agentTrade, currency: "cad", description: "XCNS buy" },
+      });
+      expect(h.securities.resolveByTradeSymbol).toHaveBeenCalledWith(
+        USER,
+        "XCNS",
+        ACCOUNT,
+        "CAD",
+      );
+      expect(
+        h.investments.previewCreateInvestmentTransaction,
+      ).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({ description: "XCNS buy" }),
+      );
+
+      h.requests.submitProposal.mockClear();
+      await expect(
+        h.service.submit(USER, "agent-1", REQ, {
+          trade: { ...agentTrade, currency: "USD" },
+        }),
+      ).rejects.toThrow(/amounts are in USD/);
+      expect(h.requests.submitProposal).not.toHaveBeenCalled();
+    });
+
     it("dates the trade by the email when the agent gives no date", async () => {
       const h = tradeSetup();
       h.requests.getForUser.mockResolvedValue(
@@ -1526,7 +1564,7 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       h.requests.submitProposal.mockResolvedValue(
         tradeRequest({ status: "proposed" }),
       );
-      h.accounts.resolveBrokerageByName.mockResolvedValue({
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
         match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
         candidates: [],
       });
@@ -1550,14 +1588,14 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       h.requests.getForUser.mockResolvedValue(
         tradeRequest({ claimedBy: "agent-1" }),
       );
-      h.accounts.resolveBrokerageByName.mockResolvedValue({
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
         match: undefined,
         candidates: [],
       });
       await expect(
         h.service.submit(USER, "agent-1", REQ, { trade: agentTrade }),
       ).rejects.toThrow(/Unknown account/);
-      h.accounts.resolveBrokerageByName.mockResolvedValue({
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
         match: undefined,
         candidates: [
           { id: "a", name: "RRSP 1" },
@@ -1590,7 +1628,7 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
           h.service.submit(USER, "agent-1", REQ, { trade: bad }),
         ).rejects.toThrow(/accountName, action \(BUY or SELL\)/);
       }
-      expect(h.accounts.resolveBrokerageByName).not.toHaveBeenCalled();
+      expect(h.accounts.resolveBrokerageByNameOrId).not.toHaveBeenCalled();
       expect(h.requests.submitProposal).not.toHaveBeenCalled();
     });
 
@@ -1602,7 +1640,7 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       h.requests.submitProposal.mockResolvedValue(
         tradeRequest({ status: "proposed" }),
       );
-      h.accounts.resolveBrokerageByName.mockResolvedValue({
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
         match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
         candidates: [],
       });

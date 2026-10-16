@@ -2489,6 +2489,29 @@ describe("SecuritiesService", () => {
       ).toEqual({ match: cad, candidates: [] });
     });
 
+    it("narrows the listings to the currency the email names, and ignores a currency none trades in", async () => {
+      const usd = {
+        ...mockSecurity,
+        id: "sec-us",
+        symbol: "SHOP",
+        currencyCode: "USD",
+      };
+      const cad = {
+        ...mockSecurity,
+        id: "sec-to",
+        symbol: "SHOP.TO",
+        currencyCode: "CAD",
+      };
+      qb([usd, cad]);
+      expect(
+        await service.resolveByTradeSymbol("user-1", "SHOP", undefined, "cad"),
+      ).toEqual({ match: cad, candidates: [] });
+      qb([usd, cad]);
+      expect(
+        await service.resolveByTradeSymbol("user-1", "SHOP", undefined, "EUR"),
+      ).toEqual({ match: null, candidates: [usd, cad] });
+    });
+
     it("lets an exact symbol win over listings in its own currency", async () => {
       const a = {
         ...mockSecurity,

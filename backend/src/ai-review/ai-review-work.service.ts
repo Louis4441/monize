@@ -574,6 +574,7 @@ export class AiReviewWorkService {
       userId,
       trade.symbol,
       trade.accountId,
+      trade.currency ?? null,
     );
     if (!resolved.match) {
       if (resolved.candidates.length > 0) {
@@ -701,7 +702,7 @@ export class AiReviewWorkService {
       );
     }
     const agent: AiReviewAgentTrade = parsed.data;
-    const resolved = await this.accountsService.resolveBrokerageByName(
+    const resolved = await this.accountsService.resolveBrokerageByNameOrId(
       userId,
       agent.accountName,
     );
@@ -740,7 +741,8 @@ export class AiReviewWorkService {
       totalAmount: agent.totalAmount,
       commission: agent.commission ?? 0,
       date,
-      description: "Email receipt",
+      description: agent.description ?? "Email receipt",
+      currency: agent.currency ?? null,
     };
   }
 

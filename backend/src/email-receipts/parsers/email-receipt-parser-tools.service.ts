@@ -113,8 +113,9 @@ export interface LlmParsedTrade {
   total: number | null;
   price: number | null;
   commission: number | null;
-  /** The currency the amounts name ("USD"), else null: a bare `$` names none. */
+  /** The trade's currency ("USD"): its amounts', else a marker's, else the security's; null when none says. */
   currency: string | null;
+  currencySource: "amount" | "marker" | "security" | null;
   date: string | null;
   accountText: string | null;
   accountId: string | null;
@@ -202,8 +203,8 @@ export interface ParserToolCategories {
   categories: Array<{ id: string; name: string }>;
   totalCount: number;
   truncated: boolean;
-  /** The user's investment accounts (id and name), for a trade profile's `accountRules` and `defaultAccountId`. */
-  investmentAccounts: Array<{ id: string; name: string }>;
+  /** The user's investment accounts (id, name and currency), for a trade profile's `accountRules` and `defaultAccountId`. */
+  investmentAccounts: Array<{ id: string; name: string; currencyCode: string }>;
   /** The whole parser language, which the tool's description has no room for. */
   guide: string;
 }
@@ -291,6 +292,7 @@ function toLlmTrade(trade: ParsedTrade): LlmParsedTrade {
     price: units(trade.price),
     commission: units(trade.commission),
     currency: trade.currency ?? null,
+    currencySource: trade.currencySource ?? null,
     date: trade.date,
     accountText: trade.accountText,
     accountId: trade.accountId,
@@ -319,9 +321,9 @@ export class EmailReceiptParserToolsService {
     );
     const all = [...names.entries()];
     const accounts = await withScopedDb(this.dataSource, async (m) =>
-      returnedRows<{ id: string; name: string }>(
+      returnedRows<{ id: string; name: string; currencyCode: string }>(
         await m.query(
-          `SELECT id, name
+          `SELECT id, name, currency_code AS "currencyCode"
              FROM accounts
             WHERE user_id = $1
               AND account_type = 'INVESTMENT'

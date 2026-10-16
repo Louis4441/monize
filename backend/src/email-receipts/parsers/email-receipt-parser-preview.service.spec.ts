@@ -5,6 +5,7 @@ import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import {
   WEALTHSIMPLE_BUY_BODY,
+  WEALTHSIMPLE_RRSP_ACCOUNT_ID,
   WEALTHSIMPLE_TRADE_DEFINITION,
 } from "../parsing/fixtures/wealthsimple-trade";
 import {
@@ -353,6 +354,47 @@ describe("EmailReceiptParserPreviewService.preview of a trade profile", () => {
   const filled = (id: string, over: Record<string, unknown> = {}) =>
     mail(id, { body_text: WEALTHSIMPLE_BUY_BODY, ...over });
 
+  it("shows which of two accounts printed alike a sample books to, by its currency", async () => {
+    const RRSP_USD = "33333333-3333-4333-8333-333333333333";
+    const { service } = setup({
+      parser: parserRow({
+        fromDomains: ["wealthsimple.com"],
+        definition: {
+          ...WEALTHSIMPLE_TRADE_DEFINITION,
+          trade: {
+            ...WEALTHSIMPLE_TRADE_DEFINITION.trade,
+            accountRules: [
+              { match: "RRSP", currency: "USD", accountId: RRSP_USD },
+              {
+                match: "RRSP",
+                currency: "CAD",
+                accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+              },
+            ],
+          },
+        } as never,
+      }),
+      selected: [
+        filled(R1, {
+          body_text: WEALTHSIMPLE_BUY_BODY.replace(
+            "Total cost: $2,000.00",
+            "Total cost: US$2,000.00",
+          ),
+        }),
+      ],
+    });
+
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      outcome: "trade",
+      parsed: { total: 2000, currency: "USD" },
+      trade: { accountId: RRSP_USD, currency: "USD" },
+    });
+  });
+
   it("reports a complete trade as `trade`, with what it read, and looks up no bank transaction", async () => {
     const { service, manager } = setup({
       parser: tradeParser(),
@@ -378,6 +420,8 @@ describe("EmailReceiptParserPreviewService.preview of a trade profile", () => {
         symbol: "XCNS",
         quantity: 75.9878,
         consistent: true,
+        accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+        currency: null,
       },
       match: null,
     });

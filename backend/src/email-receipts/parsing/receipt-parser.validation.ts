@@ -43,8 +43,10 @@ import {
   ReceiptRecordStep,
   ReceiptSingleItemsDefinition,
   ReceiptTradeAccountRule,
+  ReceiptTradeCurrencyMarker,
   ReceiptTradeDefinition,
   MAX_TRADE_ACCOUNT_RULES,
+  MAX_TRADE_CURRENCY_MARKERS,
 } from "./receipt-parser.types";
 
 /**
@@ -162,8 +164,16 @@ const TRADE_KEYS: readonly string[] = [
   "account",
   "accountRules",
   "defaultAccountId",
+  "currencyMarkers",
 ];
-const TRADE_ACCOUNT_RULE_KEYS: readonly string[] = ["match", "accountId"];
+const TRADE_ACCOUNT_RULE_KEYS: readonly string[] = [
+  "match",
+  "accountId",
+  "currency",
+];
+const TRADE_CURRENCY_MARKER_KEYS: readonly string[] = ["match", "currency"];
+/** A currency as an account rule or a marker names it: a 3-letter ISO code, upper case. */
+const CURRENCY_CODE = /^[A-Z]{3}$/;
 /** The top-level keys a profile with a `trade` section may also hold. */
 const TRADE_COMPATIBLE_KEYS: readonly string[] = [
   "version",
@@ -937,8 +947,72 @@ function checkTradeAccountRules(
       `${entryPath}.accountId`,
       errors,
     );
-    if (matchOk && accountId !== null) {
-      out.push({ match: entry.match as string, accountId });
+    const currency =
+      entry.currency === undefined
+        ? undefined
+        : checkCurrencyCode(entry.currency, `${entryPath}.currency`, errors);
+    if (matchOk && accountId !== null && currency !== null) {
+      out.push({
+        match: entry.match as string,
+        accountId,
+        ...(currency !== undefined ? { currency } : {}),
+      });
+    }
+  });
+  return errors.list.length === before ? out : null;
+}
+
+function checkCurrencyCode(
+  value: unknown,
+  path: string,
+  errors: Errors,
+): string | null {
+  if (typeof value !== "string") {
+    errors.add(path, "invalid_type");
+    return null;
+  }
+  if (!CURRENCY_CODE.test(value)) {
+    errors.add(path, "invalid_currency");
+    return null;
+  }
+  return value;
+}
+
+function checkTradeCurrencyMarkers(
+  value: unknown,
+  errors: Errors,
+): ReceiptTradeCurrencyMarker[] | null {
+  const path = "trade.currencyMarkers";
+  if (!Array.isArray(value)) {
+    errors.add(path, "invalid_type");
+    return null;
+  }
+  if (value.length > MAX_TRADE_CURRENCY_MARKERS) {
+    errors.add(path, "too_many");
+    return null;
+  }
+  const before = errors.list.length;
+  const out: ReceiptTradeCurrencyMarker[] = [];
+  value.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    if (!isPlainObject(entry)) {
+      errors.add(entryPath, "invalid_type");
+      return;
+    }
+    checkKeys(entry, TRADE_CURRENCY_MARKER_KEYS, `${entryPath}.`, errors);
+    const matchOk = checkPattern(
+      entry.match,
+      `${entryPath}.match`,
+      NO_CAPTURES,
+      errors,
+    );
+    const currency = checkCurrencyCode(
+      entry.currency,
+      `${entryPath}.currency`,
+      errors,
+    );
+    if (matchOk && currency !== null) {
+      out.push({ match: entry.match as string, currency });
     }
   });
   return errors.list.length === before ? out : null;
@@ -991,6 +1065,10 @@ function checkTrade(
     const rules = checkTradeAccountRules(value.accountRules, errors);
     if (rules !== null) out.accountRules = rules;
   }
+  if (value.currencyMarkers !== undefined) {
+    const markers = checkTradeCurrencyMarkers(value.currencyMarkers, errors);
+    if (markers !== null) out.currencyMarkers = markers;
+  }
   if (value.defaultAccountId !== undefined) {
     const id = checkUuid(
       value.defaultAccountId,
@@ -999,11 +1077,11 @@ function checkTrade(
     );
     if (id !== null) out.defaultAccountId = id;
   }
+  // Rules decide an account without `account` entries too: an email that
+  // prints no account text is matched by a `*` rule (one per currency).
   const decidable =
     value.defaultAccountId !== undefined ||
-    (Array.isArray(value.accountRules) &&
-      value.accountRules.length > 0 &&
-      value.account !== undefined);
+    (Array.isArray(value.accountRules) && value.accountRules.length > 0);
   if (!decidable) errors.add("trade.defaultAccountId", "trade_account_missing");
   return errors.list.length === before
     ? (out as unknown as ReceiptTradeDefinition)

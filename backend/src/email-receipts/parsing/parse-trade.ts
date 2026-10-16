@@ -1,11 +1,12 @@
 import type { GlobCaptures } from "../../transaction-rules/rule-glob-capture";
 import { findField } from "./parse-receipt";
-import { normalizeLine } from "./receipt-lines";
+import { normalizeLine, traceLine } from "./receipt-lines";
 import { matchReceiptPattern } from "./receipt-glob";
 import {
   MAX_TRADE_QUANTITY_DECIMALS,
   type ParsedTrade,
   type ParsedTradeAction,
+  type ParsedTradeCurrencySource,
   type ParsedTradeReason,
   type ReceiptFieldEntry,
   type ReceiptTradeDefinition,
@@ -273,29 +274,79 @@ function readText(
     : { value: found.captures[name].trim(), hit: found.hit };
 }
 
+/** What the account rules decided: an account, or none and whether the currency would have told. */
+export interface TradeAccountDecision {
+  accountId: string | null;
+  /** A rule for this account text applies to one currency, and the trade's is unknown. */
+  needsCurrency: boolean;
+}
+
 /**
  * The account a trade is for: the first rule whose glob matches the account
- * text, else the default. When the email names an account and the profile has
- * rules, none of which matches it, there is no account: the email names one the
- * profile does not know (a TFSA beside a profile's RRSP rule), and booking it to
- * the default would book it to the wrong account. The default covers emails
- * that name no account, and profiles that map every account to one.
+ * text (the empty text when the email prints none, which only a `*` rule
+ * matches), else the default. A rule with a `currency` applies only to a trade
+ * in that currency: one in another is skipped, and while the trade's currency
+ * is unknown the rule can neither apply nor be skipped, so there is no
+ * account (`needsCurrency`), never a guess between two accounts printed alike.
+ * When the email names an account and the profile has rules, none of which
+ * matches it, there is no account: the email names one the profile does not
+ * know (a TFSA beside a profile's RRSP rule), and booking it to the default
+ * would book it to the wrong account. The default covers emails that name no
+ * account, and profiles that map every account to one.
  */
-export function resolveTradeAccountId(
+export function resolveTradeAccount(
   definition: Pick<ReceiptTradeDefinition, "accountRules" | "defaultAccountId">,
   accountText: string | null,
-): string | null {
+  currency: string | null,
+): TradeAccountDecision {
   const rules = definition.accountRules ?? [];
-  if (accountText !== null) {
-    const line = normalizeLine(accountText);
-    for (const rule of rules) {
-      if (matchReceiptPattern(rule.match, line, () => true) !== null) {
-        return rule.accountId;
+  const line = accountText === null ? "" : normalizeLine(accountText);
+  const wanted = currency?.toUpperCase() ?? null;
+  for (const rule of rules) {
+    if (matchReceiptPattern(rule.match, line, () => true) === null) continue;
+    if (rule.currency === undefined) {
+      return { accountId: rule.accountId, needsCurrency: false };
+    }
+    if (wanted === null) return { accountId: null, needsCurrency: true };
+    if (rule.currency.toUpperCase() === wanted) {
+      return { accountId: rule.accountId, needsCurrency: false };
+    }
+  }
+  if (accountText !== null && rules.length > 0) {
+    return { accountId: null, needsCurrency: false };
+  }
+  return {
+    accountId: definition.defaultAccountId ?? null,
+    needsCurrency: false,
+  };
+}
+
+/** The first currency marker that matches a line, with what matched it. */
+function readCurrencyMarker(
+  definition: Pick<ReceiptTradeDefinition, "currencyMarkers">,
+  lines: readonly string[],
+): { currency: string; hit: ReceiptTraceHit } | null {
+  const markers = definition.currencyMarkers ?? [];
+  for (const [entry, marker] of markers.entries()) {
+    for (const [index, text] of lines.entries()) {
+      if (matchReceiptPattern(marker.match, text, () => true) !== null) {
+        return {
+          currency: marker.currency.toUpperCase(),
+          hit: { entry, pattern: marker.match, line: traceLine(lines, index) },
+        };
       }
     }
-    if (rules.length > 0) return null;
   }
-  return definition.defaultAccountId ?? null;
+  return null;
+}
+
+/**
+ * What a caller with a database adds to a reading: the currency of the user's
+ * security for the ticker, consulted only when an account rule needs a
+ * currency the email does not name.
+ */
+export interface TradeReadOptions {
+  securityCurrency?: string | null;
 }
 
 export interface TracedTrade {
@@ -307,6 +358,7 @@ export interface TracedTrade {
 export function parseTradeLinesTraced(
   definition: ReceiptTradeDefinition,
   lines: readonly string[],
+  options: TradeReadOptions = {},
 ): TracedTrade {
   const action = readText(definition.action, lines, "action", (v) => {
     return parseTradeAction(v) !== null;
@@ -352,14 +404,38 @@ export function parseTradeLinesTraced(
 
   const quantity = quantityRead ? parseTradeQuantity(quantityRead.value) : null;
   const accountText = accountRead?.value ?? null;
-  const accountId = resolveTradeAccountId(definition, accountText);
+  // The email's own word for the currency comes first (its amounts, then a
+  // marker); the security's currency only settles a rule the email leaves open.
+  const amountCurrency =
+    (total ? tradeAmountCurrency(total.text) : null) ??
+    (priceFound ? tradeAmountCurrency(priceFound.captures.amount) : null);
+  const marker =
+    amountCurrency === null ? readCurrencyMarker(definition, lines) : null;
+  const emailCurrency = amountCurrency ?? marker?.currency ?? null;
+  const securityCurrency =
+    emailCurrency === null
+      ? (options.securityCurrency?.toUpperCase() ?? null)
+      : null;
+  const currency = emailCurrency ?? securityCurrency;
+  const currencySource: ParsedTradeCurrencySource | null =
+    amountCurrency !== null
+      ? "amount"
+      : marker !== null
+        ? "marker"
+        : securityCurrency !== null
+          ? "security"
+          : null;
+  const decision = resolveTradeAccount(definition, accountText, currency);
+  const accountId = decision.accountId;
   const actionValue = action ? parseTradeAction(action.value) : null;
   let reason: ParsedTradeReason | null = null;
   if (actionValue === null) reason = "trade_no_action";
   else if (symbol === null) reason = "trade_no_symbol";
   else if (quantity === null) reason = "trade_no_quantity";
   else if (total === null && price === null) reason = "trade_no_amount";
-  else if (accountId === null) reason = "trade_no_account";
+  else if (accountId === null) {
+    reason = decision.needsCurrency ? "trade_no_currency" : "trade_no_account";
+  }
 
   let consistent: boolean | null = null;
   if (
@@ -386,9 +462,8 @@ export function parseTradeLinesTraced(
     total: total?.value ?? null,
     price: price?.value ?? null,
     commission: commission?.value ?? null,
-    currency:
-      (total ? tradeAmountCurrency(total.text) : null) ??
-      (priceFound ? tradeAmountCurrency(priceFound.captures.amount) : null),
+    currency,
+    currencySource,
     date: dateRead ? parseTradeDate(dateRead.value) : null,
     accountText,
     accountId,
@@ -417,6 +492,7 @@ export function parseTradeLinesTraced(
       commission: commission?.hit ?? null,
       date: dateRead?.hit ?? null,
       account: accountRead?.hit ?? null,
+      currency: marker?.hit ?? null,
     },
   };
 }
@@ -424,8 +500,9 @@ export function parseTradeLinesTraced(
 export function parseTradeLines(
   definition: ReceiptTradeDefinition,
   lines: readonly string[],
+  options: TradeReadOptions = {},
 ): ParsedTrade {
-  return parseTradeLinesTraced(definition, lines).trade;
+  return parseTradeLinesTraced(definition, lines, options).trade;
 }
 
 /**

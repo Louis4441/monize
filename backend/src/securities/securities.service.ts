@@ -1,4 +1,3 @@
-import { escapeLikePattern } from "../transactions/transaction-search.util";
 import {
   Inject,
   Injectable,
@@ -14,6 +13,7 @@ import { DataSource, EntityManager, In } from "typeorm";
 import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
 import { returnedRows } from "../common/db/query-result";
+import { findTradeListings } from "./trade-listings";
 import { Security } from "./entities/security.entity";
 import { SecurityTag } from "./entities/security-tag.entity";
 import { Holding } from "./entities/holding.entity";
@@ -1504,7 +1504,9 @@ export class SecuritiesService {
    * while they all trade in its currency (the same instrument on several
    * venues); `AAPL` in USD beside `AAPL.TO` in CAD is two instruments the email
    * cannot tell apart, so the one this account already trades decides, and
-   * otherwise they are `candidates`, never a guess. A trade written to the
+   * otherwise they are `candidates`, never a guess. A `currency` the email
+   * names narrows the listings first (`SHOP` in USD beside `SHOP.TO` in CAD
+   * is the USD one for an email in US$). A trade written to the
    * wrong security is a wrong ledger, so the loose matching
    * `resolveBySymbolOrName` does for a person typing in chat is not used here.
    */
@@ -1512,22 +1514,20 @@ export class SecuritiesService {
     userId: string,
     ticker: string,
     accountId?: string,
+    currency?: string | null,
   ): Promise<SecurityMatchResult> {
     const symbol = (ticker ?? "").trim();
     if (!symbol) return { match: null, candidates: [] };
     return withScopedDb(this.dataSource, async (m) => {
-      const rows = await m
-        .getRepository(Security)
-        .createQueryBuilder("security")
-        .where("security.userId = :userId", { userId })
-        .andWhere("security.isActive = true")
-        .andWhere(
-          "(LOWER(security.symbol) = LOWER(:symbol) OR LOWER(security.symbol) LIKE LOWER(:suffixed))",
-          { symbol, suffixed: `${escapeLikePattern(symbol)}.%` },
-        )
-        .orderBy("security.symbol", "ASC")
-        .take(10)
-        .getMany();
+      const listed = await findTradeListings(m, userId, symbol);
+      const inCurrency = currency
+        ? listed.filter(
+            (row) => row.currencyCode.toUpperCase() === currency.toUpperCase(),
+          )
+        : [];
+      // A currency no listing trades in narrows nothing: the card then
+      // refuses the mismatch by name rather than reporting no security.
+      const rows = inCurrency.length > 0 ? inCurrency : listed;
       if (rows.length === 1) return { match: rows[0], candidates: [] };
       const exact = rows.filter(
         (row) => row.symbol.toLowerCase() === symbol.toLowerCase(),

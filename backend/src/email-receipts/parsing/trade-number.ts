@@ -111,11 +111,30 @@ const SYMBOL_CURRENCY: Readonly<Record<string, string>> = {
 };
 
 /**
- * The currency an amount names, when it names one unambiguously: a 3-letter
- * code ("USD 2,000.00", "2 000,00 CAD") or a symbol only one currency uses.
- * A bare `$` names no currency (it is the CAD and the USD sign alike).
+ * The dollar signs that say whose dollar they are ("US$2,000.00", "C$ 26.32").
+ * Read before the 3-letter codes, so "CDN$" is CAD rather than a code "CDN".
+ */
+const PREFIXED_DOLLAR: Readonly<Record<string, string>> = {
+  US: "USD",
+  C: "CAD",
+  CA: "CAD",
+  CAD: "CAD",
+  CDN: "CAD",
+  A: "AUD",
+  AU: "AUD",
+  NZ: "NZD",
+  HK: "HKD",
+};
+
+/**
+ * The currency an amount names, when it names one unambiguously: a dollar
+ * sign with its country prefix ("US$", "C$", "CDN$"), a 3-letter code
+ * ("USD 2,000.00", "2 000,00 CAD") or a symbol only one currency uses. A bare
+ * `$` names no currency (it is the CAD and the USD sign alike).
  */
 export function tradeAmountCurrency(text: string): string | null {
+  const dollar = /(?:^|[^A-Za-z])([A-Z]{1,3})\s?\$/.exec(text);
+  if (dollar && PREFIXED_DOLLAR[dollar[1]]) return PREFIXED_DOLLAR[dollar[1]];
   const code = /(?:^|[^A-Za-z])([A-Z]{3})(?:[^A-Za-z]|$)/.exec(text);
   if (code) return code[1];
   for (const [symbol, currency] of Object.entries(SYMBOL_CURRENCY)) {

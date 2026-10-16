@@ -15,7 +15,6 @@ import {
   receiptOutcome,
   type ReceiptOutcome,
 } from "../parsing/parse-receipt";
-import { parseTradeLinesTraced } from "../parsing/parse-trade";
 import {
   resolveMatchConfig,
   type ResolvedMatchConfig,
@@ -29,6 +28,7 @@ import type {
 } from "../parsing/receipt-parser.types";
 import { loadReceiptCandidates } from "../pipeline/receipt-candidates";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
+import { readTradeEmail } from "../pipeline/trade-reading";
 
 const MONEY_UNITS = 10_000;
 
@@ -113,7 +113,7 @@ export async function dryRunReceipt(
   payee: DryRunPayee | null,
 ): Promise<ReceiptDryRun> {
   if (definition.trade) {
-    return dryRunTrade(definition, definition.trade, receipt);
+    return dryRunTrade(m, userId, definition, definition.trade, receipt);
   }
   // The lines of the source the definition chose (`text` or `html`); the trace's
   // line numbers refer to them. `no_html`: it reads HTML, the email has none.
@@ -162,14 +162,16 @@ export async function dryRunReceipt(
  * and nothing is matched, because a trade creates a transaction rather than
  * finding one. Reads only.
  */
-function dryRunTrade(
+async function dryRunTrade(
+  m: EntityManager,
+  userId: string,
   definition: ReceiptParserDefinition,
   trade: NonNullable<ReceiptParserDefinition["trade"]>,
   receipt: DryRunReceipt,
-): ReceiptDryRun {
+): Promise<ReceiptDryRun> {
   const lines = new ReceiptSourceLines(receipt).forSource(definition.source);
   const effectiveDate = effectiveReceiptDate(receipt);
-  const read = parseTradeLinesTraced(trade, lines ?? []);
+  const read = await readTradeEmail(m, userId, trade, lines ?? []);
   return {
     parsed: EMPTY_PARSED,
     trace: EMPTY_TRACE,

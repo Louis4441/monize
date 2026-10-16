@@ -73,7 +73,7 @@ export interface ParserPreviewItem {
     date: string;
     /** The amount paid, else the total; null when the email states neither. */
     total: number | null;
-    /** The currency of the expected or matched transaction; null when there is neither. */
+    /** The currency of the expected or matched transaction, or the one a trade's reading decided; null when there is none. */
     currency: string | null;
     lineCount: number;
   } | null;
@@ -84,6 +84,9 @@ export interface ParserPreviewItem {
     quantity: number | null;
     /** Shares times price agrees with the total; null when the email states no price. */
     consistent: boolean | null;
+    /** The account the rules chose, so two accounts printed alike can be checked apart. */
+    accountId: string | null;
+    currency: string | null;
   } | null;
   match: { transactionId: string; summary: string } | null;
   expected: { transactionId: string; summary: string } | null;
@@ -390,7 +393,7 @@ export class EmailReceiptParserPreviewService {
                 : paid === null
                   ? null
                   : roundMoney(paid / MONEY_UNITS),
-            currency: expected?.currencyCode ?? null,
+            currency: tradeRead?.currency ?? expected?.currencyCode ?? null,
             lineCount: parsed.items.length,
           }
         : null,
@@ -400,6 +403,8 @@ export class EmailReceiptParserPreviewService {
             symbol: tradeRead.symbol,
             quantity: tradeRead.quantity,
             consistent: tradeRead.consistent,
+            accountId: tradeRead.accountId,
+            currency: tradeRead.currency ?? null,
           }
         : null,
       match: run.hit

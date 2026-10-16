@@ -165,12 +165,21 @@ describe("EmailReceiptParserToolsService.listCategories", () => {
 
   it("lists the user's open investment accounts, cash accounts apart, for a trade profile's account rules", async () => {
     const { service, manager } = setup();
-    manager.query.mockResolvedValue([{ id: "acc-1", name: "RRSP" }]);
+    manager.query.mockResolvedValue([
+      { id: "acc-1", name: "RRSP", currencyCode: "CAD" },
+      { id: "acc-2", name: "RRSP USD", currencyCode: "USD" },
+    ]);
 
     const result = await service.listCategories(USER);
 
-    expect(result.investmentAccounts).toEqual([{ id: "acc-1", name: "RRSP" }]);
+    // The currency lets an agent write one rule per currency for accounts the
+    // broker prints alike.
+    expect(result.investmentAccounts).toEqual([
+      { id: "acc-1", name: "RRSP", currencyCode: "CAD" },
+      { id: "acc-2", name: "RRSP USD", currencyCode: "USD" },
+    ]);
     const [sql, params] = manager.query.mock.calls[0];
+    expect(String(sql)).toContain('currency_code AS "currencyCode"');
     expect(String(sql)).toContain("account_type = 'INVESTMENT'");
     expect(String(sql)).toContain("IS DISTINCT FROM 'INVESTMENT_CASH'");
     expect(String(sql)).toContain("is_closed = false");
@@ -955,6 +964,7 @@ describe("EmailReceiptParserToolsService.testDefinition of a trade profile", () 
       price: 26.32,
       commission: null,
       currency: null,
+      currencySource: null,
       date: "2026-10-15",
       accountText: "RRSP",
       accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,

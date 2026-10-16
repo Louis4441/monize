@@ -4,7 +4,7 @@ import {
   parseTradeLines,
   parseTradeLinesTraced,
   parseTradeQuantity,
-  resolveTradeAccountId,
+  resolveTradeAccount,
   tradeIsConsistent,
 } from "./parse-trade";
 import { normalizeReceiptLines } from "./receipt-lines";
@@ -31,6 +31,7 @@ describe("parseTradeLines", () => {
       price: 263_200,
       commission: null,
       currency: null,
+      currencySource: null,
       date: "2026-10-15",
       accountText: "RRSP",
       accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
@@ -321,15 +322,16 @@ describe("trade value readers", () => {
   });
 
   it("falls back to the default account without an account text", () => {
+    const account = (
+      definition: Parameters<typeof resolveTradeAccount>[0],
+      text: string | null,
+    ) => resolveTradeAccount(definition, text, null).accountId;
     expect(
-      resolveTradeAccountId(
-        { defaultAccountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID },
-        null,
-      ),
+      account({ defaultAccountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID }, null),
     ).toBe(WEALTHSIMPLE_RRSP_ACCOUNT_ID);
-    expect(resolveTradeAccountId({}, "RRSP")).toBeNull();
+    expect(account({}, "RRSP")).toBeNull();
     expect(
-      resolveTradeAccountId(
+      account(
         {
           accountRules: [
             { match: "RRSP", accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID },
@@ -339,6 +341,130 @@ describe("trade value readers", () => {
         "Margin",
       ),
     ).toBeNull();
+  });
+});
+
+describe("choosing between accounts the broker prints alike, by currency", () => {
+  const RRSP_USD = "33333333-3333-4333-8333-333333333333";
+  const byCurrency: ReceiptTradeDefinition = {
+    ...trade,
+    accountRules: [
+      { match: "RRSP", currency: "USD", accountId: RRSP_USD },
+      {
+        match: "RRSP",
+        currency: "CAD",
+        accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+      },
+      { match: "TFSA", accountId: WEALTHSIMPLE_TFSA_ACCOUNT_ID },
+    ],
+  };
+
+  it("takes the rule of the currency the amounts name", () => {
+    const usd = WEALTHSIMPLE_BUY_BODY.replace(
+      "Total cost: $2,000.00",
+      "Total cost: US$2,000.00",
+    );
+    const parsed = parseTradeLines(byCurrency, lines(usd));
+    expect(parsed).toMatchObject({
+      accountId: RRSP_USD,
+      currency: "USD",
+      currencySource: "amount",
+      complete: true,
+    });
+  });
+
+  it("reads a dollar sign's country prefix as its currency", () => {
+    for (const [text, code] of [
+      ["US$2,000.00", "USD"],
+      ["C$ 2,000.00", "CAD"],
+      ["CDN$2,000.00", "CAD"],
+      ["CA$2,000.00", "CAD"],
+      ["$2,000.00 CAD", "CAD"],
+    ]) {
+      const body = WEALTHSIMPLE_BUY_BODY.replace("$2,000.00", text);
+      expect(parseTradeLines(trade, lines(body)).currency).toBe(code);
+    }
+  });
+
+  it("takes a currency marker's currency when the amounts name none", () => {
+    const definition: ReceiptTradeDefinition = {
+      ...byCurrency,
+      currencyMarkers: [{ match: "*U.S. dollars*", currency: "USD" }],
+    };
+    const body = `${WEALTHSIMPLE_BUY_BODY}\nAmounts are in U.S. dollars.`;
+    const traced = parseTradeLinesTraced(definition, lines(body));
+    expect(traced.trade).toMatchObject({
+      accountId: RRSP_USD,
+      currency: "USD",
+      currencySource: "marker",
+    });
+    expect(traced.trace.currency).toMatchObject({
+      entry: 0,
+      pattern: "*U.S. dollars*",
+      line: { text: "Amounts are in U.S. dollars." },
+    });
+  });
+
+  it("prefers the amounts' currency over a marker", () => {
+    const definition: ReceiptTradeDefinition = {
+      ...byCurrency,
+      currencyMarkers: [{ match: "*Account*", currency: "USD" }],
+    };
+    const body = WEALTHSIMPLE_BUY_BODY.replace("$2,000.00", "CAD 2,000.00");
+    expect(parseTradeLines(definition, lines(body))).toMatchObject({
+      accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+      currency: "CAD",
+      currencySource: "amount",
+    });
+  });
+
+  it("falls back to the security's currency, and never guesses without one", () => {
+    expect(
+      parseTradeLines(byCurrency, lines(WEALTHSIMPLE_BUY_BODY), {
+        securityCurrency: "cad",
+      }),
+    ).toMatchObject({
+      accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+      currency: "CAD",
+      currencySource: "security",
+      complete: true,
+    });
+    expect(
+      parseTradeLines(byCurrency, lines(WEALTHSIMPLE_BUY_BODY)),
+    ).toMatchObject({
+      accountId: null,
+      currency: null,
+      complete: false,
+      reason: "trade_no_currency",
+    });
+  });
+
+  it("skips a rule of another currency, and needs no currency for a rule of any", () => {
+    expect(resolveTradeAccount(byCurrency, "RRSP", "EUR")).toEqual({
+      accountId: null,
+      needsCurrency: false,
+    });
+    expect(resolveTradeAccount(byCurrency, "TFSA", null)).toEqual({
+      accountId: WEALTHSIMPLE_TFSA_ACCOUNT_ID,
+      needsCurrency: false,
+    });
+  });
+
+  it("matches a * rule when the email prints no account", () => {
+    const rules = {
+      accountRules: [
+        { match: "*", currency: "USD", accountId: RRSP_USD },
+        { match: "*", accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID },
+      ],
+    };
+    expect(resolveTradeAccount(rules, null, "USD").accountId).toBe(RRSP_USD);
+    expect(resolveTradeAccount(rules, null, "CAD").accountId).toBe(
+      WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+    );
+    expect(resolveTradeAccount(rules, null, null)).toEqual({
+      accountId: null,
+      needsCurrency: true,
+    });
   });
 });
 
@@ -396,6 +522,54 @@ describe("validating a trade profile", () => {
         "trade.accountRules[0].extra:unknown_key",
       ]),
     );
+  });
+
+  it("accepts currency rules and markers without account entries", () => {
+    const input = valid();
+    const section = input.trade as Record<string, unknown>;
+    delete section.account;
+    section.accountRules = [
+      { match: "*", currency: "USD", accountId: WEALTHSIMPLE_TFSA_ACCOUNT_ID },
+    ];
+    section.currencyMarkers = [{ match: "*US$*", currency: "USD" }];
+    const result = validateReceiptParserDefinition(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.definition.trade?.accountRules?.[0].currency).toBe("USD");
+      expect(result.definition.trade?.currencyMarkers).toEqual([
+        { match: "*US$*", currency: "USD" },
+      ]);
+    }
+  });
+
+  it("refuses a malformed currency, a marker with a capture and too many markers", () => {
+    const input = valid();
+    const section = input.trade as Record<string, unknown>;
+    section.accountRules = [
+      {
+        match: "RRSP",
+        currency: "usd",
+        accountId: WEALTHSIMPLE_TFSA_ACCOUNT_ID,
+      },
+    ];
+    section.currencyMarkers = [
+      { match: "*{x}*", currency: "USD" },
+      { match: "*US$*", currency: "US", extra: true },
+    ];
+    expect(codes(input)).toEqual(
+      expect.arrayContaining([
+        "trade.accountRules[0].currency:invalid_currency",
+        "trade.currencyMarkers[0].match:capture_not_allowed",
+        "trade.currencyMarkers[1].currency:invalid_currency",
+        "trade.currencyMarkers[1].extra:unknown_key",
+      ]),
+    );
+    section.accountRules = [];
+    section.currencyMarkers = Array.from({ length: 21 }, () => ({
+      match: "*US$*",
+      currency: "USD",
+    }));
+    expect(codes(input)).toContain("trade.currencyMarkers:too_many");
   });
 
   it("refuses the wrong capture in a field", () => {
