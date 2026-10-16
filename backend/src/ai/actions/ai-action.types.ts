@@ -995,6 +995,8 @@ export interface AiActionPreview {
   bondSeriesCode?: string | null;
   /** create_investment_transaction: the bill or deposit that approving this marks paid. */
   scheduledName?: string | null;
+  /** create_investment_transaction: the due date of the occurrence it marks paid (`YYYY-MM-DD`). */
+  scheduledDueDate?: string | null;
   /** REDEEM of a bond-linked security: the redemption split the card shows. */
   bondRedemptionSplit?: BondRedemptionSplitPreview | null;
   // create_security display fields (symbol/securityName/securityCurrency above

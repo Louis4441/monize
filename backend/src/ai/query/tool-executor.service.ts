@@ -1114,14 +1114,7 @@ export class ToolExecutorService {
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const operation = input.operation as
-      "list" | "create" | "update" | "delete";
-    if (operation === "list") {
-      return this.listSecuritiesInAccount(
-        userId,
-        input.accountName as string | undefined,
-      );
-    }
+    const operation = input.operation as "create" | "update" | "delete";
     const items = (input.items as Array<Record<string, unknown>>) ?? [];
     if (items.length === 0) {
       return this.toolError(`${operation} needs 1-25 items.`);

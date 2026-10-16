@@ -572,7 +572,12 @@ export class AiActionBuilderService {
         accruedInterest: preview.accruedInterest,
         bondSeriesCode: preview.bondSeriesCode,
         bondRedemptionSplit: preview.redemptionSplit,
-        ...(options.scheduled ? { scheduledName: options.scheduled.name } : {}),
+        ...(options.scheduled
+          ? {
+              scheduledName: options.scheduled.name,
+              scheduledDueDate: options.scheduled.dueDate,
+            }
+          : {}),
       },
     };
   }

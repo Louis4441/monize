@@ -177,6 +177,16 @@ export class DraftParserWithAiDto {
   @ArrayUnique()
   @IsUUID("all", { each: true })
   receiptIds: string[];
+
+  @ApiPropertyOptional({
+    enum: ["receipt", "trade"],
+    default: "receipt",
+    description:
+      "trade: the emails are brokerage trade confirmations and the parser to write is a trade profile.",
+  })
+  @IsOptional()
+  @IsIn(["receipt", "trade"])
+  kind?: "receipt" | "trade";
 }
 
 /** An email and the transaction a person says it paid for (the wizard's sample pair). */

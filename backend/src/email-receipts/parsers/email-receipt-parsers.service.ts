@@ -34,7 +34,10 @@ import {
   validateReceiptParserDefinition,
 } from "../parsing/receipt-parser.validation";
 import { isReceiptDomain } from "./dto/receipt-domain.validator";
-import { RECEIPT_PARSER_DRAFT_INSTRUCTION } from "./parser-draft-instruction";
+import {
+  RECEIPT_PARSER_DRAFT_INSTRUCTION,
+  RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION,
+} from "./parser-draft-instruction";
 import {
   ApproveEmailReceiptParserDto,
   CreateEmailReceiptParserDto,
@@ -284,6 +287,7 @@ export class EmailReceiptParsersService {
   async requestAiDraft(
     userId: string,
     receiptIds: readonly string[],
+    kind: "receipt" | "trade" = "receipt",
   ): Promise<ParserDraftRequestResult> {
     return withScopedDb(this.dataSource, async (m) => {
       const rows = await m.getRepository(EmailReceipt).find({
@@ -316,7 +320,10 @@ export class EmailReceiptParsersService {
       const request = await this.requests.enqueueParserDraft(m, userId, {
         emailReceiptIds: receiptIds,
         parserDomain: domain,
-        instruction: RECEIPT_PARSER_DRAFT_INSTRUCTION,
+        instruction:
+          kind === "trade"
+            ? RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION
+            : RECEIPT_PARSER_DRAFT_INSTRUCTION,
       });
       return { ok: true as const, requestId: request.id };
     });

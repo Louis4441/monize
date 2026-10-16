@@ -13,7 +13,10 @@ import {
   EmailReceiptParsersService,
   MAX_PARSERS_PER_USER,
 } from "./email-receipt-parsers.service";
-import { RECEIPT_PARSER_DRAFT_INSTRUCTION } from "./parser-draft-instruction";
+import {
+  RECEIPT_PARSER_DRAFT_INSTRUCTION,
+  RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION,
+} from "./parser-draft-instruction";
 
 jest.mock("../../common/db/scoped-db", () =>
   jest
@@ -565,6 +568,19 @@ describe("EmailReceiptParsersService.requestAiDraft", () => {
     });
     // the emails are read through the user's own scope
     expect(receiptRepo.find.mock.calls[0][0].where.userId).toBe(USER);
+  });
+
+  it("asks for a trade profile when the emails are trade confirmations", async () => {
+    const { service, receiptRepo, requests } = setup();
+    receiptRepo.find.mockResolvedValue([row(R1, "broker.example.com")]);
+    requests.enqueueParserDraft.mockResolvedValue({ id: "req-1" });
+
+    await service.requestAiDraft(USER, [R1], "trade");
+
+    const { instruction } = requests.enqueueParserDraft.mock.calls[0][2];
+    expect(instruction).toBe(RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION);
+    expect(instruction.length).toBeLessThanOrEqual(1000);
+    expect(instruction).toContain("accountRules");
   });
 
   it("files a mixed selection under the most common sender", async () => {
