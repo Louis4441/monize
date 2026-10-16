@@ -222,6 +222,29 @@ describe("importFiles", () => {
     expect(result.files[0].stored).toBe(1);
   });
 
+  it("stores the rows and does not process them with process: false", async () => {
+    const h = setup();
+    const result = await h.service.importFiles(
+      USER,
+      [{ originalname: "order.eml", buffer: eml("<m1@x.test>") }],
+      { process: false },
+    );
+    expect(result).toMatchObject({ processed: 0, busy: false });
+    expect(result.files[0].stored).toBe(1);
+    expect(h.poll.processStoredNow).not.toHaveBeenCalled();
+  });
+
+  it("processes with process: true as by default", async () => {
+    const h = setup();
+    const result = await h.service.importFiles(
+      USER,
+      [{ originalname: "order.eml", buffer: eml("<m1@x.test>") }],
+      { process: true },
+    );
+    expect(result).toMatchObject({ processed: 2, busy: false });
+    expect(h.poll.processStoredNow).toHaveBeenCalledWith(USER);
+  });
+
   it("is a 404 with no mailbox, before any file is read", async () => {
     const h = setup();
     h.mailbox.getView.mockResolvedValue(null);

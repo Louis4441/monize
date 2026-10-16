@@ -35,6 +35,16 @@ describe('emailReceiptsApi', () => {
       expect(client.put).toHaveBeenCalledWith('/email-receipts/mailbox', payload);
     });
 
+    it('uploads files to /import, with process=false only when asked', async () => {
+      client.post.mockResolvedValue({ data: { files: [], truncated: 0, processed: 0, busy: false } });
+      const file = new File(['x'], 'a.eml');
+      await emailReceiptsApi.mailbox.import([file]);
+      expect(client.post.mock.calls.at(-1)?.[0]).toBe('/email-receipts/mailbox/import');
+      expect(client.post.mock.calls.at(-1)?.[2]).not.toHaveProperty('params');
+      await emailReceiptsApi.mailbox.import([file], { process: false });
+      expect(client.post.mock.calls.at(-1)?.[2]).toMatchObject({ params: { process: 'false' } });
+    });
+
     it('changes settings with a PATCH to /settings', async () => {
       client.patch.mockResolvedValue({ data: { id: 'mb-1', enabled: false } });
       await emailReceiptsApi.mailbox.updateSettings({ enabled: false });

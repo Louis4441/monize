@@ -11,11 +11,15 @@ import type { UploadPart } from "./upload-plan";
 import type {
   EmailReceiptImportFileResult,
   EmailReceiptImportResult,
+  ProcessEmailReceiptsResult,
 } from "@/types/email-receipts";
 
-const api = vi.hoisted(() => ({ importFiles: vi.fn() }));
+const api = vi.hoisted(() => ({ importFiles: vi.fn(), processBatch: vi.fn() }));
 vi.mock("@/lib/email-receipts-api", () => ({
-  emailReceiptsApi: { mailbox: { import: api.importFiles } },
+  emailReceiptsApi: {
+    mailbox: { import: api.importFiles },
+    receipts: { processBatch: api.processBatch },
+  },
 }));
 
 function part(
@@ -55,8 +59,23 @@ const tooMany = (headers?: Record<string, string>) => ({
 });
 const noSleep = () => vi.fn(async (_ms: number, _signal?: AbortSignal) => {});
 
+const batch = (
+  o: Partial<ProcessEmailReceiptsResult> = {},
+): ProcessEmailReceiptsResult => ({
+  processed: 0,
+  byOutcome: {},
+  failed: 0,
+  remaining: 0,
+  since: "T",
+  ...o,
+});
+
 describe("runImport", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.processBatch.mockReset();
+    api.processBatch.mockResolvedValue(batch());
+  });
 
   it("sends the requests in order and sums the entries under the origin name", async () => {
     api.importFiles
@@ -121,8 +140,13 @@ describe("runImport", () => {
       entry("m.eml", { format: "eml", messages: 1 }),
     ]);
     expect(out.result.truncated).toBe(4);
-    expect(out.result.processed).toBe(6);
-    expect(out.result.busy).toBe(true);
+    // The requests only store; what the server answered for processing is not summed.
+    expect(out.result.processed).toBe(0);
+    expect(out.result.busy).toBe(false);
+    expect(api.importFiles.mock.calls.map((c) => c[1])).toEqual([
+      { process: false },
+      { process: false },
+    ]);
   });
 
   it("falls back to the returned names when the server answers a different number of files", async () => {
@@ -136,6 +160,7 @@ describe("runImport", () => {
   it("returns an empty result for no requests", async () => {
     const out = await runImport([]);
     expect(out).toMatchObject({ status: "complete", completed: 0, total: 0 });
+    expect(api.processBatch).not.toHaveBeenCalled();
     expect(out.result).toEqual({
       files: [],
       truncated: 0,
@@ -234,6 +259,142 @@ describe("runImport", () => {
     });
     expect(out.status).toBe("cancelled");
     expect(api.importFiles).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("runImport processing", () => {
+  const one = [[part("a.eml", "a.eml")]];
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.processBatch.mockReset();
+    api.importFiles.mockResolvedValue(
+      response([entry("a.eml", { stored: 3 })], { processed: 9, busy: true }),
+    );
+  });
+
+  it("processes only pending emails after the last upload, 100 at a time, passing since back until none remain", async () => {
+    api.processBatch
+      .mockResolvedValueOnce(
+        batch({ processed: 100, failed: 1, remaining: 50, since: "S1" }),
+      )
+      .mockResolvedValueOnce(
+        batch({ processed: 49, remaining: 0, since: "S1" }),
+      );
+    const progress: Array<[number, number]> = [];
+    const out = await runImport([...one, ...one], {
+      onProcessProgress: (d, t) => progress.push([d, t]),
+    });
+
+    expect(api.importFiles).toHaveBeenCalledTimes(2);
+    expect(api.processBatch.mock.calls).toEqual([
+      [{ statuses: ["pending"], limit: 100 }],
+      [{ statuses: ["pending"], limit: 100, since: "S1" }],
+    ]);
+    // Processing starts only after the last upload request.
+    expect(api.importFiles.mock.invocationCallOrder[1]).toBeLessThan(
+      api.processBatch.mock.invocationCallOrder[0],
+    );
+    expect(progress).toEqual([
+      [101, 151],
+      [150, 150],
+    ]);
+    expect(out.status).toBe("complete");
+    expect(out.processing).toEqual({
+      processed: 149,
+      failed: 1,
+      pendingLeft: 0,
+    });
+  });
+
+  it("stops a run that touched nothing while emails remain", async () => {
+    api.processBatch.mockResolvedValue(batch({ remaining: 4 }));
+    const out = await runImport(one);
+    expect(api.processBatch).toHaveBeenCalledTimes(1);
+    expect(out.processing).toEqual({ processed: 0, failed: 0, pendingLeft: 4 });
+  });
+
+  it("does not process after a failed or cancelled upload", async () => {
+    api.importFiles.mockRejectedValueOnce({ response: { status: 500 } });
+    const failed = await runImport(one);
+    expect(failed.status).toBe("failed");
+
+    const controller = new AbortController();
+    controller.abort();
+    const cancelled = await runImport(one, { signal: controller.signal });
+    expect(cancelled.status).toBe("cancelled");
+    expect(api.processBatch).not.toHaveBeenCalled();
+    expect(cancelled.processing).toEqual({
+      processed: 0,
+      failed: 0,
+      pendingLeft: 0,
+    });
+  });
+
+  it("keeps what was processed and reports the rest as waiting when cancelled between calls", async () => {
+    const controller = new AbortController();
+    api.processBatch.mockImplementationOnce(async () => {
+      controller.abort();
+      return batch({ processed: 100, remaining: 40, since: "S1" });
+    });
+    const out = await runImport(one, { signal: controller.signal });
+    expect(out.status).toBe("cancelled");
+    expect(api.processBatch).toHaveBeenCalledTimes(1);
+    expect(out.processing).toEqual({
+      processed: 100,
+      failed: 0,
+      pendingLeft: 40,
+    });
+  });
+
+  it("reports the stored count as waiting when cancelled before the first processing call", async () => {
+    const controller = new AbortController();
+    api.importFiles.mockImplementationOnce(async () => {
+      controller.abort();
+      return response([entry("a.eml", { stored: 3 })]);
+    });
+    const out = await runImport(one, { signal: controller.signal });
+    expect(out.status).toBe("cancelled");
+    expect(api.processBatch).not.toHaveBeenCalled();
+    expect(out.processing.pendingLeft).toBe(3);
+  });
+
+  it("waits and retries a 429 from the processing call", async () => {
+    api.processBatch
+      .mockRejectedValueOnce(tooMany({ "retry-after": "2" }))
+      .mockResolvedValueOnce(batch({ processed: 3 }));
+    const sleep = noSleep();
+    const out = await runImport(one, { sleep });
+    expect(sleep.mock.calls[0][0]).toBe(2000);
+    expect(api.processBatch).toHaveBeenCalledTimes(2);
+    expect(out.status).toBe("complete");
+    expect(out.processing.processed).toBe(3);
+  });
+
+  it("cancels during the wait after a processing 429, keeping the stored count as waiting", async () => {
+    const controller = new AbortController();
+    api.processBatch.mockRejectedValue(tooMany());
+    const sleep = vi.fn(async () => controller.abort());
+    const out = await runImport(one, { sleep, signal: controller.signal });
+    expect(out.status).toBe("cancelled");
+    expect(api.processBatch).toHaveBeenCalledTimes(1);
+    expect(out.processing).toEqual({ processed: 0, failed: 0, pendingLeft: 3 });
+  });
+
+  it("fails with the error and what was processed when a processing call fails", async () => {
+    const failure = { response: { status: 500 } };
+    api.processBatch
+      .mockResolvedValueOnce(batch({ processed: 100, remaining: 20 }))
+      .mockRejectedValueOnce(failure);
+    const out = await runImport(one);
+    expect(out.status).toBe("failed");
+    expect(out.error).toBe(failure);
+    expect(out.completed).toBe(1);
+    expect(out.processing).toEqual({
+      processed: 100,
+      failed: 0,
+      pendingLeft: 20,
+    });
+    expect(out.result.files[0]).toMatchObject({ stored: 3 });
   });
 });
 

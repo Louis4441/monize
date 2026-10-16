@@ -146,6 +146,7 @@ export class EmailReceiptImportService {
   async importFiles(
     userId: string,
     files: readonly ImportFileInput[],
+    options: { process?: boolean } = {},
   ): Promise<EmailReceiptImportResult> {
     const view = await this.mailbox.getView(userId);
     if (!view) {
@@ -189,7 +190,13 @@ export class EmailReceiptImportService {
           (rows.length === 0 && found.ignoredEntries === 0 ? "empty" : null),
       });
     }
-    const { processed, busy } = await this.poll.processStoredNow(userId);
+    // `process: false`: the caller (the browser, after the last part of an
+    // archive) processes the stored rows itself, so one request never counts
+    // or processes rows of another request or of the rest of the mailbox.
+    const { processed, busy } =
+      options.process === false
+        ? { processed: 0, busy: false }
+        : await this.poll.processStoredNow(userId);
     return { files: results, truncated: state.truncated, processed, busy };
   }
 

@@ -92,12 +92,18 @@ export const emailReceiptsApi = {
      * 25 MB each). Each file is answered on its own: a refused one carries an
      * `error` and the rest are still read. The multipart header replaces the
      * client's JSON default, as in the other uploads; axios adds the boundary.
+     * `process: false` only stores the emails (the answer has `processed` 0); the
+     * caller processes them afterwards with `receipts.processBatch`.
      */
-    import: async (files: readonly File[]): Promise<EmailReceiptImportResult> => {
+    import: async (
+      files: readonly File[],
+      options: { process?: boolean } = {},
+    ): Promise<EmailReceiptImportResult> => {
       const formData = new FormData();
       for (const file of files) formData.append('files', file);
       const response = await apiClient.post<EmailReceiptImportResult>(`${MAILBOX}/import`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        ...(options.process === undefined ? {} : { params: { process: String(options.process) } }),
         timeout: 180_000,
       });
       return response.data;

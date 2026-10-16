@@ -3,13 +3,17 @@
 import { useTranslations } from "next-intl";
 import { useNumberFormat } from "@/hooks/useNumberFormat";
 import type { PlanNote } from "@/lib/email-import/build-plan";
-import type { ImportRunStatus } from "@/lib/email-import/run-import";
+import type {
+  ImportProcessing,
+  ImportRunStatus,
+} from "@/lib/email-import/run-import";
 import { PART_MAX_BYTES } from "@/lib/email-import/upload-plan";
 import type { EmailReceiptImportResult } from "@/types/email-receipts";
 
 interface Props {
   result: EmailReceiptImportResult;
   notes: readonly PlanNote[];
+  processing: ImportProcessing;
   status: ImportRunStatus;
   /** Requests that succeeded, and how many the run had. */
   completed: number;
@@ -20,6 +24,7 @@ interface Props {
 export function MailboxImportResultView({
   result,
   notes,
+  processing,
   status,
   completed,
   total,
@@ -77,19 +82,32 @@ export function MailboxImportResultView({
           {t("result.truncated", { count: count(result.truncated) })}
         </p>
       )}
-      {status !== "complete" && (
+      {status === "failed" && completed === total ? (
         <p className="text-amber-700 dark:text-amber-400">
-          {t(status === "cancelled" ? "result.cancelled" : "result.stopped", {
-            done: count(completed),
-            total: count(total),
-          })}
+          {t("result.processingStopped")}
         </p>
+      ) : (
+        status !== "complete" && (
+          <p className="text-amber-700 dark:text-amber-400">
+            {t(status === "cancelled" ? "result.cancelled" : "result.stopped", {
+              done: count(completed),
+              total: count(total),
+            })}
+          </p>
+        )
       )}
       <p className="text-gray-700 dark:text-gray-300">
-        {t("result.summary", { processed: count(result.processed) })}
+        {t("result.summary", { processed: processing.processed })}
       </p>
-      {result.busy && (
-        <p className="text-amber-700 dark:text-amber-400">{t("result.busy")}</p>
+      {processing.pendingLeft > 0 && (
+        <p className="text-amber-700 dark:text-amber-400">
+          {t("result.pendingLeft", { count: processing.pendingLeft })}
+        </p>
+      )}
+      {processing.failed > 0 && (
+        <p className="text-amber-700 dark:text-amber-400">
+          {t("result.processFailed", { count: processing.failed })}
+        </p>
       )}
     </div>
   );

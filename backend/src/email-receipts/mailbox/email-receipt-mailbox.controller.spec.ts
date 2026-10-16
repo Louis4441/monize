@@ -132,15 +132,34 @@ describe("EmailReceiptMailboxController", () => {
       const files = [
         { originalname: "a.eml", buffer: Buffer.from("x") },
       ] as Express.Multer.File[];
-      await expect(controller.importArchive(req, files)).resolves.toBe(result);
-      expect(importer.importFiles).toHaveBeenCalledWith("user-1", files);
+      await expect(controller.importArchive(req, files, {})).resolves.toBe(
+        result,
+      );
+      expect(importer.importFiles).toHaveBeenCalledWith("user-1", files, {
+        process: true,
+      });
+    });
+
+    it("passes process=true and process=false to the service", async () => {
+      importer.importFiles.mockResolvedValue(result);
+      const files = [
+        { originalname: "a.eml", buffer: Buffer.from("x") },
+      ] as Express.Multer.File[];
+      await controller.importArchive(req, files, { process: "true" });
+      expect(importer.importFiles).toHaveBeenLastCalledWith("user-1", files, {
+        process: true,
+      });
+      await controller.importArchive(req, files, { process: "false" });
+      expect(importer.importFiles).toHaveBeenLastCalledWith("user-1", files, {
+        process: false,
+      });
     });
 
     it("refuses a request with no file, before the service is called", () => {
-      expect(() => controller.importArchive(req, undefined)).toThrow(
+      expect(() => controller.importArchive(req, undefined, {})).toThrow(
         BadRequestException,
       );
-      expect(() => controller.importArchive(req, [])).toThrow(
+      expect(() => controller.importArchive(req, [], {})).toThrow(
         BadRequestException,
       );
       expect(importer.importFiles).not.toHaveBeenCalled();

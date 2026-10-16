@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Request,
   UploadedFiles,
   UseGuards,
@@ -30,6 +31,7 @@ import {
   TestEmailReceiptMailboxDto,
   UpsertEmailReceiptMailboxDto,
 } from "./dto/upsert-email-receipt-mailbox.dto";
+import { ImportEmailReceiptsQueryDto } from "./dto/import-email-receipts-query.dto";
 import { UpdateEmailReceiptMailboxSettingsDto } from "./dto/update-email-receipt-mailbox-settings.dto";
 import { EmailReceiptImportService } from "../import/email-receipt-import.service";
 import {
@@ -130,7 +132,7 @@ export class EmailReceiptMailboxController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      "Import archived emails (.eml, .mbox, .msg, .zip) into my receipts mailbox, then process what is stored",
+      "Import archived emails (.eml, .mbox, .msg, .zip) into my receipts mailbox, then process what is stored (unless process=false)",
   })
   @ApiConsumes("multipart/form-data")
   @Throttle({ default: { ttl: 60000, limit: 30 } })
@@ -149,6 +151,7 @@ export class EmailReceiptMailboxController {
   importArchive(
     @Request() req: { user: { id: string } },
     @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Query() query: ImportEmailReceiptsQueryDto,
   ) {
     if (!files?.length) {
       throw new BadRequestException(
@@ -158,6 +161,8 @@ export class EmailReceiptMailboxController {
         ),
       );
     }
-    return this.importer.importFiles(req.user.id, files);
+    return this.importer.importFiles(req.user.id, files, {
+      process: query.process !== "false",
+    });
   }
 }

@@ -1,3 +1,5 @@
+import { notifyAiAction } from "@/lib/aiActionSignal";
+import { clearAllCache } from "@/lib/apiCache";
 import { emailReceiptsApi } from "@/lib/email-receipts-api";
 import type {
   EmailReceiptImportFileResult,
@@ -15,9 +17,21 @@ const MAX_RETRY_WAIT_MS = 120_000;
 
 export type ImportRunStatus = "complete" | "cancelled" | "failed";
 
+/** Rows processed after the last part was stored (`POST /email-receipts/process-batch`). */
+export interface ImportProcessing {
+  /** Emails the processing run took through the pipeline. */
+  processed: number;
+  /** Emails that raised an error and were passed over. */
+  failed: number;
+  /** Stored emails still waiting when the run stopped; 0 after a complete run. */
+  pendingLeft: number;
+}
+
 export interface ImportRunOutcome {
   /** Everything the requests that succeeded imported, summed under the selected file names. */
   result: EmailReceiptImportResult;
+  /** What processing the new emails did; all zero when the upload did not finish. */
+  processing: ImportProcessing;
   status: ImportRunStatus;
   /** The error that stopped the run; `null` unless `status` is `failed`. */
   error: unknown;
@@ -26,10 +40,15 @@ export interface ImportRunOutcome {
   total: number;
 }
 
+/** How many emails one process-batch call takes. */
+export const PROCESS_BATCH_LIMIT = 100;
+
 export interface ImportRunOptions {
   signal?: AbortSignal;
   /** Called with the number of finished requests, before the first and after each. */
   onProgress?: (done: number, total: number) => void;
+  /** Called after each processing call with the emails done so far and the total of this run. */
+  onProcessProgress?: (done: number, total: number) => void;
   /** Injectable for tests. Resolves after `ms`, or at once when `signal` aborts. */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
@@ -83,8 +102,6 @@ export function retryWaitMs(error: unknown): number {
 class ResultMerger {
   private readonly files = new Map<string, EmailReceiptImportFileResult>();
   private truncated = 0;
-  private processed = 0;
-  private busy = false;
 
   add(origin: string, entry: EmailReceiptImportFileResult): void {
     const known = this.files.get(origin);
@@ -118,16 +135,22 @@ class ResultMerger {
       this.add(origin, entry);
     });
     this.truncated += response.truncated;
-    this.processed += response.processed;
-    this.busy = this.busy || response.busy;
+  }
+
+  /** New rows the requests stored: what waits for processing before the first answer says more. */
+  storedTotal(): number {
+    let sum = 0;
+    for (const file of this.files.values()) sum += file.stored;
+    return sum;
   }
 
   result(): EmailReceiptImportResult {
     return {
       files: [...this.files.values()],
       truncated: this.truncated,
-      processed: this.processed,
-      busy: this.busy,
+      // The requests do not process (`process=false`); see `ImportRunOutcome.processing`.
+      processed: 0,
+      busy: false,
     };
   }
 }
@@ -136,72 +159,156 @@ function aborted(signal?: AbortSignal): boolean {
   return signal?.aborted === true;
 }
 
+type Attempt<T> =
+  | { ok: true; value: T }
+  | { ok: false; cancelled: boolean; error: unknown };
+
+/** One call; a 429 waits and retries, any other failure (or a cancel while waiting) ends it. */
+async function attemptWithRetries<T>(
+  call: () => Promise<T>,
+  signal: AbortSignal | undefined,
+  sleep: (ms: number, signal?: AbortSignal) => Promise<void>,
+): Promise<Attempt<T>> {
+  let attempt = 0;
+  for (;;) {
+    try {
+      return { ok: true, value: await call() };
+    } catch (error) {
+      if (!isRateLimited(error) || attempt >= MAX_RATE_LIMIT_RETRIES) {
+        return { ok: false, cancelled: false, error };
+      }
+      attempt += 1;
+      await sleep(retryWaitMs(error), signal);
+      if (aborted(signal)) return { ok: false, cancelled: true, error: null };
+    }
+  }
+}
+
+const NOTHING_PROCESSED: ImportProcessing = {
+  processed: 0,
+  failed: 0,
+  pendingLeft: 0,
+};
+
 /**
- * Sends the requests one after another and merges what each one imported. A 429
- * waits and retries; any other failure stops the run and returns what was already
- * imported, with the error. A cancel (the signal) is honoured between requests.
+ * Processes the emails the upload stored, `PROCESS_BATCH_LIMIT` at a time, passing
+ * `since` back until nothing is left (the server's own end of a run). Only `pending`
+ * emails: the ones the upload added, never a rematch of the rest of the mailbox.
+ */
+async function processPending(
+  signal: AbortSignal | undefined,
+  sleep: (ms: number, signal?: AbortSignal) => Promise<void>,
+  onProcessProgress: ImportRunOptions["onProcessProgress"],
+  stored: number,
+): Promise<{
+  processing: ImportProcessing;
+  status: ImportRunStatus;
+  error: unknown;
+}> {
+  const processing = { ...NOTHING_PROCESSED, pendingLeft: stored };
+  let since: string | undefined;
+  for (;;) {
+    if (aborted(signal))
+      return { processing, status: "cancelled", error: null };
+    const attempt = await attemptWithRetries(
+      () =>
+        emailReceiptsApi.receipts.processBatch({
+          statuses: ["pending"],
+          limit: PROCESS_BATCH_LIMIT,
+          ...(since ? { since } : {}),
+        }),
+      signal,
+      sleep,
+    );
+    if (!attempt.ok) {
+      return {
+        processing,
+        status: attempt.cancelled ? "cancelled" : "failed",
+        error: attempt.error,
+      };
+    }
+    const answer = attempt.value;
+    since = answer.since;
+    processing.processed += answer.processed;
+    processing.failed += answer.failed;
+    processing.pendingLeft = answer.remaining;
+    const done = processing.processed + processing.failed;
+    onProcessProgress?.(done, done + answer.remaining);
+    // A call that touched nothing ends the run, so a server that stopped making progress cannot loop it.
+    if (answer.remaining <= 0 || answer.processed + answer.failed === 0) {
+      return { processing, status: "complete", error: null };
+    }
+  }
+}
+
+/**
+ * Sends the requests one after another (each only stores: `process=false`) and
+ * merges what each one imported, then processes the new emails in one run of the
+ * bulk route. A 429 waits and retries; any other failure stops the run and returns
+ * what was already imported, with the error. A cancel (the signal) is honoured
+ * between requests and between processing calls.
  */
 export async function runImport(
   requests: readonly (readonly UploadPart[])[],
   options: ImportRunOptions = {},
 ): Promise<ImportRunOutcome> {
-  const { signal, onProgress, sleep = defaultSleep } = options;
+  const {
+    signal,
+    onProgress,
+    onProcessProgress,
+    sleep = defaultSleep,
+  } = options;
   const merger = new ResultMerger();
   const total = requests.length;
   let completed = 0;
   onProgress?.(0, total);
 
-  for (const parts of requests) {
-    if (aborted(signal)) {
-      return {
-        result: merger.result(),
-        status: "cancelled",
-        error: null,
-        completed,
-        total,
-      };
-    }
-    let attempt = 0;
-    for (;;) {
-      try {
-        const response = await emailReceiptsApi.mailbox.import(
-          parts.map((part) => part.file),
-        );
-        merger.addResponse(parts, response);
-        completed += 1;
-        onProgress?.(completed, total);
-        break;
-      } catch (error) {
-        if (!isRateLimited(error) || attempt >= MAX_RATE_LIMIT_RETRIES) {
-          return {
-            result: merger.result(),
-            status: "failed",
-            error,
-            completed,
-            total,
-          };
-        }
-        attempt += 1;
-        await sleep(retryWaitMs(error), signal);
-        if (aborted(signal)) {
-          return {
-            result: merger.result(),
-            status: "cancelled",
-            error: null,
-            completed,
-            total,
-          };
-        }
-      }
-    }
-  }
-  return {
+  const outcome = (
+    status: ImportRunStatus,
+    error: unknown,
+    processing: ImportProcessing = NOTHING_PROCESSED,
+  ): ImportRunOutcome => ({
     result: merger.result(),
-    status: "complete",
-    error: null,
+    processing,
+    status,
+    error,
     completed,
     total,
-  };
+  });
+
+  for (const parts of requests) {
+    if (aborted(signal)) return outcome("cancelled", null);
+    const attempt = await attemptWithRetries(
+      () =>
+        emailReceiptsApi.mailbox.import(
+          parts.map((part) => part.file),
+          { process: false },
+        ),
+      signal,
+      sleep,
+    );
+    if (!attempt.ok) {
+      return outcome(attempt.cancelled ? "cancelled" : "failed", attempt.error);
+    }
+    merger.addResponse(parts, attempt.value);
+    completed += 1;
+    onProgress?.(completed, total);
+  }
+
+  if (completed === 0) return outcome("complete", null);
+
+  const run = await processPending(
+    signal,
+    sleep,
+    onProcessProgress,
+    merger.storedTotal(),
+  );
+  // A run can apply what an email proposed, as "Process all" does.
+  if (run.processing.processed > 0) {
+    clearAllCache();
+    notifyAiAction();
+  }
+  return outcome(run.status, run.error, run.processing);
 }
 
 /**

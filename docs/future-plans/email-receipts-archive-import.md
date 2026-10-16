@@ -156,6 +156,13 @@ as they are (decision 4).
 4. **Requests** go one after another; each response's per-file counts are
    summed under the original file name. A 429 waits and retries (the backend
    throttle becomes 30 a minute, still bounded per request by decision 4); any
-   other failure stops the run and reports what was already imported.
+   other failure stops the run and reports what was already imported. Every
+   request is sent with `?process=false` (the server only stores the rows and
+   answers `processed: 0, busy: false`), so one request never processes or counts
+   rows of another request or of the rest of the mailbox. After the last request
+   the browser processes the new emails with a run of `POST /email-receipts/process-batch`
+   (`statuses: ['pending']`, 100 per call, `since` passed back until `remaining` is 0;
+   a 429 waits and retries, a cancel stops between calls) and reports the sum of
+   its `processed`, the `failed` and the `remaining` that were left.
 5. **Progress**: "Sending part N of M" with a cancel button; a cancelled run
    keeps what was imported (the import is idempotent).

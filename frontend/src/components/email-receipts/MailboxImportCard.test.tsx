@@ -9,11 +9,18 @@ import {
 import type {
   EmailReceiptImportFileResult,
   EmailReceiptImportResult,
+  ProcessEmailReceiptsResult,
 } from "@/types/email-receipts";
 
-const api = vi.hoisted(() => ({ importFiles: vi.fn() }));
+const api = vi.hoisted(() => ({
+  importFiles: vi.fn(),
+  processBatch: vi.fn(),
+}));
 vi.mock("@/lib/email-receipts-api", () => ({
-  emailReceiptsApi: { mailbox: { import: api.importFiles } },
+  emailReceiptsApi: {
+    mailbox: { import: api.importFiles },
+    receipts: { processBatch: api.processBatch },
+  },
 }));
 vi.mock("@/lib/logger", () => ({
   createLogger: () => ({
@@ -41,7 +48,7 @@ function result(
       },
     ],
     truncated: 0,
-    processed: 3,
+    processed: 0,
     busy: false,
     ...overrides,
   };
@@ -60,6 +67,19 @@ function entry(
     skipped: 0,
     ignoredEntries: 0,
     error: null,
+    ...overrides,
+  };
+}
+
+function batch(
+  overrides: Partial<ProcessEmailReceiptsResult> = {},
+): ProcessEmailReceiptsResult {
+  return {
+    processed: 0,
+    byOutcome: {},
+    failed: 0,
+    remaining: 0,
+    since: "T",
     ...overrides,
   };
 }
@@ -91,6 +111,8 @@ async function importNow() {
 describe("MailboxImportCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    api.processBatch.mockReset();
+    api.processBatch.mockResolvedValue(batch());
   });
 
   it("explains the import and keeps files without an extension selectable", () => {
@@ -144,24 +166,32 @@ describe("MailboxImportCard", () => {
             error: null,
           },
         ],
-        processed: 4,
       }),
     );
+    api.processBatch.mockResolvedValue(batch({ processed: 4 }));
     render(<MailboxImportCard />);
     const a = file("a.mbox");
     const b = file("b.eml");
     await pick([a, b]);
     await importNow();
-    expect(api.importFiles).toHaveBeenCalledWith([a, b]);
+    expect(api.importFiles).toHaveBeenCalledWith([a, b], { process: false });
     expect(
       screen.getByText("a.mbox: 3 stored, 1 duplicates, 1 skipped"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("b.eml: 1 stored, 0 duplicates, 0 skipped"),
     ).toBeInTheDocument();
-    expect(screen.getByText("4 emails processed.")).toBeInTheDocument();
+    expect(api.processBatch).toHaveBeenCalledTimes(1);
+    expect(api.processBatch).toHaveBeenCalledWith({
+      statuses: ["pending"],
+      limit: 100,
+    });
+    expect(screen.getByText("Processed 4 waiting emails.")).toBeInTheDocument();
     expect(screen.queryByText(/not read because/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/being read right now/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/still wait/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/could not be processed/),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
   });
 
@@ -248,25 +278,115 @@ describe("MailboxImportCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("says the emails wait for the next read when the mailbox is busy", async () => {
-    api.importFiles.mockResolvedValue(result({ busy: true, processed: 0 }));
+  it("counts only what the processing run did, not what the requests answered", async () => {
+    // The server answers `processed` 9 for a request; it must not be summed or shown.
+    api.importFiles.mockResolvedValue(result({ processed: 9, busy: true }));
+    api.processBatch.mockResolvedValue(batch({ processed: 2 }));
+    render(<MailboxImportCard />);
+    await pick([file("a.mbox")]);
+    await importNow();
+    expect(screen.getByText("Processed 2 waiting emails.")).toBeInTheDocument();
+    expect(screen.queryByText(/being read right now/)).not.toBeInTheDocument();
+  });
+
+  it("repeats the processing call with since until nothing remains", async () => {
+    api.importFiles.mockResolvedValue(result());
+    api.processBatch
+      .mockResolvedValueOnce(
+        batch({ processed: 100, remaining: 1, since: "S" }),
+      )
+      .mockResolvedValueOnce(batch({ processed: 1, remaining: 0, since: "S" }));
+    render(<MailboxImportCard />);
+    await pick([file("a.mbox")]);
+    await importNow();
+    expect(api.processBatch.mock.calls.map((c) => c[0].since)).toEqual([
+      undefined,
+      "S",
+    ]);
+    expect(
+      screen.getByText("Processed 101 waiting emails."),
+    ).toBeInTheDocument();
+  });
+
+  it("says how many emails still wait and how many could not be processed", async () => {
+    api.importFiles.mockResolvedValue(result());
+    api.processBatch.mockResolvedValue(
+      batch({ processed: 0, failed: 0, remaining: 5 }),
+    );
     render(<MailboxImportCard />);
     await pick([file("a.mbox")]);
     await importNow();
     expect(
       screen.getByText(
-        "The mailbox is being read right now. The imported emails will be processed at the next read.",
+        "5 emails still wait to be processed. Monize processes them at the next mailbox read.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("says how many emails could not be processed", async () => {
+    api.importFiles.mockResolvedValue(result());
+    api.processBatch.mockResolvedValue(batch({ processed: 3, failed: 2 }));
+    render(<MailboxImportCard />);
+    await pick([file("a.mbox")]);
+    await importNow();
+    expect(screen.getByText("Processed 3 waiting emails.")).toBeInTheDocument();
+    expect(
+      screen.getByText("2 emails could not be processed."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the processing progress and cancels between processing calls", async () => {
+    api.importFiles.mockResolvedValue(result());
+    let finishFirst: (value: ProcessEmailReceiptsResult) => void = () => {};
+    api.processBatch.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFirst = resolve)),
+    );
+    render(<MailboxImportCard />);
+    await pick([file("a.mbox")]);
+    await importNow();
+    expect(screen.getByText("Processing emails: 0 of 0")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await act(async () => {
+      finishFirst(batch({ processed: 100, remaining: 40, since: "S" }));
+    });
+    await act(async () => {});
+    expect(api.processBatch).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByText("Processed 100 waiting emails."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/^40 emails still wait to be processed\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the stored emails and says processing stopped when a processing call fails", async () => {
+    api.importFiles.mockResolvedValue(result());
+    api.processBatch.mockRejectedValue({
+      response: { status: 500, data: { message: "Server broke" } },
+    });
+    render(<MailboxImportCard />);
+    await pick([file("a.mbox")]);
+    await importNow();
+    expect(screen.getByRole("alert")).toHaveTextContent("Server broke");
+    expect(
+      screen.getByText(/^Processing the imported emails stopped\./),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/The import stopped after/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/^a\.mbox: /)).toBeInTheDocument();
   });
 
   it("accepts more than 20 files and sends them in several requests", async () => {
     api.importFiles.mockImplementation(async (sent: File[]) =>
       result({
         files: sent.map((f) => entry(f.name)),
-        processed: sent.length,
       }),
     );
+    api.processBatch.mockResolvedValue(batch({ processed: 21 }));
     render(<MailboxImportCard />);
     await pick(Array.from({ length: 21 }, (_, i) => file(`m${i}.eml`)));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -274,7 +394,9 @@ describe("MailboxImportCard", () => {
     await importNow();
     expect(api.importFiles).toHaveBeenCalledTimes(2);
     expect(api.importFiles.mock.calls.map((c) => c[0].length)).toEqual([20, 1]);
-    expect(screen.getByText("21 emails processed.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Processed 21 waiting emails."),
+    ).toBeInTheDocument();
     expect(screen.getByText(/^m20\.eml: /)).toBeInTheDocument();
   });
 
@@ -301,7 +423,6 @@ describe("MailboxImportCard", () => {
         files: sent.map((f) =>
           entry(f.name, { messages: 2, stored: 2, duplicates: 0, skipped: 0 }),
         ),
-        processed: sent.length * 2,
       }),
     );
     render(<MailboxImportCard />);
@@ -335,7 +456,7 @@ describe("MailboxImportCard", () => {
         "huge.mbox: 1 messages larger than 24.0 MB were not sent.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("0 emails processed.")).toBeInTheDocument();
+    expect(screen.getByText("Processed 0 waiting emails.")).toBeInTheDocument();
   });
 
   it("shows the preparing and sending progress and cancels between requests", async () => {
@@ -353,7 +474,7 @@ describe("MailboxImportCard", () => {
     expect(screen.getByText("Sending part 1 of 2")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await act(async () => {
-      finishFirst(result({ files: [entry("m0.eml")], processed: 20 }));
+      finishFirst(result({ files: [entry("m0.eml")] }));
     });
     await act(async () => {});
     expect(api.importFiles).toHaveBeenCalledTimes(1);
@@ -370,9 +491,7 @@ describe("MailboxImportCard", () => {
 
   it("keeps what was imported when a later request fails, and says it stopped", async () => {
     api.importFiles
-      .mockResolvedValueOnce(
-        result({ files: [entry("m0.eml")], processed: 20 }),
-      )
+      .mockResolvedValueOnce(result({ files: [entry("m0.eml")] }))
       .mockRejectedValueOnce({
         response: { status: 500, data: { message: "Server broke" } },
       });
@@ -385,7 +504,7 @@ describe("MailboxImportCard", () => {
       screen.getByText(/^The import stopped after 1 of 2 parts\./),
     ).toBeInTheDocument();
     expect(screen.getByText(/^m0\.eml: /)).toBeInTheDocument();
-    expect(screen.getByText("20 emails processed.")).toBeInTheDocument();
+    expect(api.processBatch).not.toHaveBeenCalled();
     expect(screen.getByText("Selected: 21")).toBeInTheDocument();
   });
 
@@ -398,7 +517,7 @@ describe("MailboxImportCard", () => {
     await importNow();
     expect(screen.getByRole("alert")).toHaveTextContent("File too large");
     expect(toast.error).toHaveBeenCalledWith("File too large");
-    expect(screen.queryByText(/emails processed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/waiting emails/)).not.toBeInTheDocument();
   });
 
   it("falls back to a translated message when the error has none", async () => {

@@ -20,7 +20,7 @@ import {
 import { getErrorMessage } from "@/lib/errors";
 import { MailboxImportResultView } from "./MailboxImportResultView";
 
-type Phase = "idle" | "preparing" | "sending";
+type Phase = "idle" | "preparing" | "sending" | "processing";
 type Outcome = Omit<ImportRunOutcome, "error"> & { notes: PlanNote[] };
 
 /**
@@ -56,6 +56,7 @@ export function MailboxImportCard() {
   const [files, setFiles] = useState<File[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [processProgress, setProcessProgress] = useState({ done: 0, total: 0 });
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const isImporting = phase !== "idle";
@@ -88,9 +89,14 @@ export function MailboxImportCard() {
       const plan = await buildUploadPlan(files);
       setProgress({ done: 0, total: plan.requests.length });
       setPhase("sending");
+      setProcessProgress({ done: 0, total: 0 });
       const run = await runImport(plan.requests, {
         signal: controller.signal,
-        onProgress: (done, total) => setProgress({ done, total }),
+        onProgress: (done, total) => {
+          setProgress({ done, total });
+          if (done === total && total > 0) setPhase("processing");
+        },
+        onProcessProgress: (done, total) => setProcessProgress({ done, total }),
       });
       const { error, ...rest } = run;
       if (run.status === "failed") {
@@ -178,7 +184,7 @@ export function MailboxImportCard() {
           >
             {t("button")}
           </Button>
-          {phase === "sending" && (
+          {(phase === "sending" || phase === "processing") && (
             <Button
               type="button"
               variant="secondary"
@@ -193,10 +199,15 @@ export function MailboxImportCard() {
           <p role="status" className="text-sm text-gray-600 dark:text-gray-400">
             {phase === "preparing"
               ? t("preparing")
-              : t("sending", {
-                  current: count(Math.min(progress.done + 1, progress.total)),
-                  total: count(progress.total),
-                })}
+              : phase === "processing"
+                ? t("processing", {
+                    done: count(processProgress.done),
+                    total: count(processProgress.total),
+                  })
+                : t("sending", {
+                    current: count(Math.min(progress.done + 1, progress.total)),
+                    total: count(progress.total),
+                  })}
           </p>
         )}
 
@@ -210,6 +221,7 @@ export function MailboxImportCard() {
           <MailboxImportResultView
             result={outcome.result}
             notes={outcome.notes}
+            processing={outcome.processing}
             status={outcome.status}
             completed={outcome.completed}
             total={outcome.total}
