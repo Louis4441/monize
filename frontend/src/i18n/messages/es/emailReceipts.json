@@ -150,14 +150,29 @@
     "payeeUnavailable": "Lista de beneficiarios no disponible",
     "actions": {
       "approve": "Aprobar",
-      "viewJson": "Ver JSON"
+      "viewJson": "Ver JSON",
+      "ignoreEmails": "Ignorar los correos coincidentes",
+      "deleteEmails": "Eliminar los correos coincidentes"
     },
     "toasts": {
       "approved": "Perfil aprobado",
       "approveFailed": "No se pudo aprobar el perfil",
       "changedElsewhere": "Este perfil se cambió en otro lugar. Se ha vuelto a cargar la lista.",
       "deleted": "Perfil eliminado",
-      "deleteFailed": "No se pudo eliminar el perfil"
+      "deleteFailed": "No se pudo eliminar el perfil",
+      "emailsIgnored": "{count, plural, one {# correo ignorado} other {# correos ignorados}}",
+      "emailsDeleted": "{count, plural, one {# correo eliminado} other {# correos eliminados}}",
+      "bulkFailed": "No se pudo terminar con los correos de este perfil. Los que ya se procesaron se quedan así."
+    },
+    "bulk": {
+      "ignoreTitle": "¿Ignorar los correos de este perfil?",
+      "ignoreMessage": "{count, plural, one {# correo que lee {name} se ignorará} other {# correos que lee {name} se ignorarán}}: no propondrán nada y sus propuestas abiertas se cerrarán.{kept, plural, =0 {} one { # correo que ya se aplicó o que no se pudo leer se queda como está.} other { # correos que ya se aplicaron o que no se pudieron leer se quedan como están.}}",
+      "ignoreConfirm": "Ignorar correos",
+      "deleteTitle": "¿Eliminar los correos de este perfil?",
+      "deleteMessage": "{count, plural, one {# correo que lee {name} se eliminará} other {# correos que lee {name} se eliminarán}}, junto con sus propuestas abiertas. Esto no se puede deshacer.{kept, plural, =0 {} one { # correo cuya propuesta ya se aplicó se queda.} other { # correos cuyas propuestas ya se aplicaron se quedan.}}",
+      "deleteConfirm": "Eliminar correos",
+      "noneToIgnore": "Este perfil no lee ningún correo que se pueda ignorar.",
+      "noneToDelete": "Este perfil no lee ningún correo que se pueda eliminar."
     },
     "deleteDialog": {
       "title": "¿Eliminar el perfil?",

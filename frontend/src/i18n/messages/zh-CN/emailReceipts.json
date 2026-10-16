@@ -150,14 +150,29 @@
     "payeeUnavailable": "收款人列表不可用",
     "actions": {
       "approve": "批准",
-      "viewJson": "查看 JSON"
+      "viewJson": "查看 JSON",
+      "ignoreEmails": "忽略匹配的邮件",
+      "deleteEmails": "删除匹配的邮件"
     },
     "toasts": {
       "approved": "解析器已批准",
       "approveFailed": "无法批准解析器",
       "changedElsewhere": "此解析器已在别处被修改。列表已重新加载。",
       "deleted": "解析器已删除",
-      "deleteFailed": "无法删除解析器"
+      "deleteFailed": "无法删除解析器",
+      "emailsIgnored": "{count, plural, other {已忽略 # 封邮件}}",
+      "emailsDeleted": "{count, plural, other {已删除 # 封邮件}}",
+      "bulkFailed": "无法处理完此解析器的邮件。已处理的邮件保持不变。"
+    },
+    "bulk": {
+      "ignoreTitle": "忽略此解析器的邮件？",
+      "ignoreMessage": "{name} 读取的 {count, plural, other {# 封邮件}}将被忽略：它们不再提出任何提议，未完成的提议将被关闭。{kept, plural, =0 {} other {已应用或无法读取的 # 封邮件保持不变。}}",
+      "ignoreConfirm": "忽略邮件",
+      "deleteTitle": "删除此解析器的邮件？",
+      "deleteMessage": "{name} 读取的 {count, plural, other {# 封邮件}}将连同未完成的提议一起删除。此操作无法撤销。{kept, plural, =0 {} other {提议已应用的 # 封邮件将保留。}}",
+      "deleteConfirm": "删除邮件",
+      "noneToIgnore": "此解析器读取的邮件中没有可忽略的邮件。",
+      "noneToDelete": "此解析器读取的邮件中没有可删除的邮件。"
     },
     "deleteDialog": {
       "title": "删除解析器？",

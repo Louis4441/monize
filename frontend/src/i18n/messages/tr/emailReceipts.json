@@ -150,14 +150,29 @@
     "payeeUnavailable": "Alıcı listesi kullanılamıyor",
     "actions": {
       "approve": "Onayla",
-      "viewJson": "JSON'u görüntüle"
+      "viewJson": "JSON'u görüntüle",
+      "ignoreEmails": "Eşleşen e-postaları yok say",
+      "deleteEmails": "Eşleşen e-postaları sil"
     },
     "toasts": {
       "approved": "Ayrıştırıcı onaylandı",
       "approveFailed": "Ayrıştırıcı onaylanamadı",
       "changedElsewhere": "Bu ayrıştırıcı başka bir yerde değiştirildi. Liste yeniden yüklendi.",
       "deleted": "Ayrıştırıcı silindi",
-      "deleteFailed": "Ayrıştırıcı silinemedi"
+      "deleteFailed": "Ayrıştırıcı silinemedi",
+      "emailsIgnored": "{count, plural, one {# e-posta yok sayıldı} other {# e-posta yok sayıldı}}",
+      "emailsDeleted": "{count, plural, one {# e-posta silindi} other {# e-posta silindi}}",
+      "bulkFailed": "Bu ayrıştırıcının e-postaları tamamlanamadı. Zaten işlenmiş olanlar öyle kalır."
+    },
+    "bulk": {
+      "ignoreTitle": "Bu ayrıştırıcının e-postaları yok sayılsın mı?",
+      "ignoreMessage": "{name} tarafından okunan {count, plural, one {# e-posta} other {# e-posta}} yok sayılacak: hiçbir şey önermeyecekler ve açık önerileri kapatılacak.{kept, plural, =0 {} one { Zaten uygulanmış veya okunamamış # e-posta olduğu gibi kalır.} other { Zaten uygulanmış veya okunamamış # e-posta olduğu gibi kalır.}}",
+      "ignoreConfirm": "E-postaları yok say",
+      "deleteTitle": "Bu ayrıştırıcının e-postaları silinsin mi?",
+      "deleteMessage": "{name} tarafından okunan {count, plural, one {# e-posta} other {# e-posta}} açık önerileriyle birlikte silinecek. Bu işlem geri alınamaz.{kept, plural, =0 {} one { Önerisi zaten uygulanmış # e-posta kalır.} other { Önerisi zaten uygulanmış # e-posta kalır.}}",
+      "deleteConfirm": "E-postaları sil",
+      "noneToIgnore": "Bu ayrıştırıcı yok sayılabilecek hiçbir e-postayı okumuyor.",
+      "noneToDelete": "Bu ayrıştırıcı silinebilecek hiçbir e-postayı okumuyor."
     },
     "deleteDialog": {
       "title": "Ayrıştırıcı silinsin mi?",

@@ -150,14 +150,29 @@
     "payeeUnavailable": "Elenco dei beneficiari non disponibile",
     "actions": {
       "approve": "Approva",
-      "viewJson": "Mostra JSON"
+      "viewJson": "Mostra JSON",
+      "ignoreEmails": "Ignora le email corrispondenti",
+      "deleteEmails": "Elimina le email corrispondenti"
     },
     "toasts": {
       "approved": "Profilo approvato",
       "approveFailed": "Impossibile approvare il profilo",
       "changedElsewhere": "Questo profilo è stato modificato altrove. L'elenco è stato ricaricato.",
       "deleted": "Profilo eliminato",
-      "deleteFailed": "Impossibile eliminare il profilo"
+      "deleteFailed": "Impossibile eliminare il profilo",
+      "emailsIgnored": "{count, plural, one {# email ignorata} other {# email ignorate}}",
+      "emailsDeleted": "{count, plural, one {# email eliminata} other {# email eliminate}}",
+      "bulkFailed": "Impossibile completare le email di questo profilo. Quelle già gestite restano così."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignorare le email di questo profilo?",
+      "ignoreMessage": "{count, plural, one {# email letta da {name} verrà ignorata} other {# email lette da {name} verranno ignorate}}: non proporranno nulla e le proposte aperte verranno chiuse.{kept, plural, =0 {} one { # email già applicata o non leggibile resta com'è.} other { # email già applicate o non leggibili restano come sono.}}",
+      "ignoreConfirm": "Ignora email",
+      "deleteTitle": "Eliminare le email di questo profilo?",
+      "deleteMessage": "{count, plural, one {# email letta da {name} verrà eliminata} other {# email lette da {name} verranno eliminate}}, insieme alle proposte aperte. L'operazione non può essere annullata.{kept, plural, =0 {} one { # email la cui proposta è già stata applicata resta.} other { # email le cui proposte sono già state applicate restano.}}",
+      "deleteConfirm": "Elimina email",
+      "noneToIgnore": "Questo profilo non legge email che si possano ignorare.",
+      "noneToDelete": "Questo profilo non legge email che si possano eliminare."
     },
     "deleteDialog": {
       "title": "Eliminare il profilo?",

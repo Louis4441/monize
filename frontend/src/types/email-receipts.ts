@@ -328,6 +328,33 @@ export const EMAIL_RECEIPT_PROCESSABLE_STATUSES = [
 ] as const;
 export type EmailReceiptProcessableStatus = (typeof EMAIL_RECEIPT_PROCESSABLE_STATUSES)[number];
 
+/** What `POST /email-receipts/profile-batch` does with the emails a profile matches: `count` writes nothing. */
+export type ProfileBatchAction = 'count' | 'ignore' | 'delete';
+
+/** `POST /email-receipts/profile-batch`. */
+export interface ProfileBatchPayload {
+  parserId: string;
+  action: ProfileBatchAction;
+  /** The `next` the previous call answered; omit on the first call. */
+  after?: string;
+}
+
+/** What one page of a profile's bulk action found and did. */
+export interface ProfileBatchResult {
+  /** Emails of the page the profile matches (as the pipeline chooses the profile). */
+  matched: number;
+  /** Of those, the ones whose proposal was already applied: kept by both actions. */
+  applied: number;
+  /** Of those, the ones that could not be read: kept by `ignore`. */
+  unreadable: number;
+  /** Of those, the ones already ignored. */
+  ignored: number;
+  /** Emails this call ignored or deleted (0 for `count`). */
+  done: number;
+  /** Send back as `after`; null ends the scan. */
+  next: string | null;
+}
+
 /** `POST /email-receipts/process-batch`. */
 export interface ProcessEmailReceiptsPayload {
   domain?: string;

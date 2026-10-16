@@ -150,14 +150,29 @@
     "payeeUnavailable": "支払先の一覧を利用できません",
     "actions": {
       "approve": "承認",
-      "viewJson": "JSONを表示"
+      "viewJson": "JSONを表示",
+      "ignoreEmails": "一致するメールを無視",
+      "deleteEmails": "一致するメールを削除"
     },
     "toasts": {
       "approved": "プロフィールを承認しました",
       "approveFailed": "プロフィールを承認できませんでした",
       "changedElsewhere": "このプロフィールは別の場所で変更されました。一覧を再読み込みしました。",
       "deleted": "プロフィールを削除しました",
-      "deleteFailed": "プロフィールを削除できませんでした"
+      "deleteFailed": "プロフィールを削除できませんでした",
+      "emailsIgnored": "{count, plural, other {# 件のメールを無視しました}}",
+      "emailsDeleted": "{count, plural, other {# 件のメールを削除しました}}",
+      "bulkFailed": "このプロフィールのメールの処理を完了できませんでした。処理済みのメールはそのままです。"
+    },
+    "bulk": {
+      "ignoreTitle": "このプロフィールのメールを無視しますか?",
+      "ignoreMessage": "{name} が読み取る {count, plural, other {# 件のメール}}を無視します。これらは何も提案せず、未処理の提案は閉じられます。{kept, plural, =0 {} other {すでに適用済み、または読み取れなかった # 件のメールはそのまま残ります。}}",
+      "ignoreConfirm": "メールを無視",
+      "deleteTitle": "このプロフィールのメールを削除しますか?",
+      "deleteMessage": "{name} が読み取る {count, plural, other {# 件のメール}}を、未処理の提案とともに削除します。この操作は元に戻せません。{kept, plural, =0 {} other {提案がすでに適用済みの # 件のメールは残ります。}}",
+      "deleteConfirm": "メールを削除",
+      "noneToIgnore": "このプロフィールが読み取るメールのうち、無視できるものはありません。",
+      "noneToDelete": "このプロフィールが読み取るメールのうち、削除できるものはありません。"
     },
     "deleteDialog": {
       "title": "プロフィールを削除しますか?",

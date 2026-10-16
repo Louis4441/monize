@@ -150,14 +150,29 @@
     "payeeUnavailable": "Lista de beneficiários indisponível",
     "actions": {
       "approve": "Aprovar",
-      "viewJson": "Ver JSON"
+      "viewJson": "Ver JSON",
+      "ignoreEmails": "Ignorar os e-mails correspondentes",
+      "deleteEmails": "Eliminar os e-mails correspondentes"
     },
     "toasts": {
       "approved": "Analisador aprovado",
       "approveFailed": "Não foi possível aprovar o analisador",
       "changedElsewhere": "Este analisador foi alterado noutro local. A lista foi recarregada.",
       "deleted": "Analisador eliminado",
-      "deleteFailed": "Não foi possível eliminar o analisador"
+      "deleteFailed": "Não foi possível eliminar o analisador",
+      "emailsIgnored": "{count, plural, one {# e-mail ignorado} other {# e-mails ignorados}}",
+      "emailsDeleted": "{count, plural, one {# e-mail eliminado} other {# e-mails eliminados}}",
+      "bulkFailed": "Não foi possível terminar os e-mails deste analisador. Os que já foram tratados ficam assim."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignorar os e-mails deste analisador?",
+      "ignoreMessage": "{count, plural, one {# e-mail lido por {name} será ignorado} other {# e-mails lidos por {name} serão ignorados}}: deixam de propor o que quer que seja e as propostas abertas são fechadas.{kept, plural, =0 {} one { # e-mail já aplicado ou que não pôde ser lido fica como está.} other { # e-mails já aplicados ou que não puderam ser lidos ficam como estão.}}",
+      "ignoreConfirm": "Ignorar e-mails",
+      "deleteTitle": "Eliminar os e-mails deste analisador?",
+      "deleteMessage": "{count, plural, one {# e-mail lido por {name} será eliminado} other {# e-mails lidos por {name} serão eliminados}}, juntamente com as propostas abertas. Esta ação não pode ser anulada.{kept, plural, =0 {} one { # e-mail cuja proposta já foi aplicada fica.} other { # e-mails cujas propostas já foram aplicadas ficam.}}",
+      "deleteConfirm": "Eliminar e-mails",
+      "noneToIgnore": "Este analisador não lê e-mails que possam ser ignorados.",
+      "noneToDelete": "Este analisador não lê e-mails que possam ser eliminados."
     },
     "deleteDialog": {
       "title": "Eliminar o analisador?",

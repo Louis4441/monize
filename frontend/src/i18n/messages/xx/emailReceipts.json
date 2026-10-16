@@ -150,14 +150,29 @@
     "payeeUnavailable": "[XX-Payee list unavailable-XX]",
     "actions": {
       "approve": "[XX-Approve-XX]",
-      "viewJson": "[XX-View JSON-XX]"
+      "viewJson": "[XX-View JSON-XX]",
+      "ignoreEmails": "[XX-Ignore matching emails-XX]",
+      "deleteEmails": "[XX-Delete matching emails-XX]"
     },
     "toasts": {
       "approved": "[XX-Profile approved-XX]",
       "approveFailed": "[XX-Could not approve the profile-XX]",
       "changedElsewhere": "[XX-This profile was changed elsewhere. The list has been reloaded.-XX]",
       "deleted": "[XX-Profile deleted-XX]",
-      "deleteFailed": "[XX-Could not delete the profile-XX]"
+      "deleteFailed": "[XX-Could not delete the profile-XX]",
+      "emailsIgnored": "[XX-{count, plural, one {# email ignored} other {# emails ignored}}-XX]",
+      "emailsDeleted": "[XX-{count, plural, one {# email deleted} other {# emails deleted}}-XX]",
+      "bulkFailed": "[XX-Could not finish with this profile's emails. The ones already handled stay that way.-XX]"
+    },
+    "bulk": {
+      "ignoreTitle": "[XX-Ignore this profile's emails?-XX]",
+      "ignoreMessage": "[XX-{count, plural, one {# email} other {# emails}} that {name} reads will be ignored: they propose nothing, and their open proposals are closed.{kept, plural, =0 {} one { # email that was already applied or could not be read stays as it is.} other { # emails that were already applied or could not be read stay as they are.}}-XX]",
+      "ignoreConfirm": "[XX-Ignore emails-XX]",
+      "deleteTitle": "[XX-Delete this profile's emails?-XX]",
+      "deleteMessage": "[XX-{count, plural, one {# email} other {# emails}} that {name} reads will be deleted, with their open proposals. This cannot be undone.{kept, plural, =0 {} one { # email whose proposal was already applied stays.} other { # emails whose proposals were already applied stay.}}-XX]",
+      "deleteConfirm": "[XX-Delete emails-XX]",
+      "noneToIgnore": "[XX-This profile reads no emails that can be ignored.-XX]",
+      "noneToDelete": "[XX-This profile reads no emails that can be deleted.-XX]"
     },
     "deleteDialog": {
       "title": "[XX-Delete the profile?-XX]",

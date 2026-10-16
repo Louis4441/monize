@@ -150,14 +150,29 @@
     "payeeUnavailable": "Lista odbiorców niedostępna",
     "actions": {
       "approve": "Zatwierdź",
-      "viewJson": "Pokaż JSON"
+      "viewJson": "Pokaż JSON",
+      "ignoreEmails": "Ignoruj pasujące wiadomości",
+      "deleteEmails": "Usuń pasujące wiadomości"
     },
     "toasts": {
       "approved": "Parser zatwierdzony",
       "approveFailed": "Nie udało się zatwierdzić parsera",
       "changedElsewhere": "Ten parser został zmieniony w innym miejscu. Lista została wczytana ponownie.",
       "deleted": "Parser usunięty",
-      "deleteFailed": "Nie udało się usunąć parsera"
+      "deleteFailed": "Nie udało się usunąć parsera",
+      "emailsIgnored": "{count, plural, one {Zignorowano # wiadomość} few {Zignorowano # wiadomości} many {Zignorowano # wiadomości} other {Zignorowano # wiadomości}}",
+      "emailsDeleted": "{count, plural, one {Usunięto # wiadomość} few {Usunięto # wiadomości} many {Usunięto # wiadomości} other {Usunięto # wiadomości}}",
+      "bulkFailed": "Nie udało się dokończyć pracy z wiadomościami tego parsera. Te już obsłużone pozostają bez zmian."
+    },
+    "bulk": {
+      "ignoreTitle": "Zignorować wiadomości tego parsera?",
+      "ignoreMessage": "{count, plural, one {# wiadomość odczytywana przez {name} zostanie zignorowana} few {# wiadomości odczytywane przez {name} zostaną zignorowane} many {# wiadomości odczytywanych przez {name} zostanie zignorowanych} other {# wiadomości odczytywanych przez {name} zostanie zignorowanych}}: nic nie zaproponują, a ich otwarte propozycje zostaną zamknięte.{kept, plural, =0 {} one { # wiadomość, która została już zastosowana lub nie dała się odczytać, pozostaje bez zmian.} few { # wiadomości, które zostały już zastosowane lub nie dały się odczytać, pozostają bez zmian.} many { # wiadomości, które zostały już zastosowane lub nie dały się odczytać, pozostaje bez zmian.} other { # wiadomości, które zostały już zastosowane lub nie dały się odczytać, pozostaje bez zmian.}}",
+      "ignoreConfirm": "Ignoruj wiadomości",
+      "deleteTitle": "Usunąć wiadomości tego parsera?",
+      "deleteMessage": "{count, plural, one {# wiadomość odczytywana przez {name} zostanie usunięta} few {# wiadomości odczytywane przez {name} zostaną usunięte} many {# wiadomości odczytywanych przez {name} zostanie usuniętych} other {# wiadomości odczytywanych przez {name} zostanie usuniętych}} razem z otwartymi propozycjami. Tej operacji nie można cofnąć.{kept, plural, =0 {} one { # wiadomość, której propozycja została już zastosowana, pozostaje.} few { # wiadomości, których propozycje zostały już zastosowane, pozostają.} many { # wiadomości, których propozycje zostały już zastosowane, pozostaje.} other { # wiadomości, których propozycje zostały już zastosowane, pozostaje.}}",
+      "deleteConfirm": "Usuń wiadomości",
+      "noneToIgnore": "Ten parser nie odczytuje żadnych wiadomości, które można zignorować.",
+      "noneToDelete": "Ten parser nie odczytuje żadnych wiadomości, które można usunąć."
     },
     "deleteDialog": {
       "title": "Usunąć parser?",

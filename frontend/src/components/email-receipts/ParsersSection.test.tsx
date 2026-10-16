@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   listDomains: vi.fn(),
   listUncovered: vi.fn(),
   processBatch: vi.fn(),
+  profileBatch: vi.fn(),
 }));
 const payeesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
 const categoriesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
@@ -26,7 +27,13 @@ const exchangeRatesApi = vi.hoisted(() => ({ getCurrencies: vi.fn() }));
 vi.mock('@/lib/email-receipts-api', () => ({
   emailReceiptsApi: {
     parsers: { list: api.list, approve: api.approve, remove: api.remove, create: api.create, update: api.update, test: api.test },
-    receipts: { list: api.receiptsList, listDomains: api.listDomains, listUncovered: api.listUncovered, processBatch: api.processBatch },
+    receipts: {
+      list: api.receiptsList,
+      listDomains: api.listDomains,
+      listUncovered: api.listUncovered,
+      processBatch: api.processBatch,
+      profileBatch: api.profileBatch,
+    },
   },
 }));
 vi.mock('@/lib/payees', async (importOriginal) => ({
@@ -438,6 +445,71 @@ describe('ParsersSection', () => {
       expect(api.list).toHaveBeenCalledTimes(2);
       await click(screen.getByRole('button', { name: 'close wizard' }));
       expect(onWizardDomainChange).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe("a profile's emails, in bulk", () => {
+    const page = (over: Record<string, unknown> = {}) => ({
+      matched: 0,
+      applied: 0,
+      unreadable: 0,
+      ignored: 0,
+      done: 0,
+      next: null,
+      ...over,
+    });
+    const openMenuItem = async (name: string) => {
+      const row = screen.getByRole('row', { name: /Allegro parser/ });
+      await click(within(row).getByRole('button', { name: 'More actions' }));
+      await click(screen.getByRole('menuitem', { name }));
+    };
+
+    it('counts first and asks with the numbers, then ignores every page and says how many', async () => {
+      await renderSection();
+      api.profileBatch
+        .mockResolvedValueOnce(page({ matched: 3, applied: 1, next: 'c-1' }))
+        .mockResolvedValueOnce(page({ matched: 2, ignored: 1 }))
+        .mockResolvedValueOnce(page({ matched: 3, done: 2, next: 'c-1' }))
+        .mockResolvedValueOnce(page({ matched: 2, done: 1 }));
+      await openMenuItem('Ignore matching emails');
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent(
+        '3 emails that Allegro parser reads will be ignored: they propose nothing, and their open proposals are closed. 1 email that was already applied or could not be read stays as it is.',
+      );
+      expect(api.profileBatch).toHaveBeenCalledTimes(2);
+      expect(api.profileBatch).toHaveBeenNthCalledWith(2, { parserId: approved.id, action: 'count', after: 'c-1' });
+
+      await click(within(dialog).getByRole('button', { name: 'Ignore emails' }));
+      expect(api.profileBatch).toHaveBeenNthCalledWith(3, { parserId: approved.id, action: 'ignore' });
+      expect(api.profileBatch).toHaveBeenNthCalledWith(4, { parserId: approved.id, action: 'ignore', after: 'c-1' });
+      expect(toast.success).toHaveBeenCalledWith('3 emails ignored');
+    });
+
+    it('deletes nothing when the person cancels', async () => {
+      await renderSection();
+      api.profileBatch.mockResolvedValueOnce(page({ matched: 2 }));
+      await openMenuItem('Delete matching emails');
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent('2 emails that Allegro parser reads will be deleted, with their open proposals. This cannot be undone.');
+      await click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(api.profileBatch).toHaveBeenCalledTimes(1);
+      expect(api.profileBatch).toHaveBeenCalledWith({ parserId: approved.id, action: 'count' });
+    });
+
+    it('says so, and asks nothing, when there is nothing to act on', async () => {
+      await renderSection();
+      api.profileBatch.mockResolvedValueOnce(page({ matched: 1, applied: 1 }));
+      await openMenuItem('Delete matching emails');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(toast).toHaveBeenCalledWith('This profile reads no emails that can be deleted.');
+    });
+
+    it('names a failure', async () => {
+      await renderSection();
+      api.profileBatch.mockRejectedValueOnce(new Error('boom'));
+      await openMenuItem('Ignore matching emails');
+      expect(toast.error).toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 });

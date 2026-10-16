@@ -23,7 +23,6 @@ import {
   EmailReceiptMailbox,
   type EmailReceiptAiMode,
 } from "../entities/email-receipt-mailbox.entity";
-import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import {
   EmailReceipt,
   type EmailReceiptMatchKind,
@@ -61,6 +60,7 @@ import {
   EmailReceiptTradeService,
   RECEIPT_TRADE_EXISTS_REASON,
 } from "./email-receipt-trade.service";
+import { loadApprovedParsers } from "./approved-parsers";
 import { chooseReceiptParser } from "./choose-receipt-parser";
 import { describeFailure, isRefusal, refusalNote } from "./receipt-failure";
 import { loadLinkableTransaction } from "./linkable-transaction";
@@ -99,9 +99,6 @@ export const RECEIPT_NO_HTML_REASON = "no_html";
  * `items_uncategorized`, ...), which `parsed.source` records either way.
  */
 export const RECEIPT_SCHEMA_ORG_REASON = "schema_org";
-
-/** At most this many approved parsers are considered for one email. */
-const MAX_PARSERS_CONSIDERED = 1000;
 
 /** What `process` does and refuses, by who asked. */
 export interface ProcessReceiptOptions {
@@ -340,11 +337,7 @@ export class EmailReceiptPipelineService {
     const aiMode: EmailReceiptAiMode = mailbox?.aiMode ?? "off";
     const autoApplyOn = mailbox?.autoApply ?? false;
 
-    const parsers = await m.getRepository(EmailReceiptParser).find({
-      where: { userId, status: "approved" },
-      order: { createdAt: "ASC", id: "ASC" },
-      take: MAX_PARSERS_CONSIDERED,
-    });
+    const parsers = await loadApprovedParsers(m, userId);
     const keptLink = {
       transactionId: link?.id ?? null,
       candidateIds: [],

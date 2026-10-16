@@ -150,14 +150,29 @@
     "payeeUnavailable": "Payee list unavailable",
     "actions": {
       "approve": "Approve",
-      "viewJson": "View JSON"
+      "viewJson": "View JSON",
+      "ignoreEmails": "Ignore matching emails",
+      "deleteEmails": "Delete matching emails"
     },
     "toasts": {
       "approved": "Profile approved",
       "approveFailed": "Could not approve the profile",
       "changedElsewhere": "This profile was changed elsewhere. The list has been reloaded.",
       "deleted": "Profile deleted",
-      "deleteFailed": "Could not delete the profile"
+      "deleteFailed": "Could not delete the profile",
+      "emailsIgnored": "{count, plural, one {# email ignored} other {# emails ignored}}",
+      "emailsDeleted": "{count, plural, one {# email deleted} other {# emails deleted}}",
+      "bulkFailed": "Could not finish with this profile's emails. The ones already handled stay that way."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignore this profile's emails?",
+      "ignoreMessage": "{count, plural, one {# email} other {# emails}} that {name} reads will be ignored: they propose nothing, and their open proposals are closed.{kept, plural, =0 {} one { # email that was already applied or could not be read stays as it is.} other { # emails that were already applied or could not be read stay as they are.}}",
+      "ignoreConfirm": "Ignore emails",
+      "deleteTitle": "Delete this profile's emails?",
+      "deleteMessage": "{count, plural, one {# email} other {# emails}} that {name} reads will be deleted, with their open proposals. This cannot be undone.{kept, plural, =0 {} one { # email whose proposal was already applied stays.} other { # emails whose proposals were already applied stay.}}",
+      "deleteConfirm": "Delete emails",
+      "noneToIgnore": "This profile reads no emails that can be ignored.",
+      "noneToDelete": "This profile reads no emails that can be deleted."
     },
     "deleteDialog": {
       "title": "Delete the profile?",

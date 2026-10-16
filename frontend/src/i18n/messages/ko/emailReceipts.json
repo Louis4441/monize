@@ -150,14 +150,29 @@
     "payeeUnavailable": "수취인 목록을 사용할 수 없음",
     "actions": {
       "approve": "승인",
-      "viewJson": "JSON 보기"
+      "viewJson": "JSON 보기",
+      "ignoreEmails": "일치하는 메일 무시",
+      "deleteEmails": "일치하는 메일 삭제"
     },
     "toasts": {
       "approved": "프로필 승인됨",
       "approveFailed": "프로필을 승인하지 못했습니다",
       "changedElsewhere": "이 프로필이 다른 곳에서 변경되었습니다. 목록을 다시 불러왔습니다.",
       "deleted": "프로필 삭제됨",
-      "deleteFailed": "프로필을 삭제하지 못했습니다"
+      "deleteFailed": "프로필을 삭제하지 못했습니다",
+      "emailsIgnored": "{count, plural, other {메일 #개를 무시했습니다}}",
+      "emailsDeleted": "{count, plural, other {메일 #개를 삭제했습니다}}",
+      "bulkFailed": "이 프로필의 메일 처리를 마치지 못했습니다. 이미 처리된 메일은 그대로 유지됩니다."
+    },
+    "bulk": {
+      "ignoreTitle": "이 프로필의 메일을 무시할까요?",
+      "ignoreMessage": "{name}이(가) 읽는 메일 {count, plural, other {#개}}를 무시합니다. 이 메일들은 아무것도 제안하지 않으며, 열려 있는 제안은 닫힙니다.{kept, plural, =0 {} other { 이미 적용되었거나 읽을 수 없는 메일 #개는 그대로 유지됩니다.}}",
+      "ignoreConfirm": "메일 무시",
+      "deleteTitle": "이 프로필의 메일을 삭제할까요?",
+      "deleteMessage": "{name}이(가) 읽는 메일 {count, plural, other {#개}}를 열려 있는 제안과 함께 삭제합니다. 이 작업은 되돌릴 수 없습니다.{kept, plural, =0 {} other { 제안이 이미 적용된 메일 #개는 유지됩니다.}}",
+      "deleteConfirm": "메일 삭제",
+      "noneToIgnore": "이 프로필이 읽는 메일 중 무시할 수 있는 메일이 없습니다.",
+      "noneToDelete": "이 프로필이 읽는 메일 중 삭제할 수 있는 메일이 없습니다."
     },
     "deleteDialog": {
       "title": "프로필을 삭제할까요?",

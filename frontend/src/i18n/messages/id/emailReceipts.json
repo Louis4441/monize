@@ -150,14 +150,29 @@
     "payeeUnavailable": "Daftar penerima tidak tersedia",
     "actions": {
       "approve": "Setujui",
-      "viewJson": "Lihat JSON"
+      "viewJson": "Lihat JSON",
+      "ignoreEmails": "Abaikan surel yang cocok",
+      "deleteEmails": "Hapus surel yang cocok"
     },
     "toasts": {
       "approved": "Profil disetujui",
       "approveFailed": "Profil tidak dapat disetujui",
       "changedElsewhere": "Profil ini diubah di tempat lain. Daftar telah dimuat ulang.",
       "deleted": "Profil dihapus",
-      "deleteFailed": "Profil tidak dapat dihapus"
+      "deleteFailed": "Profil tidak dapat dihapus",
+      "emailsIgnored": "{count, plural, other {# surel diabaikan}}",
+      "emailsDeleted": "{count, plural, other {# surel dihapus}}",
+      "bulkFailed": "Tidak dapat menyelesaikan surel profil ini. Surel yang sudah ditangani tetap seperti itu."
+    },
+    "bulk": {
+      "ignoreTitle": "Abaikan surel profil ini?",
+      "ignoreMessage": "{count, plural, other {# surel}} yang dibaca {name} akan diabaikan: surel tersebut tidak mengusulkan apa pun, dan usulan terbukanya ditutup.{kept, plural, =0 {} other { # surel yang sudah diterapkan atau tidak dapat dibaca tetap seperti semula.}}",
+      "ignoreConfirm": "Abaikan surel",
+      "deleteTitle": "Hapus surel profil ini?",
+      "deleteMessage": "{count, plural, other {# surel}} yang dibaca {name} akan dihapus beserta usulan terbukanya. Tindakan ini tidak dapat dibatalkan.{kept, plural, =0 {} other { # surel yang usulannya sudah diterapkan tetap ada.}}",
+      "deleteConfirm": "Hapus surel",
+      "noneToIgnore": "Profil ini tidak membaca surel yang dapat diabaikan.",
+      "noneToDelete": "Profil ini tidak membaca surel yang dapat dihapus."
     },
     "deleteDialog": {
       "title": "Hapus profil?",

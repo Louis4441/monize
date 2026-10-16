@@ -150,14 +150,29 @@
     "payeeUnavailable": "Danh sách người nhận không khả dụng",
     "actions": {
       "approve": "Duyệt",
-      "viewJson": "Xem JSON"
+      "viewJson": "Xem JSON",
+      "ignoreEmails": "Bỏ qua các email khớp",
+      "deleteEmails": "Xóa các email khớp"
     },
     "toasts": {
       "approved": "Đã duyệt trình phân tích",
       "approveFailed": "Không thể duyệt trình phân tích",
       "changedElsewhere": "Trình phân tích này đã được thay đổi ở nơi khác. Danh sách đã được tải lại.",
       "deleted": "Đã xóa trình phân tích",
-      "deleteFailed": "Không thể xóa trình phân tích"
+      "deleteFailed": "Không thể xóa trình phân tích",
+      "emailsIgnored": "{count, plural, other {Đã bỏ qua # email}}",
+      "emailsDeleted": "{count, plural, other {Đã xóa # email}}",
+      "bulkFailed": "Không thể xử lý xong email của trình phân tích này. Những email đã xử lý vẫn giữ nguyên."
+    },
+    "bulk": {
+      "ignoreTitle": "Bỏ qua email của trình phân tích này?",
+      "ignoreMessage": "{count, plural, other {# email}} mà {name} đọc sẽ bị bỏ qua: chúng không đề xuất gì nữa và các đề xuất đang mở sẽ bị đóng.{kept, plural, =0 {} other { # email đã được áp dụng hoặc không đọc được sẽ giữ nguyên.}}",
+      "ignoreConfirm": "Bỏ qua email",
+      "deleteTitle": "Xóa email của trình phân tích này?",
+      "deleteMessage": "{count, plural, other {# email}} mà {name} đọc sẽ bị xóa cùng với các đề xuất đang mở. Không thể hoàn tác thao tác này.{kept, plural, =0 {} other { # email có đề xuất đã được áp dụng sẽ được giữ lại.}}",
+      "deleteConfirm": "Xóa email",
+      "noneToIgnore": "Trình phân tích này không đọc email nào có thể bỏ qua.",
+      "noneToDelete": "Trình phân tích này không đọc email nào có thể xóa."
     },
     "deleteDialog": {
       "title": "Xóa trình phân tích?",

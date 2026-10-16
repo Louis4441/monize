@@ -115,7 +115,12 @@ interface RawRow {
   in_domain: boolean;
 }
 
-const DOMAIN_MATCH_SQL = `EXISTS (
+/**
+ * An email `r` is from one of the domains in `$2` (`text[]`), or one of their
+ * sub-domains: the preview's emails, and the emails a profile's bulk actions
+ * look at before asking which profile reads each one.
+ */
+export const DOMAIN_MATCH_SQL = `EXISTS (
         SELECT 1
           FROM unnest($2::text[]) AS pd(domain)
          WHERE r.from_domain = pd.domain

@@ -1,13 +1,7 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
-import { tr } from "../../i18n/translate";
 import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import { EmailReceipt } from "../entities/email-receipt.entity";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
@@ -16,10 +10,14 @@ import { EmailReceiptTradeLinkService } from "./email-receipt-trade-link.service
 import { EmailReceiptPipelineService } from "../pipeline/email-receipt-pipeline.service";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
 import {
-  closeReceiptRequests,
-  currentReceiptRequestStatus,
-  lockReceiptTransaction,
-} from "../pipeline/receipt-requests.util";
+  deleteLockedReceipt,
+  ignoreLockedReceipt,
+  lockReceipt,
+  receiptApplied,
+  receiptAppliedConflict,
+  receiptNotFound,
+  receiptSkippedConflict,
+} from "./receipt-disposal";
 import {
   EMAIL_RECEIPT_PROCESSABLE_STATUSES,
   EMAIL_RECEIPTS_DEFAULT_BATCH_LIMIT,
@@ -763,25 +761,11 @@ export class EmailReceiptsService {
     await withScopedDb(this.dataSource, async (m) => {
       const receipt = await this.lockReceipt(m, userId, id);
       if (receipt.status === "ignored") return;
-      if (receipt.status === "skipped") {
-        throw new ConflictException(
-          tr(
-            "errors.emailReceipts.receiptSkipped",
-            "This email could not be read (it was too large or could not be decoded), so there is nothing to process.",
-          ),
-        );
+      if (receipt.status === "skipped") throw receiptSkippedConflict();
+      if (await receiptApplied(m, userId, receipt)) {
+        throw receiptAppliedConflict();
       }
-      await this.refuseWhenApplied(m, userId, receipt);
-      if (receipt.transactionId) {
-        await lockReceiptTransaction(m, receipt.transactionId);
-      }
-      await closeReceiptRequests(m, userId, id);
-      await m
-        .getRepository(EmailReceipt)
-        .update(
-          { id, userId },
-          { status: "ignored", statusReason: null, aiReviewRequestId: null },
-        );
+      await ignoreLockedReceipt(m, userId, receipt);
     });
     return this.get(userId, id);
   }
@@ -790,11 +774,7 @@ export class EmailReceiptsService {
   async remove(userId: string, id: string): Promise<void> {
     await withScopedDb(this.dataSource, async (m) => {
       const receipt = await this.lockReceipt(m, userId, id);
-      if (receipt.transactionId) {
-        await lockReceiptTransaction(m, receipt.transactionId);
-      }
-      await closeReceiptRequests(m, userId, id);
-      await m.getRepository(EmailReceipt).delete({ id, userId });
+      await deleteLockedReceipt(m, userId, receipt);
     });
   }
 
@@ -805,32 +785,9 @@ export class EmailReceiptsService {
     userId: string,
     id: string,
   ): Promise<EmailReceipt> {
-    const receipt = await m.getRepository(EmailReceipt).findOne({
-      where: { id, userId },
-      lock: { mode: "pessimistic_write" },
-    });
+    const receipt = await lockReceipt(m, userId, id);
     if (!receipt) throw receiptNotFound(id);
     return receipt;
-  }
-
-  private async refuseWhenApplied(
-    m: EntityManager,
-    userId: string,
-    receipt: EmailReceipt,
-  ): Promise<void> {
-    const status = await currentReceiptRequestStatus(
-      m,
-      userId,
-      receipt.aiReviewRequestId,
-    );
-    if (status === "applied") {
-      throw new ConflictException(
-        tr(
-          "errors.emailReceipts.receiptApplied",
-          "This email's proposal has already been applied to a transaction.",
-        ),
-      );
-    }
   }
 
   private async readDetail(
@@ -933,10 +890,4 @@ export class EmailReceiptsService {
         : [];
     });
   }
-}
-
-function receiptNotFound(id: string): NotFoundException {
-  return new NotFoundException(
-    tr("errors.emailReceipts.receiptNotFound", `Email ${id} not found`, { id }),
-  );
 }

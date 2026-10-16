@@ -983,6 +983,22 @@ section 3a.
   that the same person could not approve one by one, and the daily limit counts each one.
   The service and controller live in the AI module (the receipts module imports it, not
   the reverse).
+- `POST /email-receipts/profile-batch` `{ parserId, action, after? }` counts, ignores or
+  deletes the stored emails a profile matches (`EmailReceiptProfileBatchService`). An
+  email matches when the pipeline would give it to the profile: `chooseReceiptParser`
+  over the user's approved profiles (`loadApprovedParsers`) with this one among them as
+  approved (a draft is asked about as it would read once approved), so the sender
+  domain, the subject words, the ranking against the other profiles and `requireLine`
+  all count, and an email another profile of the same domain reads is never touched.
+  The scan walks the profile's sender-domain emails (`DOMAIN_MATCH_SQL`) in id order,
+  100 per call, and answers `{ matched, applied, unreadable, ignored, done, next }`; the
+  client loops with `after = next` until `next` is null, so each email is looked at once
+  whatever the action does to it. `count` writes nothing (the client confirms with the
+  totals first). Each email is ignored or deleted in its own transaction under its row
+  lock, with the single action's steps (`backend/src/email-receipts/receipts/receipt-disposal.ts`) and its state read
+  again there: an email whose proposal was applied is kept by both actions, one that could
+  not be read (`skipped`) is kept by `ignore` (the single action refuses it) and deleted
+  by `delete`. A deleted email is not fetched again: the mailbox cursor is past it.
 
 ## 9. Frontend
 

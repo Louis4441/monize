@@ -150,14 +150,29 @@
     "payeeUnavailable": "Liste des bénéficiaires indisponible",
     "actions": {
       "approve": "Approuver",
-      "viewJson": "Afficher le JSON"
+      "viewJson": "Afficher le JSON",
+      "ignoreEmails": "Ignorer les e-mails correspondants",
+      "deleteEmails": "Supprimer les e-mails correspondants"
     },
     "toasts": {
       "approved": "Profil approuvé",
       "approveFailed": "Le profil n'a pas pu être approuvé",
       "changedElsewhere": "Ce profil a été modifié ailleurs. La liste a été rechargée.",
       "deleted": "Profil supprimé",
-      "deleteFailed": "Le profil n'a pas pu être supprimé"
+      "deleteFailed": "Le profil n'a pas pu être supprimé",
+      "emailsIgnored": "{count, plural, one {# e-mail ignoré} other {# e-mails ignorés}}",
+      "emailsDeleted": "{count, plural, one {# e-mail supprimé} other {# e-mails supprimés}}",
+      "bulkFailed": "Impossible de terminer avec les e-mails de ce profil. Ceux déjà traités restent ainsi."
+    },
+    "bulk": {
+      "ignoreTitle": "Ignorer les e-mails de ce profil ?",
+      "ignoreMessage": "{count, plural, one {# e-mail lu par {name} sera ignoré} other {# e-mails lus par {name} seront ignorés}} : plus rien n'est proposé et les propositions ouvertes sont fermées.{kept, plural, =0 {} one { # e-mail déjà appliqué ou illisible reste tel quel.} other { # e-mails déjà appliqués ou illisibles restent tels quels.}}",
+      "ignoreConfirm": "Ignorer les e-mails",
+      "deleteTitle": "Supprimer les e-mails de ce profil ?",
+      "deleteMessage": "{count, plural, one {# e-mail lu par {name} sera supprimé} other {# e-mails lus par {name} seront supprimés}}, avec les propositions ouvertes. Cette action est irréversible.{kept, plural, =0 {} one { # e-mail dont la proposition a déjà été appliquée est conservé.} other { # e-mails dont les propositions ont déjà été appliquées sont conservés.}}",
+      "deleteConfirm": "Supprimer les e-mails",
+      "noneToIgnore": "Ce profil ne lit aucun e-mail pouvant être ignoré.",
+      "noneToDelete": "Ce profil ne lit aucun e-mail pouvant être supprimé."
     },
     "deleteDialog": {
       "title": "Supprimer le profil ?",

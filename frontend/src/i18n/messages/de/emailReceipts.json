@@ -150,14 +150,29 @@
     "payeeUnavailable": "Zahlungsempfängerliste nicht verfügbar",
     "actions": {
       "approve": "Freigeben",
-      "viewJson": "JSON anzeigen"
+      "viewJson": "JSON anzeigen",
+      "ignoreEmails": "Passende E-Mails ignorieren",
+      "deleteEmails": "Passende E-Mails löschen"
     },
     "toasts": {
       "approved": "Profil freigegeben",
       "approveFailed": "Das Profil konnte nicht freigegeben werden",
       "changedElsewhere": "Dieses Profil wurde an anderer Stelle geändert. Die Liste wurde neu geladen.",
       "deleted": "Profil gelöscht",
-      "deleteFailed": "Das Profil konnte nicht gelöscht werden"
+      "deleteFailed": "Das Profil konnte nicht gelöscht werden",
+      "emailsIgnored": "{count, plural, one {# E-Mail ignoriert} other {# E-Mails ignoriert}}",
+      "emailsDeleted": "{count, plural, one {# E-Mail gelöscht} other {# E-Mails gelöscht}}",
+      "bulkFailed": "Die E-Mails dieses Profils konnten nicht vollständig bearbeitet werden. Bereits bearbeitete bleiben so."
+    },
+    "bulk": {
+      "ignoreTitle": "E-Mails dieses Profils ignorieren?",
+      "ignoreMessage": "{count, plural, one {# E-Mail, die {name} ausliest, wird} other {# E-Mails, die {name} ausliest, werden}} ignoriert: Sie schlagen nichts vor, und ihre offenen Vorschläge werden geschlossen.{kept, plural, =0 {} one { # E-Mail, die bereits angewendet wurde oder nicht gelesen werden konnte, bleibt unverändert.} other { # E-Mails, die bereits angewendet wurden oder nicht gelesen werden konnten, bleiben unverändert.}}",
+      "ignoreConfirm": "E-Mails ignorieren",
+      "deleteTitle": "E-Mails dieses Profils löschen?",
+      "deleteMessage": "{count, plural, one {# E-Mail, die {name} ausliest, wird} other {# E-Mails, die {name} ausliest, werden}} samt ihren offenen Vorschlägen gelöscht. Das lässt sich nicht rückgängig machen.{kept, plural, =0 {} one { # E-Mail, deren Vorschlag bereits angewendet wurde, bleibt.} other { # E-Mails, deren Vorschläge bereits angewendet wurden, bleiben.}}",
+      "deleteConfirm": "E-Mails löschen",
+      "noneToIgnore": "Dieses Profil liest keine E-Mails, die ignoriert werden können.",
+      "noneToDelete": "Dieses Profil liest keine E-Mails, die gelöscht werden können."
     },
     "deleteDialog": {
       "title": "Profil löschen?",

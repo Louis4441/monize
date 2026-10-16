@@ -150,14 +150,29 @@
     "payeeUnavailable": "Lijst met begunstigden niet beschikbaar",
     "actions": {
       "approve": "Goedkeuren",
-      "viewJson": "JSON bekijken"
+      "viewJson": "JSON bekijken",
+      "ignoreEmails": "Overeenkomende e-mails negeren",
+      "deleteEmails": "Overeenkomende e-mails verwijderen"
     },
     "toasts": {
       "approved": "Profiel goedgekeurd",
       "approveFailed": "Het profiel kon niet worden goedgekeurd",
       "changedElsewhere": "Dit profiel is elders gewijzigd. De lijst is opnieuw geladen.",
       "deleted": "Profiel verwijderd",
-      "deleteFailed": "Het profiel kon niet worden verwijderd"
+      "deleteFailed": "Het profiel kon niet worden verwijderd",
+      "emailsIgnored": "{count, plural, one {# e-mail genegeerd} other {# e-mails genegeerd}}",
+      "emailsDeleted": "{count, plural, one {# e-mail verwijderd} other {# e-mails verwijderd}}",
+      "bulkFailed": "De e-mails van dit profiel konden niet allemaal worden verwerkt. Wat al verwerkt is, blijft zo."
+    },
+    "bulk": {
+      "ignoreTitle": "De e-mails van dit profiel negeren?",
+      "ignoreMessage": "{count, plural, one {# e-mail die {name} inleest, wordt} other {# e-mails die {name} inleest, worden}} genegeerd: ze stellen niets meer voor en hun open voorstellen worden gesloten.{kept, plural, =0 {} one { # e-mail die al is toegepast of niet kon worden gelezen, blijft zoals hij is.} other { # e-mails die al zijn toegepast of niet konden worden gelezen, blijven zoals ze zijn.}}",
+      "ignoreConfirm": "E-mails negeren",
+      "deleteTitle": "De e-mails van dit profiel verwijderen?",
+      "deleteMessage": "{count, plural, one {# e-mail die {name} inleest, wordt} other {# e-mails die {name} inleest, worden}} verwijderd, samen met hun open voorstellen. Dit kan niet ongedaan worden gemaakt.{kept, plural, =0 {} one { # e-mail waarvan het voorstel al is toegepast, blijft.} other { # e-mails waarvan het voorstel al is toegepast, blijven.}}",
+      "deleteConfirm": "E-mails verwijderen",
+      "noneToIgnore": "Dit profiel leest geen e-mails in die kunnen worden genegeerd.",
+      "noneToDelete": "Dit profiel leest geen e-mails in die kunnen worden verwijderd."
     },
     "deleteDialog": {
       "title": "Het profiel verwijderen?",

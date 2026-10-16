@@ -24,7 +24,9 @@ import {
   LinkEmailReceiptDto,
   ListEmailReceiptsDto,
   ProcessBatchEmailReceiptsDto,
+  ProfileBatchEmailReceiptsDto,
 } from "./dto/email-receipts.dto";
+import { EmailReceiptProfileBatchService } from "./email-receipt-profile-batch.service";
 import { EmailReceiptsService } from "./email-receipts.service";
 
 /**
@@ -45,6 +47,7 @@ export class EmailReceiptsController {
   constructor(
     private readonly receipts: EmailReceiptsService,
     private readonly ai: EmailReceiptAiService,
+    private readonly profileBatches: EmailReceiptProfileBatchService,
   ) {}
 
   @Get()
@@ -125,6 +128,25 @@ export class EmailReceiptsController {
       limit: dto.limit,
       since: dto.since,
     });
+  }
+
+  @Post("profile-batch")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
+  @ApiOperation({
+    summary:
+      "Count, ignore or delete the stored emails a profile matches (as the pipeline chooses the profile), a page per call; answers what it found and did, and the cursor of the next page",
+  })
+  profileBatch(
+    @Request() req: { user: { id: string } },
+    @Body() dto: ProfileBatchEmailReceiptsDto,
+  ) {
+    return this.profileBatches.run(
+      req.user.id,
+      dto.parserId,
+      dto.action,
+      dto.after,
+    );
   }
 
   @Get(":id")

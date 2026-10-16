@@ -24,6 +24,8 @@ import type {
   EmailReceiptStatus,
   ProcessEmailReceiptsPayload,
   ProcessEmailReceiptsResult,
+  ProfileBatchPayload,
+  ProfileBatchResult,
   TestEmailReceiptMailboxPayload,
   TestEmailReceiptParserPayload,
   UpdateEmailReceiptMailboxSettingsPayload,
@@ -177,6 +179,16 @@ export const emailReceiptsApi = {
      */
     processBatch: async (payload: ProcessEmailReceiptsPayload = {}): Promise<ProcessEmailReceiptsResult> => {
       const response = await apiClient.post<ProcessEmailReceiptsResult>(`${RECEIPTS}/process-batch`, payload);
+      return response.data;
+    },
+
+    /**
+     * Count, ignore or delete one page of the stored emails a profile matches.
+     * Send the answer's `next` back as `after` until it is null
+     * (`sweepProfileEmails` does).
+     */
+    profileBatch: async (payload: ProfileBatchPayload): Promise<ProfileBatchResult> => {
+      const response = await apiClient.post<ProfileBatchResult>(`${RECEIPTS}/profile-batch`, payload);
       return response.data;
     },
 
