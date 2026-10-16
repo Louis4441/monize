@@ -828,14 +828,18 @@ export class AiReviewRequestsService {
    * back together. The UPDATE is bound to the user, to the kind and to
    * `proposed`: a request that was dismissed or expired since the card was built
    * matches nothing and the caller's write is refused (409) before it happens.
-   * The caller runs this first, under the holdings lock.
+   * The caller runs this first, under the holdings lock. Returns the email the
+   * request was raised for (null once that email is deleted).
    */
   async markTradeApplied(
     m: EntityManager,
     userId: string,
     id: string,
-  ): Promise<void> {
-    const applied = returnedRows<{ id: string }>(
+  ): Promise<{ emailReceiptId: string | null }> {
+    const applied = returnedRows<{
+      id: string;
+      email_receipt_id: string | null;
+    }>(
       await m.query(
         `UPDATE ai_review_requests
             SET status = 'applied'
@@ -844,7 +848,7 @@ export class AiReviewRequestsService {
             AND kind = 'email_trade'
             AND status = 'proposed'
             AND expires_at > CURRENT_TIMESTAMP
-         RETURNING id`,
+         RETURNING id, email_receipt_id`,
         [id, userId],
       ),
     );
@@ -856,6 +860,7 @@ export class AiReviewRequestsService {
         ),
       );
     }
+    return { emailReceiptId: applied[0].email_receipt_id };
   }
 
   /**

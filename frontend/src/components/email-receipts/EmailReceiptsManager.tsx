@@ -28,6 +28,7 @@ import { useReceiptParserLookups } from '@/hooks/useReceiptParserLookups';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import {
   canDraftParser,
+  canLinkTradeEmail,
   canRecognizeWithAi,
   distinctSenderDomains,
   isReceiptActionable,
@@ -54,13 +55,6 @@ type ReceiptFilter = (typeof FILTERS)[number];
 /** States from which the detail dialog can link the email to a transaction. */
 const LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['ambiguous', 'unmatched', 'no_parser', 'parse_failed'];
 
-/**
- * States from which a trade email can be linked to the investment transaction it
- * reports: it was read (its proposal waits, was dismissed or was refused), or the
- * trade was already in the ledger (`ignored`, which is where "link" marks the
- * scheduled bill it pays as paid).
- */
-const TRADE_LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['parse_failed', 'review', 'review_conflict', 'ignored'];
 
 /** The list answers one pair of filters (state and sender domain, `''` for all); `items === null` is a request that failed. */
 interface LoadedList {
@@ -319,8 +313,15 @@ export function EmailReceiptsManager() {
     }
   };
 
-  const handleApprove = (receipt: EmailReceiptListItem) =>
-    runCommand(
+  const handleApprove = (receipt: EmailReceiptListItem) => {
+    // A trade creates an investment transaction: it is approved on its card in
+    // the review inbox, where the account, the ticker and the total are shown,
+    // never blind from this list.
+    if (receipt.isTrade) {
+      router.push('/ai-reviews?kind=email_receipt');
+      return;
+    }
+    return runCommand(
       receipt,
       async () => {
         if (!receipt.aiReviewRequestId) throw new Error('no proposal');
@@ -330,6 +331,7 @@ export function EmailReceiptsManager() {
       },
       t('toasts.approveFailed'),
     );
+  };
 
   const toggleSelected = (receipt: EmailReceiptListItem) =>
     setSelectedIds((previous) => {
@@ -381,7 +383,7 @@ export function EmailReceiptsManager() {
       {
         // The proposal this email made, applied as the review inbox's Confirm does.
         key: 'approve',
-        label: t('actions.approve'),
+        label: receipt.isTrade ? t('actions.reviewTrade') : t('actions.approve'),
         icon: 'post',
         tone: 'success',
         onClick: () => void handleApprove(receipt),
@@ -416,9 +418,7 @@ export function EmailReceiptsManager() {
         onClick: () => setDetailId(receipt.id),
         // The candidates of an ambiguous email, or the picker of one the matcher
         // could not tie to a transaction.
-        hidden: receipt.isTrade
-          ? !TRADE_LINKABLE_STATUSES.includes(receipt.status) || receipt.displayState === 'applied'
-          : !LINKABLE_STATUSES.includes(receipt.status),
+        hidden: receipt.isTrade ? !canLinkTradeEmail(receipt) : !LINKABLE_STATUSES.includes(receipt.status),
         disabled,
       },
       {

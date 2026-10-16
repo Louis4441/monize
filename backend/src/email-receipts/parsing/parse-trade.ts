@@ -1,6 +1,5 @@
 import type { GlobCaptures } from "../../transaction-rules/rule-glob-capture";
-import { findField, readAmount } from "./parse-receipt";
-import { isStrictReceiptAmount, parseReceiptAmount } from "./receipt-amount";
+import { findField } from "./parse-receipt";
 import { normalizeLine } from "./receipt-lines";
 import { matchReceiptPattern } from "./receipt-glob";
 import {
@@ -13,6 +12,7 @@ import {
   type ReceiptTradeTrace,
   type ReceiptTraceHit,
 } from "./receipt-parser.types";
+import { parseTradeNumber, tradeAmountCurrency } from "./trade-number";
 
 /**
  * The trade reader (design "Trade confirmations"): the lines of one brokerage
@@ -21,16 +21,20 @@ import {
  * reader's field machinery (`findField`: entries in array order, line patterns
  * and labelled entries), so a trade profile reads exactly like a receipt one.
  *
- * Arithmetic is integer: money is 1/10000 units, a share count is held as an
- * integer of 1e-8 shares in a BigInt while it is multiplied by a price, so a
- * fractional share (75.9878) is never a float in a comparison.
+ * Arithmetic is integer: money is 1/10000 units, a share count and a price are
+ * held as integers of 1e-8 in a BigInt while they are multiplied, so neither a
+ * fractional share (75.9878) nor a 4-decimal price (26.3201) is ever a float in
+ * a comparison. Numbers are read with the trade grammar (`trade-number.ts`).
  */
 
 const MONEY_UNITS = 10_000;
+const MONEY_DECIMALS = 4;
 const QUANTITY_UNITS = 100_000_000n;
-const MAX_QUANTITY_TEXT = 24;
+/** A price is read to 8 decimals for the cross-check, stored to 4 for the card. */
+const PRICE_DECIMALS = 8;
 const ONE_CENT_UNITS = 100n;
 
+/** English and French month names (Wealthsimple writes both). */
 const MONTHS: Readonly<Record<string, number>> = {
   jan: 1,
   january: 1,
@@ -56,57 +60,79 @@ const MONTHS: Readonly<Record<string, number>> = {
   november: 11,
   dec: 12,
   december: 12,
+  janvier: 1,
+  janv: 1,
+  février: 2,
+  fevrier: 2,
+  févr: 2,
+  fevr: 2,
+  mars: 3,
+  avril: 4,
+  avr: 4,
+  mai: 5,
+  juin: 6,
+  juillet: 7,
+  juil: 7,
+  août: 8,
+  aout: 8,
+  septembre: 9,
+  octobre: 10,
+  novembre: 11,
+  décembre: 12,
+  decembre: 12,
+  déc: 12,
 };
 
 const isDigits = (text: string): boolean =>
   text !== "" && [...text].every((ch) => ch >= "0" && ch <= "9");
 
 /**
- * A share count: digits with an optional `.` and up to 8 decimals; a comma is a
- * thousands separator. Anything else (a sign, an exponent, text, a second
- * point) is null. Returned as the exact integer of 1e-8 shares and as a number.
+ * A share count: a positive number with up to 8 decimals, in either decimal
+ * convention ("75.9878", "75,9878", "1,234.5"); a sign is dropped (the action
+ * says which way the shares moved). Anything else is null. Returned as the
+ * exact integer of 1e-8 shares and as a number.
  */
 export function parseTradeQuantity(
   text: string,
 ): { units: bigint; value: number } | null {
-  const trimmed = text.trim().replace(/,/g, "");
-  if (trimmed === "" || trimmed.length > MAX_QUANTITY_TEXT) return null;
-  const [whole, fraction = "", ...rest] = trimmed.split(".");
-  if (rest.length > 0) return null;
-  if (!isDigits(whole) || (fraction !== "" && !isDigits(fraction))) {
-    return null;
-  }
-  if (fraction.length > MAX_TRADE_QUANTITY_DECIMALS) return null;
-  if (whole.length > 12) return null;
-  const units =
-    BigInt(whole) * QUANTITY_UNITS +
-    BigInt(fraction.padEnd(MAX_TRADE_QUANTITY_DECIMALS, "0"));
-  if (units === 0n) return null;
-  return { units, value: Number(trimmed) };
+  const read = parseTradeNumber(text, MAX_TRADE_QUANTITY_DECIMALS);
+  if (read === null || read.units === 0n) return null;
+  return { units: read.units, value: Number(read.units) / 1e8 };
 }
 
-/** Whether the text names a buy or a sell (the first word wins); null when it names neither or both. */
+/** Whether the text names a buy or a sell (English or French); null when it names neither or both. */
 export function parseTradeAction(text: string): ParsedTradeAction | null {
-  const words = text.toLowerCase().split(/[^a-z]+/);
-  const buy = words.includes("buy") || words.includes("bought");
-  const sell = words.includes("sell") || words.includes("sold");
+  const words = text.toLowerCase().split(/[^a-zà-ÿ]+/);
+  const buy = ["buy", "bought", "achat", "acheté", "achete"].some((w) =>
+    words.includes(w),
+  );
+  const sell = ["sell", "sold", "vente", "vendu"].some((w) =>
+    words.includes(w),
+  );
   if (buy === sell) return null;
   return buy ? "BUY" : "SELL";
 }
 
 /**
- * The day in a trade's date text: `YYYY-MM-DD`, or an English month name with a
- * day and a year ("October 15, 2026 12:04 EDT"). The time and the zone are
- * ignored on purpose: the text states the broker's own local day, which is the
- * day the trade is dated. Null when no real calendar day is found.
+ * The day in a trade's date text:
+ * - `YYYY-MM-DD`, also as the date of an ISO timestamp ("2026-10-15T12:04:00Z")
+ *   or written `YYYY/MM/DD`;
+ * - a month name with a day and a year, either order, English or French
+ *   ("October 15, 2026 12:04 EDT", "15 Oct 2026", "15 octobre 2026", "1er mai 2026");
+ * - a numeric day and month with a 4-digit year ("10/15/2026", "15.10.2026")
+ *   only when which is the day is certain (one part above 12, or both equal).
+ * The time and the zone are ignored on purpose: the text states the broker's
+ * own local day, which is the day the trade is dated. Null when no real
+ * calendar day is found.
  */
 export function parseTradeDate(text: string): string | null {
   const tokens = text
     .toLowerCase()
     .split(/[\s,]+/)
+    .map((t) => t.replace(/t\d.*$/, ""))
     .filter((t) => t !== "");
   for (const token of tokens) {
-    const parts = token.split("-");
+    const parts = token.split(/[-/]/);
     if (
       parts.length === 3 &&
       parts[0].length === 4 &&
@@ -117,13 +143,44 @@ export function parseTradeDate(text: string): string | null {
       return validDay(Number(parts[0]), Number(parts[1]), Number(parts[2]));
     }
   }
+  const dayOf = (token: string): string =>
+    token.replace(/\.$/, "").replace(/(st|nd|rd|th|er)$/, "");
+  const monthOf = (token: string): number | undefined =>
+    MONTHS[token.replace(/\.$/, "")];
   for (let i = 0; i + 2 < tokens.length; i++) {
-    const month = MONTHS[tokens[i].replace(/\.$/, "")];
-    const day = tokens[i + 1].replace(/(st|nd|rd|th)$/, "");
     const year = tokens[i + 2];
-    if (month && isDigits(day) && year.length === 4 && isDigits(year)) {
+    if (year.length !== 4 || !isDigits(year)) continue;
+    // Month day year ("October 15, 2026").
+    const month = monthOf(tokens[i]);
+    const day = dayOf(tokens[i + 1]);
+    if (month && isDigits(day)) {
       return validDay(Number(year), month, Number(day));
     }
+    // Day month year ("15 octobre 2026").
+    const month2 = monthOf(tokens[i + 1]);
+    const day2 = dayOf(tokens[i]);
+    if (month2 && isDigits(day2)) {
+      return validDay(Number(year), month2, Number(day2));
+    }
+  }
+  for (const token of tokens) {
+    const parts = token.split(/[/.]/);
+    if (
+      parts.length !== 3 ||
+      parts[2].length !== 4 ||
+      !parts.every(isDigits) ||
+      parts[0].length > 2 ||
+      parts[1].length > 2
+    ) {
+      continue;
+    }
+    const a = Number(parts[0]);
+    const b = Number(parts[1]);
+    const year = Number(parts[2]);
+    if (a > 12 && b <= 12) return validDay(year, b, a);
+    if (b > 12 && a <= 12) return validDay(year, a, b);
+    if (a === b) return validDay(year, a, b);
+    return null;
   }
   return null;
 }
@@ -137,23 +194,17 @@ function validDay(year: number, month: number, day: number): string | null {
   return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`;
 }
 
-/** The decimals a price was written with ("26.32" is 2); a text with no point has none. */
-function priceDecimals(text: string): number {
-  const cleaned = text.trim().replace(/[^0-9.]/g, "");
-  const at = cleaned.lastIndexOf(".");
-  return at < 0 ? 0 : Math.min(4, cleaned.length - at - 1);
-}
-
 /**
  * Whether quantity times price agrees with the executed total. A price written
  * with `d` decimals is within half a unit of its last place, so the product may
  * be off by `quantity * 0.5 * 10^-d`, plus one cent for the total's own
  * rounding. Commission is in the total of a buy and out of a sell's proceeds.
+ * `priceUnits8` is the price in 1e-8 units, exactly as written.
  */
 export function tradeIsConsistent(input: {
   action: ParsedTradeAction;
   quantityUnits: bigint;
-  priceUnits: number;
+  priceUnits8: bigint;
   priceDecimals: number;
   totalUnits: number;
   commissionUnits: number;
@@ -163,15 +214,41 @@ export function tradeIsConsistent(input: {
       ? input.totalUnits - input.commissionUnits
       : input.totalUnits + input.commissionUnits;
   if (gross < 0) return false;
-  // Both sides at 1e-12 of a currency unit: quantity (1e-8) * price (1e-4).
-  const product = input.quantityUnits * BigInt(input.priceUnits);
-  const expected = BigInt(gross) * QUANTITY_UNITS;
+  // Both sides at 1e-16 of a currency unit: quantity (1e-8) * price (1e-8),
+  // and the total (1e-4) scaled by 1e12.
+  const product = input.quantityUnits * input.priceUnits8;
+  const expected = BigInt(gross) * 1_000_000_000_000n;
   const diff = product > expected ? product - expected : expected - product;
-  const halfLastPlace = 10n ** BigInt(4 - input.priceDecimals) / 2n;
+  const decimals = Math.min(Math.max(input.priceDecimals, 0), PRICE_DECIMALS);
+  const halfLastPlace = 10n ** BigInt(PRICE_DECIMALS - decimals) / 2n;
   const tolerance =
     input.quantityUnits * (halfLastPlace === 0n ? 1n : halfLastPlace) +
-    ONE_CENT_UNITS * QUANTITY_UNITS;
+    ONE_CENT_UNITS * 1_000_000_000_000n;
   return diff <= tolerance;
+}
+
+/** An amount field (total, commission): the first capture `{amount}` the trade grammar reads, as 1/10000 units. */
+function readTradeAmount(
+  entries: readonly ReceiptFieldEntry[] | undefined,
+  lines: readonly string[],
+): { value: number; text: string; hit: ReceiptTraceHit } | null {
+  const found = findField(
+    entries,
+    lines,
+    (captures) =>
+      captures.amount !== undefined &&
+      parseTradeNumber(captures.amount, MONEY_DECIMALS) !== null,
+  );
+  if (found === null) return null;
+  const read = parseTradeNumber(found.captures.amount, MONEY_DECIMALS);
+  if (read === null || read.units > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return null;
+  }
+  return {
+    value: Number(read.units),
+    text: found.captures.amount,
+    hit: found.hit,
+  };
 }
 
 const hasCapture =
@@ -196,18 +273,27 @@ function readText(
     : { value: found.captures[name].trim(), hit: found.hit };
 }
 
-/** The account a trade is for: the first rule whose glob matches the account text, else the default. */
+/**
+ * The account a trade is for: the first rule whose glob matches the account
+ * text, else the default. When the email names an account and the profile has
+ * rules, none of which matches it, there is no account: the email names one the
+ * profile does not know (a TFSA beside a profile's RRSP rule), and booking it to
+ * the default would book it to the wrong account. The default covers emails
+ * that name no account, and profiles that map every account to one.
+ */
 export function resolveTradeAccountId(
   definition: Pick<ReceiptTradeDefinition, "accountRules" | "defaultAccountId">,
   accountText: string | null,
 ): string | null {
+  const rules = definition.accountRules ?? [];
   if (accountText !== null) {
     const line = normalizeLine(accountText);
-    for (const rule of definition.accountRules ?? []) {
+    for (const rule of rules) {
       if (matchReceiptPattern(rule.match, line, () => true) !== null) {
         return rule.accountId;
       }
     }
+    if (rules.length > 0) return null;
   }
   return definition.defaultAccountId ?? null;
 }
@@ -232,23 +318,30 @@ export function parseTradeLinesTraced(
     "quantity",
     (v) => parseTradeQuantity(v) !== null,
   );
-  const total = readAmount(definition.total, lines);
-  // The price keeps the text it was written in: its decimals bound the rounding
-  // the cross-check allows.
+  const total = readTradeAmount(definition.total, lines);
+  // The price is read to 8 decimals and keeps the number of decimals it was
+  // written with: they bound the rounding the cross-check allows.
   const priceFound = findField(
     definition.price,
     lines,
     (captures) =>
-      captures.amount !== undefined && isStrictReceiptAmount(captures.amount),
+      captures.amount !== undefined &&
+      parseTradeNumber(captures.amount, PRICE_DECIMALS) !== null,
   );
-  const priceUnits = priceFound
-    ? parseReceiptAmount(priceFound.captures.amount)
+  const priceRead = priceFound
+    ? parseTradeNumber(priceFound.captures.amount, PRICE_DECIMALS)
     : null;
   const price =
-    priceFound && priceUnits !== null
-      ? { value: priceUnits, hit: priceFound.hit }
+    priceFound && priceRead !== null
+      ? {
+          // Stored in 1/10000 units, rounded half up, for the card.
+          value: Number((priceRead.units + 5_000n) / 10_000n),
+          units8: priceRead.units,
+          decimals: priceRead.decimals,
+          hit: priceFound.hit,
+        }
       : null;
-  const commission = readAmount(definition.commission, lines);
+  const commission = readTradeAmount(definition.commission, lines);
   const dateRead = readText(
     definition.date,
     lines,
@@ -279,20 +372,23 @@ export function parseTradeLinesTraced(
     consistent = tradeIsConsistent({
       action: actionValue,
       quantityUnits: quantity.units,
-      priceUnits: price.value,
-      priceDecimals: priceDecimals(priceFound?.captures.amount ?? ""),
+      priceUnits8: price.units8,
+      priceDecimals: price.decimals,
       totalUnits: total.value,
       commissionUnits: commission?.value ?? 0,
     });
   }
 
-  const trade: ParsedTrade = {
+  const read: ParsedTrade = {
     action: actionValue,
     symbol: symbol?.value ?? null,
     quantity: quantity?.value ?? null,
     total: total?.value ?? null,
     price: price?.value ?? null,
     commission: commission?.value ?? null,
+    currency:
+      (total ? tradeAmountCurrency(total.text) : null) ??
+      (priceFound ? tradeAmountCurrency(priceFound.captures.amount) : null),
     date: dateRead ? parseTradeDate(dateRead.value) : null,
     accountText,
     accountId,
@@ -300,6 +396,16 @@ export function parseTradeLinesTraced(
     consistent,
     reason,
   };
+  // A sell whose price implies less than its commission has no total to propose.
+  const trade: ParsedTrade =
+    read.complete && tradeExecutedTotalUnits(read) === null
+      ? {
+          ...read,
+          complete: false,
+          consistent: null,
+          reason: "trade_no_amount",
+        }
+      : read;
   return {
     trade,
     trace: {
@@ -320,6 +426,24 @@ export function parseTradeLines(
   lines: readonly string[],
 ): ParsedTrade {
   return parseTradeLinesTraced(definition, lines).trade;
+}
+
+/**
+ * The executed total a complete reading proposes, in 1/10000 units: the total
+ * the email states, else the one its price implies (commission added to a buy,
+ * taken from a sell), rounded half up to 1/10000. Null when neither is read.
+ * The one place this is decided, so the preview shows what the pipeline proposes.
+ */
+export function tradeExecutedTotalUnits(trade: ParsedTrade): number | null {
+  if (trade.total !== null) return trade.total;
+  if (trade.price === null || trade.quantity === null) return null;
+  const quantity8 = BigInt(Math.round(trade.quantity * 1e8));
+  const gross =
+    (quantity8 * BigInt(trade.price) + 50_000_000n) / QUANTITY_UNITS;
+  const commission = BigInt(trade.commission ?? 0);
+  const total =
+    trade.action === "SELL" ? gross - commission : gross + commission;
+  return total < 0n ? null : Number(total);
 }
 
 /** The executed total as a decimal for the proposal: 1/10000 units to a number with at most 4 decimals. */

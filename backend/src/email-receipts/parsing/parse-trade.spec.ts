@@ -30,6 +30,7 @@ describe("parseTradeLines", () => {
       total: 20_000_000,
       price: 263_200,
       commission: null,
+      currency: null,
       date: "2026-10-15",
       accountText: "RRSP",
       accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
@@ -90,18 +91,125 @@ describe("parseTradeLines", () => {
     expect(parsed.consistent).toBe(false);
   });
 
-  it("uses the default account when the text matches no rule", () => {
+  it("never books account text the rules do not know to the default account", () => {
+    // A TFSA email under a profile that knows only RRSP: booking it to the
+    // default would book it to the wrong account.
+    const rrspOnly: ReceiptTradeDefinition = {
+      ...trade,
+      accountRules: [
+        { match: "RRSP", accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID },
+      ],
+      defaultAccountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+    };
+    const body = WEALTHSIMPLE_BUY_BODY.replace(
+      "Account: RRSP",
+      "Account: TFSA",
+    );
+    const parsed = parseTradeLines(rrspOnly, lines(body));
+    expect(parsed.accountId).toBeNull();
+    expect(parsed.reason).toBe("trade_no_account");
+  });
+
+  it("uses the default account for an email that names none, and for a profile with no rules", () => {
     const withDefault: ReceiptTradeDefinition = {
       ...trade,
       defaultAccountId: WEALTHSIMPLE_TFSA_ACCOUNT_ID,
     };
-    const body = WEALTHSIMPLE_BUY_BODY.replace(
-      "Account: RRSP",
-      "Account: Margin",
-    );
-    expect(parseTradeLines(withDefault, lines(body)).accountId).toBe(
+    const noAccountLine = WEALTHSIMPLE_BUY_BODY.replace("Account: RRSP\n", "");
+    expect(parseTradeLines(withDefault, lines(noAccountLine)).accountId).toBe(
       WEALTHSIMPLE_TFSA_ACCOUNT_ID,
     );
+    const noRules: ReceiptTradeDefinition = {
+      ...withDefault,
+      accountRules: undefined,
+    };
+    expect(
+      parseTradeLines(noRules, lines(WEALTHSIMPLE_BUY_BODY)).accountId,
+    ).toBe(WEALTHSIMPLE_TFSA_ACCOUNT_ID);
+  });
+
+  it("reads a price with three or four decimals as a price, and cross-checks it exactly", () => {
+    for (const price of ["$26.320", "$26.3200", "$26.32000000"]) {
+      const parsed = parseTradeLines(
+        trade,
+        lines(WEALTHSIMPLE_BUY_BODY.replace("$26.32", price)),
+      );
+      expect(parsed.price).toBe(263_200);
+      expect(parsed.consistent).toBe(true);
+    }
+    // A 4-decimal price 0.0001 too high is still within its own rounding plus
+    // a cent; one 0.01 too high is not.
+    const close = parseTradeLines(
+      trade,
+      lines(WEALTHSIMPLE_BUY_BODY.replace("$26.32", "$26.3201")),
+    );
+    expect(close.price).toBe(263_201);
+    expect(close.consistent).toBe(true);
+    const off = parseTradeLines(
+      trade,
+      lines(WEALTHSIMPLE_BUY_BODY.replace("$26.32", "$26.3300")),
+    );
+    expect(off.consistent).toBe(false);
+  });
+
+  it("reads the European convention, with the tolerance of the decimals actually written", () => {
+    const body = WEALTHSIMPLE_BUY_BODY.replace("75.9878", "75,9878")
+      .replace("$26.32", "26,32 $")
+      .replace("$2,000.00", "2 000,00 $");
+    const parsed = parseTradeLines(trade, lines(body));
+    expect(parsed.quantity).toBe(75.9878);
+    expect(parsed.price).toBe(263_200);
+    expect(parsed.total).toBe(20_000_000);
+    expect(parsed.consistent).toBe(true);
+    // 76 shares at 26,00 is 1976, $24 short of 2.000,00: two written decimals
+    // allow half a cent a share, not half a dollar.
+    const wrong = WEALTHSIMPLE_BUY_BODY.replace("75.9878", "76")
+      .replace("$26.32", "26,00 $")
+      .replace("$2,000.00", "2.000,00 $");
+    expect(parseTradeLines(trade, lines(wrong)).consistent).toBe(false);
+  });
+
+  it("reads a total printed as a debit as the total", () => {
+    for (const total of [
+      "-$2,000.00",
+      "($2,000.00)",
+      "$-2,000.00",
+      "−2,000.00",
+    ]) {
+      const parsed = parseTradeLines(
+        trade,
+        lines(WEALTHSIMPLE_BUY_BODY.replace("$2,000.00", total)),
+      );
+      expect(parsed.total).toBe(20_000_000);
+      expect(parsed.consistent).toBe(true);
+    }
+  });
+
+  it("reads the currency an amount names, and none from a bare dollar sign", () => {
+    expect(
+      parseTradeLines(trade, lines(WEALTHSIMPLE_BUY_BODY)).currency,
+    ).toBeNull();
+    const usd = WEALTHSIMPLE_BUY_BODY.replace("$2,000.00", "$2,000.00 USD");
+    expect(parseTradeLines(trade, lines(usd)).currency).toBe("USD");
+    const eur = WEALTHSIMPLE_BUY_BODY.replace("$2,000.00", "€2,000.00");
+    expect(parseTradeLines(trade, lines(eur)).currency).toBe("EUR");
+  });
+
+  it("is incomplete when a sell's price implies less than its commission", () => {
+    const sell: ReceiptTradeDefinition = {
+      ...trade,
+      total: undefined,
+      commission: ["Commission: {amount}"],
+    };
+    const body = WEALTHSIMPLE_BUY_BODY.replace("Fractional Buy", "Sell")
+      .replace("Shares: 75.9878", "Shares: 0.01")
+      .replace(
+        "Average price: $26.32",
+        "Average price: $1.00\nCommission: $9.99",
+      );
+    const parsed = parseTradeLines(sell, lines(body));
+    expect(parsed.complete).toBe(false);
+    expect(parsed.reason).toBe("trade_no_amount");
   });
 
   it("traces the lines that read each value", () => {
@@ -122,14 +230,35 @@ describe("trade value readers", () => {
     expect(parseTradeQuantity("0.00000001")?.units).toBe(1n);
   });
 
-  it.each(["", "0", "-5", "1e3", "1.2.3", "12.123456789", "abc", "5 shares"])(
-    "refuses the share count %p",
-    (text) => {
-      expect(parseTradeQuantity(text)).toBeNull();
-    },
-  );
+  it("reads share counts in either decimal convention, and a sign is only the direction", () => {
+    expect(parseTradeQuantity("75,9878")?.value).toBe(75.9878);
+    expect(parseTradeQuantity("1.234,5")?.value).toBe(1234.5);
+    expect(parseTradeQuantity("1 234,5")?.value).toBe(1234.5);
+    // A comma with exactly three digits after it groups thousands.
+    expect(parseTradeQuantity("1,234")?.value).toBe(1234);
+    expect(parseTradeQuantity("1.234")?.value).toBe(1.234);
+    expect(parseTradeQuantity("-5")?.value).toBe(5);
+  });
+
+  it.each([
+    "",
+    "0",
+    "1e3",
+    "1.2.3",
+    "12.123456789",
+    "abc",
+    "5 shares 3",
+    ",,,1",
+    "1,,2",
+    "1,2,3",
+    "2 x 3",
+  ])("refuses the share count %p", (text) => {
+    expect(parseTradeQuantity(text)).toBeNull();
+  });
 
   it("reads the direction from the words", () => {
+    expect(parseTradeAction("Achat fractionné")).toBe("BUY");
+    expect(parseTradeAction("Vente")).toBe("SELL");
     expect(parseTradeAction("Fractional Buy")).toBe("BUY");
     expect(parseTradeAction("Market sell")).toBe("SELL");
     expect(parseTradeAction("Buy to cover sell")).toBeNull();
@@ -145,11 +274,24 @@ describe("trade value readers", () => {
     expect(parseTradeDate("no date here")).toBeNull();
   });
 
+  it("reads ISO timestamps, day-first and French dates, and a numeric date only when it is certain", () => {
+    expect(parseTradeDate("2026-10-15T12:04:00Z")).toBe("2026-10-15");
+    expect(parseTradeDate("2026/10/15")).toBe("2026-10-15");
+    expect(parseTradeDate("15 October 2026")).toBe("2026-10-15");
+    expect(parseTradeDate("15 octobre 2026 12 h 04 HAE")).toBe("2026-10-15");
+    expect(parseTradeDate("1er mai 2026")).toBe("2026-05-01");
+    expect(parseTradeDate("10/15/2026")).toBe("2026-10-15");
+    expect(parseTradeDate("15.10.2026")).toBe("2026-10-15");
+    expect(parseTradeDate("05/05/2026")).toBe("2026-05-05");
+    // May 6th or June 5th: not certain, so no day.
+    expect(parseTradeDate("05/06/2026")).toBeNull();
+  });
+
   it("allows the rounding of a written price and one cent, no more", () => {
     const base = {
       action: "BUY" as const,
       quantityUnits: 7_598_780_000n,
-      priceUnits: 263_200,
+      priceUnits8: 2_632_000_000n,
       priceDecimals: 2,
       totalUnits: 20_000_000,
       commissionUnits: 0,
@@ -163,7 +305,7 @@ describe("trade value readers", () => {
     const shares = 1_000_000_000n;
     const common = {
       quantityUnits: shares,
-      priceUnits: 100_000,
+      priceUnits8: 1_000_000_000n,
       priceDecimals: 2,
       commissionUnits: 99_900,
     };
@@ -186,6 +328,17 @@ describe("trade value readers", () => {
       ),
     ).toBe(WEALTHSIMPLE_RRSP_ACCOUNT_ID);
     expect(resolveTradeAccountId({}, "RRSP")).toBeNull();
+    expect(
+      resolveTradeAccountId(
+        {
+          accountRules: [
+            { match: "RRSP", accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID },
+          ],
+          defaultAccountId: WEALTHSIMPLE_TFSA_ACCOUNT_ID,
+        },
+        "Margin",
+      ),
+    ).toBeNull();
   });
 });
 

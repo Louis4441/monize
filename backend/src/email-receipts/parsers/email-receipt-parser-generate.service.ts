@@ -203,6 +203,16 @@ export class EmailReceiptParserGenerateService {
   ): Promise<Prepared> {
     // A trade confirmation pays no bank transaction: its samples are emails only.
     const isTrade = dto.kind === "trade";
+    const given = isTrade ? dto.tradeReceiptIds : dto.samples;
+    const other = isTrade ? dto.samples : dto.tradeReceiptIds;
+    if (given === undefined || other !== undefined) {
+      throw new BadRequestException(
+        tr(
+          "errors.emailReceipts.generateSamplesForKind",
+          "A receipt profile is generated from samples (each email with the transaction it paid for); a trade profile from tradeReceiptIds. Send the one for the kind, and not the other.",
+        ),
+      );
+    }
     const pairs: Array<{ receiptId: string; transactionId: string | null }> =
       isTrade
         ? (dto.tradeReceiptIds ?? []).map((receiptId) => ({

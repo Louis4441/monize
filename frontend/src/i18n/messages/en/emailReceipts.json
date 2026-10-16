@@ -422,7 +422,14 @@
         "requireLine": "Required line",
         "skipIfLine": "Skip line",
         "waitIfLine": "Wait line",
-        "reference": "Reference"
+        "reference": "Reference",
+        "action": "Buy or sell",
+        "symbol": "Ticker",
+        "quantity": "Shares",
+        "price": "Price",
+        "commission": "Commission",
+        "date": "Date",
+        "account": "Account"
       },
       "entryLine": "entry {entry} ({pattern}), line {line}: {text}",
       "entrySubject": "entry {entry} ({pattern}), the subject: {text}",
@@ -557,7 +564,8 @@
       "approve": "Approve",
       "draftParser": "Prepare a profile with AI",
       "createParser": "Create profile",
-      "ignore": "Ignore"
+      "ignore": "Ignore",
+      "reviewTrade": "Review in inbox"
     },
     "toasts": {
       "approved": "Proposal approved",
@@ -699,7 +707,11 @@
       "capped": "Only the first {max} lines are read.",
       "empty": "No lines.",
       "listLabel": "Numbered lines of the email"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.",
+    "noTradeTransaction": "None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.",
+    "candidateShares": "{quantity} shares",
+    "tradeNoCandidates": "No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox."
   },
   "picker": {
     "heading": "Choose the transaction",
@@ -780,7 +792,8 @@
     "inboxLink": "Open the AI review inbox",
     "opened": "Opened the chat with the email attached. Read the message and press Send.",
     "chatPrompt": "Recognize the products, quantities and prices in the attached order email and split my transaction of {date} ({payee}, {amount}) by product with a category for each. Claim AI review request {requestId} and submit your proposal for it.",
-    "tradeChatPrompt": "Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy or a sell, the ticker, the shares, the executed total and the date. Claim AI review request {requestId} and submit the trade for it."
+    "tradeChatPrompt": "Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy or a sell, the ticker, the shares, the executed total and the date. Claim AI review request {requestId} and submit the trade for it.",
+    "tradeDetachesTransaction": "Read as a trade, this email no longer stands behind {summary}: the trade creates its own investment transaction."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Skipped (skip line found)",
         "wait_line": "On hold (order not final)",
         "no_html": "No HTML part",
-        "trade": "Proposes a trade"
+        "trade": "Proposes a trade",
+        "trade_exists": "Already in your ledger"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "The average price does not match the shares and the total, so this trade will not be applied automatically.",
     "incomplete": "The profile could not read a complete trade from this email.",
     "totalFromPrice": "the total implied by the price",
-    "dateUnknown": "the day the email arrived"
+    "dateUnknown": "the day the email arrived",
+    "price": "Average price in the email: {price} a share"
   }
 }

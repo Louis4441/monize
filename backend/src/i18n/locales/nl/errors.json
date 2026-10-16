@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "Het veld trade beantwoordt alleen een handelsverzoek.",
     "tradeDateRequired": "De transactie heeft een datum nodig (JJJJ-MM-DD): de e-mail is weg, dus er is geen dag om op terug te vallen.",
     "tradeInvalid": "De transactie heeft accountName, action (BUY of SELL), symbol, quantity, totalAmount en eventueel commission en date (JJJJ-MM-DD) nodig.",
-    "tradeSecurityAmbiguous": "\"{symbol}\" komt overeen met meerdere van je effecten ({list}). Hernoem er één zodat het symbool uniek is.",
-    "tradeSecurityUnknown": "Je hebt geen effect met het symbool \"{symbol}\". Voeg het effect toe en verwerk de e-mail daarna opnieuw.",
+    "tradeSecurityAmbiguous": "\"{{ symbol }}\" komt overeen met meerdere van je effecten ({{ list }}). Hernoem er één zodat het symbool uniek is.",
+    "tradeSecurityUnknown": "Je hebt geen effect met het symbool \"{{ symbol }}\". Voeg het effect toe en verwerk de e-mail daarna opnieuw.",
     "tagNamesInvalid": "Een voorstel mag maximaal {{ max }} labels toevoegen van elk 1 tot {{ length }} tekens, zonder stuurtekens.",
     "noApprovableProposal": "Dit verzoek heeft hier geen voorstel om goed te keuren.",
-    "approveFailed": "Dit voorstel kon niet worden goedgekeurd. Probeer het apart."
+    "approveFailed": "Dit voorstel kon niet worden goedgekeurd. Probeer het apart.",
+    "tradeAlreadyBooked": "Deze transactie staat al in je administratie. Koppel de e-mail eraan in plaats van haar opnieuw te boeken.",
+    "tradeScheduleMoved": "De geplande transactie die deze transactie zou betalen, is sinds het voorstel geboekt of gewijzigd. Koppel de e-mail in plaats daarvan aan die transactie, of wijs hem af.",
+    "tradeCurrencyMismatch": "De bedragen in de e-mail zijn in {{ currency }}, maar je effect {{ symbol }} wordt verhandeld in {{ securityCurrency }}. Controleer welke notering is gekocht en voer de transactie dan zelf in."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Te veel verificatiepogingen. Log opnieuw in.",
@@ -417,7 +420,12 @@
     "previewExpectedNotSelected": "Er is een verwachte transactie genoemd voor een e-mail die niet bij de geselecteerde e-mails hoort.",
     "previewReceiptOutsideDomain": "Een e-mail komt niet van een afzenderdomein van dit profiel.",
     "parserCategoryNameUnknown": "De categorie \"{{ name }}\" is niet gevonden. Gebruik de naam van een van uw categorieën.",
-    "parserCategoryNameAmbiguous": "De categorie \"{{ name }}\" komt overeen met meerdere categorieën ({{ candidates }}). Gebruik de volledige naam, bijvoorbeeld \"Parent: Child\"."
+    "parserCategoryNameAmbiguous": "De categorie \"{{ name }}\" komt overeen met meerdere categorieën ({{ candidates }}). Gebruik de volledige naam, bijvoorbeeld \"Parent: Child\".",
+    "tradeNotBankLinkable": "Deze e-mail wordt gelezen als transactiebevestiging. Koppel hem in plaats daarvan aan een beleggingstransactie.",
+    "tradeAccountedFor": "Deze e-mail hoort al bij een beleggingstransactie en wordt daarom niet opnieuw gelezen.",
+    "tradeLinkedElsewhere": "Een andere e-mail hoort al bij die transactie.",
+    "parserAccountNotFound": "Een rekening die in dit transactieprofiel staat, is geen van je open beleggingsrekeningen.",
+    "generateSamplesForKind": "Een bonprofiel wordt gemaakt uit samples (elke e-mail met de transactie die hij betaalde), een transactieprofiel uit tradeReceiptIds. Stuur het veld dat bij de soort hoort, en niet het andere."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "E-mail is niet geconfigureerd. Noodtoegang kan pas worden ingeschakeld als SMTP is ingesteld.",

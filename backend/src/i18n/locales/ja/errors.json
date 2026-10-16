@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "tradeフィールドは取引リクエストにのみ応答します。",
     "tradeDateRequired": "取引には日付(YYYY-MM-DD)が必要です:メールがすでにないため、代わりの日がありません。",
     "tradeInvalid": "取引には accountName、action(BUY または SELL)、symbol、quantity、totalAmount が必要で、任意で commission と date(YYYY-MM-DD)を指定できます。",
-    "tradeSecurityAmbiguous": "「{symbol}」は複数の銘柄({list})に一致します。ティッカーが一意になるよう、いずれかの名前を変更してください。",
-    "tradeSecurityUnknown": "ティッカー「{symbol}」の銘柄がありません。銘柄を追加してから、メールを再処理してください。",
+    "tradeSecurityAmbiguous": "「{{ symbol }}」は複数の銘柄({{ list }})に一致します。ティッカーが一意になるよう、いずれかの名前を変更してください。",
+    "tradeSecurityUnknown": "ティッカー「{{ symbol }}」の銘柄がありません。銘柄を追加してから、メールを再処理してください。",
     "tagNamesInvalid": "提案に追加できるタグは最大 {{ max }} 個で、各タグは 1 から {{ length }} 文字、制御文字は使えません。",
     "noApprovableProposal": "このリクエストには、ここで承認できる提案がありません。",
-    "approveFailed": "この提案は承認できませんでした。単独でもう一度お試しください。"
+    "approveFailed": "この提案は承認できませんでした。単独でもう一度お試しください。",
+    "tradeAlreadyBooked": "この取引はすでに台帳にあります。もう一度記帳せず、メールをその取引に紐付けてください。",
+    "tradeScheduleMoved": "この取引が支払う予定だった定期取引は、提案後に記帳または変更されました。代わりにメールをその取引に紐付けるか、却下してください。",
+    "tradeCurrencyMismatch": "メールの金額は {{ currency }} ですが、銘柄 {{ symbol }} は {{ securityCurrency }} で取引されています。どの上場銘柄を購入したか確認し、取引を自分で入力してください。"
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "確認の試行回数が多すぎます。もう一度ログインしてください。",
@@ -417,7 +420,12 @@
     "previewExpectedNotSelected": "選択されたメールに含まれていないメールに対して、期待される取引が指定されました。",
     "previewReceiptOutsideDomain": "メールの 1 通が、このプロフィールの送信元ドメインから届いたものではありません。",
     "parserCategoryNameUnknown": "カテゴリ「{{ name }}」が見つかりません。あなたのカテゴリの1つの名前を使用してください。",
-    "parserCategoryNameAmbiguous": "カテゴリ「{{ name }}」は複数のカテゴリと一致しています（{{ candidates }}）。完全な名前を使用してください（例：「Parent: Child」）。"
+    "parserCategoryNameAmbiguous": "カテゴリ「{{ name }}」は複数のカテゴリと一致しています（{{ candidates }}）。完全な名前を使用してください（例：「Parent: Child」）。",
+    "tradeNotBankLinkable": "このメールは取引確認として読み取られています。代わりに投資取引に紐付けてください。",
+    "tradeAccountedFor": "このメールはすでに投資取引に対応しているため、再度読み取られません。",
+    "tradeLinkedElsewhere": "別のメールがすでにその取引に対応しています。",
+    "parserAccountNotFound": "この取引プロファイルで指定された口座は、開設中の証券口座ではありません。",
+    "generateSamplesForKind": "レシートプロファイルは samples（各メールと、それが支払った取引）から、取引プロファイルは tradeReceiptIds から生成されます。種類に合うほうだけを送信してください。"
   },
   "emergencyAccess": {
     "smtpNotConfigured": "メールが設定されていません。SMTPが設定されるまで緊急アクセスは有効にできません。",

@@ -422,7 +422,14 @@
         "requireLine": "필수 줄",
         "skipIfLine": "건너뛰기 줄",
         "waitIfLine": "보류 줄",
-        "reference": "참조"
+        "reference": "참조",
+        "action": "매수 또는 매도",
+        "symbol": "종목 코드",
+        "quantity": "주식 수",
+        "price": "가격",
+        "commission": "수수료",
+        "date": "날짜",
+        "account": "계좌"
       },
       "entryLine": "항목 {entry} ({pattern}), {line}번째 줄: {text}",
       "entrySubject": "항목 {entry} ({pattern}), 제목: {text}",
@@ -557,7 +564,8 @@
       "approve": "승인",
       "draftParser": "AI로 프로필 준비",
       "createParser": "프로필 만들기",
-      "ignore": "제외"
+      "ignore": "제외",
+      "reviewTrade": "검토함에서 확인"
     },
     "toasts": {
       "approved": "제안을 승인했습니다",
@@ -699,7 +707,11 @@
       "capped": "처음 {max}줄만 읽습니다.",
       "empty": "줄이 없습니다.",
       "listLabel": "이메일의 번호가 매겨진 줄"
-    }
+    },
+    "tradeTransactionSummary": "{date}에 {symbol} {quantity}주를 {total}에 {action, select, BUY {매수} other {매도}}.",
+    "noTradeTransaction": "아직 없음: 제안을 승인하면 거래가 기록되거나, 원장에 이미 있는 거래에 연결됩니다.",
+    "candidateShares": "{quantity}주",
+    "tradeNoCandidates": "거래일 전후 일주일 안에 이 계좌, 방향, 종목 코드로 연결할 수 있는 투자 거래가 없습니다. 직접 입력했다면 계좌와 날짜를 확인하고, 그렇지 않다면 검토함에서 제안을 승인하세요."
   },
   "picker": {
     "heading": "거래 선택",
@@ -780,7 +792,8 @@
     "inboxLink": "AI 검토 수신함 열기",
     "opened": "이메일을 첨부한 채로 채팅을 열었습니다. 메시지를 읽고 보내기를 누르세요.",
     "chatPrompt": "첨부한 주문 이메일의 상품, 수량, 가격을 인식하고, {date}의 내 거래({payee}, {amount})를 각각 카테고리를 지정해 상품별로 나눠 주세요. AI 검토 요청 {requestId}을(를) 맡아서 그에 대한 제안을 제출해 주세요.",
-    "tradeChatPrompt": "첨부된 증권사 확인 메일의 거래를 인식하세요: 계좌, 매수인지 매도인지, 종목 코드, 수량, 체결 합계, 날짜. AI 검토 요청 {requestId}를 맡고 그 거래를 제출하세요."
+    "tradeChatPrompt": "첨부된 증권사 확인 메일의 거래를 인식하세요: 계좌, 매수인지 매도인지, 종목 코드, 수량, 체결 합계, 날짜. AI 검토 요청 {requestId}를 맡고 그 거래를 제출하세요.",
+    "tradeDetachesTransaction": "거래로 읽으면 이 이메일은 더 이상 {summary}에 대응되지 않습니다. 거래는 자체 투자 거래를 만듭니다."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "건너뜀 (건너뛰기 줄 발견)",
         "wait_line": "보류 (주문이 최종 아님)",
         "no_html": "HTML 부분 없음",
-        "trade": "거래를 제안함"
+        "trade": "거래를 제안함",
+        "trade_exists": "이미 원장에 있음"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "평균 가격이 수량과 합계와 맞지 않아 이 거래는 자동으로 적용되지 않습니다.",
     "incomplete": "프로필이 이 메일에서 완전한 거래를 읽지 못했습니다.",
     "totalFromPrice": "가격으로 계산한 합계",
-    "dateUnknown": "메일이 도착한 날"
+    "dateUnknown": "메일이 도착한 날",
+    "price": "이메일의 평균 가격: 주당 {price}"
   }
 }

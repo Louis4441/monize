@@ -422,7 +422,14 @@
         "requireLine": "Dòng bắt buộc",
         "skipIfLine": "Dòng bỏ qua",
         "waitIfLine": "Dòng chờ",
-        "reference": "Tham chiếu"
+        "reference": "Tham chiếu",
+        "action": "Mua hoặc bán",
+        "symbol": "Mã",
+        "quantity": "Cổ phiếu",
+        "price": "Giá",
+        "commission": "Phí hoa hồng",
+        "date": "Ngày",
+        "account": "Tài khoản"
       },
       "entryLine": "mục {entry} ({pattern}), dòng {line}: {text}",
       "entrySubject": "mục {entry} ({pattern}), tiêu đề: {text}",
@@ -557,7 +564,8 @@
       "approve": "Phê duyệt",
       "draftParser": "Chuẩn bị hồ sơ với AI",
       "createParser": "Tạo hồ sơ",
-      "ignore": "Phớt lờ"
+      "ignore": "Phớt lờ",
+      "reviewTrade": "Xem trong hộp thư"
     },
     "toasts": {
       "approved": "Đề xuất được phê duyệt",
@@ -699,7 +707,11 @@
       "capped": "Chỉ đọc {max} dòng đầu tiên.",
       "empty": "Không có dòng nào.",
       "listLabel": "Các dòng được đánh số của email"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Đã mua} other {Đã bán}} {quantity} {symbol} với giá {total} vào {date}.",
+    "noTradeTransaction": "Chưa có: giao dịch được ghi khi bạn duyệt đề xuất, hoặc được liên kết với giao dịch đã có trong sổ cái.",
+    "candidateShares": "{quantity} cổ phiếu",
+    "tradeNoCandidates": "Không có giao dịch đầu tư nào của tài khoản, chiều và mã này trong vòng một tuần quanh ngày giao dịch còn trống để liên kết. Nếu bạn tự nhập giao dịch, hãy kiểm tra tài khoản và ngày; nếu không, hãy duyệt đề xuất trong hộp thư xem xét."
   },
   "picker": {
     "heading": "Chọn giao dịch",
@@ -780,7 +792,8 @@
     "inboxLink": "Mở hộp thư xem xét của AI",
     "opened": "Đã mở cuộc trò chuyện kèm email. Hãy đọc tin nhắn và nhấn Gửi.",
     "chatPrompt": "Hãy nhận dạng các sản phẩm, số lượng và giá trong email đơn hàng đính kèm, rồi chia giao dịch ngày {date} của tôi ({payee}, {amount}) theo sản phẩm, mỗi sản phẩm có một danh mục. Hãy nhận yêu cầu xem xét AI {requestId} và gửi đề xuất của bạn cho yêu cầu đó.",
-    "tradeChatPrompt": "Hãy nhận diện giao dịch trong email xác nhận của công ty môi giới đính kèm: tài khoản, mua hay bán, mã, số lượng, tổng đã khớp và ngày. Nhận yêu cầu xem xét bằng AI {requestId} và gửi giao dịch cho nó."
+    "tradeChatPrompt": "Hãy nhận diện giao dịch trong email xác nhận của công ty môi giới đính kèm: tài khoản, mua hay bán, mã, số lượng, tổng đã khớp và ngày. Nhận yêu cầu xem xét bằng AI {requestId} và gửi giao dịch cho nó.",
+    "tradeDetachesTransaction": "Khi đọc là giao dịch, email này không còn tương ứng với {summary}: giao dịch sẽ tạo giao dịch đầu tư riêng."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Đã bỏ qua (có dòng bỏ qua)",
         "wait_line": "Đang chờ (đơn hàng chưa chốt)",
         "no_html": "Không có phần HTML",
-        "trade": "Đề xuất một giao dịch"
+        "trade": "Đề xuất một giao dịch",
+        "trade_exists": "Đã có trong sổ cái"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "Giá trung bình không khớp với số lượng và tổng, nên giao dịch này sẽ không được áp dụng tự động.",
     "incomplete": "Trình phân tích không đọc được một giao dịch đầy đủ từ email này.",
     "totalFromPrice": "tổng suy ra từ giá",
-    "dateUnknown": "ngày email đến"
+    "dateUnknown": "ngày email đến",
+    "price": "Giá trung bình trong email: {price} mỗi cổ phiếu"
   }
 }

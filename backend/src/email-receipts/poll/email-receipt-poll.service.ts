@@ -482,7 +482,8 @@ export class EmailReceiptPollService {
    * days (the bank transaction usually arrives later than the email), and
    * `review` ones that stand behind no transaction or behind a request that no
    * longer exists (a restore). A request that was dismissed, expired or applied
-   * still exists and is left alone.
+   * still exists and is left alone. A trade email is never one: it stands behind
+   * no bank transaction by design, and its proposal is the person's to approve.
    */
   private async selectRematch(
     userId: string,
@@ -499,6 +500,15 @@ export class EmailReceiptPollService {
                 (r.status = 'unmatched'
                   AND r.received_at > CURRENT_TIMESTAMP - ($4::int * INTERVAL '1 day'))
                 OR (r.status = 'review'
+                  -- A trade email has no bank transaction by design and its
+                  -- outcome lives on its own request: not a lost match.
+                  AND r.trade IS NULL
+                  AND NOT EXISTS (
+                        SELECT 1
+                          FROM ai_review_requests t
+                         WHERE t.id = r.ai_review_request_id
+                           AND t.user_id = r.user_id
+                           AND t.kind = 'email_trade')
                   AND (r.transaction_id IS NULL
                        OR NOT EXISTS (
                             SELECT 1

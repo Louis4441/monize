@@ -152,6 +152,7 @@ export const PARSED_TRADE = {
   total: 20_000_000,
   price: 263_200,
   commission: null,
+  currency: null,
   date: '2026-10-15',
   accountText: 'RRSP',
   accountId: 'acc-rrsp',

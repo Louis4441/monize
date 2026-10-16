@@ -55,7 +55,8 @@
     "dates": "作成日 {created}、期限 {expires}",
     "viewTransaction": "取引を表示",
     "waitingForAgent": "AIエージェントを待っています。<link>設定でAIプロバイダーを接続する</link>か、MCPクライアントに引き受けさせてください。",
-    "parserDraftReady": "プロフィールの下書きができました。<link>プロフィールの設定でテストして承認する</link>。"
+    "parserDraftReady": "プロフィールの下書きができました。<link>プロフィールの設定でテストして承認する</link>。",
+    "tradePending": "メールの取引（未読み取り）"
   },
   "actions": {
     "dismiss": "却下する"

@@ -11,7 +11,10 @@ import { withScopedDb } from "../common/db/scoped-db";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 import { AiActionBuilderService } from "../ai/actions/ai-action-builder.service";
-import type { PendingAiAction } from "../ai/actions/ai-action.types";
+import type {
+  CreateInvestmentTransactionDescriptor,
+  PendingAiAction,
+} from "../ai/actions/ai-action.types";
 import { AccountsService } from "../accounts/accounts.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
 import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
@@ -25,6 +28,7 @@ import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
 import { receiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
 import { AiReviewRequest } from "./ai-review-request.entity";
 import { AiReviewRequestsService } from "./ai-review-requests.service";
+import { emailDayOfUser, findTradeInLedger } from "./trade-ledger";
 import {
   AI_REVIEW_EMAIL_TEXT_MAX_CHARS,
   AI_REVIEW_MAX_TAG_NAME_LENGTH,
@@ -569,6 +573,7 @@ export class AiReviewWorkService {
     const resolved = await this.securitiesService.resolveByTradeSymbol(
       userId,
       trade.symbol,
+      trade.accountId,
     );
     if (!resolved.match) {
       if (resolved.candidates.length > 0) {
@@ -589,42 +594,94 @@ export class AiReviewWorkService {
         ),
       );
     }
+    // The total is in the security's currency. An email whose amounts name
+    // another (a CAD total for a USD listing) would be booked at the wrong
+    // figure, and the ticker alone cannot say which listing was meant.
+    if (
+      trade.currency &&
+      trade.currency.toUpperCase() !== resolved.match.currencyCode.toUpperCase()
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.aiReview.tradeCurrencyMismatch",
+          `The email's amounts are in ${trade.currency}, but your security ${resolved.match.symbol} trades in ${resolved.match.currencyCode}. Check which listing was bought, then enter the trade yourself.`,
+          {
+            currency: trade.currency,
+            symbol: resolved.match.symbol,
+            securityCurrency: resolved.match.currencyCode,
+          },
+        ),
+      );
+    }
+    // The ledger may hold this trade already: a card for it would book it twice.
+    // Asked for every card (the profile's, an agent's, the inbox's rebuild), and
+    // again by the confirm itself, under the write's lock.
+    const ledger = await withScopedDb(this.dataSource, (m) =>
+      findTradeInLedger(
+        m,
+        userId,
+        { ...trade, securityId: resolved.match!.id },
+        request.emailReceiptId,
+      ),
+    );
+    if (ledger.unclaimedId !== null) {
+      throw new ConflictException(
+        tr(
+          "errors.aiReview.tradeAlreadyBooked",
+          "Your ledger already has this trade. Link the email to it instead of booking it again.",
+        ),
+      );
+    }
+    const action =
+      trade.action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL;
+    // A scheduled bill or deposit this trade pays is marked paid by approving
+    // it. Looked up each time the card is built, so the inbox shows the
+    // schedule as it is now; an unsure match (none, or several) is no match.
+    // Posting it settles through the schedule's own funding account, so the
+    // card is previewed with that account: what it shows is what is written.
+    const scheduled =
+      await this.scheduledTransactionsService.findInvestmentOccurrenceForTrade(
+        userId,
+        {
+          accountId: trade.accountId,
+          securityId: resolved.match.id,
+          action,
+          date: trade.date,
+          commission: trade.commission,
+        },
+      );
     const preview =
       await this.investmentTransactionsService.previewCreateInvestmentTransaction(
         userId,
         {
           accountId: trade.accountId,
-          action:
-            trade.action === "BUY"
-              ? InvestmentAction.BUY
-              : InvestmentAction.SELL,
+          action,
           transactionDate: trade.date,
           securityQuery: resolved.match.symbol,
           quantity: trade.quantity,
           totalAmount: trade.totalAmount,
           commission: trade.commission,
+          ...(scheduled?.fundingAccountId
+            ? { fundingAccountId: scheduled.fundingAccountId }
+            : {}),
           description: trade.description ?? undefined,
         },
       );
-    // A scheduled bill or deposit this trade pays is marked paid by approving
-    // it. Looked up each time the card is built, so the inbox shows the
-    // schedule as it is now; an unsure match (none, or several) is no match.
-    const scheduled = preview.securityId
-      ? await this.scheduledTransactionsService.findInvestmentOccurrenceForTrade(
-          userId,
-          {
-            accountId: trade.accountId,
-            securityId: preview.securityId,
-            action: preview.action,
-            date: trade.date,
-            commission: trade.commission,
-          },
-        )
-      : null;
     return this.actionBuilder.buildCreateInvestmentTransaction(
       userId,
       preview,
-      { aiReviewRequestId: request.id, ...(scheduled ? { scheduled } : {}) },
+      {
+        aiReviewRequestId: request.id,
+        ...(scheduled
+          ? {
+              scheduled: {
+                id: scheduled.id,
+                name: scheduled.name,
+                dueDate: scheduled.dueDate,
+              },
+            }
+          : {}),
+      },
     );
   }
 
@@ -687,7 +744,7 @@ export class AiReviewWorkService {
     };
   }
 
-  /** The day the trade email was sent (the shop's day for a forward), else null when the email is gone. */
+  /** The day the trade email was sent (the shop's day for a forward) in the user's timezone, else null when the email is gone. */
   private async emailDay(
     userId: string,
     request: AiReviewRequest,
@@ -700,9 +757,13 @@ export class AiReviewWorkService {
       }),
     );
     return receipt
-      ? (receipt.originalSentAt ?? receipt.receivedAt)
-          .toISOString()
-          .slice(0, 10)
+      ? withScopedDb(this.dataSource, (m) =>
+          emailDayOfUser(
+            m,
+            userId,
+            receipt.originalSentAt ?? receipt.receivedAt,
+          ),
+        )
       : null;
   }
 
@@ -957,7 +1018,29 @@ export class AiReviewWorkService {
     trade: AiReviewTradeInput,
   ): Promise<{ action: PendingAiAction } | { error: string }> {
     try {
-      return { action: await this.buildTradeCard(userId, request, trade) };
+      const action = await this.buildTradeCard(userId, request, trade);
+      // The card the proposal was made with paid a scheduled occurrence. If the
+      // rebuild no longer finds it, it was posted (the auto-post cron, a person)
+      // or moved since: a plain creation now would put the trade in the ledger
+      // beside the posted row, so there is no card to approve.
+      const stored =
+        request.proposal as Partial<StoredAiReviewTradeProposal> | null;
+      const before = stored?.action?.descriptor as
+        Partial<CreateInvestmentTransactionDescriptor> | undefined;
+      const after = action.descriptor as CreateInvestmentTransactionDescriptor;
+      if (
+        typeof before?.scheduledTransactionId === "string" &&
+        (before.scheduledTransactionId !== after.scheduledTransactionId ||
+          before.scheduledDueDate !== after.scheduledDueDate)
+      ) {
+        return {
+          error: tr(
+            "errors.aiReview.tradeScheduleMoved",
+            "The scheduled transaction this trade was to pay has been posted or changed since it was proposed. Link the email to that transaction instead, or dismiss it.",
+          ),
+        };
+      }
+      return { action };
     } catch (err) {
       // A refusal (the account was closed, the security renamed, the position
       // no longer covers a sell) is the reason to show; anything else is ours.

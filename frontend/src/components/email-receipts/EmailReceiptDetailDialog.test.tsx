@@ -7,6 +7,11 @@ import { makeDetail, PARSED_RECEIPT, PARSED_TRADE } from './email-receipts-fixtu
 const api = vi.hoisted(() => ({ get: vi.fn(), link: vi.fn() }));
 const txApi = vi.hoisted(() => ({ getAll: vi.fn() }));
 vi.mock('@/lib/email-receipts-api', () => ({ emailReceiptsApi: { receipts: api } }));
+const cache = vi.hoisted(() => ({ clearAllCache: vi.fn() }));
+vi.mock('@/lib/apiCache', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/apiCache')>()),
+  clearAllCache: cache.clearAllCache,
+}));
 vi.mock('@/lib/transactions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/transactions')>()),
   transactionsApi: txApi,
@@ -332,7 +337,14 @@ describe('EmailReceiptDetailDialog', () => {
 
   describe('a trade confirmation', () => {
     const tradeDetail = (over = {}) =>
-      makeDetail({ status: 'review', displayState: 'proposed', parserName: 'Wealthsimple', trade: PARSED_TRADE, ...over });
+      makeDetail({
+        status: 'review',
+        displayState: 'proposed',
+        parserName: 'Wealthsimple',
+        isTrade: true,
+        trade: PARSED_TRADE,
+        ...over,
+      });
 
     it('lists the existing investment transactions a trade email could be, and links the chosen one', async () => {
       api.get.mockResolvedValue(
@@ -340,10 +352,31 @@ describe('EmailReceiptDetailDialog', () => {
           status: 'ignored',
           statusReason: 'trade_exists',
           displayState: null,
-          candidates: [{ id: 'it-1', date: '2026-10-15', amount: 2000, currencyCode: 'CAD', payeeName: 'XCNS.TO', description: '75.9878' }],
+          candidates: [
+            { id: 'it-1', date: '2026-10-15', amount: 2000, currencyCode: 'CAD', payeeName: 'XCNS.TO', description: null, quantity: 75.9878 },
+          ],
         }),
       );
-      api.link.mockResolvedValue(tradeDetail({ status: 'ignored', statusReason: 'trade_linked', displayState: null }));
+      const linked = {
+        id: 'it-1',
+        date: '2026-10-15',
+        action: 'BUY',
+        symbol: 'XCNS.TO',
+        quantity: 75.9878,
+        totalAmount: 2000,
+        currencyCode: 'CAD',
+      };
+      api.link.mockResolvedValue(
+        tradeDetail({
+          status: 'ignored',
+          statusReason: 'trade_linked',
+          displayState: null,
+          investmentTransaction: linked,
+          candidates: [
+            { id: 'it-1', date: '2026-10-15', amount: 2000, currencyCode: 'CAD', payeeName: 'XCNS.TO', description: null, quantity: 75.9878 },
+          ],
+        }),
+      );
       await renderDialog();
       expect(screen.getByRole('heading', { name: 'Existing transactions that could be this trade' })).toBeInTheDocument();
       expect(screen.getByText(/a scheduled bill or deposit it pays is marked paid/)).toBeInTheDocument();
@@ -355,6 +388,21 @@ describe('EmailReceiptDetailDialog', () => {
       expect(api.link).toHaveBeenCalledWith('r-1', 'it-1');
       expect(toast.success).toHaveBeenCalledWith('Email linked to the transaction');
       expect(screen.getByText('Linked to the transaction it reports, so nothing was proposed.')).toBeInTheDocument();
+      // Linking can mark a scheduled bill paid: every cached read of it is dropped.
+      expect(cache.clearAllCache).toHaveBeenCalled();
+      // The email now says what it is linked to, and offers no second link.
+      expect(screen.getByText(/Bought 75\.9878 XCNS\.TO for/)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'View transaction' })).toHaveAttribute('href', '/investments?edit=it-1');
+      expect(screen.queryByRole('button', { name: 'Link to this transaction' })).not.toBeInTheDocument();
+      // The candidate's shares are formatted, not the raw database string.
+      expect(screen.getByText('75.9878 shares')).toBeInTheDocument();
+    });
+
+    it('explains why there is nothing to link when no investment transaction fits', async () => {
+      api.get.mockResolvedValue(tradeDetail({ candidates: [] }));
+      await renderDialog();
+      expect(screen.getByText(/No investment transaction of this account, direction and ticker/)).toBeInTheDocument();
+      expect(screen.getByText(/None yet: the trade is booked when you approve its proposal/)).toBeInTheDocument();
     });
 
     it('offers no link once the proposal was applied', async () => {

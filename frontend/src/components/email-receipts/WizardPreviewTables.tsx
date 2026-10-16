@@ -87,6 +87,29 @@ function ReasonLabel({ reason }: { reason: string }) {
   return <>{known ? t(reason as ParsedReceiptReason) : reason}</>;
 }
 
+/** How the draft would end an email, with why when it could not read it completely. */
+function OutcomeCell({ item }: { item: ParserPreviewItem }) {
+  const done = item.outcome === 'trade' || item.outcome === 'matched';
+  return (
+    <>
+      <div>
+        {item.trade !== null ? (
+          <Badge variant={done ? 'green' : 'amber'}>
+            <OutcomeLabel outcome={item.outcome} />
+          </Badge>
+        ) : (
+          <OutcomeLabel outcome={item.outcome} />
+        )}
+      </div>
+      {item.statusReason !== null && (
+        <div className={`mt-0.5 text-xs ${MUTED}`}>
+          <ReasonLabel reason={item.statusReason} />
+        </div>
+      )}
+    </>
+  );
+}
+
 /**
  * The two tables of the preview: the chosen samples (what was expected against what
  * the draft read, and whether they agree) and, only when there are any, the domain's
@@ -95,6 +118,10 @@ function ReasonLabel({ reason }: { reason: string }) {
 export function WizardPreviewTables({ result }: { result: ParserPreviewResult }) {
   const t = useTranslations('emailReceipts.profileWizard.preview');
   const { formatNumber } = useNumberFormat();
+  // A trade profile's samples pay no bank transaction, so nothing is expected and
+  // nothing can agree: the table says how each would end instead, so a reading
+  // that would never propose (no account, no ticker) is not shown as a success.
+  const tradeSamples = result.selected.length > 0 && result.selected.every((item) => item.trade !== null);
 
   return (
     <div className="space-y-6">
@@ -108,23 +135,27 @@ export function WizardPreviewTables({ result }: { result: ParserPreviewResult })
               <thead>
                 <tr>
                   <Th className="px-2 sm:px-4">{t('columns.email')}</Th>
-                  <Th className="px-2 sm:px-4">{t('columns.expected')}</Th>
+                  {!tradeSamples && <Th className="px-2 sm:px-4">{t('columns.expected')}</Th>}
                   <Th className="px-2 sm:px-4">{t('columns.parsed')}</Th>
-                  <Th className="px-2 sm:px-4">{t('columns.agrees')}</Th>
+                  <Th className="px-2 sm:px-4">{tradeSamples ? t('columns.outcome') : t('columns.agrees')}</Th>
                 </tr>
               </thead>
               <tbody className={TABLE_BODY_CLASS}>
                 {result.selected.map((item) => (
                   <tr key={item.receiptId}>
                     <EmailCell item={item} />
-                    <Td className="min-w-0 px-2 align-top break-words sm:px-4">
-                      {item.expected ? item.expected.summary : <span className={MUTED}>{t('noExpectation')}</span>}
-                    </Td>
+                    {!tradeSamples && (
+                      <Td className="min-w-0 px-2 align-top break-words sm:px-4">
+                        {item.expected ? item.expected.summary : <span className={MUTED}>{t('noExpectation')}</span>}
+                      </Td>
+                    )}
                     <Td className="px-2 align-top sm:px-4">
                       <ParsedCell item={item} />
                     </Td>
                     <Td className="px-2 align-top sm:px-4">
-                      {item.agrees === null ? (
+                      {tradeSamples ? (
+                        <OutcomeCell item={item} />
+                      ) : item.agrees === null ? (
                         <span className={MUTED}>{t('agreesUnknown')}</span>
                       ) : (
                         <Badge variant={item.agrees ? 'green' : 'red'}>{item.agrees ? t('agreesYes') : t('agreesNo')}</Badge>
@@ -163,10 +194,7 @@ export function WizardPreviewTables({ result }: { result: ParserPreviewResult })
                   <tr key={item.receiptId}>
                     <EmailCell item={item} />
                     <Td className="px-2 align-top sm:px-4">
-                      <div>
-                        <OutcomeLabel outcome={item.outcome} />
-                      </div>
-                      {item.statusReason !== null && <div className={`mt-0.5 text-xs ${MUTED}`}><ReasonLabel reason={item.statusReason} /></div>}
+                      <OutcomeCell item={item} />
                     </Td>
                     <Td className="px-2 align-top sm:px-4">
                       <ParsedCell item={item} />

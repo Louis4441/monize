@@ -515,6 +515,33 @@ describe("generating a trade profile", () => {
     expect(sqls.some((q) => q.includes("t.currency_code"))).toBe(false);
   });
 
+  it.each([
+    ["a trade request without tradeReceiptIds", { tradeReceiptIds: undefined }],
+    [
+      "a trade request that also sends samples",
+      { samples: [{ receiptId: R1, transactionId: T1 }] },
+    ],
+    [
+      "a receipt request that sends tradeReceiptIds",
+      {
+        kind: "receipt",
+        samples: [{ receiptId: R1, transactionId: T1 }],
+      },
+    ],
+    [
+      "a receipt request without samples",
+      { kind: undefined, tradeReceiptIds: undefined },
+    ],
+  ])("refuses %s before any provider is called", async (_why, over) => {
+    const { service, aiQuery } = setup({
+      receipts: [receipt(R1, { bodyText: "Symbol: XCNS" })],
+    });
+    await expect(service.generate(USER, tradeDto(over))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(aiQuery.executeQuery).not.toHaveBeenCalled();
+  });
+
   it("queues the trade instruction for the user's own agent", async () => {
     const { service, requests } = setup({
       noDirectProvider: true,

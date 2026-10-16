@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   canDraftParser,
+  canLinkTradeEmail,
   distinctSenderDomains,
   dominantSenderDomain,
   fromReceiptUnits,
@@ -254,4 +255,35 @@ describe('normalizeDomainFilter', () => {
       expect(normalizeDomainFilter(raw as string | null | undefined)).toBe('');
     },
   );
+});
+
+describe('canLinkTradeEmail', () => {
+  const trade = (over: Partial<Parameters<typeof canLinkTradeEmail>[0]> = {}) => ({
+    isTrade: true,
+    status: 'review' as const,
+    statusReason: null,
+    displayState: 'proposed' as const,
+    investmentTransaction: null,
+    ...over,
+  });
+  const booked = { id: 'it-1', date: '2026-10-15', action: 'BUY', symbol: 'XCNS', quantity: 1, totalAmount: 1, currencyCode: 'CAD' };
+
+  it('links a trade whose proposal waits or was refused, and one the ledger already held', () => {
+    expect(canLinkTradeEmail(trade())).toBe(true);
+    expect(canLinkTradeEmail(trade({ status: 'review_conflict', displayState: null }))).toBe(true);
+    expect(
+      canLinkTradeEmail(
+        trade({ status: 'ignored', statusReason: 'trade_exists', displayState: null, investmentTransaction: booked }),
+      ),
+    ).toBe(true);
+  });
+
+  it('never links an email twice, an applied one, a non-trade or one a person ignored', () => {
+    expect(canLinkTradeEmail(trade({ status: 'ignored', statusReason: 'trade_linked', displayState: null, investmentTransaction: booked }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ displayState: 'applied', investmentTransaction: booked }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ isTrade: false }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ status: 'ignored', statusReason: 'ignored_by_user', displayState: null }))).toBe(false);
+    // A reading with no account has no candidates to offer.
+    expect(canLinkTradeEmail(trade({ status: 'parse_failed', statusReason: 'trade_no_account', displayState: null }))).toBe(false);
+  });
 });

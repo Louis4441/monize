@@ -55,7 +55,8 @@
     "dates": "Criado em {created}, expira em {expires}",
     "viewTransaction": "Ver transação",
     "waitingForAgent": "Aguardando um agente de IA. <link>Conecte um provedor de IA em Configurações</link> ou deixe um cliente MCP assumi-la.",
-    "parserDraftReady": "Rascunho de perfil pronto. <link>Teste e aprove-o nas configurações de perfis</link>."
+    "parserDraftReady": "Rascunho de perfil pronto. <link>Teste e aprove-o nas configurações de perfis</link>.",
+    "tradePending": "Uma operação de um e-mail, ainda não lida"
   },
   "actions": {
     "dismiss": "Dispensar"

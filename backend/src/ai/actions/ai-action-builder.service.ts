@@ -536,7 +536,10 @@ export class AiActionBuilderService {
       description: preview.description,
       bondInstrumentId: preview.bondInstrumentId,
       ...(options.aiReviewRequestId
-        ? { aiReviewRequestId: options.aiReviewRequestId }
+        ? {
+            aiReviewRequestId: options.aiReviewRequestId,
+            totalAmount: preview.totalAmount,
+          }
         : {}),
       ...(options.scheduled
         ? {

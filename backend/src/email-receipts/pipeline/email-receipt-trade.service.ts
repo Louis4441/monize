@@ -7,17 +7,21 @@ import {
   EMAIL_RECEIPTS_CLAIM_KEY,
   type AiReviewTradeInput,
 } from "../../ai-review/ai-review-work.types";
-import { returnedRows } from "../../common/db/query-result";
+import {
+  emailDayOfUser,
+  findTradeInLedger,
+} from "../../ai-review/trade-ledger";
 import { roundMoney } from "../../common/round.util";
-import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
-import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import type { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import type {
   EmailReceipt,
   EmailReceiptStatus,
 } from "../entities/email-receipt.entity";
 import { effectiveReceiptDate } from "../imap/forwarded-receipt";
-import { parseTradeLines } from "../parsing/parse-trade";
+import {
+  parseTradeLines,
+  tradeExecutedTotalUnits,
+} from "../parsing/parse-trade";
 import type {
   ParsedTrade,
   ReceiptTradeDefinition,
@@ -38,6 +42,8 @@ export interface TradeOutcome {
   /** The `email_trade` request the receipt now stands behind; null when it holds none. */
   requestId: string | null;
   trade: ParsedTrade;
+  /** The ledger row the email accounts for: the one already booked (`trade_exists`), else null. */
+  investmentTransactionId: string | null;
   /** Present when the opt-in auto-apply gate passed: the signed card to confirm. */
   autoApply: PendingAiAction | null;
 }
@@ -78,16 +84,38 @@ export class EmailReceiptTradeService {
       reason: string | null,
       requestId: string | null = null,
       autoApply: PendingAiAction | null = null,
-    ): TradeOutcome => ({ status, reason, requestId, trade, autoApply });
+      investmentTransactionId: string | null = null,
+    ): TradeOutcome => ({
+      status,
+      reason,
+      requestId,
+      trade,
+      investmentTransactionId,
+      autoApply,
+    });
 
     if (!trade.complete) return outcome("parse_failed", trade.reason);
-    const input = this.toInput(receipt, trade);
+    const input = this.toInput(
+      receipt,
+      trade,
+      trade.date ??
+        (await emailDayOfUser(m, userId, effectiveReceiptDate(receipt))),
+    );
 
     // The ledger may already hold this trade (a manual entry, a broker import).
     // Creating it twice is the worst thing automation can do here, so it is an
-    // ignored email that says why, never a second proposal.
-    if (await this.alreadyBooked(m, userId, input)) {
-      return outcome("ignored", RECEIPT_TRADE_EXISTS_REASON);
+    // ignored email that says why and accounts for that row, never a second
+    // proposal. A matching row another email already accounts for is a second,
+    // identical fill: proposed, but never auto-applied.
+    const ledger = await findTradeInLedger(m, userId, input, receipt.id);
+    if (ledger.unclaimedId !== null) {
+      return outcome(
+        "ignored",
+        RECEIPT_TRADE_EXISTS_REASON,
+        null,
+        null,
+        ledger.unclaimedId,
+      );
     }
 
     // A reprocess replaces the proposal: the receipt's earlier requests close
@@ -110,7 +138,8 @@ export class EmailReceiptTradeService {
       const gate =
         context.mailboxAutoApply &&
         context.parser.status === "approved" &&
-        trade.consistent === true;
+        trade.consistent === true &&
+        !ledger.anyMatch;
       return outcome("review", null, request.id, gate ? done.action : null);
     } catch (error) {
       if (!isRefusal(error)) throw error;
@@ -127,23 +156,20 @@ export class EmailReceiptTradeService {
     }
   }
 
-  /** The proposal a complete reading makes: the day, the executed total and the commission, in currency units. */
+  /** The proposal a complete reading makes on `date` (the email's own, else the day it was sent): the executed total and the commission, in currency units. */
   private toInput(
     receipt: EmailReceipt,
     trade: ParsedTrade,
+    date: string,
   ): AiReviewTradeInput {
     const quantity = trade.quantity as number;
     const commission = (trade.commission ?? 0) / MONEY_UNITS;
     const action = trade.action as "BUY" | "SELL";
     // The executed total is the fact. An email that states only a price gives
     // the total its price implies (commission added to a buy, taken from a sell).
-    const total =
-      trade.total !== null
-        ? trade.total / MONEY_UNITS
-        : roundMoney(
-            quantity * ((trade.price as number) / MONEY_UNITS) +
-              (action === "BUY" ? commission : -commission),
-          );
+    const total = roundMoney(
+      (tradeExecutedTotalUnits(trade) as number) / MONEY_UNITS,
+    );
     return {
       accountId: trade.accountId as string,
       action,
@@ -151,46 +177,12 @@ export class EmailReceiptTradeService {
       quantity,
       totalAmount: total,
       commission,
-      date:
-        trade.date ?? effectiveReceiptDate(receipt).toISOString().slice(0, 10),
+      date,
       description: `Email receipt: ${receipt.subject}`.slice(
         0,
         MAX_DESCRIPTION,
       ),
+      currency: trade.currency ?? null,
     };
-  }
-
-  /** Whether an investment transaction with this account, direction, security, day and share count exists (a VOID one does not count). */
-  private async alreadyBooked(
-    m: EntityManager,
-    userId: string,
-    input: AiReviewTradeInput,
-  ): Promise<boolean> {
-    const rows = returnedRows<{ id: string }>(
-      await m.query(
-        `SELECT it.id
-           FROM investment_transactions it
-           JOIN securities s ON s.id = it.security_id
-          WHERE it.user_id = $1
-            AND it.account_id = $2
-            AND it.action = $3
-            AND it.transaction_date = $4::date
-            AND it.status != 'VOID'
-            AND it.quantity = $5::numeric
-            AND (LOWER(s.symbol) = LOWER($6)
-                 OR LOWER(s.symbol) LIKE LOWER($7))
-          LIMIT 1`,
-        [
-          userId,
-          input.accountId,
-          input.action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL,
-          input.date,
-          String(input.quantity),
-          input.symbol,
-          `${escapeLikePattern(input.symbol)}.%`,
-        ],
-      ),
-    );
-    return rows.length > 0;
   }
 }

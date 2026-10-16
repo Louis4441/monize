@@ -422,7 +422,14 @@
         "requireLine": "Zorunlu satır",
         "skipIfLine": "Atlama satırı",
         "waitIfLine": "Bekleme satırı",
-        "reference": "Referans"
+        "reference": "Referans",
+        "action": "Alım veya satım",
+        "symbol": "Sembol",
+        "quantity": "Pay",
+        "price": "Fiyat",
+        "commission": "Komisyon",
+        "date": "Tarih",
+        "account": "Hesap"
       },
       "entryLine": "girdi {entry} ({pattern}), {line}. satır: {text}",
       "entrySubject": "girdi {entry} ({pattern}), konu: {text}",
@@ -557,7 +564,8 @@
       "approve": "Onayla",
       "draftParser": "Yapay Zeka ile profil hazırla",
       "createParser": "Profil oluştur",
-      "ignore": "Yoksay"
+      "ignore": "Yoksay",
+      "reviewTrade": "Kutuda incele"
     },
     "toasts": {
       "approved": "Teklif onaylandı",
@@ -699,7 +707,11 @@
       "capped": "Yalnızca ilk {max} satır okunur.",
       "empty": "Satır yok.",
       "listLabel": "E-postanın numaralı satırları"
-    }
+    },
+    "tradeTransactionSummary": "{date} tarihinde {total} karşılığında {quantity} {symbol} {action, select, BUY {alındı} other {satıldı}}.",
+    "noTradeTransaction": "Henüz yok: işlem, önerisini onayladığınızda kaydedilir ya da defterinizde zaten olan bir işleme bağlanır.",
+    "candidateShares": "{quantity} pay",
+    "tradeNoCandidates": "İşlem gününden bir hafta içinde bu hesap, yön ve sembole ait bağlanabilecek bir yatırım işlemi yok. İşlemi kendiniz girdiyseniz hesabını ve tarihini kontrol edin; aksi halde öneriyi inceleme kutusunda onaylayın."
   },
   "picker": {
     "heading": "İşlemi seçin",
@@ -780,7 +792,8 @@
     "inboxLink": "Yapay zekâ inceleme kutusunu aç",
     "opened": "Sohbet, e-posta ekli olarak açıldı. Mesajı okuyun ve Gönder'e basın.",
     "chatPrompt": "Ekteki sipariş e-postasındaki ürünleri, miktarları ve fiyatları tanı; {date} tarihli işlemimi ({payee}, {amount}) her biri için bir kategoriyle ürünlere göre böl. {requestId} numaralı yapay zekâ inceleme isteğini üstlen ve önerini onun için gönder.",
-    "tradeChatPrompt": "Ekteki aracı kurum onay e-postasındaki işlemi tanıyın: hesap, alım mı satım mı, hisse kodu, adet, gerçekleşen toplam ve tarih. {requestId} yapay zekâ inceleme isteğini üstlenin ve işlemi onun için gönderin."
+    "tradeChatPrompt": "Ekteki aracı kurum onay e-postasındaki işlemi tanıyın: hesap, alım mı satım mı, hisse kodu, adet, gerçekleşen toplam ve tarih. {requestId} yapay zekâ inceleme isteğini üstlenin ve işlemi onun için gönderin.",
+    "tradeDetachesTransaction": "İşlem olarak okunduğunda bu e-posta artık {summary} ile eşleşmez: işlem kendi yatırım işlemini oluşturur."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Atlandı (atlama satırı bulundu)",
         "wait_line": "Beklemede (sipariş kesin değil)",
         "no_html": "HTML bölümü yok",
-        "trade": "Bir işlem önerir"
+        "trade": "Bir işlem önerir",
+        "trade_exists": "Defterinizde zaten var"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "Ortalama fiyat adet ve toplamla uyuşmuyor, bu yüzden bu işlem otomatik uygulanmayacak.",
     "incomplete": "Ayrıştırıcı bu e-postadan tam bir işlem okuyamadı.",
     "totalFromPrice": "fiyattan çıkan toplam",
-    "dateUnknown": "e-postanın geldiği gün"
+    "dateUnknown": "e-postanın geldiği gün",
+    "price": "E-postadaki ortalama fiyat: pay başına {price}"
   }
 }

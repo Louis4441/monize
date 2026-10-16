@@ -55,7 +55,8 @@
     "dates": "Aangemaakt op {created}, verloopt op {expires}",
     "viewTransaction": "Transactie bekijken",
     "waitingForAgent": "Wacht op een AI-agent. <link>Koppel een AI-provider in de Instellingen</link> of laat een MCP-client het verzoek oppakken.",
-    "parserDraftReady": "Profielconcept klaar. <link>Test en keur het goed in de profielinstellingen</link>."
+    "parserDraftReady": "Profielconcept klaar. <link>Test en keur het goed in de profielinstellingen</link>.",
+    "tradePending": "Een transactie uit een e-mail, nog niet gelezen"
   },
   "actions": {
     "dismiss": "Negeren"

@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "Il campo trade risponde solo a una richiesta di operazione.",
     "tradeDateRequired": "L'operazione richiede una data (AAAA-MM-GG): l'email non esiste più, quindi non c'è un giorno di riserva.",
     "tradeInvalid": "L'operazione richiede accountName, action (BUY o SELL), symbol, quantity, totalAmount e, facoltativamente, commission e date (AAAA-MM-GG).",
-    "tradeSecurityAmbiguous": "«{symbol}» corrisponde a più dei tuoi titoli ({list}). Rinomina uno di essi così il simbolo è univoco.",
-    "tradeSecurityUnknown": "Non hai alcun titolo con il simbolo «{symbol}». Aggiungi il titolo, poi rielabora l'email.",
+    "tradeSecurityAmbiguous": "«{{ symbol }}» corrisponde a più dei tuoi titoli ({{ list }}). Rinomina uno di essi così il simbolo è univoco.",
+    "tradeSecurityUnknown": "Non hai alcun titolo con il simbolo «{{ symbol }}». Aggiungi il titolo, poi rielabora l'email.",
     "tagNamesInvalid": "Una proposta può aggiungere fino a {{ max }} etichette, ciascuna da 1 a {{ length }} caratteri, senza caratteri di controllo.",
     "noApprovableProposal": "Questa richiesta non ha qui alcuna proposta da approvare.",
-    "approveFailed": "Non è stato possibile approvare questa proposta. Prova ad approvarla da sola."
+    "approveFailed": "Non è stato possibile approvare questa proposta. Prova ad approvarla da sola.",
+    "tradeAlreadyBooked": "Il tuo registro contiene già questa operazione. Collega l'email a essa invece di registrarla di nuovo.",
+    "tradeScheduleMoved": "La transazione pianificata che questa operazione doveva pagare è stata registrata o modificata dopo la proposta. Collega invece l'email a quella transazione, oppure ignorala.",
+    "tradeCurrencyMismatch": "Gli importi dell'email sono in {{ currency }}, ma il tuo titolo {{ symbol }} è negoziato in {{ securityCurrency }}. Verifica quale quotazione è stata acquistata, poi inserisci tu l'operazione."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Troppi tentativi di verifica. Accedi di nuovo.",
@@ -417,7 +420,12 @@
     "previewExpectedNotSelected": "È stata indicata una transazione attesa per un'email che non è tra quelle selezionate.",
     "previewReceiptOutsideDomain": "Un'email non proviene da un dominio mittente di questo parser.",
     "parserCategoryNameUnknown": "La categoria \"{{ name }}\" non è stata trovata. Utilizzare il nome di una delle tue categorie.",
-    "parserCategoryNameAmbiguous": "La categoria \"{{ name }}\" corrisponde a diverse categorie ({{ candidates }}). Utilizzare il nome completo, ad esempio \"Parent: Child\"."
+    "parserCategoryNameAmbiguous": "La categoria \"{{ name }}\" corrisponde a diverse categorie ({{ candidates }}). Utilizzare il nome completo, ad esempio \"Parent: Child\".",
+    "tradeNotBankLinkable": "Questa email viene letta come conferma di un'operazione. Collegala invece a una transazione di investimento.",
+    "tradeAccountedFor": "Questa email corrisponde già a una transazione di investimento, quindi non viene riletta.",
+    "tradeLinkedElsewhere": "Un'altra email corrisponde già a quella transazione.",
+    "parserAccountNotFound": "Un conto indicato in questo profilo delle operazioni non è uno dei tuoi conti di intermediazione aperti.",
+    "generateSamplesForKind": "Un profilo di ricevute si genera da samples (ogni email con la transazione che ha pagato); un profilo delle operazioni da tradeReceiptIds. Invia quello del tipo scelto, non l'altro."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "L'email non è configurata. L'accesso di emergenza non può essere abilitato finché SMTP non è configurato.",

@@ -392,4 +392,41 @@ describe("EmailReceiptParserPreviewService.preview of a trade profile", () => {
     const sqls = manager.query.mock.calls.map((c) => String(c[0]));
     expect(sqls.some((q) => q.includes("JOIN accounts"))).toBe(false);
   });
+
+  it("says `trade_exists` for a trade the ledger already holds, as the pipeline would ignore it", async () => {
+    const { service, manager } = setup({
+      parser: tradeParser(),
+      selected: [filled(R1)],
+      others: [],
+    });
+    const fallback = manager.query.getMockImplementation();
+    manager.query.mockImplementation(async (sql: string, params: unknown[]) =>
+      String(sql).includes("FROM investment_transactions it")
+        ? [{ id: "it-1", claimed: false }]
+        : fallback?.(sql, params),
+    );
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+    expect(result.selected[0].outcome).toBe("trade_exists");
+  });
+
+  it("shows the total a price-only trade proposes, as the pipeline computes it", async () => {
+    const priceOnly = parserRow({
+      fromDomains: ["wealthsimple.com"],
+      definition: {
+        ...WEALTHSIMPLE_TRADE_DEFINITION,
+        trade: { ...WEALTHSIMPLE_TRADE_DEFINITION.trade, total: undefined },
+      } as never,
+    });
+    const { service } = setup({
+      parser: priceOnly,
+      selected: [filled(R1)],
+      others: [],
+    });
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+    expect(result.selected[0].parsed?.total).toBe(1999.9989);
+  });
 });

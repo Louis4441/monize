@@ -181,6 +181,21 @@ export interface EmailReceiptTransactionSummary {
 
 export interface EmailReceiptCandidateSummary extends EmailReceiptTransactionSummary {
   description: string | null;
+  /** A trade email's candidate (an investment transaction): its share count; absent for a bank transaction. */
+  quantity?: number;
+}
+
+/** The investment transaction a trade email accounts for: the one its approval booked, a person linked, or already in the ledger. */
+export interface EmailReceiptInvestmentSummary {
+  id: string;
+  /** YYYY-MM-DD. */
+  date: string;
+  action: string;
+  symbol: string;
+  quantity: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
 }
 
 /** One stored email in the list: never its text. */
@@ -214,6 +229,8 @@ export interface EmailReceiptListItem {
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
   transaction: EmailReceiptTransactionSummary | null;
+  /** A trade email's ledger row; null for every other email and for a trade email that accounts for none yet. Absent from a server that predates it. */
+  investmentTransaction?: EmailReceiptInvestmentSummary | null;
   createdAt: string;
 }
 
@@ -351,6 +368,8 @@ export interface ParsedTrade {
   total: number | null;
   price: number | null;
   commission: number | null;
+  /** The currency the amounts name ("USD"); null when they name none (a bare `$`), or from a server that predates it. */
+  currency: string | null;
   date: string | null;
   accountText: string | null;
   accountId: string | null;
@@ -368,6 +387,7 @@ export function readParsedTrade(value: Record<string, unknown> | null | undefine
   if (!value) return null;
   const { action, symbol, quantity, total, price, commission, date, accountText, accountId, complete, consistent, reason } =
     value;
+  const currency = value.currency ?? null;
   if (
     (action !== 'BUY' && action !== 'SELL' && action !== null) ||
     !isNullableString(symbol) ||
@@ -380,11 +400,26 @@ export function readParsedTrade(value: Record<string, unknown> | null | undefine
     !isNullableString(accountId) ||
     typeof complete !== 'boolean' ||
     (consistent !== null && typeof consistent !== 'boolean') ||
-    !isNullableString(reason)
+    !isNullableString(reason) ||
+    !isNullableString(currency)
   ) {
     return null;
   }
-  return { action, symbol, quantity, total, price, commission, date, accountText, accountId, complete, consistent, reason };
+  return {
+    action,
+    symbol,
+    quantity,
+    total,
+    price,
+    commission,
+    currency,
+    date,
+    accountText,
+    accountId,
+    complete,
+    consistent,
+    reason,
+  };
 }
 
 /**
@@ -701,12 +736,31 @@ export type ReceiptTraceField = (typeof RECEIPT_TRACE_FIELDS)[number];
 
 export type ReceiptTrace = Record<ReceiptTraceField, ReceiptTraceHit | null> & { items: ReceiptTraceItem[] };
 
+/** The fields a trade trace names, in the order the panel lists them. */
+export const RECEIPT_TRADE_TRACE_FIELDS = [
+  'action',
+  'symbol',
+  'quantity',
+  'total',
+  'price',
+  'commission',
+  'date',
+  'account',
+] as const;
+export type ReceiptTradeTraceField = (typeof RECEIPT_TRADE_TRACE_FIELDS)[number];
+export type ReceiptTradeTrace = Record<ReceiptTradeTraceField, ReceiptTraceHit | null>;
+
 /** What the pipeline would do with the email under this parser (`no_html`: it reads the HTML part and the email has none). */
 export type ReceiptOutcome = 'read' | 'not_applicable' | 'skip_line' | 'wait_line' | 'no_html';
 
 export interface EmailReceiptParserTestResult {
-  /** For a profile with a `trade` section: what it read. Such a profile is not matched to a bank transaction, so `parsed` and `match` are then empty. */
-  trade?: { parsed: ParsedTrade };
+  /**
+   * For a profile with a `trade` section: what it read, and which entry and
+   * line read each value (`trace`, absent from a server that predates it).
+   * Such a profile is not matched to a bank transaction, so `parsed` and
+   * `match` are then empty.
+   */
+  trade?: { parsed: ParsedTrade; trace?: ReceiptTradeTrace };
   parsed: ParsedReceipt;
   /** Which entry and which line read each value. Absent from a server that predates it. */
   trace?: ReceiptTrace;
@@ -789,6 +843,7 @@ export const PARSER_PREVIEW_OUTCOMES = [
   'wait_line',
   'no_html',
   'trade',
+  'trade_exists',
 ] as const;
 export type ParserPreviewOutcome = (typeof PARSER_PREVIEW_OUTCOMES)[number];
 

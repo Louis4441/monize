@@ -18,14 +18,25 @@ export async function currentReceiptRequestStatus(
   userId: string,
   aiReviewRequestId: string | null,
 ): Promise<string | null> {
+  return (
+    (await currentReceiptRequest(m, userId, aiReviewRequestId))?.status ?? null
+  );
+}
+
+/** The status and kind of the request a receipt stands behind, else null. */
+export async function currentReceiptRequest(
+  m: EntityManager,
+  userId: string,
+  aiReviewRequestId: string | null,
+): Promise<{ status: string; kind: string } | null> {
   if (!aiReviewRequestId) return null;
-  const rows = returnedRows<{ status: string }>(
+  const rows = returnedRows<{ status: string; kind: string }>(
     await m.query(
-      `SELECT status FROM ai_review_requests WHERE id = $1 AND user_id = $2`,
+      `SELECT status, kind FROM ai_review_requests WHERE id = $1 AND user_id = $2`,
       [aiReviewRequestId, userId],
     ),
   );
-  return rows[0]?.status ?? null;
+  return rows[0] ?? null;
 }
 
 /**

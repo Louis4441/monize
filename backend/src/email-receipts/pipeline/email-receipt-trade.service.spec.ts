@@ -43,12 +43,24 @@ const card = {
 } as unknown as PendingAiAction;
 
 function setup(
-  over: { booked?: boolean; enqueue?: AiReviewRequest | null } = {},
+  over: {
+    /** A matching ledger row: `unclaimed` no email accounts for, `claimed` another email does. */
+    booked?: "unclaimed" | "claimed";
+    enqueue?: AiReviewRequest | null;
+    timezone?: string;
+  } = {},
 ) {
   const manager = {
     query: jest.fn(async (sql: string, ..._params: unknown[]) => {
       if (String(sql).includes("FROM investment_transactions")) {
-        return over.booked ? [{ id: "it-1" }] : [];
+        return over.booked
+          ? [{ id: "it-1", claimed: over.booked === "claimed" }]
+          : [];
+      }
+      if (String(sql).includes("FROM user_preferences")) {
+        return over.timezone
+          ? [{ timezone: over.timezone, last_client_timezone: null }]
+          : [];
       }
       // closeReceiptRequests
       return [[], 0];
@@ -109,12 +121,14 @@ describe("EmailReceiptTradeService.process", () => {
         commission: 0,
         date: "2026-10-15",
         description: "Email receipt: Your order has been filled",
+        currency: null,
       },
     );
     expect(outcome).toMatchObject({
       status: "review",
       reason: null,
       requestId: "rq-trade",
+      investmentTransactionId: null,
       autoApply: null,
     });
   });
@@ -140,6 +154,26 @@ describe("EmailReceiptTradeService.process", () => {
       lines: normalizeReceiptLines(WEALTHSIMPLE_BUY_BODY),
       mailboxAutoApply: false,
     });
+    expect(h.work.submitTrade.mock.calls[0][3]).toMatchObject({
+      date: "2026-10-15",
+    });
+  });
+
+  it("dates an undated trade by the day it was sent in the user's timezone, not the UTC day", async () => {
+    // 01:30 UTC on the 16th is the evening of the 15th in Toronto.
+    const h = setup({ timezone: "America/Toronto" });
+    const noDate = { ...definition, date: undefined };
+    await h.service.process(
+      h.manager as never,
+      USER,
+      receipt({ receivedAt: new Date("2026-10-16T01:30:00Z") }),
+      {
+        parser: parser(),
+        definition: noDate,
+        lines: normalizeReceiptLines(WEALTHSIMPLE_BUY_BODY),
+        mailboxAutoApply: false,
+      },
+    );
     expect(h.work.submitTrade.mock.calls[0][3]).toMatchObject({
       date: "2026-10-15",
     });
@@ -176,17 +210,21 @@ describe("EmailReceiptTradeService.process", () => {
     expect(h.manager.query).not.toHaveBeenCalled();
   });
 
-  it("ignores a trade the ledger already holds instead of proposing it twice", async () => {
-    const h = setup({ booked: true });
+  it("ignores a trade the ledger already holds instead of proposing it twice, and accounts for that row", async () => {
+    const h = setup({ booked: "unclaimed" });
     const outcome = await run(h);
     expect(outcome).toMatchObject({
       status: "ignored",
       reason: RECEIPT_TRADE_EXISTS_REASON,
       requestId: null,
+      investmentTransactionId: "it-1",
     });
     expect(h.requests.enqueueTrade).not.toHaveBeenCalled();
-    const [sql, params] = h.manager.query.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = h.manager.query.mock.calls.find(([text]) =>
+      String(text).includes("FROM investment_transactions"),
+    ) as [string, unknown[]];
     expect(sql).toContain("it.status != 'VOID'");
+    expect(sql).toContain("r.investment_transaction_id = it.id");
     expect(params).toEqual([
       USER,
       WEALTHSIMPLE_RRSP_ACCOUNT_ID,
@@ -195,7 +233,17 @@ describe("EmailReceiptTradeService.process", () => {
       "75.9878",
       "XCNS",
       "XCNS.%",
+      "receipt-1",
+      null,
     ]);
+  });
+
+  it("proposes a second identical fill whose twin another email accounts for, but never auto-applies it", async () => {
+    const h = setup({ booked: "claimed" });
+    const outcome = await run(h, WEALTHSIMPLE_BUY_BODY, { autoApply: true });
+    expect(outcome).toMatchObject({ status: "review", requestId: "rq-trade" });
+    expect(outcome.trade.consistent).toBe(true);
+    expect(outcome.autoApply).toBeNull();
   });
 
   it("is a conflict, not a second proposal, when the email already has one open", async () => {

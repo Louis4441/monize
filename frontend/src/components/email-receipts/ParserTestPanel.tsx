@@ -171,7 +171,10 @@ export function ParserTestPanel({ definition, payeeId, initialReceiptId, categor
           )}
           {result.trade ? (
             // A trade profile creates an investment transaction: there is no bank transaction to match.
-            <TradeReadingView trade={result.trade.parsed} fallbackDate={testedReceipt?.effectiveDate ?? null} />
+            <>
+              <TradeReadingView trade={result.trade.parsed} fallbackDate={testedReceipt?.effectiveDate ?? null} showReason />
+              {result.trade.trace && <ParserTraceList trace={result.trade.trace} />}
+            </>
           ) : (
             <>
               <ParsedReceiptView parsed={result.parsed} categoryLabels={categoryLabels} />

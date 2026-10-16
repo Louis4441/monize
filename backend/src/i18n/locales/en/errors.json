@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "The trade field answers a trade request only.",
     "tradeDateRequired": "The trade needs a date (YYYY-MM-DD): the email is gone, so there is no day to fall back on.",
     "tradeInvalid": "The trade needs accountName, action (BUY or SELL), symbol, quantity, totalAmount and, optionally, commission and date (YYYY-MM-DD).",
-    "tradeSecurityAmbiguous": "\"{symbol}\" matches several of your securities ({list}). Rename one so the ticker is unique.",
-    "tradeSecurityUnknown": "You have no security with the ticker \"{symbol}\". Add the security, then reprocess the email.",
+    "tradeSecurityAmbiguous": "\"{{ symbol }}\" matches several of your securities ({{ list }}). Rename one so the ticker is unique.",
+    "tradeSecurityUnknown": "You have no security with the ticker \"{{ symbol }}\". Add the security, then reprocess the email.",
     "tagNamesInvalid": "A proposal may add up to {{ max }} tags of 1 to {{ length }} characters each, with no control characters.",
     "noApprovableProposal": "This request has no proposal to approve here.",
-    "approveFailed": "This proposal could not be approved. Try it on its own."
+    "approveFailed": "This proposal could not be approved. Try it on its own.",
+    "tradeAlreadyBooked": "Your ledger already has this trade. Link the email to it instead of booking it again.",
+    "tradeScheduleMoved": "The scheduled transaction this trade was to pay has been posted or changed since it was proposed. Link the email to that transaction instead, or dismiss it.",
+    "tradeCurrencyMismatch": "The email's amounts are in {{ currency }}, but your security {{ symbol }} trades in {{ securityCurrency }}. Check which listing was bought, then enter the trade yourself."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Too many verification attempts. Please log in again.",
@@ -417,7 +420,12 @@
     "generateNoProvider": "No AI is set up to write the profile. In AI Settings, add an Anthropic, OpenAI or Ollama provider, or connect your own agent over MCP, then try again.",
     "generateReceiptOutsideDomain": "An email is not from the sender domain the profile is for.",
     "previewExpectedNotSelected": "An expected transaction was named for an email that is not among the selected ones.",
-    "previewReceiptOutsideDomain": "An email is not from a sender domain of this parser."
+    "previewReceiptOutsideDomain": "An email is not from a sender domain of this parser.",
+    "tradeNotBankLinkable": "This email is read as a trade confirmation. Link it to an investment transaction instead.",
+    "tradeAccountedFor": "This email already accounts for an investment transaction, so it is not read again.",
+    "tradeLinkedElsewhere": "Another email already accounts for that transaction.",
+    "parserAccountNotFound": "An account named in this trade profile is not one of your open brokerage accounts.",
+    "generateSamplesForKind": "A receipt profile is generated from samples (each email with the transaction it paid for); a trade profile from tradeReceiptIds. Send the one for the kind, and not the other."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "Email is not configured. Emergency access cannot be enabled until SMTP is set up.",

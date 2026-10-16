@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCalendarDate } from "../common/validators/is-calendar-date.validator";
 import type { PendingAiAction } from "../ai/actions/ai-action.types";
 import type { LlmTransactionRow } from "../transactions/transactions.service";
 import type { ReceiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
@@ -117,18 +118,28 @@ export interface AiReviewAgentTrade {
  * The shape of an agent's `trade`, checked where it is used: the tool schemas
  * carry it as a free-form object (the `tools/list` byte budget has no room for
  * its eight fields), and the numbers are read the tolerant way a hand-written
- * tool call needs.
+ * tool call needs. The precision is the confirm's own (8 decimals of a share,
+ * 4 of money) and the date a real calendar day, so a card the agent's figures
+ * build is never one the approval then refuses.
  */
+const hasAtMostDecimals = (max: number) => (value: number) =>
+  Number.isFinite(value) && Number(value.toFixed(max)) === value;
+
 export const aiReviewAgentTradeSchema = z.object({
   accountName: z.string().trim().min(1).max(100),
   action: z.enum(["BUY", "SELL"]),
   symbol: z.string().trim().min(1).max(30),
-  quantity: z.coerce.number().positive().max(1e12),
-  totalAmount: z.coerce.number().min(0).max(1e12),
-  commission: z.coerce.number().min(0).max(1e9).optional(),
+  quantity: z.coerce.number().min(1e-8).max(1e12).refine(hasAtMostDecimals(8)),
+  totalAmount: z.coerce.number().min(0).max(1e12).refine(hasAtMostDecimals(4)),
+  commission: z.coerce
+    .number()
+    .min(0)
+    .max(1e9)
+    .refine(hasAtMostDecimals(4))
+    .optional(),
   date: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine((value) => isCalendarDate(value))
     .optional(),
 });
 
@@ -157,6 +168,12 @@ export interface AiReviewTradeInput {
   /** `YYYY-MM-DD`. */
   date: string;
   description: string | null;
+  /**
+   * The currency the email's amounts name, when they name one; the card is
+   * refused unless it is the security's (the total is in the security's
+   * currency). Absent or null when the email names none.
+   */
+  currency?: string | null;
 }
 
 /** A request as a model reads it. The claim key itself never leaves the server. */

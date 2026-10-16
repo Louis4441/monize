@@ -422,7 +422,14 @@
         "requireLine": "Baris wajib",
         "skipIfLine": "Baris lewati",
         "waitIfLine": "Baris tunggu",
-        "reference": "Referensi"
+        "reference": "Referensi",
+        "action": "Beli atau jual",
+        "symbol": "Kode",
+        "quantity": "Saham",
+        "price": "Harga",
+        "commission": "Komisi",
+        "date": "Tanggal",
+        "account": "Akun"
       },
       "entryLine": "entri {entry} ({pattern}), baris {line}: {text}",
       "entrySubject": "entri {entry} ({pattern}), subjek: {text}",
@@ -557,7 +564,8 @@
       "approve": "Setujui",
       "draftParser": "Siapkan profil dengan AI",
       "createParser": "Buat profil",
-      "ignore": "Kecualikan"
+      "ignore": "Kecualikan",
+      "reviewTrade": "Tinjau di kotak masuk"
     },
     "toasts": {
       "approved": "Usulan disetujui",
@@ -699,7 +707,11 @@
       "capped": "Hanya {max} baris pertama yang dibaca.",
       "empty": "Tidak ada baris.",
       "listLabel": "Baris surel yang bernomor"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Membeli} other {Menjual}} {quantity} {symbol} seharga {total} pada {date}.",
+    "noTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulannya, atau ditautkan ke transaksi yang sudah ada di buku besar Anda.",
+    "candidateShares": "{quantity} saham",
+    "tradeNoCandidates": "Tidak ada transaksi investasi dengan akun, arah, dan kode ini dalam seminggu dari hari transaksi yang bebas untuk ditautkan. Jika Anda mencatatnya sendiri, periksa akun dan tanggalnya; jika tidak, setujui usulannya di kotak tinjauan."
   },
   "picker": {
     "heading": "Pilih transaksi",
@@ -780,7 +792,8 @@
     "inboxLink": "Buka kotak masuk peninjauan AI",
     "opened": "Obrolan dibuka dengan surel terlampir. Baca pesannya lalu tekan Kirim.",
     "chatPrompt": "Kenali produk, jumlah, dan harga dalam surel pesanan terlampir, lalu bagi transaksi saya tanggal {date} ({payee}, {amount}) per produk dengan satu kategori untuk masing-masing. Ambil permintaan peninjauan AI {requestId} dan kirimkan usulan Anda untuk permintaan itu.",
-    "tradeChatPrompt": "Kenali perdagangan di surel konfirmasi pialang terlampir: akun, apakah beli atau jual, ticker, saham, total yang dieksekusi, dan tanggal. Ambil permintaan tinjauan AI {requestId} dan ajukan perdagangan untuknya."
+    "tradeChatPrompt": "Kenali perdagangan di surel konfirmasi pialang terlampir: akun, apakah beli atau jual, ticker, saham, total yang dieksekusi, dan tanggal. Ambil permintaan tinjauan AI {requestId} dan ajukan perdagangan untuknya.",
+    "tradeDetachesTransaction": "Jika dibaca sebagai transaksi, email ini tidak lagi mewakili {summary}: transaksi itu membuat transaksi investasinya sendiri."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Dilewati (baris lewati ditemukan)",
         "wait_line": "Ditahan (pesanan belum final)",
         "no_html": "Tidak ada bagian HTML",
-        "trade": "Mengusulkan perdagangan"
+        "trade": "Mengusulkan perdagangan",
+        "trade_exists": "Sudah ada di buku besar"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "Harga rata-rata tidak cocok dengan jumlah saham dan total, sehingga perdagangan ini tidak akan diterapkan otomatis.",
     "incomplete": "Profil tidak dapat membaca perdagangan yang lengkap dari surel ini.",
     "totalFromPrice": "total yang tersirat dari harga",
-    "dateUnknown": "hari surel diterima"
+    "dateUnknown": "hari surel diterima",
+    "price": "Harga rata-rata di email: {price} per saham"
   }
 }

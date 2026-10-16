@@ -422,7 +422,14 @@
         "requireLine": "Vereiste regel",
         "skipIfLine": "Overslaanregel",
         "waitIfLine": "Wachtregel",
-        "reference": "Referentie"
+        "reference": "Referentie",
+        "action": "Koop of verkoop",
+        "symbol": "Ticker",
+        "quantity": "Aandelen",
+        "price": "Prijs",
+        "commission": "Commissie",
+        "date": "Datum",
+        "account": "Rekening"
       },
       "entryLine": "vermelding {entry} ({pattern}), regel {line}: {text}",
       "entrySubject": "vermelding {entry} ({pattern}), het onderwerp: {text}",
@@ -557,7 +564,8 @@
       "approve": "Goedkeuren",
       "draftParser": "Profiel laten opstellen door AI",
       "createParser": "Profiel maken",
-      "ignore": "Negeren"
+      "ignore": "Negeren",
+      "reviewTrade": "Beoordelen in inbox"
     },
     "toasts": {
       "approved": "Voorstel goedgekeurd",
@@ -699,7 +707,11 @@
       "capped": "Alleen de eerste {max} regels worden gelezen.",
       "empty": "Geen regels.",
       "listLabel": "Genummerde regels van de e-mail"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Gekocht} other {Verkocht}}: {quantity} {symbol} voor {total} op {date}.",
+    "noTradeTransaction": "Nog geen: de transactie wordt geboekt wanneer je het voorstel goedkeurt, of gekoppeld aan een transactie die al in je administratie staat.",
+    "candidateShares": "{quantity} aandelen",
+    "tradeNoCandidates": "Geen beleggingstransactie van deze rekening, richting en ticker binnen een week van de transactiedag is vrij om te koppelen. Heb je de transactie zelf ingevoerd, controleer dan de rekening en de datum; keur anders het voorstel goed in de beoordelingsinbox."
   },
   "picker": {
     "heading": "Kies de transactie",
@@ -780,7 +792,8 @@
     "inboxLink": "Het AI-controlepostvak openen",
     "opened": "De chat is geopend met de e-mail als bijlage. Lees het bericht en druk op Verzenden.",
     "chatPrompt": "Herken de producten, aantallen en prijzen in de bijgevoegde bestel-e-mail en splits mijn transactie van {date} ({payee}, {amount}) per product, met een categorie voor elk. Neem AI-controleverzoek {requestId} over en dien je voorstel ervoor in.",
-    "tradeChatPrompt": "Herken de transactie in de bijgevoegde bevestigingsmail van de broker: de rekening, of het een aankoop of verkoop is, het symbool, de aandelen, het uitgevoerde totaal en de datum. Neem AI-beoordelingsverzoek {requestId} aan en dien de transactie ervoor in."
+    "tradeChatPrompt": "Herken de transactie in de bijgevoegde bevestigingsmail van de broker: de rekening, of het een aankoop of verkoop is, het symbool, de aandelen, het uitgevoerde totaal en de datum. Neem AI-beoordelingsverzoek {requestId} aan en dien de transactie ervoor in.",
+    "tradeDetachesTransaction": "Als transactie gelezen hoort deze e-mail niet meer bij {summary}: de transactie maakt een eigen beleggingstransactie aan."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Overgeslagen (overslaanregel gevonden)",
         "wait_line": "In de wacht (bestelling niet definitief)",
         "no_html": "Geen HTML-deel",
-        "trade": "Stelt een transactie voor"
+        "trade": "Stelt een transactie voor",
+        "trade_exists": "Staat al in je administratie"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "De gemiddelde prijs komt niet overeen met de aandelen en het totaal, dus deze transactie wordt niet automatisch toegepast.",
     "incomplete": "Het profiel kon uit deze e-mail geen volledige transactie lezen.",
     "totalFromPrice": "het uit de prijs afgeleide totaal",
-    "dateUnknown": "de dag waarop de e-mail binnenkwam"
+    "dateUnknown": "de dag waarop de e-mail binnenkwam",
+    "price": "Gemiddelde prijs in de e-mail: {price} per aandeel"
   }
 }

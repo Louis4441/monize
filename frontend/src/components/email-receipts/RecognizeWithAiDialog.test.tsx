@@ -259,6 +259,18 @@ describe('RecognizeWithAiDialog', () => {
       );
     });
 
+    it('says the email will no longer stand behind the bank transaction it was matched to', async () => {
+      await openAsTrade(
+        makeReceipt({
+          id: 'r-1',
+          subject: 'Your order has been filled',
+          status: 'review_conflict',
+          transaction: { id: 'tx-1', date: '2026-10-15', amount: -2000, currencyCode: 'CAD', payeeName: 'Wealthsimple' },
+        }),
+      );
+      expect(screen.getByRole('note')).toHaveTextContent(/no longer stands behind/);
+    });
+
     it('asks for no bank transaction: it explains the trade and offers one button', async () => {
       await openAsTrade();
       expect(screen.getByRole('dialog', { name: 'Recognize as a trade with AI' })).toBeInTheDocument();

@@ -31,6 +31,21 @@ export interface EmailReceiptTransactionSummary {
 /** A candidate of an ambiguous receipt: the summary plus the text that helps choose. */
 export interface EmailReceiptCandidateSummary extends EmailReceiptTransactionSummary {
   description: string | null;
+  /** A trade email's candidate (an investment transaction): its share count; absent for a bank transaction. */
+  quantity?: number;
+}
+
+/** The investment transaction a trade email accounts for (`investment_transaction_id`). */
+export interface EmailReceiptInvestmentSummary {
+  id: string;
+  /** `YYYY-MM-DD`. */
+  date: string;
+  action: string;
+  symbol: string;
+  quantity: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
 }
 
 /** One stored email in the list: never its text. */
@@ -65,6 +80,8 @@ export interface EmailReceiptListItem {
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
   transaction: EmailReceiptTransactionSummary | null;
+  /** A trade email's ledger row: the one its approval booked, a person linked, or already there; else null. */
+  investmentTransaction: EmailReceiptInvestmentSummary | null;
   createdAt: string;
 }
 

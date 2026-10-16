@@ -101,6 +101,28 @@ export function isReceiptActionable(receipt: Pick<EmailReceiptListItem, 'status'
   return receipt.status !== 'skipped' && receipt.status !== 'ignored' && receipt.displayState !== 'applied';
 }
 
+/** The `status_reason` of a trade email already in the ledger when it arrived, and of one a person linked. */
+export const RECEIPT_TRADE_EXISTS_REASON = 'trade_exists';
+export const RECEIPT_TRADE_LINKED_REASON = 'trade_linked';
+
+/**
+ * Whether a trade email can be linked to the investment transaction it reports
+ * (the server's own refusals, `EmailReceiptTradeLinkService.link`): its
+ * proposal waits or was refused (`review`, `review_conflict`), or the trade was
+ * already in the ledger (`ignored` as `trade_exists`, which may be pointed at
+ * the right row). Never once it accounts for a row it was linked to or booked,
+ * nor once its proposal was applied.
+ */
+export function canLinkTradeEmail(
+  receipt: Pick<EmailReceiptListItem, 'isTrade' | 'status' | 'statusReason' | 'displayState' | 'investmentTransaction'>,
+): boolean {
+  if (!receipt.isTrade || receipt.displayState === 'applied') return false;
+  if (receipt.statusReason === RECEIPT_TRADE_LINKED_REASON) return false;
+  if (receipt.investmentTransaction && receipt.statusReason !== RECEIPT_TRADE_EXISTS_REASON) return false;
+  if (receipt.status === 'ignored') return receipt.statusReason === RECEIPT_TRADE_EXISTS_REASON;
+  return receipt.status === 'review' || receipt.status === 'review_conflict';
+}
+
 /** The states from which "Recognize with AI" is offered: nothing read it, or what read it was dismissed or lost. */
 const RECOGNIZABLE_STATES: readonly EmailReceiptShownState[] = [
   'no_parser',

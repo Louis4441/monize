@@ -422,7 +422,14 @@
         "requireLine": "Riga obbligatoria",
         "skipIfLine": "Riga da saltare",
         "waitIfLine": "Riga di attesa",
-        "reference": "Riferimento"
+        "reference": "Riferimento",
+        "action": "Acquisto o vendita",
+        "symbol": "Simbolo",
+        "quantity": "Quote",
+        "price": "Prezzo",
+        "commission": "Commissione",
+        "date": "Data",
+        "account": "Conto"
       },
       "entryLine": "voce {entry} ({pattern}), riga {line}: {text}",
       "entrySubject": "voce {entry} ({pattern}), l'oggetto: {text}",
@@ -557,7 +564,8 @@
       "approve": "Approva",
       "draftParser": "Prepara un profilo con l'IA",
       "createParser": "Crea profilo",
-      "ignore": "Ignora"
+      "ignore": "Ignora",
+      "reviewTrade": "Rivedi nella casella"
     },
     "toasts": {
       "approved": "Proposta approvata",
@@ -699,7 +707,11 @@
       "capped": "Vengono lette solo le prime {max} righe.",
       "empty": "Nessuna riga.",
       "listLabel": "Righe numerate dell'email"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Acquisto} other {Vendita}} di {quantity} {symbol} per {total} il {date}.",
+    "noTradeTransaction": "Ancora nessuna: l'operazione viene registrata quando approvi la proposta, oppure collegata a una già presente nel registro.",
+    "candidateShares": "{quantity} quote",
+    "tradeNoCandidates": "Nessuna transazione di investimento di questo conto, direzione e simbolo entro una settimana dal giorno dell'operazione è libera da collegare. Se hai inserito tu l'operazione, controllane conto e data; altrimenti approva la proposta nella casella di revisione."
   },
   "picker": {
     "heading": "Scegli la transazione",
@@ -780,7 +792,8 @@
     "inboxLink": "Apri la posta di revisione IA",
     "opened": "Chat aperta con l'email allegata. Leggi il messaggio e premi Invia.",
     "chatPrompt": "Riconosci i prodotti, le quantità e i prezzi nell'email d'ordine allegata e suddividi la mia transazione del {date} ({payee}, {amount}) per prodotto, con una categoria per ciascuno. Prendi in carico la richiesta di revisione IA {requestId} e invia la tua proposta per essa.",
-    "tradeChatPrompt": "Riconosci l'operazione nell'email di conferma del broker allegata: il conto, se è un acquisto o una vendita, il simbolo, le quote, il totale eseguito e la data. Prendi in carico la richiesta di revisione IA {requestId} e invia l'operazione per essa."
+    "tradeChatPrompt": "Riconosci l'operazione nell'email di conferma del broker allegata: il conto, se è un acquisto o una vendita, il simbolo, le quote, il totale eseguito e la data. Prendi in carico la richiesta di revisione IA {requestId} e invia l'operazione per essa.",
+    "tradeDetachesTransaction": "Letta come operazione, questa email non corrisponde più a {summary}: l'operazione crea una propria transazione di investimento."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Saltata (trovata una riga da saltare)",
         "wait_line": "In attesa (ordine non definitivo)",
         "no_html": "Nessuna parte HTML",
-        "trade": "Propone un'operazione"
+        "trade": "Propone un'operazione",
+        "trade_exists": "Già nel registro"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "Il prezzo medio non corrisponde alle quote e al totale, quindi questa operazione non verrà applicata automaticamente.",
     "incomplete": "Il profilo non è riuscito a leggere un'operazione completa da questa email.",
     "totalFromPrice": "il totale ricavato dal prezzo",
-    "dateUnknown": "il giorno in cui è arrivata l'email"
+    "dateUnknown": "il giorno in cui è arrivata l'email",
+    "price": "Prezzo medio nell'email: {price} per quota"
   }
 }

@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
+import { emailDayOfUser } from "../../ai-review/trade-ledger";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { tr } from "../../i18n/translate";
@@ -14,6 +15,7 @@ import { InvestmentAction } from "../../securities/entities/investment-transacti
 import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import { RECEIPT_TRADE_EXISTS_REASON } from "../pipeline/email-receipt-trade.service";
 import {
   closeReceiptRequests,
   currentReceiptRequestStatus,
@@ -54,12 +56,17 @@ export class EmailReceiptTradeLinkService {
     private readonly scheduled: ScheduledTransactionsService,
   ) {}
 
-  /** Existing investment transactions that could be the trade the email reports (VOID rows are not offered). */
+  /**
+   * Existing investment transactions that could be the trade the email
+   * reports, closest day first. VOID rows are not offered, and neither is a row
+   * another email already accounts for (it is that email's trade, not this one's).
+   */
   async candidates(
     m: EntityManager,
     userId: string,
     trade: Record<string, unknown>,
     effectiveDate: string,
+    receiptId: string,
   ): Promise<EmailReceiptCandidateSummary[]> {
     const accountId = trade.accountId;
     const symbol = trade.symbol;
@@ -72,7 +79,9 @@ export class EmailReceiptTradeLinkService {
       return [];
     }
     const day =
-      typeof trade.date === "string" ? trade.date : effectiveDate.slice(0, 10);
+      typeof trade.date === "string"
+        ? trade.date
+        : await emailDayOfUser(m, userId, new Date(effectiveDate));
     // investment_transactions read as records for a pick list; VOID rows are left out (status != 'VOID').
     const rows = returnedRows<{
       id: string;
@@ -95,6 +104,12 @@ export class EmailReceiptTradeLinkService {
             AND it.status != 'VOID'
             AND it.transaction_date BETWEEN ($4::date - $5::int) AND ($4::date + $5::int)
             AND (LOWER(s.symbol) = LOWER($6) OR LOWER(s.symbol) LIKE LOWER($7))
+            AND NOT EXISTS (
+                  SELECT 1
+                    FROM email_receipts r
+                   WHERE r.user_id = it.user_id
+                     AND r.investment_transaction_id = it.id
+                     AND r.id <> $9::uuid)
           ORDER BY ABS(it.transaction_date - $4::date) ASC, it.id ASC
           LIMIT $8`,
         [
@@ -106,6 +121,7 @@ export class EmailReceiptTradeLinkService {
           symbol,
           `${escapeLikePattern(symbol)}.%`,
           MAX_CANDIDATES,
+          receiptId,
         ],
       ),
     );
@@ -115,7 +131,8 @@ export class EmailReceiptTradeLinkService {
       amount: Number(row.total_amount),
       currencyCode: row.currency_code ?? "",
       payeeName: row.symbol,
-      description: `${row.quantity}${row.description ? ` - ${row.description}` : ""}`,
+      description: row.description,
+      quantity: Number(row.quantity),
     }));
   }
 
@@ -172,6 +189,19 @@ export class EmailReceiptTradeLinkService {
           ),
         );
       }
+      // Linked once, or booked by its approval: the email already accounts for
+      // a row. A `trade_exists` email may be pointed at the right row instead.
+      if (
+        Boolean(receipt.investmentTransactionId) &&
+        receipt.statusReason !== RECEIPT_TRADE_EXISTS_REASON
+      ) {
+        throw new ConflictException(
+          tr(
+            "errors.emailReceipts.tradeAccountedFor",
+            "This email already accounts for an investment transaction, so it is not read again.",
+          ),
+        );
+      }
       const rows = returnedRows<InvestmentRow>(
         await m.query(
           `SELECT it.id, it.account_id, it.security_id, it.action,
@@ -194,13 +224,54 @@ export class EmailReceiptTradeLinkService {
         );
       }
 
+      const claimedElsewhere = returnedRows<{ id: string }>(
+        await m.query(
+          `SELECT id FROM email_receipts
+            WHERE user_id = $1
+              AND investment_transaction_id = $2
+              AND id <> $3
+            LIMIT 1`,
+          [userId, investmentTransactionId, receipt.id],
+        ),
+      );
+      if (claimedElsewhere.length > 0) {
+        throw new ConflictException(
+          tr(
+            "errors.emailReceipts.tradeLinkedElsewhere",
+            "Another email already accounts for that transaction.",
+          ),
+        );
+      }
+
       await closeReceiptRequests(m, userId, receipt.id);
+      // An approval that committed while this ran booked the trade: closing
+      // skipped its applied request, and linking now would leave the email's
+      // own row beside the linked one. Refused, so this transaction rolls back.
+      const applied = returnedRows<{ id: string }>(
+        await m.query(
+          `SELECT id FROM ai_review_requests
+            WHERE user_id = $1
+              AND email_receipt_id = $2
+              AND status = 'applied'
+            LIMIT 1`,
+          [userId, receipt.id],
+        ),
+      );
+      if (applied.length > 0) {
+        throw new ConflictException(
+          tr(
+            "errors.emailReceipts.receiptApplied",
+            "This email's proposal has already been applied to a transaction.",
+          ),
+        );
+      }
       await m.getRepository(EmailReceipt).update(
         { id: receipt.id, userId },
         {
           status: "ignored",
           statusReason: RECEIPT_TRADE_LINKED_REASON,
           aiReviewRequestId: null,
+          investmentTransactionId,
         },
       );
 

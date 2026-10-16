@@ -37,6 +37,7 @@ import {
   type ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
 import {
+  collectParserAccountIds,
   collectParserCategoryIds,
   validateReceiptParserDefinition,
   type ReceiptParserValidationError,
@@ -48,6 +49,7 @@ import {
 import { MAX_PARSERS_PER_USER } from "./email-receipt-parsers.service";
 import {
   assertParserReferencesOwned,
+  usableTradeAccountIds,
   invalidDefinitionError,
 } from "./parser-references.util";
 
@@ -111,6 +113,8 @@ export interface LlmParsedTrade {
   total: number | null;
   price: number | null;
   commission: number | null;
+  /** The currency the amounts name ("USD"), else null: a bare `$` names none. */
+  currency: string | null;
   date: string | null;
   accountText: string | null;
   accountId: string | null;
@@ -182,6 +186,8 @@ export interface ParserToolTestResult {
   errors: ReceiptParserValidationError[];
   /** Category ids the definition names that are not the user's. */
   unknownCategoryIds: string[];
+  /** Account ids a trade profile names that are not an open brokerage account of the user's. */
+  unknownAccountIds: string[];
   emails: ParserToolTestEmail[];
   /** True only when the definition is valid and every email reads complete. */
   allComplete: boolean;
@@ -284,6 +290,7 @@ function toLlmTrade(trade: ParsedTrade): LlmParsedTrade {
     total: units(trade.total),
     price: units(trade.price),
     commission: units(trade.commission),
+    currency: trade.currency ?? null,
     date: trade.date,
     accountText: trade.accountText,
     accountId: trade.accountId,
@@ -353,8 +360,9 @@ export class EmailReceiptParserToolsService {
    * An invalid definition is a RESULT (`valid: false` and every error with its
    * path), not an exception, so the agent can fix it and test again. Reads only:
    * nothing is written and no email changes. A category id the definition names
-   * that is not the user's is listed in `unknownCategoryIds`: the draft would be
-   * refused on save.
+   * that is not the user's is listed in `unknownCategoryIds`, and an account id
+   * that is not an open brokerage account of theirs in `unknownAccountIds`: the
+   * draft would be refused on save.
    */
   async testDefinition(
     userId: string,
@@ -385,6 +393,7 @@ export class EmailReceiptParserToolsService {
         valid: false,
         errors: validation.errors,
         unknownCategoryIds: [],
+        unknownAccountIds: [],
         emails: [],
         allComplete: false,
         allAgree: null,
@@ -488,13 +497,20 @@ export class EmailReceiptParserToolsService {
       const unknownCategoryIds = collectParserCategoryIds(definition).filter(
         (id) => !categoryNames.has(id),
       );
+      const accountIds = collectParserAccountIds(definition);
+      const usableAccounts = await usableTradeAccountIds(m, userId, accountIds);
+      const unknownAccountIds = accountIds.filter(
+        (id) => !usableAccounts.has(id),
+      );
       return {
         valid: true,
         errors: [],
         unknownCategoryIds,
+        unknownAccountIds,
         emails,
         allComplete:
           unknownCategoryIds.length === 0 &&
+          unknownAccountIds.length === 0 &&
           emails.every((email) =>
             email.trade ? email.trade.parsed.complete : email.parsed.complete,
           ),
@@ -596,6 +612,7 @@ export class EmailReceiptParserToolsService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: payee?.id ?? null,
         categoryIds: collectParserCategoryIds(definition),
+        accountIds: collectParserAccountIds(definition),
       });
       let saved: EmailReceiptParser;
       if (existing) {

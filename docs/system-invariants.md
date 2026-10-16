@@ -7529,44 +7529,73 @@ Status              enforced
 
 ```text
 Statement           A brokerage trade-confirmation email (a profile with a
-                    `trade` section) creates an investment transaction only by
+                    `trade` section, or an agent's answer to "Recognize as a
+                    trade") creates an investment transaction only by
                     /ai/actions/confirm with the signed create_investment_transaction
                     card built for it. This is the one way a receipt moves money
                     (INV-RECEIPT-003 excludes it), and it is bounded the same way:
                     the card is signed, single-use and expires, and the
                     email_trade request is marked applied in the write's own
-                    transaction. The executed total is the fact and the price
-                    follows it (INV-TRADE-001); the security is the user's own,
-                    found by ticker without guessing; a trade the ledger already
-                    holds is not proposed. Auto-apply, when the user turned it
-                    on, calls the same confirm and only for an approved profile,
-                    a complete reading whose price agrees with its shares and
-                    total, and a card that built. A trade that pays a scheduled
-                    bill or deposit posts that occurrence instead of creating a
-                    second row (the due date is signed), and linking a trade
-                    email to a transaction already in the ledger marks the
+                    transaction. The executed total is the fact and is signed on
+                    the card and stored as given (INV-TRADE-001); the security is
+                    the user's own and active, found by ticker without guessing
+                    (an exact symbol beside a listing in another currency is
+                    decided by the one the account already trades, else refused),
+                    and an email whose amounts name another currency than the
+                    security's is refused. A trade the ledger already holds is
+                    not booked again: a matching row no other email accounts for
+                    (email_receipts.investment_transaction_id) makes the email
+                    `trade_exists`, refuses an agent's or the inbox's card, and
+                    refuses the confirm itself; a matching row another email
+                    accounts for is a second identical fill, proposed but never
+                    auto-applied. Auto-apply, when the user turned it on, calls the
+                    same confirm and only for an approved profile, a complete
+                    reading whose price agrees with its shares and total, no
+                    matching row at all, and a card that built. No automatic pass
+                    (the poll's rematch, a bulk run) replaces a trade proposal:
+                    one waiting for approval, or dismissed, stays as it is. A
+                    trade that pays a scheduled bill or deposit posts that
+                    occurrence instead of creating a second row (the due date is
+                    signed, the occurrence is the schedule's next one within less
+                    than half its cycle of the trade's day, and the card is
+                    previewed with the schedule's funding account); a card whose
+                    occurrence was posted or moved since it was proposed is not
+                    approvable. Linking a trade email to a transaction already in
+                    the ledger records that row on the email, once, and marks the
                     schedule paid with no money written.
-Source of truth     ai_review_requests (kind email_trade), investment_transactions
+Source of truth     ai_review_requests (kind email_trade), investment_transactions,
+                    email_receipts.investment_transaction_id
 Enforcement         EmailReceiptTradeService queues the request claimed by the
                     receipts key and AiReviewWorkService.submitTrade builds and
                     stores the card (AiReviewRequestsService.enqueueTrade, one open
-                    request per email by uq_ai_review_requests_trade_open); confirm
-                    passes create() a beforeWrite hook that runs
-                    AiReviewRequestsService.markTradeApplied under the holdings
-                    lock, before any row is written. No agent can claim or submit
-                    the kind: it is born claimed, and submit refuses it.
-Concurrency scope   email_receipts row (pipeline), holdings scope (confirm)
+                    request per email by uq_ai_review_requests_trade_open); an
+                    agent's answer goes through the same buildTradeCard. Every
+                    "already booked" question is findTradeInLedger
+                    (ai-review/trade-ledger.ts). Confirm passes create() (or the
+                    schedule's post()) a beforeWrite hook that runs
+                    AiReviewRequestsService.markTradeApplied and findTradeInLedger
+                    under the holdings lock, before any row is written, and an
+                    afterWrite hook that records the row on the email in the same
+                    transaction. The pipeline returns unchanged under
+                    onlyWhenStatusIn for an email whose request is an open or
+                    dismissed email_trade one, and selectRematch never selects one.
+Concurrency scope   email_receipts row (pipeline, link), holdings scope (confirm)
 Retry semantics     a second confirm of the same card is refused by the
-                    single-use claim and by markTradeApplied; a reprocess closes
-                    the email's open request and queues a new one
+                    single-use claim and by markTradeApplied; a person's reprocess
+                    closes the email's open request and queues a new one; an
+                    email that accounts for a row is not reprocessed or relinked
 Crash semantics     the request stays proposed until the write commits
-Failure response    409 when the request is no longer proposed or has expired;
-                    the proposal stays in the inbox when auto-apply is refused
+Failure response    409 when the request is no longer proposed or has expired, or
+                    the trade is already booked; the proposal stays in the inbox
+                    when auto-apply is refused
 Required tests      Present: email-receipt-trade.service.spec.ts,
                     ai-review-work.service.spec.ts, ai-actions.service.spec.ts,
-                    investment-transactions.service.spec.ts.
+                    investment-transactions.service.spec.ts,
+                    email-receipt-trade-link.service.spec.ts,
+                    email-receipt-pipeline.service.spec.ts.
                     Absent: an integration test against real PostgreSQL (the
-                    migration and the two-connection race of two confirms).
+                    migration, the ledger query and the two-connection race of
+                    two confirms, or of a link and a confirm).
 Status              enforced
 ```
 

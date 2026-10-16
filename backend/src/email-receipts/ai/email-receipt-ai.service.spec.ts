@@ -409,7 +409,7 @@ describe("EmailReceiptAiService.askAi", () => {
     });
     h.manager.query.mockImplementation(async (sql: string) => {
       const text = String(sql);
-      if (text.includes("SELECT status FROM ai_review_requests")) {
+      if (/SELECT status(, kind)? FROM ai_review_requests/.test(text)) {
         return [{ status: "proposed" }];
       }
       if (text.includes("FROM transactions t")) return [txRow()];
@@ -474,7 +474,7 @@ describe("EmailReceiptAiService.askAi", () => {
     it("refuses an email whose proposal was applied", async () => {
       const h = happy();
       h.manager.query.mockImplementation(async (sql: string) =>
-        String(sql).includes("SELECT status FROM ai_review_requests")
+        /SELECT status(, kind)? FROM ai_review_requests/.test(String(sql))
           ? [{ status: "applied" }]
           : [],
       );

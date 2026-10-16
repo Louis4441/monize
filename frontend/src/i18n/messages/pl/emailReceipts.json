@@ -422,7 +422,14 @@
         "requireLine": "Wymagany wiersz",
         "skipIfLine": "Wiersz pomijający",
         "waitIfLine": "Wiersz wstrzymujący",
-        "reference": "Referencja"
+        "reference": "Referencja",
+        "action": "Kupno lub sprzedaż",
+        "symbol": "Symbol",
+        "quantity": "Akcje",
+        "price": "Cena",
+        "commission": "Prowizja",
+        "date": "Data",
+        "account": "Konto"
       },
       "entryLine": "wpis {entry} ({pattern}), wiersz {line}: {text}",
       "entrySubject": "wpis {entry} ({pattern}), temat: {text}",
@@ -557,7 +564,8 @@
       "approve": "Zatwierdź",
       "draftParser": "Przygotuj profil za pomocą AI",
       "createParser": "Utwórz profil",
-      "ignore": "Zignoruj"
+      "ignore": "Zignoruj",
+      "reviewTrade": "Przejrzyj w skrzynce"
     },
     "toasts": {
       "approved": "Propozycja zatwierdzona",
@@ -699,7 +707,11 @@
       "capped": "Odczytywane jest tylko pierwszych {max} wierszy.",
       "empty": "Brak wierszy.",
       "listLabel": "Ponumerowane wiersze wiadomości"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Kupiono} other {Sprzedano}} {quantity} {symbol} za {total} dnia {date}.",
+    "noTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji albo połączona z już istniejącą w księdze.",
+    "candidateShares": "{quantity} akcji",
+    "tradeNoCandidates": "Żadna transakcja inwestycyjna z tego konta, w tym kierunku i z tym symbolem, w ciągu tygodnia od dnia transakcji, nie jest wolna do połączenia. Jeśli wprowadziłeś ją sam, sprawdź konto i datę; w przeciwnym razie zatwierdź propozycję w skrzynce przeglądu."
   },
   "picker": {
     "heading": "Wybierz transakcję",
@@ -780,7 +792,8 @@
     "inboxLink": "Otwórz skrzynkę przeglądów AI",
     "opened": "Otwarto czat z dołączoną wiadomością. Przeczytaj treść i naciśnij Wyślij.",
     "chatPrompt": "Rozpoznaj produkty, ilości i ceny w załączonej wiadomości z zamówieniem i podziel moją transakcję z {date} ({payee}, {amount}) według produktów, przypisując każdemu kategorię. Przejmij prośbę o przegląd AI {requestId} i prześlij do niej swoją propozycję.",
-    "tradeChatPrompt": "Rozpoznaj transakcję w załączonej wiadomości z potwierdzeniem od brokera: konto, czy to kupno, czy sprzedaż, symbol, jednostki, wykonaną sumę i datę. Przejmij żądanie przeglądu AI {requestId} i złóż dla niego transakcję."
+    "tradeChatPrompt": "Rozpoznaj transakcję w załączonej wiadomości z potwierdzeniem od brokera: konto, czy to kupno, czy sprzedaż, symbol, jednostki, wykonaną sumę i datę. Przejmij żądanie przeglądu AI {requestId} i złóż dla niego transakcję.",
+    "tradeDetachesTransaction": "Odczytany jako transakcja, ten e-mail przestaje odpowiadać {summary}: transakcja tworzy własną transakcję inwestycyjną."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Pominięto (znaleziono wiersz do pominięcia)",
         "wait_line": "Wstrzymano (zamówienie niefinalne)",
         "no_html": "Brak części HTML",
-        "trade": "Proponuje transakcję"
+        "trade": "Proponuje transakcję",
+        "trade_exists": "Już jest w księdze"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "Średnia cena nie zgadza się z liczbą jednostek i sumą, więc ta transakcja nie zostanie zastosowana automatycznie.",
     "incomplete": "Parser nie odczytał z tej wiadomości kompletnej transakcji.",
     "totalFromPrice": "suma wynikająca z ceny",
-    "dateUnknown": "dzień otrzymania wiadomości"
+    "dateUnknown": "dzień otrzymania wiadomości",
+    "price": "Średnia cena w e-mailu: {price} za akcję"
   }
 }

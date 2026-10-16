@@ -297,6 +297,24 @@ describe('AiReviewRow', () => {
       expect(screen.getByRole('button', { name: /confirm|approve/i })).toBeInTheDocument();
     });
 
+    it('shows the total in its amount column: as money with the currency the card names, else as a number', () => {
+      const amountCell = () => screen.getAllByRole('cell')[2];
+      const { unmount } = renderRow(
+        makeTradeItem({ proposal: { action: { ...PROPOSED_ACTION, preview: { ...PROPOSED_ACTION.preview, securityCurrency: 'CAD' } } } }),
+      );
+      expect(amountCell()).toHaveTextContent('$2,000.00');
+      unmount();
+      renderRow(makeTradeItem());
+      expect(amountCell()).toHaveTextContent(/^2,000\.00$/);
+    });
+
+    it('says a trade request an agent has not answered is about an email, and that it waits for one', () => {
+      renderRow(makeTradeItem({ status: 'pending', trade: null, instructionKey: null, instruction: 'Recognize the trade.' }));
+      expect(screen.getByText('A trade from an email, not read yet')).toBeInTheDocument();
+      expect(screen.queryByText('This transaction no longer exists')).not.toBeInTheDocument();
+      expect(screen.getByText(/Waiting for an AI agent/)).toBeInTheDocument();
+    });
+
     it('lets the person dismiss one whose card can no longer be built, with the reason', () => {
       renderRow(makeTradeItem({ proposal: { error: 'You have no security with the ticker "XCNS".' } }));
       expect(screen.getByRole('alert')).toHaveTextContent('You have no security with the ticker "XCNS".');

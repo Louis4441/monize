@@ -55,7 +55,8 @@
     "dates": "Tạo ngày {created}, hết hạn ngày {expires}",
     "viewTransaction": "Xem giao dịch",
     "waitingForAgent": "Đang chờ một tác nhân AI. <link>Kết nối nhà cung cấp AI trong Cài đặt</link>, hoặc để một ứng dụng khách MCP nhận yêu cầu.",
-    "parserDraftReady": "Dự thảo hồ sơ sẵn sàng. <link>Kiểm tra và phê duyệt nó trong cài đặt hồ sơ</link>."
+    "parserDraftReady": "Dự thảo hồ sơ sẵn sàng. <link>Kiểm tra và phê duyệt nó trong cài đặt hồ sơ</link>.",
+    "tradePending": "Một giao dịch từ email, chưa được đọc"
   },
   "actions": {
     "dismiss": "Bỏ qua"

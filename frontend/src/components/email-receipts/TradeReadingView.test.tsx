@@ -45,6 +45,21 @@ describe('TradeReadingView', () => {
     expect(screen.queryByText(/Account named in the email/)).not.toBeInTheDocument();
   });
 
+  it('shows the price the email states, and money in the currency the email names', () => {
+    const { rerender } = render(<TradeReadingView trade={trade()} fallbackDate={null} />);
+    expect(screen.getByText('Average price in the email: 26.3200 a share')).toBeInTheDocument();
+    rerender(<TradeReadingView trade={trade({ currency: 'USD' })} fallbackDate={null} />);
+    expect(screen.getByText(/for \$2,000\.00, dated/)).toBeInTheDocument();
+  });
+
+  it('names the reason of an incomplete reading only where it is asked to', () => {
+    const incomplete = trade({ complete: false, accountId: null, reason: 'trade_no_account' });
+    const { rerender } = render(<TradeReadingView trade={incomplete} fallbackDate={null} />);
+    expect(screen.queryByText(/account/i)).not.toBeInTheDocument();
+    rerender(<TradeReadingView trade={incomplete} fallbackDate={null} showReason />);
+    expect(screen.getByText(/account/i)).toBeInTheDocument();
+  });
+
   it('says nothing was read rather than inventing a sentence from an incomplete reading', () => {
     render(
       <TradeReadingView trade={trade({ complete: false, symbol: null, reason: 'trade_no_symbol' })} fallbackDate={null} />,

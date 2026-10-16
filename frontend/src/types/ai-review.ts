@@ -39,6 +39,8 @@ export interface AiReviewTrade {
   /** YYYY-MM-DD. */
   date: string;
   description: string | null;
+  /** The currency the email's amounts named, when they named one. */
+  currency?: string | null;
 }
 
 /** The email a request of kind `email_receipt` was raised for (`AiReviewInboxEmailReceipt`). */

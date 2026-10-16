@@ -135,6 +135,13 @@ interface ItemRow {
   tx_amount: string | number | null;
   tx_currency: string | null;
   tx_payee: string | null;
+  inv_id?: string | null;
+  inv_date?: string | null;
+  inv_action?: string | null;
+  inv_symbol?: string | null;
+  inv_quantity?: string | number | null;
+  inv_total?: string | number | null;
+  inv_currency?: string | null;
 }
 
 interface DetailRow extends ItemRow {
@@ -155,7 +162,12 @@ const ITEM_COLUMNS = `r.id, r.from_address, r.from_domain, r.subject, r.received
        r.transaction_id,
        TO_CHAR(t.transaction_date, 'YYYY-MM-DD') AS tx_date,
        t.amount AS tx_amount, t.currency_code AS tx_currency,
-       t.payee_name AS tx_payee`;
+       t.payee_name AS tx_payee,
+       it.id AS inv_id,
+       TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS inv_date,
+       it.action AS inv_action, its.symbol AS inv_symbol,
+       it.quantity AS inv_quantity, it.total_amount AS inv_total,
+       its.currency_code AS inv_currency`;
 
 const ITEM_JOINS = `FROM email_receipts r
        LEFT JOIN email_receipt_parsers p
@@ -163,7 +175,11 @@ const ITEM_JOINS = `FROM email_receipts r
        LEFT JOIN ai_review_requests rq
               ON rq.id = r.ai_review_request_id AND rq.user_id = r.user_id
        LEFT JOIN transactions t
-              ON t.id = r.transaction_id AND t.user_id = r.user_id`;
+              ON t.id = r.transaction_id AND t.user_id = r.user_id
+       LEFT JOIN investment_transactions it
+              ON it.id = r.investment_transaction_id AND it.user_id = r.user_id
+       LEFT JOIN securities its
+              ON its.id = it.security_id`;
 
 const iso = (value: Date | string): string =>
   (value instanceof Date ? value : new Date(value)).toISOString();
@@ -203,6 +219,18 @@ function toListItem(row: ItemRow): EmailReceiptListItem {
             amount: Number(row.tx_amount),
             currencyCode: row.tx_currency as string,
             payeeName: row.tx_payee,
+          }
+        : null,
+    investmentTransaction:
+      row.inv_id && row.inv_date
+        ? {
+            id: row.inv_id,
+            date: row.inv_date,
+            action: row.inv_action ?? "",
+            symbol: row.inv_symbol ?? "",
+            quantity: Number(row.inv_quantity ?? 0),
+            totalAmount: Number(row.inv_total ?? 0),
+            currencyCode: row.inv_currency ?? "",
           }
         : null,
     createdAt: iso(row.created_at),
@@ -832,6 +860,7 @@ export class EmailReceiptsService {
             userId,
             row.trade,
             iso(row.original_sent_at ?? row.received_at),
+            row.id,
           )
         : await this.readCandidates(
             m,

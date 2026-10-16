@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "trade 字段只用于回应交易请求。",
     "tradeDateRequired": "交易需要日期（YYYY-MM-DD）：邮件已不存在，因此没有可回退的日期。",
     "tradeInvalid": "交易需要 accountName、action（BUY 或 SELL）、symbol、quantity、totalAmount，以及可选的 commission 和 date（YYYY-MM-DD）。",
-    "tradeSecurityAmbiguous": "“{symbol}”匹配你的多个证券（{list}）。请重命名其中一个，使代码唯一。",
-    "tradeSecurityUnknown": "你没有代码为“{symbol}”的证券。请先添加该证券，然后重新处理邮件。",
+    "tradeSecurityAmbiguous": "“{{ symbol }}”匹配你的多个证券（{{ list }}）。请重命名其中一个，使代码唯一。",
+    "tradeSecurityUnknown": "你没有代码为“{{ symbol }}”的证券。请先添加该证券，然后重新处理邮件。",
     "tagNamesInvalid": "一条提议最多可添加 {{ max }} 个标签，每个标签 1 到 {{ length }} 个字符，且不能包含控制字符。",
     "noApprovableProposal": "此请求在这里没有可批准的提议。",
-    "approveFailed": "无法批准此提议。请单独尝试。"
+    "approveFailed": "无法批准此提议。请单独尝试。",
+    "tradeAlreadyBooked": "您的账本中已有这笔交易。请将邮件关联到该交易，而不是再次记账。",
+    "tradeScheduleMoved": "这笔交易原本要支付的计划交易在提议后已被记账或更改。请改为将邮件关联到该交易，或将其忽略。",
+    "tradeCurrencyMismatch": "邮件中的金额为 {{ currency }}，但您的证券 {{ symbol }} 以 {{ securityCurrency }} 交易。请确认买入的是哪个上市品种，然后自行录入这笔交易。"
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "验证尝试次数过多。请重新登录。",
@@ -417,7 +420,12 @@
     "previewExpectedNotSelected": "为一封不在所选邮件之列的邮件指定了预期交易。",
     "previewReceiptOutsideDomain": "有一封邮件并非来自此解析器的任何发件人域名。",
     "parserCategoryNameUnknown": "类别\"{{ name }}\"未找到。请使用您的某个类别的名称。",
-    "parserCategoryNameAmbiguous": "类别\"{{ name }}\"与多个类别匹配({{ candidates }})。请使用完整名称，例如\"父类：子类\"。"
+    "parserCategoryNameAmbiguous": "类别\"{{ name }}\"与多个类别匹配({{ candidates }})。请使用完整名称，例如\"父类：子类\"。",
+    "tradeNotBankLinkable": "此邮件被读取为交易确认。请改为将其关联到一笔投资交易。",
+    "tradeAccountedFor": "此邮件已对应一笔投资交易，因此不会再次读取。",
+    "tradeLinkedElsewhere": "另一封邮件已对应该交易。",
+    "parserAccountNotFound": "此交易配置中指定的账户不是您未关闭的经纪账户之一。",
+    "generateSamplesForKind": "收据配置由 samples 生成（每封邮件及其支付的交易）；交易配置由 tradeReceiptIds 生成。请只发送与类型对应的那一项，不要发送另一项。"
   },
   "emergencyAccess": {
     "smtpNotConfigured": "邮件未配置。在设置 SMTP 之前，无法启用紧急访问。",

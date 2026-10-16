@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "Das Feld trade beantwortet nur eine Handelsanfrage.",
     "tradeDateRequired": "Der Handel braucht ein Datum (JJJJ-MM-TT): Die E-Mail ist nicht mehr da, es gibt also keinen Tag als Ersatz.",
     "tradeInvalid": "Der Handel braucht accountName, action (BUY oder SELL), symbol, quantity, totalAmount und optional commission und date (JJJJ-MM-TT).",
-    "tradeSecurityAmbiguous": "„{symbol}“ passt zu mehreren deiner Wertpapiere ({list}). Benenne eines um, damit das Börsenkürzel eindeutig ist.",
-    "tradeSecurityUnknown": "Du hast kein Wertpapier mit dem Börsenkürzel „{symbol}“. Füge das Wertpapier hinzu und verarbeite die E-Mail dann erneut.",
+    "tradeSecurityAmbiguous": "„{{ symbol }}“ passt zu mehreren deiner Wertpapiere ({{ list }}). Benenne eines um, damit das Börsenkürzel eindeutig ist.",
+    "tradeSecurityUnknown": "Du hast kein Wertpapier mit dem Börsenkürzel „{{ symbol }}“. Füge das Wertpapier hinzu und verarbeite die E-Mail dann erneut.",
     "tagNamesInvalid": "Ein Vorschlag darf bis zu {{ max }} Tags enthalten, jeweils mit 1 bis {{ length }} Zeichen und ohne Steuerzeichen.",
     "noApprovableProposal": "Diese Anfrage hat hier keinen Vorschlag, der freigegeben werden könnte.",
-    "approveFailed": "Dieser Vorschlag konnte nicht freigegeben werden. Versuche ihn einzeln."
+    "approveFailed": "Dieser Vorschlag konnte nicht freigegeben werden. Versuche ihn einzeln.",
+    "tradeAlreadyBooked": "Dieser Trade ist bereits in deinen Büchern. Verknüpfe die E-Mail damit, statt ihn erneut zu buchen.",
+    "tradeScheduleMoved": "Die geplante Transaktion, die dieser Trade bezahlen sollte, wurde seit dem Vorschlag gebucht oder geändert. Verknüpfe die E-Mail stattdessen mit dieser Transaktion oder verwirf sie.",
+    "tradeCurrencyMismatch": "Die Beträge der E-Mail sind in {{ currency }}, dein Wertpapier {{ symbol }} wird aber in {{ securityCurrency }} gehandelt. Prüfe, welche Notierung gekauft wurde, und erfasse den Trade dann selbst."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Zu viele Verifikationsversuche. Bitte melden Sie sich erneut an.",
@@ -417,7 +420,12 @@
     "previewExpectedNotSelected": "Für eine E-Mail wurde eine erwartete Buchung angegeben, die nicht zu den ausgewählten gehört.",
     "previewReceiptOutsideDomain": "Eine E-Mail stammt nicht von einer Absenderdomain dieses Profils.",
     "parserCategoryNameUnknown": "Die Kategorie \"{{ name }}\" wurde nicht gefunden. Verwenden Sie den Namen einer Ihrer Kategorien.",
-    "parserCategoryNameAmbiguous": "Die Kategorie \"{{ name }}\" passt zu mehreren Kategorien ({{ candidates }}). Verwenden Sie den vollständigen Namen, zum Beispiel \"Parent: Child\"."
+    "parserCategoryNameAmbiguous": "Die Kategorie \"{{ name }}\" passt zu mehreren Kategorien ({{ candidates }}). Verwenden Sie den vollständigen Namen, zum Beispiel \"Parent: Child\".",
+    "tradeNotBankLinkable": "Diese E-Mail wird als Handelsbestätigung gelesen. Verknüpfe sie stattdessen mit einer Investmenttransaktion.",
+    "tradeAccountedFor": "Diese E-Mail steht bereits für eine Investmenttransaktion und wird daher nicht erneut gelesen.",
+    "tradeLinkedElsewhere": "Eine andere E-Mail steht bereits für diese Transaktion.",
+    "parserAccountNotFound": "Ein in diesem Handelsprofil genanntes Konto ist keines deiner offenen Depotkonten.",
+    "generateSamplesForKind": "Ein Belegprofil wird aus samples erzeugt (jede E-Mail mit der Transaktion, die sie bezahlt hat), ein Handelsprofil aus tradeReceiptIds. Sende das passende Feld für die Art und nicht das andere."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "E-Mail ist nicht konfiguriert. Notfallzugriff kann erst aktiviert werden, wenn SMTP eingerichtet ist.",

@@ -223,7 +223,10 @@ export class GenerateParserWithAiDto {
     description:
       "kind receipt: 1 to 5 emails of the domain, each with the transaction it paid for; an email at most once.",
   })
-  @ValidateIf((o: GenerateParserWithAiDto) => o.kind !== "trade")
+  // Bounded whenever it is sent; which of the two arrays the kind needs (and
+  // that the other is absent) is checked by the service, because a ValidateIf
+  // here would switch every bound off for the other kind.
+  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(PARSER_GENERATE_MAX_SAMPLES)
@@ -239,7 +242,7 @@ export class GenerateParserWithAiDto {
     description:
       "kind trade: 1 to 5 trade-confirmation emails of the domain (a trade pays no bank transaction, so none is paired).",
   })
-  @ValidateIf((o: GenerateParserWithAiDto) => o.kind === "trade")
+  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(PARSER_GENERATE_MAX_SAMPLES)

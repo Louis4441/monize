@@ -422,7 +422,14 @@
         "requireLine": "Erforderliche Zeile",
         "skipIfLine": "Überspringzeile",
         "waitIfLine": "Zurückhaltezeile",
-        "reference": "Referenz"
+        "reference": "Referenz",
+        "action": "Kauf oder Verkauf",
+        "symbol": "Kürzel",
+        "quantity": "Anteile",
+        "price": "Preis",
+        "commission": "Provision",
+        "date": "Datum",
+        "account": "Konto"
       },
       "entryLine": "Eintrag {entry} ({pattern}), Zeile {line}: {text}",
       "entrySubject": "Eintrag {entry} ({pattern}), der Betreff: {text}",
@@ -557,7 +564,8 @@
       "approve": "Freigeben",
       "draftParser": "Profil mit KI entwerfen",
       "createParser": "Profil erstellen",
-      "ignore": "Ignorieren"
+      "ignore": "Ignorieren",
+      "reviewTrade": "Im Eingang prüfen"
     },
     "toasts": {
       "approved": "Vorschlag freigegeben",
@@ -699,7 +707,11 @@
       "capped": "Es werden nur die ersten {max} Zeilen gelesen.",
       "empty": "Keine Zeilen.",
       "listLabel": "Nummerierte Zeilen der E-Mail"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Gekauft} other {Verkauft}}: {quantity} {symbol} für {total} am {date}.",
+    "noTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag freigibst, oder mit einer bereits erfassten Transaktion verknüpft.",
+    "candidateShares": "{quantity} Anteile",
+    "tradeNoCandidates": "Keine Investmenttransaktion dieses Kontos, dieser Richtung und dieses Kürzels innerhalb einer Woche um den Handelstag ist frei zum Verknüpfen. Wenn du den Trade selbst erfasst hast, prüfe Konto und Datum; andernfalls gib den Vorschlag im Prüfeingang frei."
   },
   "picker": {
     "heading": "Buchung auswählen",
@@ -780,7 +792,8 @@
     "inboxLink": "KI-Prüfungseingang öffnen",
     "opened": "Der Chat wurde mit der angehängten E-Mail geöffnet. Lies die Nachricht und drücke auf Senden.",
     "chatPrompt": "Erkenne die Produkte, Mengen und Preise in der angehängten Bestell-E-Mail und teile meine Buchung vom {date} ({payee}, {amount}) nach Produkten auf, mit je einer Kategorie. Übernimm die KI-Prüfungsanfrage {requestId} und reiche deinen Vorschlag dafür ein.",
-    "tradeChatPrompt": "Erkenne den Handel in der angehängten Broker-Bestätigung: das Konto, ob es ein Kauf oder Verkauf ist, das Börsenkürzel, die Anteile, die ausgeführte Summe und das Datum. Übernimm die KI-Prüfanfrage {requestId} und reiche den Handel dafür ein."
+    "tradeChatPrompt": "Erkenne den Handel in der angehängten Broker-Bestätigung: das Konto, ob es ein Kauf oder Verkauf ist, das Börsenkürzel, die Anteile, die ausgeführte Summe und das Datum. Übernimm die KI-Prüfanfrage {requestId} und reiche den Handel dafür ein.",
+    "tradeDetachesTransaction": "Als Trade gelesen, gehört diese E-Mail nicht mehr zu {summary}: Der Trade erzeugt eine eigene Investmenttransaktion."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Übersprungen (Überspringen-Zeile gefunden)",
         "wait_line": "Zurückgestellt (Bestellung nicht endgültig)",
         "no_html": "Kein HTML-Teil",
-        "trade": "Schlägt einen Handel vor"
+        "trade": "Schlägt einen Handel vor",
+        "trade_exists": "Bereits gebucht"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "Der Durchschnittspreis passt nicht zu den Anteilen und der Summe, daher wird dieser Handel nicht automatisch angewendet.",
     "incomplete": "Das Profil konnte aus dieser E-Mail keinen vollständigen Handel lesen.",
     "totalFromPrice": "die aus dem Preis abgeleitete Summe",
-    "dateUnknown": "der Tag, an dem die E-Mail eintraf"
+    "dateUnknown": "der Tag, an dem die E-Mail eintraf",
+    "price": "Durchschnittspreis in der E-Mail: {price} je Anteil"
   }
 }

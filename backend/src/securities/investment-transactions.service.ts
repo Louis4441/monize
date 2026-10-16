@@ -1142,6 +1142,12 @@ export class InvestmentTransactionsService {
        * row it proposed.
        */
       beforeWrite?: (manager: EntityManager) => Promise<void>;
+      /**
+       * Runs last in the write's transaction, with the row's id; a throw rolls
+       * the whole creation back. How a trade email records the row its
+       * approval booked.
+       */
+      afterWrite?: (manager: EntityManager, id: string) => Promise<void>;
     } = {},
   ): Promise<InvestmentTransaction> {
     const account = await this.accountsService.findOne(
@@ -1310,6 +1316,8 @@ export class InvestmentTransactionsService {
       }
 
       await bondGuard.verify([saved.id]);
+
+      await options.afterWrite?.(manager, saved.id);
 
       return saved.id;
     });

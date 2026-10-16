@@ -389,6 +389,12 @@ export interface CreateInvestmentTransactionDescriptor extends BaseDescriptor {
    */
   aiReviewRequestId?: string;
   /**
+   * The executed total the card showed, for a card that answers an
+   * `email_trade` request: signed with the rest and stored as given, never
+   * re-derived from the price (INV-TRADE-001). Absent on every other card.
+   */
+  totalAmount?: number;
+  /**
    * The scheduled bill or deposit this trade pays. When set (with
    * `scheduledDueDate`, the occurrence the card was built for), confirm posts
    * that occurrence with the figures above instead of creating a second row, so

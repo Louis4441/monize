@@ -644,6 +644,24 @@ describe('EmailReceiptsManager', () => {
       expect(await allActions('Order trade applied')).not.toContain('Choose transaction');
     });
 
+    it('never links an email that already accounts for a transaction, nor one a trade profile could not read', async () => {
+      api.list.mockResolvedValue([
+        trade({ id: 'r-linked', subject: 'Order linked', status: 'ignored', displayState: null, statusReason: 'trade_linked' }),
+        trade({ id: 'r-noacct', subject: 'Order no account', status: 'parse_failed', displayState: null, statusReason: 'trade_no_account' }),
+      ]);
+      await renderManager();
+      expect(await allActions('Order linked')).not.toContain('Choose transaction');
+      expect(await allActions('Order no account')).not.toContain('Choose transaction');
+    });
+
+    it('sends a trade proposal to the review inbox, where its card is shown, and approves nothing from the list', async () => {
+      api.list.mockResolvedValue([trade({ aiReviewRequestId: 'req-trade' })]);
+      await renderManager();
+      await runAction('Order trade', 'Review in inbox');
+      expect(useRouter().push).toHaveBeenCalledWith('/ai-reviews?kind=email_receipt');
+      expect(api.approveProposal).not.toHaveBeenCalled();
+    });
+
     it('opens the trade dialog, which queues the request as a trade', async () => {
       api.list.mockResolvedValue([trade({ status: 'no_parser', displayState: null, isTrade: false, id: 'r-np', subject: 'Order np' })]);
       api.askAi.mockResolvedValue({ ok: true, requestId: 'req-t', transactionId: null });

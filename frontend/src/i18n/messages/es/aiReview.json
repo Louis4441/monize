@@ -55,7 +55,8 @@
     "dates": "Creada el {created}, caduca el {expires}",
     "viewTransaction": "Ver transacción",
     "waitingForAgent": "Esperando a un agente de IA. <link>Conecta un proveedor de IA en Ajustes</link> o deja que un cliente MCP la tome.",
-    "parserDraftReady": "Borrador de perfil listo. <link>Pruébalo y apruébalo en la configuración de perfiles</link>."
+    "parserDraftReady": "Borrador de perfil listo. <link>Pruébalo y apruébalo en la configuración de perfiles</link>.",
+    "tradePending": "Una operación de un correo, aún sin leer"
   },
   "actions": {
     "dismiss": "Descartar"

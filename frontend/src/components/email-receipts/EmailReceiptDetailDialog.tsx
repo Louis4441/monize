@@ -18,8 +18,9 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { clearAllCache } from '@/lib/apiCache';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
-import { isReceiptActionable, readParsedReceipt } from '@/lib/email-receipts-format';
+import { canLinkTradeEmail, isReceiptActionable, readParsedReceipt } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { readParsedTrade, type EmailReceiptDetail, type EmailReceiptStatus } from '@/types/email-receipts';
@@ -54,7 +55,7 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
   const tState = useTranslations('emailReceipts.state');
   const tc = useTranslations('common');
   const { formatDate, formatDateTime } = useDateFormat();
-  const { formatCurrency } = useNumberFormat();
+  const { formatCurrency, formatShareQuantity } = useNumberFormat();
   const [state, setState] = useState<DetailState>({ status: 'loading' });
   // Bumped by the retry button; each value is one request.
   const [attempt, setAttempt] = useState(0);
@@ -83,6 +84,9 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     setLinkError(null);
     try {
       const detail = await emailReceiptsApi.receipts.link(receiptId, transactionId);
+      // Linking a trade email can mark the scheduled bill or deposit it pays as
+      // paid: every cached read of the schedules (and what they feed) is stale.
+      if (detail.isTrade) clearAllCache();
       setState({ status: 'ready', detail });
       toast.success(t('linked'));
       onChanged();
@@ -121,12 +125,11 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     const parsed = readParsedReceipt(detail.parsed);
     const trade = readParsedTrade(detail.trade);
     // A trade email is linked to the investment transaction it reports, even once it was
-    // closed as already booked (that is when linking marks its scheduled bill paid).
-    const canLink =
-      detail.candidates.length > 0 &&
-      (trade !== null
-        ? detail.status !== 'skipped' && detail.displayState !== 'applied'
-        : isReceiptActionable(detail));
+    // closed as already booked (that is when linking marks its scheduled bill paid), but
+    // only once: an email linked or booked already accounts for its row.
+    const tradeLinkable = trade !== null && canLinkTradeEmail(detail);
+    const canLink = detail.candidates.length > 0 && (trade !== null ? tradeLinkable : isReceiptActionable(detail));
+    const booked = detail.investmentTransaction ?? null;
     // An email the matcher could not tie to a transaction can be tied by hand.
     const canPick = trade === null && PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);
     const reasonKey = detail.statusReason ? `reasons.${detail.statusReason}` : null;
@@ -179,7 +182,27 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
           <div className="min-w-0">
             <dt className="text-gray-500 dark:text-gray-400">{t('transaction')}</dt>
             <dd className="text-gray-900 dark:text-gray-100">
-              {detail.transaction ? (
+              {trade !== null ? (
+                booked ? (
+                  <>
+                    {t('tradeTransactionSummary', {
+                      action: booked.action === 'SELL' ? 'SELL' : 'BUY',
+                      quantity: formatShareQuantity(booked.quantity),
+                      symbol: booked.symbol,
+                      total: formatCurrency(booked.totalAmount, booked.currencyCode),
+                      date: formatDate(booked.date),
+                    })}{' '}
+                    <Link
+                      href={`/investments?edit=${booked.id}`}
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      {t('viewTransaction')}
+                    </Link>
+                  </>
+                ) : (
+                  <span className="text-gray-500 dark:text-gray-400">{t('noTradeTransaction')}</span>
+                )
+              ) : detail.transaction ? (
                 <>
                   {t('transactionSummary', {
                     date: formatDate(detail.transaction.date),
@@ -262,6 +285,11 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
                         payee: candidate.payeeName ?? t('noPayee'),
                       })}
                     </div>
+                    {candidate.quantity !== undefined && (
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {t('candidateShares', { quantity: formatShareQuantity(candidate.quantity) })}
+                      </div>
+                    )}
                     {candidate.description && (
                       <div className="break-words text-gray-500 dark:text-gray-400">
                         <LinkifiedText text={candidate.description} />
@@ -283,6 +311,12 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
               ))}
             </ul>
           </section>
+        )}
+
+        {tradeLinkable && detail.candidates.length === 0 && (
+          <p className="rounded-lg border border-gray-200 p-3 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+            {t('tradeNoCandidates')}
+          </p>
         )}
 
         {canPick && (

@@ -2348,10 +2348,14 @@ describe("SecuritiesService", () => {
     it("looks only at symbols (the ticker or the ticker with an exchange suffix), never names, and escapes LIKE metacharacters", async () => {
       const builder = qb([suffixed]);
       await service.resolveByTradeSymbol("user-1", "X_NS");
-      const [clause, params] = builder.andWhere.mock.calls[0];
+      const [clause, params] = builder.andWhere.mock.calls.find(([text]) =>
+        String(text).includes(":symbol"),
+      ) as [string, unknown];
       expect(clause).toMatch(/symbol\) = LOWER\(:symbol\)/);
       expect(clause).not.toMatch(/name/);
       expect(params).toEqual({ symbol: "X_NS", suffixed: "X\\_NS.%" });
+      // An inactive security is never the one a new trade is for.
+      expect(builder.andWhere).toHaveBeenCalledWith("security.isActive = true");
     });
 
     it("matches the ticker the broker prints to the user's exchange-suffixed symbol", async () => {
@@ -2364,6 +2368,57 @@ describe("SecuritiesService", () => {
       qb([exact, suffixed]);
       const result = await service.resolveByTradeSymbol("user-1", "XCNS");
       expect(result.match).toBe(exact);
+    });
+
+    it("does not let an exact symbol win over a listing in another currency: the account's own trades decide", async () => {
+      const usd = {
+        ...mockSecurity,
+        id: "sec-us",
+        symbol: "AAPL",
+        currencyCode: "USD",
+      };
+      const cad = {
+        ...mockSecurity,
+        id: "sec-to",
+        symbol: "AAPL.TO",
+        currencyCode: "CAD",
+      };
+      qb([usd, cad]);
+      expect(await service.resolveByTradeSymbol("user-1", "AAPL")).toEqual({
+        match: null,
+        candidates: [usd, cad],
+      });
+
+      qb([usd, cad]);
+      scopedManager.query.mockImplementationOnce(
+        async (sql: string, params: unknown[]) => {
+          expect(String(sql)).toContain("it.status != 'VOID'");
+          expect(params.slice(0, 2)).toEqual(["user-1", "acc-1"]);
+          return [{ security_id: "sec-to" }];
+        },
+      );
+      expect(
+        await service.resolveByTradeSymbol("user-1", "AAPL", "acc-1"),
+      ).toEqual({ match: cad, candidates: [] });
+    });
+
+    it("lets an exact symbol win over listings in its own currency", async () => {
+      const a = {
+        ...mockSecurity,
+        id: "sec-a",
+        symbol: "XCNS",
+        currencyCode: "CAD",
+      };
+      const b = {
+        ...mockSecurity,
+        id: "sec-b",
+        symbol: "XCNS.TO",
+        currencyCode: "CAD",
+      };
+      qb([a, b]);
+      expect((await service.resolveByTradeSymbol("user-1", "XCNS")).match).toBe(
+        a,
+      );
     });
 
     it("never guesses between several suffixed securities", async () => {

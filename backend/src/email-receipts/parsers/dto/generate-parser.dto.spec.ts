@@ -24,8 +24,25 @@ describe("GenerateParserWithAiDto", () => {
     ).toEqual([]);
   });
 
-  it("refuses a receipt request with no samples", async () => {
-    expect(await errors({ domain: "shop.example.com" })).toContain("samples");
+  // Which array the kind needs is the service's check
+  // (email-receipt-parser-generate.service.spec.ts); here, each is bounded
+  // whenever it is sent, whatever the kind.
+  it("bounds the other kind's array too, so neither is ever unbounded", async () => {
+    expect(
+      await errors({
+        domain: "shop.example.com",
+        samples: [{ receiptId: R1, transactionId: T1 }],
+        tradeReceiptIds: [R1, R2, R1, R2, R1, R2],
+      }),
+    ).toContain("tradeReceiptIds");
+    expect(
+      await errors({
+        domain: "wealthsimple.com",
+        kind: "trade",
+        tradeReceiptIds: [R1],
+        samples: [{ receiptId: "x", transactionId: T1 }],
+      }),
+    ).toContain("samples");
   });
 
   it("accepts a trade request with emails only", async () => {
@@ -43,7 +60,6 @@ describe("GenerateParserWithAiDto", () => {
     ["a repeated email", { tradeReceiptIds: [R1, R1] }],
     ["more than five emails", { tradeReceiptIds: [R1, R2, R1, R2, R1, R2] }],
     ["an id that is not a uuid", { tradeReceiptIds: ["x"] }],
-    ["no tradeReceiptIds at all", {}],
   ])("refuses a trade request with %s", async (_why, body) => {
     expect(
       await errors({ domain: "wealthsimple.com", kind: "trade", ...body }),

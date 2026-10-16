@@ -422,7 +422,14 @@
         "requireLine": "必須の行",
         "skipIfLine": "スキップする行",
         "waitIfLine": "保留にする行",
-        "reference": "参照"
+        "reference": "参照",
+        "action": "売買区分",
+        "symbol": "銘柄コード",
+        "quantity": "株数",
+        "price": "価格",
+        "commission": "手数料",
+        "date": "日付",
+        "account": "口座"
       },
       "entryLine": "項目 {entry} ({pattern})、{line} 行目: {text}",
       "entrySubject": "項目 {entry} ({pattern})、件名: {text}",
@@ -557,7 +564,8 @@
       "approve": "承認",
       "draftParser": "AIでプロフィールを準備",
       "createParser": "プロフィールを作成",
-      "ignore": "無視"
+      "ignore": "無視",
+      "reviewTrade": "受信箱で確認"
     },
     "toasts": {
       "approved": "提案を承認しました",
@@ -699,7 +707,11 @@
       "capped": "最初の {max} 行のみが読み取られます。",
       "empty": "行がありません。",
       "listLabel": "メールの番号付き行"
-    }
+    },
+    "tradeTransactionSummary": "{date} に {symbol} を {quantity} 株、{total} で{action, select, BUY {購入} other {売却}}。",
+    "noTradeTransaction": "まだありません。提案を承認すると記帳されるか、台帳にある既存の取引に紐付けられます。",
+    "candidateShares": "{quantity} 株",
+    "tradeNoCandidates": "取引日の前後1週間以内に、この口座・売買区分・銘柄コードで紐付けられる投資取引はありません。自分で入力した場合は口座と日付を確認してください。そうでなければ、レビュー受信箱で提案を承認してください。"
   },
   "picker": {
     "heading": "取引を選択",
@@ -780,7 +792,8 @@
     "inboxLink": "AIレビュー受信箱を開く",
     "opened": "メールを添付してチャットを開きました。メッセージを確認して送信を押してください。",
     "chatPrompt": "添付された注文メールの商品、数量、価格を認識し、{date} の私の取引 ({payee}、{amount}) を、それぞれにカテゴリを付けて商品ごとに分割してください。AIレビュー依頼 {requestId} を引き受け、その提案を送信してください。",
-    "tradeChatPrompt": "添付の証券会社の確認メールにある取引を認識してください:口座、購入か売却か、ティッカー、数量、約定合計金額、日付。AIレビューリクエスト{requestId}を受け取り、その取引を提出してください。"
+    "tradeChatPrompt": "添付の証券会社の確認メールにある取引を認識してください:口座、購入か売却か、ティッカー、数量、約定合計金額、日付。AIレビューリクエスト{requestId}を受け取り、その取引を提出してください。",
+    "tradeDetachesTransaction": "取引として読み取ると、このメールは {summary} に対応しなくなります。取引は独自の投資取引を作成します。"
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "スキップ (スキップ行を検出)",
         "wait_line": "保留 (注文が未確定)",
         "no_html": "HTML部分なし",
-        "trade": "取引を提案"
+        "trade": "取引を提案",
+        "trade_exists": "台帳に記帳済み"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "平均価格が数量と合計金額に一致しないため、この取引は自動的には適用されません。",
     "incomplete": "プロフィールはこのメールから完全な取引を読み取れませんでした。",
     "totalFromPrice": "価格から求めた合計",
-    "dateUnknown": "メールが届いた日"
+    "dateUnknown": "メールが届いた日",
+    "price": "メールの平均価格: 1株あたり {price}"
   }
 }

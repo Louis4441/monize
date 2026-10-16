@@ -422,7 +422,14 @@
         "requireLine": "[XX-Required line-XX]",
         "skipIfLine": "[XX-Skip line-XX]",
         "waitIfLine": "[XX-Wait line-XX]",
-        "reference": "[XX-Reference-XX]"
+        "reference": "[XX-Reference-XX]",
+        "action": "[XX-Buy or sell-XX]",
+        "symbol": "[XX-Ticker-XX]",
+        "quantity": "[XX-Shares-XX]",
+        "price": "[XX-Price-XX]",
+        "commission": "[XX-Commission-XX]",
+        "date": "[XX-Date-XX]",
+        "account": "[XX-Account-XX]"
       },
       "entryLine": "[XX-entry {entry} ({pattern}), line {line}: {text}-XX]",
       "entrySubject": "[XX-entry {entry} ({pattern}), the subject: {text}-XX]",
@@ -557,7 +564,8 @@
       "approve": "[XX-Approve-XX]",
       "draftParser": "[XX-Prepare a profile with AI-XX]",
       "createParser": "[XX-Create profile-XX]",
-      "ignore": "[XX-Ignore-XX]"
+      "ignore": "[XX-Ignore-XX]",
+      "reviewTrade": "[XX-Review in inbox-XX]"
     },
     "toasts": {
       "approved": "[XX-Proposal approved-XX]",
@@ -699,7 +707,11 @@
       "capped": "[XX-Only the first {max} lines are read.-XX]",
       "empty": "[XX-No lines.-XX]",
       "listLabel": "[XX-Numbered lines of the email-XX]"
-    }
+    },
+    "tradeTransactionSummary": "[XX-{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.-XX]",
+    "noTradeTransaction": "[XX-None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.-XX]",
+    "candidateShares": "[XX-{quantity} shares-XX]",
+    "tradeNoCandidates": "[XX-No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox.-XX]"
   },
   "picker": {
     "heading": "[XX-Choose the transaction-XX]",
@@ -780,7 +792,8 @@
     "inboxLink": "[XX-Open the AI review inbox-XX]",
     "opened": "[XX-Opened the chat with the email attached. Read the message and press Send.-XX]",
     "chatPrompt": "[XX-Recognize the products, quantities and prices in the attached order email and split my transaction of {date} ({payee}, {amount}) by product with a category for each. Claim AI review request {requestId} and submit your proposal for it.-XX]",
-    "tradeChatPrompt": "[XX-Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy or a sell, the ticker, the shares, the executed total and the date. Claim AI review request {requestId} and submit the trade for it.-XX]"
+    "tradeChatPrompt": "[XX-Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy or a sell, the ticker, the shares, the executed total and the date. Claim AI review request {requestId} and submit the trade for it.-XX]",
+    "tradeDetachesTransaction": "[XX-Read as a trade, this email no longer stands behind {summary}: the trade creates its own investment transaction.-XX]"
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "[XX-Skipped (skip line found)-XX]",
         "wait_line": "[XX-On hold (order not final)-XX]",
         "no_html": "[XX-No HTML part-XX]",
-        "trade": "[XX-Proposes a trade-XX]"
+        "trade": "[XX-Proposes a trade-XX]",
+        "trade_exists": "[XX-Already in your ledger-XX]"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "[XX-The average price does not match the shares and the total, so this trade will not be applied automatically.-XX]",
     "incomplete": "[XX-The profile could not read a complete trade from this email.-XX]",
     "totalFromPrice": "[XX-the total implied by the price-XX]",
-    "dateUnknown": "[XX-the day the email arrived-XX]"
+    "dateUnknown": "[XX-the day the email arrived-XX]",
+    "price": "[XX-Average price in the email: {price} a share-XX]"
   }
 }

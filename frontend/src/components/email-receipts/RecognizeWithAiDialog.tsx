@@ -173,6 +173,12 @@ export function RecognizeWithAiDialog({ receipt, asTrade = false, onClose, onCha
       content = (
         <div className="space-y-4">
           <p className="text-sm text-gray-700 dark:text-gray-300">{t('tradeMessage')}</p>
+          {/* Read as a trade, the email stands behind no bank transaction: say so before its match is let go. */}
+          {receipt.transaction && (
+            <p role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+              {t('tradeDetachesTransaction', { summary: summary(receipt.transaction) })}
+            </p>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
             <Button isLoading={running} disabled={running} onClick={() => void run()}>
               {t('tradeConfirm')}

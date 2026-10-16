@@ -1,6 +1,7 @@
 import {
   WEALTHSIMPLE_BUY_BODY,
   WEALTHSIMPLE_RRSP_ACCOUNT_ID,
+  WEALTHSIMPLE_TFSA_ACCOUNT_ID,
   WEALTHSIMPLE_TRADE_DEFINITION,
 } from "../parsing/fixtures/wealthsimple-trade";
 import {
@@ -8,6 +9,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import { Account } from "../../accounts/entities/account.entity";
 import { Category } from "../../categories/entities/category.entity";
 import { Payee } from "../../payees/entities/payee.entity";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
@@ -89,11 +91,24 @@ function setup() {
     count: jest.fn(async ({ where }) => (where.id._value as string[]).length),
   };
   const payeeRepo = { count: jest.fn().mockResolvedValue(1) };
+  // The open brokerage accounts a trade profile may name (`usableTradeAccountIds`).
+  const accountRepo = {
+    find: jest.fn(async ({ where }) =>
+      (where.id._value as string[])
+        .filter(
+          (id) =>
+            id === WEALTHSIMPLE_RRSP_ACCOUNT_ID ||
+            id === WEALTHSIMPLE_TFSA_ACCOUNT_ID,
+        )
+        .map((id) => ({ id, accountSubType: "INVESTMENT_BROKERAGE" })),
+    ),
+  };
   const { manager, dataSource } = createScopedDbMocks([
     [EmailReceiptParser, parserRepo],
     [EmailReceipt, receiptRepo],
     [Category, categoryRepo],
     [Payee, payeeRepo],
+    [Account, accountRepo],
   ]);
   // The candidate query (`JOIN accounts`) the test's matching runs; none by default.
   manager.query.mockResolvedValue([]);
@@ -939,6 +954,7 @@ describe("EmailReceiptParserToolsService.testDefinition of a trade profile", () 
       total: 2000,
       price: 26.32,
       commission: null,
+      currency: null,
       date: "2026-10-15",
       accountText: "RRSP",
       accountId: WEALTHSIMPLE_RRSP_ACCOUNT_ID,
@@ -966,6 +982,27 @@ describe("EmailReceiptParserToolsService.testDefinition of a trade profile", () 
       receiptIds: [R1],
     });
     expect(result.emails[0].trade?.parsed.reason).toBe("trade_no_symbol");
+    expect(result.allComplete).toBe(false);
+  });
+
+  it("lists an account id that is not an open brokerage account of the user's, and is then not complete", async () => {
+    const { service, receiptRepo } = setup();
+    receiptRepo.find.mockResolvedValue([
+      receipt({ bodyText: WEALTHSIMPLE_BUY_BODY }),
+    ]);
+    const made_up = "90000000-0000-4000-8000-000000000009";
+    const result = await service.testDefinition(USER, {
+      definition: {
+        ...WEALTHSIMPLE_TRADE_DEFINITION,
+        trade: {
+          ...WEALTHSIMPLE_TRADE_DEFINITION.trade,
+          defaultAccountId: made_up,
+        },
+      },
+      receiptIds: [R1],
+    });
+    expect(result.unknownAccountIds).toEqual([made_up]);
+    expect(result.emails[0].trade?.parsed.complete).toBe(true);
     expect(result.allComplete).toBe(false);
   });
 });

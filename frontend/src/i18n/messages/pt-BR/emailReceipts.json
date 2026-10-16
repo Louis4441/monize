@@ -422,7 +422,14 @@
         "requireLine": "Linha obrigatória",
         "skipIfLine": "Linha de exclusão",
         "waitIfLine": "Linha de espera",
-        "reference": "Referência"
+        "reference": "Referência",
+        "action": "Compra ou venda",
+        "symbol": "Código",
+        "quantity": "Ações",
+        "price": "Preço",
+        "commission": "Comissão",
+        "date": "Data",
+        "account": "Conta"
       },
       "entryLine": "entrada {entry} ({pattern}), linha {line}: {text}",
       "entrySubject": "entrada {entry} ({pattern}), o assunto: {text}",
@@ -557,7 +564,8 @@
       "approve": "Aprovar",
       "draftParser": "Preparar um perfil com IA",
       "createParser": "Criar perfil",
-      "ignore": "Ignorar"
+      "ignore": "Ignorar",
+      "reviewTrade": "Revisar na caixa"
     },
     "toasts": {
       "approved": "Proposta aprovada",
@@ -699,7 +707,11 @@
       "capped": "Só as primeiras {max} linhas são lidas.",
       "empty": "Sem linhas.",
       "listLabel": "Linhas numeradas do e-mail"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venda}} de {quantity} {symbol} por {total} em {date}.",
+    "noTradeTransaction": "Nenhuma ainda: a operação é lançada quando você aprovar a proposta, ou vinculada a uma que já esteja no seu registro.",
+    "candidateShares": "{quantity} ações",
+    "tradeNoCandidates": "Nenhuma transação de investimento desta conta, sentido e código dentro de uma semana do dia da operação está livre para vincular. Se você lançou a operação, confira a conta e a data; caso contrário, aprove a proposta na caixa de revisão."
   },
   "picker": {
     "heading": "Escolha a transação",
@@ -780,7 +792,8 @@
     "inboxLink": "Abrir a caixa de revisão de IA",
     "opened": "O chat foi aberto com o e-mail anexado. Leia a mensagem e clique em Enviar.",
     "chatPrompt": "Reconheça os produtos, as quantidades e os preços no e-mail de pedido anexado e divida minha transação de {date} ({payee}, {amount}) por produto, com uma categoria para cada um. Assuma a solicitação de revisão de IA {requestId} e envie sua proposta para ela.",
-    "tradeChatPrompt": "Reconheça a negociação no e-mail de confirmação da corretora anexado: a conta, se é compra ou venda, o símbolo, as cotas, o total executado e a data. Assuma o pedido de revisão por IA {requestId} e envie a negociação para ele."
+    "tradeChatPrompt": "Reconheça a negociação no e-mail de confirmação da corretora anexado: a conta, se é compra ou venda, o símbolo, as cotas, o total executado e a data. Assuma o pedido de revisão por IA {requestId} e envie a negociação para ele.",
+    "tradeDetachesTransaction": "Lido como operação, este e-mail deixa de corresponder a {summary}: a operação cria sua própria transação de investimento."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Ignorado (linha de exclusão encontrada)",
         "wait_line": "Em espera (pedido não final)",
         "no_html": "Sem parte HTML",
-        "trade": "Propõe uma negociação"
+        "trade": "Propõe uma negociação",
+        "trade_exists": "Já está no seu registro"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "O preço médio não bate com as cotas e o total, então esta negociação não será aplicada automaticamente.",
     "incomplete": "O analisador não conseguiu ler uma negociação completa neste e-mail.",
     "totalFromPrice": "o total implícito no preço",
-    "dateUnknown": "o dia em que o e-mail chegou"
+    "dateUnknown": "o dia em que o e-mail chegou",
+    "price": "Preço médio no e-mail: {price} por ação"
   }
 }

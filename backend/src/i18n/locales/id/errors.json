@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "Bidang trade hanya menjawab permintaan perdagangan.",
     "tradeDateRequired": "Perdagangan memerlukan tanggal (YYYY-MM-DD): surelnya sudah tidak ada, jadi tidak ada hari cadangan.",
     "tradeInvalid": "Perdagangan memerlukan accountName, action (BUY atau SELL), symbol, quantity, totalAmount dan, secara opsional, commission dan date (YYYY-MM-DD).",
-    "tradeSecurityAmbiguous": "\"{symbol}\" cocok dengan beberapa sekuritas Anda ({list}). Ubah nama salah satunya agar tickernya unik.",
-    "tradeSecurityUnknown": "Anda tidak punya sekuritas dengan ticker \"{symbol}\". Tambahkan sekuritasnya, lalu proses ulang surel.",
+    "tradeSecurityAmbiguous": "\"{{ symbol }}\" cocok dengan beberapa sekuritas Anda ({{ list }}). Ubah nama salah satunya agar tickernya unik.",
+    "tradeSecurityUnknown": "Anda tidak punya sekuritas dengan ticker \"{{ symbol }}\". Tambahkan sekuritasnya, lalu proses ulang surel.",
     "tagNamesInvalid": "Sebuah usulan dapat menambahkan hingga {{ max }} tag dengan panjang masing-masing 1 sampai {{ length }} karakter, tanpa karakter kontrol.",
     "noApprovableProposal": "Permintaan ini tidak memiliki usulan untuk disetujui di sini.",
-    "approveFailed": "Usulan ini tidak dapat disetujui. Coba setujui secara terpisah."
+    "approveFailed": "Usulan ini tidak dapat disetujui. Coba setujui secara terpisah.",
+    "tradeAlreadyBooked": "Buku besar Anda sudah memiliki transaksi ini. Tautkan email ke transaksi tersebut alih-alih mencatatnya lagi.",
+    "tradeScheduleMoved": "Transaksi terjadwal yang seharusnya dibayar oleh transaksi ini telah dicatat atau diubah sejak diusulkan. Tautkan email ke transaksi tersebut, atau abaikan.",
+    "tradeCurrencyMismatch": "Jumlah dalam email dalam {{ currency }}, tetapi sekuritas Anda {{ symbol }} diperdagangkan dalam {{ securityCurrency }}. Periksa listing mana yang dibeli, lalu masukkan transaksinya sendiri."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Terlalu banyak percobaan verifikasi. Silakan masuk lagi.",
@@ -417,7 +420,12 @@
     "previewExpectedNotSelected": "Transaksi yang diharapkan disebutkan untuk surel yang tidak termasuk surel terpilih.",
     "previewReceiptOutsideDomain": "Sebuah surel bukan berasal dari domain pengirim parser ini.",
     "parserCategoryNameUnknown": "Kategori \"{{ name }}\" tidak ditemukan. Gunakan nama salah satu kategori Anda.",
-    "parserCategoryNameAmbiguous": "Kategori \"{{ name }}\" cocok dengan beberapa kategori ({{ candidates }}). Gunakan nama lengkap, misalnya \"Parent: Child\"."
+    "parserCategoryNameAmbiguous": "Kategori \"{{ name }}\" cocok dengan beberapa kategori ({{ candidates }}). Gunakan nama lengkap, misalnya \"Parent: Child\".",
+    "tradeNotBankLinkable": "Email ini dibaca sebagai konfirmasi transaksi. Tautkan ke transaksi investasi.",
+    "tradeAccountedFor": "Email ini sudah mewakili sebuah transaksi investasi, jadi tidak dibaca ulang.",
+    "tradeLinkedElsewhere": "Email lain sudah mewakili transaksi tersebut.",
+    "parserAccountNotFound": "Akun yang disebut dalam profil transaksi ini bukan salah satu akun pialang Anda yang terbuka.",
+    "generateSamplesForKind": "Profil struk dibuat dari samples (setiap email beserta transaksi yang dibayarnya); profil transaksi dari tradeReceiptIds. Kirim yang sesuai dengan jenisnya, bukan yang lain."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "Email belum dikonfigurasi. Akses darurat tidak dapat diaktifkan hingga SMTP dikonfigurasi.",

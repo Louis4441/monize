@@ -422,7 +422,14 @@
         "requireLine": "Línea obligatoria",
         "skipIfLine": "Línea de omisión",
         "waitIfLine": "Línea de espera",
-        "reference": "Referencia"
+        "reference": "Referencia",
+        "action": "Compra o venta",
+        "symbol": "Símbolo",
+        "quantity": "Acciones",
+        "price": "Precio",
+        "commission": "Comisión",
+        "date": "Fecha",
+        "account": "Cuenta"
       },
       "entryLine": "entrada {entry} ({pattern}), línea {line}: {text}",
       "entrySubject": "entrada {entry} ({pattern}), el asunto: {text}",
@@ -557,7 +564,8 @@
       "approve": "Aprobar",
       "draftParser": "Preparar un perfil con IA",
       "createParser": "Crear perfil",
-      "ignore": "Ignorar"
+      "ignore": "Ignorar",
+      "reviewTrade": "Revisar en la bandeja"
     },
     "toasts": {
       "approved": "Propuesta aprobada",
@@ -699,7 +707,11 @@
       "capped": "Solo se leen las primeras {max} líneas.",
       "empty": "No hay líneas.",
       "listLabel": "Líneas numeradas del correo"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venta}} de {quantity} {symbol} por {total} el {date}.",
+    "noTradeTransaction": "Ninguna todavía: la operación se registra al aprobar su propuesta, o se vincula a una que ya esté en tu registro.",
+    "candidateShares": "{quantity} acciones",
+    "tradeNoCandidates": "Ninguna transacción de inversión de esta cuenta, sentido y símbolo dentro de una semana del día de la operación está libre para vincular. Si registraste la operación tú mismo, revisa su cuenta y fecha; si no, aprueba la propuesta en la bandeja de revisión."
   },
   "picker": {
     "heading": "Elige la transacción",
@@ -780,7 +792,8 @@
     "inboxLink": "Abrir la bandeja de revisión de IA",
     "opened": "Se abrió el chat con el correo adjunto. Lee el mensaje y pulsa Enviar.",
     "chatPrompt": "Reconoce los productos, las cantidades y los precios del correo de pedido adjunto y desglosa mi transacción del {date} ({payee}, {amount}) por producto, con una categoría para cada uno. Toma la solicitud de revisión de IA {requestId} y envía tu propuesta para ella.",
-    "tradeChatPrompt": "Reconoce la operación del correo de confirmación del corredor adjunto: la cuenta, si es compra o venta, el símbolo, las participaciones, el total ejecutado y la fecha. Reclama la solicitud de revisión con IA {requestId} y envía la operación para ella."
+    "tradeChatPrompt": "Reconoce la operación del correo de confirmación del corredor adjunto: la cuenta, si es compra o venta, el símbolo, las participaciones, el total ejecutado y la fecha. Reclama la solicitud de revisión con IA {requestId} y envía la operación para ella.",
+    "tradeDetachesTransaction": "Leído como operación, este correo deja de corresponder a {summary}: la operación crea su propia transacción de inversión."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Omitido (se encontró una línea de omisión)",
         "wait_line": "En espera (pedido no definitivo)",
         "no_html": "Sin parte HTML",
-        "trade": "Propone una operación"
+        "trade": "Propone una operación",
+        "trade_exists": "Ya está en tu registro"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "El precio medio no coincide con las participaciones y el total, así que esta operación no se aplicará automáticamente.",
     "incomplete": "El perfil no pudo leer una operación completa en este correo.",
     "totalFromPrice": "el total que implica el precio",
-    "dateUnknown": "el día en que llegó el correo"
+    "dateUnknown": "el día en que llegó el correo",
+    "price": "Precio medio en el correo: {price} por acción"
   }
 }

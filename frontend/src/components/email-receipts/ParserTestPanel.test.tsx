@@ -233,6 +233,36 @@ describe('ParserTestPanel', () => {
     expect(screen.queryByText(/No emails are stored yet/)).not.toBeInTheDocument();
   });
 
+  it('says why a trade read is incomplete and which line read each value', async () => {
+    api.test.mockResolvedValue({
+      trade: {
+        parsed: { ...PARSED_TRADE, complete: false, accountId: null, reason: 'trade_no_account' },
+        trace: {
+          action: null,
+          symbol: { entry: 0, pattern: 'Symbol: {symbol}', line: { line: 4, text: 'Symbol: XCNS' } },
+          quantity: null,
+          total: null,
+          price: null,
+          commission: null,
+          date: null,
+          account: null,
+        },
+      },
+      parsed: { ...PARSED_RECEIPT, total: null, complete: false, reason: 'no_total' },
+      outcome: 'read',
+      match: { kind: 'unmatched', considered: 0, attempts: [] },
+      candidateCount: 0,
+      transaction: null,
+    });
+    await renderPanel();
+    await choose('r-1');
+    await runTest();
+    expect(screen.getByText('The profile could not read a complete trade from this email.')).toBeInTheDocument();
+    expect(screen.getByText(/account/i, { selector: 'p' })).toBeInTheDocument();
+    expect(screen.getByText('Ticker')).toBeInTheDocument();
+    expect(screen.getByText(/Symbol: XCNS/)).toBeInTheDocument();
+  });
+
   it('shows the trade a trade profile read and no bank-transaction match', async () => {
     api.test.mockResolvedValue({
       trade: { parsed: PARSED_TRADE },

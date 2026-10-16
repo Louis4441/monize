@@ -422,7 +422,14 @@
         "requireLine": "Ligne obligatoire",
         "skipIfLine": "Ligne d'exclusion",
         "waitIfLine": "Ligne d'attente",
-        "reference": "Référence"
+        "reference": "Référence",
+        "action": "Achat ou vente",
+        "symbol": "Symbole",
+        "quantity": "Actions",
+        "price": "Prix",
+        "commission": "Commission",
+        "date": "Date",
+        "account": "Compte"
       },
       "entryLine": "entrée {entry} ({pattern}), ligne {line} : {text}",
       "entrySubject": "entrée {entry} ({pattern}), l'objet : {text}",
@@ -557,7 +564,8 @@
       "approve": "Approuver",
       "draftParser": "Préparer un profil avec l'IA",
       "createParser": "Créer un profil",
-      "ignore": "Ignorer"
+      "ignore": "Ignorer",
+      "reviewTrade": "Examiner dans la boîte"
     },
     "toasts": {
       "approved": "Proposition approuvée",
@@ -699,7 +707,11 @@
       "capped": "Seules les {max} premières lignes sont lues.",
       "empty": "Aucune ligne.",
       "listLabel": "Lignes numérotées de l'e-mail"
-    }
+    },
+    "tradeTransactionSummary": "{action, select, BUY {Achat} other {Vente}} de {quantity} {symbol} pour {total} le {date}.",
+    "noTradeTransaction": "Aucune pour l'instant : l'opération est enregistrée quand vous approuvez sa proposition, ou liée à une opération déjà présente dans votre registre.",
+    "candidateShares": "{quantity} actions",
+    "tradeNoCandidates": "Aucune opération de placement de ce compte, de ce sens et de ce symbole à moins d'une semaine du jour de l'opération n'est libre à lier. Si vous avez saisi l'opération vous-même, vérifiez son compte et sa date ; sinon, approuvez la proposition dans la boîte de révision."
   },
   "picker": {
     "heading": "Choisir la transaction",
@@ -780,7 +792,8 @@
     "inboxLink": "Ouvrir la boîte de révision par l'IA",
     "opened": "Le chat est ouvert avec l'e-mail joint. Lisez le message et appuyez sur Envoyer.",
     "chatPrompt": "Reconnaissez les produits, les quantités et les prix dans l'e-mail de commande joint et répartissez ma transaction du {date} ({payee}, {amount}) par produit, avec une catégorie pour chacun. Prenez en charge la demande de révision par l'IA {requestId} et soumettez votre proposition pour celle-ci.",
-    "tradeChatPrompt": "Reconnais l'opération dans l'e-mail de confirmation du courtier joint : le compte, achat ou vente, le symbole, les parts, le total exécuté et la date. Prends la demande de revue par IA {requestId} et soumets l'opération pour elle."
+    "tradeChatPrompt": "Reconnais l'opération dans l'e-mail de confirmation du courtier joint : le compte, achat ou vente, le symbole, les parts, le total exécuté et la date. Prends la demande de revue par IA {requestId} et soumets l'opération pour elle.",
+    "tradeDetachesTransaction": "Lu comme une opération, ce courriel ne correspond plus à {summary} : l'opération crée sa propre opération de placement."
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "Ignoré (ligne à ignorer trouvée)",
         "wait_line": "En attente (commande non définitive)",
         "no_html": "Aucune partie HTML",
-        "trade": "Propose une opération"
+        "trade": "Propose une opération",
+        "trade_exists": "Déjà dans votre registre"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "Le prix moyen ne correspond pas aux parts et au total ; cette opération ne sera donc pas appliquée automatiquement.",
     "incomplete": "Le profil n'a pas pu lire une opération complète dans cet e-mail.",
     "totalFromPrice": "le total déduit du prix",
-    "dateUnknown": "jour de réception de l'e-mail"
+    "dateUnknown": "jour de réception de l'e-mail",
+    "price": "Prix moyen dans le courriel : {price} par action"
   }
 }

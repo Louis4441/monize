@@ -13,6 +13,7 @@ import { tr } from "../i18n/translate";
 import { DataSource, EntityManager, In } from "typeorm";
 import { acquireAdvisoryLock, LockScope } from "../common/db/locks";
 import { withScopedDb } from "../common/db/scoped-db";
+import { returnedRows } from "../common/db/query-result";
 import { Security } from "./entities/security.entity";
 import { SecurityTag } from "./entities/security-tag.entity";
 import { Holding } from "./entities/holding.entity";
@@ -1450,40 +1451,66 @@ export class SecuritiesService {
 
   /**
    * Resolve the ticker a broker's trade confirmation prints to the user's
-   * security, strictly: the symbol itself (any case) or the symbol with an
-   * exchange suffix (`XCNS` finds `XCNS.TO`), never a name or a fragment. An
-   * exact symbol wins over suffixed ones; several suffixed securities and no
-   * exact one are `candidates`, never a guess. A trade written to the wrong
-   * security is a wrong ledger, so the loose matching `resolveBySymbolOrName`
-   * does for a person typing in chat is not used for an email.
+   * active security, strictly: the symbol itself (any case) or the symbol with
+   * an exchange suffix (`XCNS` finds `XCNS.TO`), never a name or a fragment.
+   *
+   * One candidate is the match. An exact symbol wins over suffixed ones only
+   * while they all trade in its currency (the same instrument on several
+   * venues); `AAPL` in USD beside `AAPL.TO` in CAD is two instruments the email
+   * cannot tell apart, so the one this account already trades decides, and
+   * otherwise they are `candidates`, never a guess. A trade written to the
+   * wrong security is a wrong ledger, so the loose matching
+   * `resolveBySymbolOrName` does for a person typing in chat is not used here.
    */
   async resolveByTradeSymbol(
     userId: string,
     ticker: string,
+    accountId?: string,
   ): Promise<SecurityMatchResult> {
     const symbol = (ticker ?? "").trim();
     if (!symbol) return { match: null, candidates: [] };
-    const rows = await withScopedDb(this.dataSource, (m) =>
-      m
+    return withScopedDb(this.dataSource, async (m) => {
+      const rows = await m
         .getRepository(Security)
         .createQueryBuilder("security")
         .where("security.userId = :userId", { userId })
+        .andWhere("security.isActive = true")
         .andWhere(
           "(LOWER(security.symbol) = LOWER(:symbol) OR LOWER(security.symbol) LIKE LOWER(:suffixed))",
           { symbol, suffixed: `${escapeLikePattern(symbol)}.%` },
         )
         .orderBy("security.symbol", "ASC")
         .take(10)
-        .getMany(),
-    );
-    const exact = rows.filter(
-      (row) => row.symbol.toLowerCase() === symbol.toLowerCase(),
-    );
-    if (exact.length === 1) return { match: exact[0], candidates: [] };
-    if (exact.length === 0 && rows.length === 1) {
-      return { match: rows[0], candidates: [] };
-    }
-    return { match: null, candidates: rows };
+        .getMany();
+      if (rows.length === 1) return { match: rows[0], candidates: [] };
+      const exact = rows.filter(
+        (row) => row.symbol.toLowerCase() === symbol.toLowerCase(),
+      );
+      if (
+        exact.length === 1 &&
+        rows.every((row) => row.currencyCode === exact[0].currencyCode)
+      ) {
+        return { match: exact[0], candidates: [] };
+      }
+      if (accountId && rows.length > 1) {
+        const traded = returnedRows<{ security_id: string }>(
+          await m.query(
+            `SELECT DISTINCT it.security_id
+               FROM investment_transactions it
+              WHERE it.user_id = $1
+                AND it.account_id = $2
+                AND it.status != 'VOID'
+                AND it.security_id = ANY($3::uuid[])`,
+            [userId, accountId, rows.map((row) => row.id)],
+          ),
+        );
+        if (traded.length === 1) {
+          const held = rows.find((row) => row.id === traded[0].security_id);
+          if (held) return { match: held, candidates: [] };
+        }
+      }
+      return { match: null, candidates: rows };
+    });
   }
 
   /**

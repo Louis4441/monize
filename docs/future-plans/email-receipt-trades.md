@@ -40,14 +40,23 @@ editor's JSON mode, by the wizard or by the assistant).
    chat uses derives the price at the column's ten decimals. The email's average
    price is only a cross-check.
 4. **The account comes from the profile**: `accountRules` map the account text the
-   email prints (`Account: RRSP`) to the user's INVESTMENT account, with a
-   `defaultAccountId`. The security is found by ticker among the user's own
-   securities, strictly (the ticker, or the ticker plus an exchange suffix:
-   `XCNS` finds `XCNS.TO`), never by name or fragment, and never by a guess between
-   several.
+   email prints (`Account: RRSP`) to the user's open brokerage account, with a
+   `defaultAccountId` for emails that print no account (text the rules do not
+   know is no account, never the default). Every account id is checked when the
+   profile is tested and saved. The security is found by ticker among the user's
+   own active securities, strictly (the ticker, or the ticker plus an exchange
+   suffix: `XCNS` finds `XCNS.TO`), never by name or fragment, and never by a
+   guess between several; an exact symbol wins only over listings in its own
+   currency, else the one the account already trades decides. An email whose
+   amounts name a currency other than the security's is refused.
 5. **A trade already in the ledger is not proposed again.** The same account,
-   direction, security, day and exact share count (VOID rows ignored) makes the
-   email `ignored` with `status_reason` `trade_exists`.
+   direction, security, day and exact share count (VOID rows ignored), on a row
+   no other email accounts for (`email_receipts.investment_transaction_id`),
+   makes the email `ignored` with `status_reason` `trade_exists`, and the email
+   then accounts for that row. A matching row another email already accounts for
+   is a second identical fill: proposed, never auto-applied. The same check
+   refuses an agent's card and the inbox's rebuild, and runs again inside the
+   confirm, under the holdings lock.
 6. **Auto-apply is the mailbox's existing switch, with a stricter gate** (section 5).
 7. **A trade that pays a scheduled bill or deposit marks it paid** (section 4.1).
 8. **A trade email is linked to the transaction it reports, not to a bank
@@ -82,12 +91,12 @@ only). The capture each takes: `action`, `symbol`, `quantity`, `date`, `account`
 
 | Field | Required | Meaning |
 |---|---|---|
-| `action` | yes | Text that names the direction: a word `buy`/`bought` or `sell`/`sold` (case-insensitive); both or neither is no reading |
+| `action` | yes | Text that names the direction: a word `buy`/`bought`/`achat` or `sell`/`sold`/`vente`/`vendu` (case-insensitive); both or neither is no reading |
 | `symbol` | yes | The ticker as the broker prints it |
-| `quantity` | yes | Shares, digits with at most 8 decimals; a comma is a thousands separator |
-| `total` or `price` | one of them | The executed total (commission included for a buy), or the average price per share |
+| `quantity` | yes | Shares, at most 8 decimals, in either decimal convention (`75.9878`, `75,9878`, `1,234.5`, `1.234,5`); a `,` followed by exactly three digits groups thousands |
+| `total` or `price` | one of them | The executed total (commission included for a buy), or the average price per share (up to 8 decimals); a sign or parentheses on a total are dropped (a debit is still the total) |
 | `commission` | no | Commission; a buy's total includes it, a sell's proceeds are net of it |
-| `date` | no | `YYYY-MM-DD` or `Month D, YYYY`; time and zone are ignored (the broker's own day). Without it, the day the email arrived (the shop's day for a forward) |
+| `date` | no | `YYYY-MM-DD` (also of an ISO timestamp, or `YYYY/MM/DD`), `Month D, YYYY` or `D Month YYYY` in English or French, or a numeric day and month only when which is the day is certain; time and zone are ignored (the broker's own day). Without it, the day the email was sent (the shop's day for a forward) in the user's timezone |
 | `account` + `accountRules` | one of this or `defaultAccountId` | The account text and the rules that map it (first match wins) |
 
 Bounds: the receipt parser's (200 characters a pattern, 10 entries a field), at
@@ -111,8 +120,10 @@ reading is consistent when
 
     | q * price - gross |  <=  q * 0.5 * 10^-d  +  0.01
 
-(price rounding plus one cent), in integer arithmetic (shares in 1e-8 units as a
-BigInt, money in 1/10000). `consistent` is `null` when the email states no price
+(price rounding plus one cent), in integer arithmetic (shares and the price in
+1e-8 units as BigInts, money in 1/10000). Numbers are read with the trade grammar
+(`parsing/trade-number.ts`), not the receipt amount grammar, which reads a third
+decimal as a thousand group. `consistent` is `null` when the email states no price
 or no total: nothing to check.
 
 Numerical example (the email in the fixture
@@ -131,7 +142,8 @@ to the ledger's four decimals (`75.9878 * 26.32 = 1999.9989`); it is never
 poll/process -> choose parser (as before)
              -> the parser has `trade`:
                   read the lines            -> incomplete: parse_failed (reason)
-                  already booked            -> ignored (trade_exists)
+                  already booked            -> ignored (trade_exists), the email
+                                               accounts for that row
                   close the email's open requests, queue an email_trade request
                   submit the card           -> refused: review + proposal_refused,
                                                request rejected with the reason
@@ -146,35 +158,47 @@ time and again whenever the inbox rebuilds the card, so a stale proposal says wh
 it can no longer be applied instead of failing the list.
 
 `email_receipts.trade` (JSONB, nullable) stores the reading; `parsed` is null
-for a trade email. The receipts page shows the reading in the detail dialog; the
+for a trade email. `email_receipts.investment_transaction_id` is the ledger row
+the email accounts for (booked by its approval, linked, or `trade_exists`); an
+email that accounts for a row is not read again or linked again. No automatic
+pass (the poll's rematch, a bulk run) re-reads a trade email whose request is
+open or dismissed: the proposal is the person's to approve, and a dismissal
+stands. A bank-transaction link on an email a trade profile now reads is refused. The receipts page shows the reading in the detail dialog; the
 review inbox shows the row as "Buy N shares of SYMBOL" with the card.
 
 ### 4.1 A scheduled bill or deposit the trade pays
 
 When the card is built, `ScheduledTransactionsService.findInvestmentOccurrenceForTrade`
 looks for the one active scheduled investment transaction of the same account,
-direction and security whose next occurrence is due within 7 days of the trade's
-day and whose commission equals the trade's. Exactly one, or none: with two, which
+direction and security whose next occurrence is due within less than half its
+cycle of the trade's day (at most 7 days; a daily schedule its own day only), so
+the occurrence after the one a trade paid is never taken for it, and whose
+commission equals the trade's. Exactly one, or none: with two, which
 bill the trade paid is a guess, and a guess marks the wrong one paid.
 
 A match is part of the signed card (`scheduledTransactionId`, the due date the
 card was built for, and the schedule's name on the card). Approving it does NOT
 create a second row: confirm posts that occurrence through
 `ScheduledTransactionsService.post` with the card's figures (date, shares, the
-price the executed total implies, description), inside the one transaction that
-also marks the request applied (`beforeWrite`). The post creates the investment
+executed total and the exchange rate the card showed, description), inside the
+one transaction that also marks the request applied (`beforeWrite`) and records
+the row on the email (`afterInvestmentWrite`). The card is previewed with the
+schedule's own funding account, which is where the post settles. The post creates the investment
 transaction exactly as the schedule would, claims the occurrence and advances the
 schedule. A schedule that moved on since the card was built refuses with a
 conflict and nothing is written. The card is rebuilt on every inbox read, so it
-shows the schedule as it is now.
+shows the schedule as it is now; a card whose occurrence was posted or moved
+since it was proposed is not approvable (link the email instead).
 
 ### 4.2 Linking a trade email
 
 A trade email is not matched to a bank transaction, so "Link" means "this email
 is that existing transaction". The detail dialog lists the user's own non-VOID
 investment transactions of the trade's account, direction and ticker within 7
-days of its day (`EmailReceiptTradeLinkService.candidates`); linking one closes the
-email as `ignored` with `status_reason` `trade_linked`, dismisses its open request
+days of its day that no other email accounts for
+(`EmailReceiptTradeLinkService.candidates`); linking one closes the email as
+`ignored` with `status_reason` `trade_linked`, records the row on the email
+(once: a linked email is not linked again), dismisses its open request
 and, when a scheduled bill or deposit that trade pays is not yet paid (the matching
 rule of 4.1, applied to the linked transaction's own figures), marks the occurrence
 paid with `ScheduledTransactionsService.post(..., { recordOnly: true })`: the
@@ -223,7 +247,7 @@ The mailbox switch (`auto_apply`) applies a trade only when ALL hold: the switch
 is on; the profile is `approved`; the reading is complete; `consistent` is
 `true` (a price was stated and agrees with the shares and the total); the card
 was built (account and security resolved, preview valid); no trade of that
-description exists. It then calls the same `/ai/actions/confirm` a person's
+description exists, accounted for or not. It then calls the same `/ai/actions/confirm` a person's
 approval calls. Anything else waits in the inbox. The daily AI write limit counts
 a trade (the exemption of a profile's proposal applies to `update_transaction`
 only).
@@ -236,10 +260,12 @@ the one exception to INV-RECEIPT-003's "never moves money", and it is bounded th
 same way: signed card, single-use, expiry, the request marked applied in the
 write's own transaction.
 
-The duplicate check is a read before the proposal, not a lock: a manual entry of
-the same trade made between the proposal and its approval is not detected. The
-person approving sees the card and the account; this is the same exposure the
-chat's `create_investment_transaction` has.
+The duplicate check runs before the proposal and again inside the confirm,
+under the holdings lock every investment write takes, so a manual entry or a
+schedule's post of the same trade made between the proposal and its approval
+refuses the approval (409). Two different emails reporting one fill (a forward
+and the original) are told apart only by the row the first accounts for: the
+second is proposed, never auto-applied, and the person approving sees both.
 
 ## 7. Test matrix
 

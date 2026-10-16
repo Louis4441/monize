@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { RECEIPT_PARSED_INSTRUCTION } from "../email-receipts/pipeline/receipt-instructions";
 import { DataSource } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
@@ -58,11 +58,13 @@ function setup() {
     findOne: jest.fn().mockResolvedValue(null),
     find: jest.fn().mockResolvedValue([]),
   };
-  const { dataSource } = createScopedDbMocks([
+  const { dataSource, manager } = createScopedDbMocks([
     [Transaction, txRepo],
     [TransactionRule, ruleRepo],
     [EmailReceipt, receiptRepo],
   ]);
+  // The ledger check (`findTradeInLedger`) and the user's timezone: none by default.
+  manager.query.mockResolvedValue([]);
   const requests = {
     listForUser: jest.fn().mockResolvedValue([]),
     getForUser: jest.fn().mockResolvedValue(request()),
@@ -119,6 +121,7 @@ function setup() {
     txRepo,
     ruleRepo,
     receiptRepo,
+    manager,
   };
 }
 
@@ -1257,7 +1260,7 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
   function tradeSetup() {
     const h = setup();
     h.securities.resolveByTradeSymbol.mockResolvedValue({
-      match: { id: SECURITY, symbol: "XCNS.TO" },
+      match: { id: SECURITY, symbol: "XCNS.TO", currencyCode: "CAD" },
       candidates: [],
     });
     h.investments.previewCreateInvestmentTransaction.mockResolvedValue({
@@ -1283,9 +1286,11 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       trade,
     );
 
+    // The account decides between listings in two currencies.
     expect(h.securities.resolveByTradeSymbol).toHaveBeenCalledWith(
       USER,
       "XCNS",
+      ACCOUNT,
     );
     // The resolved symbol, not the email's text, goes to the preview; the total
     // is passed as the fact and no price is supplied (INV-TRADE-001).
@@ -1326,6 +1331,7 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       id: "sch-1",
       name: "Monthly XCNS",
       dueDate: "2026-10-16",
+      fundingAccountId: "chequing-1",
     });
     h.requests.getForUser.mockResolvedValue(
       tradeRequest({ claimedBy: "email-receipts" }),
@@ -1334,6 +1340,14 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       tradeRequest({ status: "proposed" }),
     );
     await h.service.submitTrade(USER, "email-receipts", REQ, trade);
+    // Posting the occurrence settles through the schedule's funding account, so
+    // the card is previewed with it: what it shows is what is written.
+    expect(
+      h.investments.previewCreateInvestmentTransaction,
+    ).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({ fundingAccountId: "chequing-1" }),
+    );
     expect(h.scheduled.findInvestmentOccurrenceForTrade).toHaveBeenCalledWith(
       USER,
       {
@@ -1356,6 +1370,70 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
         },
       },
     );
+  });
+
+  it("refuses a trade the ledger already holds on a row no other email accounts for, storing nothing", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    h.manager.query.mockImplementation(async (sql: string) =>
+      String(sql).includes("FROM investment_transactions")
+        ? [{ id: "it-1", claimed: false }]
+        : [],
+    );
+    await expect(
+      h.service.submitTrade(USER, "email-receipts", REQ, trade),
+    ).rejects.toBeInstanceOf(ConflictException);
+    const ledger = h.manager.query.mock.calls.find((c) =>
+      String(c[0]).includes("FROM investment_transactions"),
+    );
+    // By the resolved security, and this email's own row is not "another's".
+    expect(ledger?.[1]).toEqual(
+      expect.arrayContaining([SECURITY, RECEIPT, ACCOUNT, "2026-10-15"]),
+    );
+    expect(h.requests.submitProposal).not.toHaveBeenCalled();
+  });
+
+  it("refuses an email whose amounts name another currency than the security's", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({ claimedBy: "email-receipts" }),
+    );
+    await expect(
+      h.service.submitTrade(USER, "email-receipts", REQ, {
+        ...trade,
+        currency: "USD",
+      }),
+    ).rejects.toThrow(/in USD, but your security XCNS\.TO trades in CAD/);
+    expect(
+      h.investments.previewCreateInvestmentTransaction,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("has no approvable card once the scheduled occurrence the proposal paid was posted", async () => {
+    const h = tradeSetup();
+    h.requests.getForUser.mockResolvedValue(
+      tradeRequest({
+        status: "proposed",
+        proposal: {
+          trade,
+          action: {
+            descriptor: {
+              type: "create_investment_transaction",
+              scheduledTransactionId: "sch-1",
+              scheduledDueDate: "2026-10-16",
+            },
+          },
+        },
+      }),
+    );
+    // The schedule moved on: the rebuild finds no occurrence.
+    h.scheduled.findInvestmentOccurrenceForTrade.mockResolvedValue(null);
+    const out = await h.service.buildApprovalCard(USER, REQ);
+    expect(out).toEqual({
+      error: expect.stringMatching(/has been posted or changed/),
+    });
   });
 
   it("refuses a ticker that is none of the user's securities, storing nothing", async () => {
@@ -1501,6 +1579,11 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
         { ...agentTrade, action: "HOLD" },
         { ...agentTrade, quantity: -1 },
         { ...agentTrade, date: "15/10/2026" },
+        // Not a calendar day, and finer than the confirm stores: refused
+        // before a card the approval would then refuse.
+        { ...agentTrade, date: "2026-02-31" },
+        { ...agentTrade, quantity: 1.123456789 },
+        { ...agentTrade, totalAmount: 2000.00001 },
         { accountName: "RRSP" },
       ]) {
         await expect(

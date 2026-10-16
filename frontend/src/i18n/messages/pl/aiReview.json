@@ -55,7 +55,8 @@
     "dates": "Utworzono {created}, wygasa {expires}",
     "viewTransaction": "Zobacz transakcję",
     "waitingForAgent": "Oczekiwanie na agenta AI. <link>Połącz dostawcę AI w Ustawieniach</link> lub pozwól klientowi MCP ją przejąć.",
-    "parserDraftReady": "Szkic profilu gotowy. <link>Przetestuj i zatwierdź go w ustawieniach profili</link>."
+    "parserDraftReady": "Szkic profilu gotowy. <link>Przetestuj i zatwierdź go w ustawieniach profili</link>.",
+    "tradePending": "Transakcja z e-maila, jeszcze nieodczytana"
   },
   "actions": {
     "dismiss": "Odrzuć"

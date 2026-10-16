@@ -434,6 +434,12 @@ export interface ParsedTrade {
   total: number | null;
   price: number | null;
   commission: number | null;
+  /**
+   * The currency the total (else the price) names, as a 3-letter code, when it
+   * names one unambiguously ("USD 2,000.00"; a bare `$` names none). Checked
+   * against the security's currency when the card is built.
+   */
+  currency?: string | null;
   /** The trade's day, else null (the proposal then uses the email's day). */
   date: string | null;
   /** The account text the email printed, when the profile reads one. */

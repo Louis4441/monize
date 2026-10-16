@@ -67,6 +67,7 @@ import { addDaysYMD, todayInTimezone, todayYMD } from "../common/date-utils";
 import {
   calculateNextDueDate as calcNextDueDate,
   ensureYMD,
+  FREQUENCY_CYCLE_DAYS,
 } from "../common/recurrence";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
@@ -455,8 +456,30 @@ function sameOverrideMutationBasis(
  */
 export type PostBeforeWrite = (manager: EntityManager) => Promise<void>;
 
-/** How far from a trade's day a scheduled investment may be due and still be the one the trade paid. */
+/** A hook run inside a posting transaction with the investment transaction the post created. */
+export type PostAfterInvestmentWrite = (
+  manager: EntityManager,
+  investmentTransactionId: string,
+) => Promise<void>;
+
+/** How far from a trade's day a scheduled investment may be due and still be the one the trade paid, at most. */
 export const TRADE_SCHEDULE_WINDOW_DAYS = 7;
+
+/**
+ * The window for one schedule: under half its cycle, so the occurrence AFTER
+ * the one a trade paid is never inside it (a weekly buy posted on the 5th is
+ * next due on the 12th, which a 7-day window around a trade on the 5th would
+ * take for the one that trade paid). A daily schedule matches its own day only;
+ * a one-time one has no next occurrence and keeps the full window.
+ */
+export function tradeScheduleWindowDays(frequency: FrequencyType): number {
+  const cycle = FREQUENCY_CYCLE_DAYS[frequency];
+  if (!cycle) return TRADE_SCHEDULE_WINDOW_DAYS;
+  return Math.max(
+    0,
+    Math.min(TRADE_SCHEDULE_WINDOW_DAYS, Math.floor((cycle - 1) / 2)),
+  );
+}
 
 @Injectable()
 export class ScheduledTransactionsService {
@@ -2773,11 +2796,12 @@ export class ScheduledTransactionsService {
 
   /**
    * The active scheduled investment transaction a brokerage trade pays: same
-   * account, direction and security, an unposted occurrence due within
-   * `TRADE_SCHEDULE_WINDOW_DAYS` of the trade's day, and the same commission
-   * (a posting uses the schedule's own). Exactly one qualifies, or none: with
-   * two, which bill the trade paid is a guess, and a guess marks the wrong one
-   * paid.
+   * account, direction and security, its next (unposted) occurrence due within
+   * `tradeScheduleWindowDays` of the trade's day, and the same commission (a
+   * posting uses the schedule's own). Exactly one qualifies, or none: with two,
+   * which bill the trade paid is a guess, and a guess marks the wrong one paid.
+   * The schedule's funding account comes back with it, because posting the
+   * occurrence settles through that account, so the card must show it.
    */
   async findInvestmentOccurrenceForTrade(
     userId: string,
@@ -2788,7 +2812,12 @@ export class ScheduledTransactionsService {
       date: string;
       commission: number;
     },
-  ): Promise<{ id: string; name: string; dueDate: string } | null> {
+  ): Promise<{
+    id: string;
+    name: string;
+    dueDate: string;
+    fundingAccountId: string | null;
+  } | null> {
     const rows = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(ScheduledTransaction)
@@ -2808,14 +2837,23 @@ export class ScheduledTransactionsService {
         .andWhere("COALESCE(st.investmentCommission, 0) = :commission", {
           commission: trade.commission,
         })
-        .take(2)
+        .take(10)
         .getMany(),
     );
-    if (rows.length !== 1) return null;
+    const due = rows.filter(
+      (row) =>
+        Math.abs(daysBetweenYMD(trade.date, ensureYMD(row.nextDueDate))) <=
+        tradeScheduleWindowDays(row.frequency),
+    );
+    if (due.length !== 1) return null;
+    const [row] = due;
     return {
-      id: rows[0].id,
-      name: rows[0].name,
-      dueDate: ensureYMD(rows[0].nextDueDate),
+      id: row.id,
+      name: row.name,
+      dueDate: ensureYMD(row.nextDueDate),
+      fundingAccountId: FUNDING_ACCOUNT_ACTIONS.has(trade.action)
+        ? (row.investmentFundingAccountId ?? null)
+        : null,
     };
   }
 
@@ -2851,6 +2889,19 @@ export class ScheduledTransactionsService {
        * as for a post; nothing is created.
        */
       recordOnly?: boolean;
+      /**
+       * The executed total and the rate a trade email's approved card showed
+       * (INV-TRADE-001: the total is the fact, stored as given). An investment
+       * posting then writes exactly what was approved rather than re-deriving
+       * the total from a price and re-resolving the rate.
+       */
+      investmentFigures?: { totalAmount: number; exchangeRate: number };
+      /**
+       * Runs inside the posting transaction after an investment occurrence's
+       * row is written, with its id; a throw rolls the whole post back. How a
+       * trade email records the row its approval booked.
+       */
+      afterInvestmentWrite?: PostAfterInvestmentWrite;
     } = {},
   ): Promise<ScheduledTransaction | null> {
     const scheduled = await this.findOne(userId, id);
@@ -3619,13 +3670,15 @@ export class ScheduledTransactionsService {
         // the stale account (issue #1154 review). `current` carries the
         // authoritative scalar investment fields; postInvestment reads only
         // those, and the nested create resolves its own settlement account.
-        await this.postInvestment(
+        const investmentTransactionId = await this.postInvestment(
           userId,
           current,
           postDto,
           postDate,
           lockedOverride,
+          options.investmentFigures,
         );
+        await options.afterInvestmentWrite?.(m, investmentTransactionId);
       } else if (preparedTransfer) {
         // Already validated and authorized above; only the writes join this
         // transaction, so the legs and their balance updates commit with the
@@ -3777,7 +3830,8 @@ export class ScheduledTransactionsService {
     postDto: PostScheduledTransactionDto | undefined,
     postDate: string,
     storedOverride: ScheduledTransactionOverride | null,
-  ): Promise<void> {
+    figures?: { totalAmount: number; exchangeRate: number },
+  ): Promise<string> {
     const action = scheduled.investmentAction as InvestmentAction | null;
     if (!action) {
       throw new BadRequestException(
@@ -3903,6 +3957,7 @@ export class ScheduledTransactionsService {
       dto.quantity = quantity;
       dto.price = price;
       if (commission !== undefined) dto.commission = commission;
+      if (figures) dto.totalAmount = figures.totalAmount;
     } else if (QUANTITY_ONLY_ACTIONS.has(action)) {
       dto.quantity = quantity;
     } else if (AMOUNT_ONLY_ACTIONS.has(action)) {
@@ -3931,9 +3986,17 @@ export class ScheduledTransactionsService {
     // settlement pair -- the staleness check above already reset `exchangeRate`
     // to undefined otherwise, so a rate for a pair that no longer applies falls
     // through to fresh resolution in the posting resolver (issue #1167).
-    if (exchangeRate !== undefined) dto.exchangeRate = exchangeRate;
+    if (figures) {
+      dto.exchangeRate = figures.exchangeRate;
+    } else if (exchangeRate !== undefined) {
+      dto.exchangeRate = exchangeRate;
+    }
 
-    await this.investmentTransactionsService.create(userId, dto);
+    const created = await this.investmentTransactionsService.create(
+      userId,
+      dto,
+    );
+    return created.id;
   }
 
   private calculateNextDueDate(

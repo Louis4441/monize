@@ -194,6 +194,8 @@ interface World {
   candidates: Array<Record<string, unknown>>;
   linkRow: Record<string, unknown> | null;
   requestStatus: string | null;
+  /** The kind of the request the receipt stands behind; `email_receipt` by default. */
+  requestKind?: string;
 }
 
 function setup(over: Partial<World> = {}) {
@@ -239,10 +241,15 @@ function setup(over: Partial<World> = {}) {
       order.push("close");
       return [[], 0];
     }
-    if (text.includes("SELECT status FROM ai_review_requests")) {
+    if (/SELECT status(, kind)? FROM ai_review_requests/.test(text)) {
       return world.requestStatus === null
         ? []
-        : [{ status: world.requestStatus }];
+        : [
+            {
+              status: world.requestStatus,
+              kind: world.requestKind ?? "email_receipt",
+            },
+          ];
     }
     if (text.includes("JOIN accounts a")) return world.candidates;
     if (text.includes("WHERE t.id = $1")) {
@@ -286,6 +293,7 @@ function setup(over: Partial<World> = {}) {
       reason: null,
       requestId: "rq-trade",
       trade: TRADE_READING,
+      investmentTransactionId: null,
       autoApply: null,
     })),
   };
@@ -397,6 +405,7 @@ describe("EmailReceiptPipelineService.process", () => {
           parserId: null,
           parsed: null,
           trade: null,
+          investmentTransactionId: null,
           transactionId: null,
           candidateTransactionIds: [],
           matchKind: null,
@@ -2047,11 +2056,93 @@ describe("EmailReceiptPipelineService.process: the email's own schema.org order"
         reason: "trade_exists",
         requestId: null,
         trade: TRADE_READING,
+        investmentTransactionId: "it-1",
         autoApply: null,
       });
       const result = await run(h);
       expect(result).toMatchObject({ status: "ignored", requestId: null });
       expect(h.order).toContain("close");
+      // The email accounts for the row the ledger already held.
+      expect(h.lastUpdate()[1]).toMatchObject({
+        investmentTransactionId: "it-1",
+      });
+    });
+
+    it.each(["pending", "claimed", "proposed", "rejected"])(
+      "an automatic pass leaves an email whose trade request is %s as it is",
+      async (status) => {
+        const h = tradeWorld();
+        h.world.receipt = receiptRow({
+          bodyText: TRADE_BODY,
+          status: "review",
+          aiReviewRequestId: "rq-trade",
+        });
+        h.world.requestStatus = status;
+        h.world.requestKind = "email_trade";
+        const result = await run(h, { onlyWhenStatusIn: ["review"] });
+        expect(result.unchanged).toBe(true);
+        expect(h.trades.process).not.toHaveBeenCalled();
+        expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it("an automatic pass reads again an email whose trade request expired, and a person's reprocess always does", async () => {
+      let h = tradeWorld();
+      h.world.receipt = receiptRow({
+        bodyText: TRADE_BODY,
+        status: "review",
+        aiReviewRequestId: "rq-trade",
+      });
+      h.world.requestStatus = "expired";
+      h.world.requestKind = "email_trade";
+      await run(h, { onlyWhenStatusIn: ["review"] });
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
+
+      h = tradeWorld();
+      h.world.requestStatus = "proposed";
+      h.world.requestKind = "email_trade";
+      await run(h);
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses a bank-transaction link on an email a trade profile now reads, writing nothing", async () => {
+      const h = tradeWorld();
+      h.world.linkRow = {
+        id: "tx-9",
+        amount: "-15.0000",
+        description: "CARD",
+        payee_id: null,
+        is_transfer: false,
+        status: "UNRECONCILED",
+        plain: true,
+      };
+      await expect(
+        run(h, { link: { transactionId: "tx-9" } }),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(h.trades.process).not.toHaveBeenCalled();
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses to read again an email that accounts for a row, unless that row was only already there", async () => {
+      let h = tradeWorld();
+      h.world.receipt = receiptRow({
+        bodyText: TRADE_BODY,
+        investmentTransactionId: "it-1",
+        status: "ignored",
+        statusReason: "trade_linked",
+      });
+      await expect(run(h)).rejects.toBeInstanceOf(ConflictException);
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+
+      h = tradeWorld();
+      h.world.receipt = receiptRow({
+        bodyText: TRADE_BODY,
+        investmentTransactionId: "it-1",
+        status: "ignored",
+        statusReason: "trade_exists",
+      });
+      await run(h);
+      expect(h.trades.process).toHaveBeenCalledTimes(1);
     });
 
     it("confirms the card the trade service passed the gate with, as an approval does", async () => {
@@ -2062,6 +2153,7 @@ describe("EmailReceiptPipelineService.process: the email's own schema.org order"
         reason: null,
         requestId: "rq-trade",
         trade: { ...TRADE_READING, consistent: true },
+        investmentTransactionId: null,
         autoApply: action,
       });
       const result = await run(h);

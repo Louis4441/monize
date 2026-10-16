@@ -724,6 +724,10 @@ describe("processing and rematching", () => {
     expect(select[0]).toContain("r.status = 'review'");
     expect(select[0]).toContain("NOT EXISTS");
     expect(select[0]).toContain("r.transaction_id IS NULL");
+    // A trade email stands behind no bank transaction by design: never rematched,
+    // so a proposal waiting for approval is not swapped and a dismissal stands.
+    expect(select[0]).toContain("r.trade IS NULL");
+    expect(select[0]).toContain("t.kind = 'email_trade'");
     expect(select[1]).toEqual([USER, MAILBOX, MAX_REMATCHED_PER_POLL, 30]);
   });
 

@@ -29,6 +29,7 @@ import type {
   ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
 import {
+  collectParserAccountIds,
   collectParserCategoryIds,
   validateReceiptParserDefinition,
 } from "../parsing/receipt-parser.validation";
@@ -179,6 +180,7 @@ export class EmailReceiptParsersService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: dto.payeeId ?? null,
         categoryIds: collectParserCategoryIds(definition),
+        accountIds: collectParserAccountIds(definition),
       });
       const saved = await repo.save(
         repo.create({
@@ -226,6 +228,7 @@ export class EmailReceiptParsersService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: payeeId !== existing.payeeId ? payeeId : null,
         categoryIds: definition ? collectParserCategoryIds(definition) : [],
+        accountIds: definition ? collectParserAccountIds(definition) : [],
       });
       await repo.update(
         { id, userId },
@@ -348,6 +351,7 @@ export class EmailReceiptParsersService {
       await assertParserReferencesOwned(m, userId, {
         payeeId: existing.payeeId,
         categoryIds: collectParserCategoryIds(definition),
+        accountIds: collectParserAccountIds(definition),
       });
       await repo.update(
         { id, userId },

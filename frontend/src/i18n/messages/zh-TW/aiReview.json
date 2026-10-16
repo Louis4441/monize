@@ -55,7 +55,8 @@
     "dates": "建立於 {created}，到期於 {expires}",
     "viewTransaction": "檢視交易",
     "waitingForAgent": "正在等待 AI 代理。請<link>在設定中連接 AI 提供者</link>，或讓 MCP 用戶端來認領。",
-    "parserDraftReady": "設定檔草稿已準備好。<link>在設定檔設定中測試並核准它</link>。"
+    "parserDraftReady": "設定檔草稿已準備好。<link>在設定檔設定中測試並核准它</link>。",
+    "tradePending": "來自郵件的交易，尚未讀取"
   },
   "actions": {
     "dismiss": "忽略"

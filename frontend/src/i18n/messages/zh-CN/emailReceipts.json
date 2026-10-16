@@ -422,7 +422,14 @@
         "requireLine": "必需的行",
         "skipIfLine": "跳过行",
         "waitIfLine": "暂缓行",
-        "reference": "参考号"
+        "reference": "参考号",
+        "action": "买入或卖出",
+        "symbol": "代码",
+        "quantity": "股数",
+        "price": "价格",
+        "commission": "佣金",
+        "date": "日期",
+        "account": "账户"
       },
       "entryLine": "条目 {entry}（{pattern}），第 {line} 行：{text}",
       "entrySubject": "条目 {entry}（{pattern}），主题：{text}",
@@ -557,7 +564,8 @@
       "approve": "批准",
       "draftParser": "使用 AI 准备配置文件",
       "createParser": "创建配置文件",
-      "ignore": "忽略"
+      "ignore": "忽略",
+      "reviewTrade": "在收件箱中审核"
     },
     "toasts": {
       "approved": "提议已批准",
@@ -699,7 +707,11 @@
       "capped": "仅读取前 {max} 行。",
       "empty": "没有行。",
       "listLabel": "邮件的编号行"
-    }
+    },
+    "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {买入} other {卖出}} {quantity} 股 {symbol}。",
+    "noTradeTransaction": "暂无：批准提议后会记账这笔交易，或将其关联到账本中已有的交易。",
+    "candidateShares": "{quantity} 股",
+    "tradeNoCandidates": "在交易日前后一周内，没有此账户、方向和代码的可关联投资交易。如果您自己录入过这笔交易，请检查其账户和日期；否则请在审核收件箱中批准提议。"
   },
   "picker": {
     "heading": "选择交易",
@@ -780,7 +792,8 @@
     "inboxLink": "打开 AI 审核收件箱",
     "opened": "已打开聊天并附上该邮件。请阅读消息并点击“发送”。",
     "chatPrompt": "请识别所附订单邮件中的商品、数量和价格，并将我 {date} 的交易（{payee}，{amount}）按商品拆分，并为每项指定类别。请认领 AI 审核请求 {requestId}，并为它提交你的提议。",
-    "tradeChatPrompt": "识别所附券商确认邮件中的交易：账户、是买入还是卖出、股票代码、份数、成交合计和日期。领取 AI 审核请求 {requestId} 并为它提交这笔交易。"
+    "tradeChatPrompt": "识别所附券商确认邮件中的交易：账户、是买入还是卖出、股票代码、份数、成交合计和日期。领取 AI 审核请求 {requestId} 并为它提交这笔交易。",
+    "tradeDetachesTransaction": "按交易读取后，此邮件不再对应 {summary}：该交易会创建自己的投资交易。"
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "已跳过（发现跳过行）",
         "wait_line": "已搁置（订单未最终确定）",
         "no_html": "没有 HTML 部分",
-        "trade": "提出一笔交易"
+        "trade": "提出一笔交易",
+        "trade_exists": "已在账本中"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "平均价格与份数和合计不符，因此这笔交易不会自动应用。",
     "incomplete": "解析器无法从这封邮件中读取完整的交易。",
     "totalFromPrice": "由价格推算出的合计",
-    "dateUnknown": "邮件到达的当天"
+    "dateUnknown": "邮件到达的当天",
+    "price": "邮件中的平均价格：每股 {price}"
   }
 }

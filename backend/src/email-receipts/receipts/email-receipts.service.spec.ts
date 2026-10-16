@@ -114,6 +114,38 @@ describe("deriveDisplayState", () => {
 });
 
 describe("EmailReceiptsService.list", () => {
+  it("shows the investment transaction a trade email accounts for", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([
+      row({
+        is_trade: true,
+        transaction_id: null,
+        tx_date: null,
+        inv_id: "it-1",
+        inv_date: "2026-10-15",
+        inv_action: "BUY",
+        inv_symbol: "XCNS.TO",
+        inv_quantity: "75.98780000",
+        inv_total: "2000.0000",
+        inv_currency: "CAD",
+      }),
+    ]);
+    const [item] = await service.list(USER, {});
+    const [sql] = manager.query.mock.calls[0];
+    expect(sql).toContain(
+      "ON it.id = r.investment_transaction_id AND it.user_id = r.user_id",
+    );
+    expect(item.investmentTransaction).toEqual({
+      id: "it-1",
+      date: "2026-10-15",
+      action: "BUY",
+      symbol: "XCNS.TO",
+      quantity: 75.9878,
+      totalAmount: 2000,
+      currencyCode: "CAD",
+    });
+  });
+
   it("lists newest first without the text, deriving the state and the transaction", async () => {
     const { service, manager } = setup();
     manager.query.mockResolvedValue([
@@ -166,6 +198,7 @@ describe("EmailReceiptsService.list", () => {
         currencyCode: "USD",
         payeeName: "Shop",
       },
+      investmentTransaction: null,
       createdAt: "2026-09-10T10:05:00.000Z",
     });
     expect(items[1]).toMatchObject({
@@ -682,6 +715,7 @@ describe("EmailReceiptsService.reprocess and link", () => {
       USER,
       { accountId: "a1", symbol: "XCNS", action: "BUY" },
       expect.any(String),
+      ID,
     );
   });
 
@@ -701,7 +735,7 @@ describe("EmailReceiptsService.ignore", () => {
     const { service, manager, receiptRepo } = setup();
     receiptRepo.findOne.mockResolvedValue(locked());
     manager.query.mockImplementation(async (sql: string) =>
-      sql.includes("SELECT status FROM ai_review_requests")
+      /SELECT status(, kind)? FROM ai_review_requests/.test(sql)
         ? [{ status: "proposed" }]
         : sql.includes("FROM email_receipts r")
           ? [

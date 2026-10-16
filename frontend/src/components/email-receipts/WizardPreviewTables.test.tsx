@@ -34,6 +34,31 @@ describe('WizardPreviewTables of a trade profile', () => {
     expect(within(row).queryByText(/lines?$/)).not.toBeInTheDocument();
   });
 
+  it('says how each trade sample would end instead of an expectation it cannot have, so an unreadable one is not a success', () => {
+    render(
+      <WizardPreviewTables
+        result={result({
+          selected: [
+            item(),
+            item({
+              receiptId: 'r-9',
+              subject: 'No account named',
+              outcome: 'parse_failed',
+              statusReason: 'trade_no_account',
+            }),
+            item({ receiptId: 'r-8', subject: 'Booked already', outcome: 'trade_exists' }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByRole('columnheader', { name: 'Expected' })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Outcome' })).toBeInTheDocument();
+    const failed = screen.getByRole('row', { name: /No account named/ });
+    expect(within(failed).getByText('Could not be read')).toBeInTheDocument();
+    expect(within(failed).getByText('The profile could not tell which account this trade is for.')).toBeInTheDocument();
+    expect(within(screen.getByRole('row', { name: /Booked already/ })).getByText('Already in your ledger')).toBeInTheDocument();
+  });
+
   it('says a trade whose price does not fit the total will not auto-apply', () => {
     render(
       <WizardPreviewTables

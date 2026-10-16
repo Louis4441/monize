@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
+import {
+  emailDayOfUser,
+  findTradeInLedger,
+} from "../../ai-review/trade-ledger";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { roundMoney } from "../../common/round.util";
@@ -12,8 +16,10 @@ import { Payee } from "../../payees/entities/payee.entity";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { receiptMatchAmount } from "../matching/match-receipt";
 import type { ReceiptOutcome } from "../parsing/parse-receipt";
+import { tradeExecutedTotalUnits } from "../parsing/parse-trade";
 import type {
   ParsedReceiptReason,
+  ParsedTrade,
   ParsedTradeReason,
 } from "../parsing/receipt-parser.types";
 import { validateReceiptParserDefinition } from "../parsing/receipt-parser.validation";
@@ -47,7 +53,9 @@ export type ParserPreviewOutcome =
   | "matched"
   | "ambiguous"
   | "unmatched"
-  | "trade";
+  | "trade"
+  /** A complete trade the ledger already holds: the pipeline ignores the email (`trade_exists`). */
+  | "trade_exists";
 
 export interface ParserPreviewItem {
   receiptId: string;
@@ -296,6 +304,31 @@ export class EmailReceiptParserPreviewService {
     return rows.map(toPreviewRow);
   }
 
+  /** Whether the pipeline would find this complete trade already in the ledger (and ignore the email). */
+  private async tradeAlreadyBooked(
+    m: EntityManager,
+    userId: string,
+    trade: ParsedTrade,
+    row: PreviewRow,
+  ): Promise<boolean> {
+    const date =
+      trade.date ??
+      (await emailDayOfUser(m, userId, row.originalSentAt ?? row.receivedAt));
+    const ledger = await findTradeInLedger(
+      m,
+      userId,
+      {
+        accountId: trade.accountId as string,
+        action: trade.action as "BUY" | "SELL",
+        symbol: trade.symbol as string,
+        quantity: trade.quantity as number,
+        date,
+      },
+      row.id,
+    );
+    return ledger.unclaimedId !== null;
+  }
+
   private async previewOne(
     m: EntityManager,
     userId: string,
@@ -308,11 +341,26 @@ export class EmailReceiptParserPreviewService {
     const { parsed, outcome } = run;
     const read = outcome === "read";
     const tradeRead = read ? (run.trade?.parsed ?? null) : null;
+    // A trade the email does not date is dated the day it was sent in the
+    // user's timezone, as the pipeline dates it.
+    const tradeDay =
+      tradeRead === null
+        ? null
+        : (tradeRead.date ??
+          (await emailDayOfUser(
+            m,
+            userId,
+            row.originalSentAt ?? row.receivedAt,
+          )));
     const paid = receiptMatchAmount(parsed);
     let itemOutcome: ParserPreviewOutcome;
     if (!read) itemOutcome = outcome;
     else if (run.trade) {
-      itemOutcome = run.trade.parsed.complete ? "trade" : "parse_failed";
+      itemOutcome = !run.trade.parsed.complete
+        ? "parse_failed"
+        : (await this.tradeAlreadyBooked(m, userId, run.trade.parsed, row))
+          ? "trade_exists"
+          : "trade";
     } else if (!parsed.complete) itemOutcome = "parse_failed";
     else itemOutcome = run.match.kind;
     return {
@@ -330,12 +378,15 @@ export class EmailReceiptParserPreviewService {
             : null,
       parsed: read
         ? {
-            date: tradeRead?.date ?? run.purchaseDate,
+            date: tradeDay ?? run.purchaseDate,
             total:
               tradeRead !== null
-                ? tradeRead.total === null
-                  ? null
-                  : roundMoney(tradeRead.total / MONEY_UNITS)
+                ? (() => {
+                    const units = tradeExecutedTotalUnits(tradeRead);
+                    return units === null
+                      ? null
+                      : roundMoney(units / MONEY_UNITS);
+                  })()
                 : paid === null
                   ? null
                   : roundMoney(paid / MONEY_UNITS),

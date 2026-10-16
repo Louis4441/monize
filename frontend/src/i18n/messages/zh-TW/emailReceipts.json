@@ -422,7 +422,14 @@
         "requireLine": "必要的行",
         "skipIfLine": "略過行",
         "waitIfLine": "暫緩行",
-        "reference": "參考號碼"
+        "reference": "參考號碼",
+        "action": "買入或賣出",
+        "symbol": "代碼",
+        "quantity": "股數",
+        "price": "價格",
+        "commission": "佣金",
+        "date": "日期",
+        "account": "帳戶"
       },
       "entryLine": "項目 {entry}（{pattern}），第 {line} 行：{text}",
       "entrySubject": "項目 {entry}（{pattern}），主旨：{text}",
@@ -557,7 +564,8 @@
       "approve": "核准",
       "draftParser": "使用 AI 準備設定檔",
       "createParser": "建立設定檔",
-      "ignore": "忽略"
+      "ignore": "忽略",
+      "reviewTrade": "在收件匣中審核"
     },
     "toasts": {
       "approved": "提案已核准",
@@ -699,7 +707,11 @@
       "capped": "僅讀取前 {max} 行。",
       "empty": "沒有行。",
       "listLabel": "郵件的編號行"
-    }
+    },
+    "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {買入} other {賣出}} {quantity} 股 {symbol}。",
+    "noTradeTransaction": "尚無：核准提議後會記帳這筆交易，或將其連結到帳本中已有的交易。",
+    "candidateShares": "{quantity} 股",
+    "tradeNoCandidates": "在交易日前後一週內，沒有此帳戶、方向和代碼的可連結投資交易。如果您自己輸入過這筆交易，請檢查其帳戶和日期；否則請在審核收件匣中核准提議。"
   },
   "picker": {
     "heading": "選擇交易",
@@ -780,7 +792,8 @@
     "inboxLink": "開啟 AI 審核收件匣",
     "opened": "已開啟聊天並附上該郵件。請閱讀訊息並按下「傳送」。",
     "chatPrompt": "請辨識所附訂單郵件中的商品、數量和價格，並將我 {date} 的交易（{payee}，{amount}）依商品拆分，並為每項指定類別。請認領 AI 審核請求 {requestId}，並為它提交你的提議。",
-    "tradeChatPrompt": "辨識所附券商確認郵件中的交易：帳戶、是買入還是賣出、股票代號、份數、成交合計和日期。領取 AI 審查請求 {requestId} 並為它提交這筆交易。"
+    "tradeChatPrompt": "辨識所附券商確認郵件中的交易：帳戶、是買入還是賣出、股票代號、份數、成交合計和日期。領取 AI 審查請求 {requestId} 並為它提交這筆交易。",
+    "tradeDetachesTransaction": "按交易讀取後，此郵件不再對應 {summary}：該交易會建立自己的投資交易。"
   },
   "hub": {
     "tabs": {
@@ -1014,7 +1027,8 @@
         "skip_line": "已略過（發現略過行）",
         "wait_line": "已擱置（訂單尚未最終確定）",
         "no_html": "沒有 HTML 部分",
-        "trade": "提出一筆交易"
+        "trade": "提出一筆交易",
+        "trade_exists": "已在帳本中"
       }
     }
   },
@@ -1024,6 +1038,7 @@
     "priceMismatch": "平均價格與份數和合計不符，因此這筆交易不會自動套用。",
     "incomplete": "解析器無法從這封郵件中讀取完整的交易。",
     "totalFromPrice": "由價格推算出的合計",
-    "dateUnknown": "郵件送達的當天"
+    "dateUnknown": "郵件送達的當天",
+    "price": "郵件中的平均價格：每股 {price}"
   }
 }

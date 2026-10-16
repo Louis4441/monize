@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import { RECEIPT_TRADE_EXISTS_REASON } from "../pipeline/email-receipt-trade.service";
 import {
   EmailReceiptTradeLinkService,
   RECEIPT_TRADE_LINKED_REASON,
@@ -39,6 +40,7 @@ function setup(
   receipt: EmailReceipt | null = tradeReceipt(),
   rows: unknown[] = [investmentRow],
   requestStatus: string | null = null,
+  world: { claimedElsewhere?: boolean; appliedMeanwhile?: boolean } = {},
 ) {
   const receiptRepo = {
     findOne: jest.fn(async () => receipt),
@@ -49,11 +51,17 @@ function setup(
   ]);
   manager.query.mockImplementation(async (sql: string) => {
     const text = String(sql);
-    if (text.includes("SELECT status FROM ai_review_requests")) {
+    if (/SELECT status(, kind)? FROM ai_review_requests/.test(text)) {
       return requestStatus === null ? [] : [{ status: requestStatus }];
     }
     if (text.includes("FROM investment_transactions it\n            WHERE")) {
       return rows;
+    }
+    if (text.includes("AND investment_transaction_id = $2")) {
+      return world.claimedElsewhere ? [{ id: "receipt-2" }] : [];
+    }
+    if (text.includes("AND status = 'applied'")) {
+      return world.appliedMeanwhile ? [{ id: "rq" }] : [];
     }
     return [];
   });
@@ -80,8 +88,49 @@ describe("EmailReceiptTradeLinkService.link", () => {
         status: "ignored",
         statusReason: RECEIPT_TRADE_LINKED_REASON,
         aiReviewRequestId: null,
+        investmentTransactionId: IT,
       },
     );
+  });
+
+  it("refuses a second link of an email that already accounts for a row, but repoints a trade_exists one", async () => {
+    let h = setup(
+      tradeReceipt({
+        investmentTransactionId: "it-0",
+        statusReason: RECEIPT_TRADE_LINKED_REASON,
+      }),
+    );
+    await expect(service_link(h)).rejects.toBeInstanceOf(ConflictException);
+    expect(h.receiptRepo.update).not.toHaveBeenCalled();
+
+    h = setup(
+      tradeReceipt({
+        investmentTransactionId: "it-0",
+        statusReason: RECEIPT_TRADE_EXISTS_REASON,
+      }),
+    );
+    await service_link(h);
+    expect(h.receiptRepo.update).toHaveBeenCalledWith(
+      { id: RECEIPT, userId: USER },
+      expect.objectContaining({ investmentTransactionId: IT }),
+    );
+  });
+
+  it("refuses a transaction another email already accounts for, writing nothing", async () => {
+    const h = setup(tradeReceipt(), [investmentRow], null, {
+      claimedElsewhere: true,
+    });
+    await expect(service_link(h)).rejects.toBeInstanceOf(ConflictException);
+    expect(h.receiptRepo.update).not.toHaveBeenCalled();
+    expect(h.scheduled.post).not.toHaveBeenCalled();
+  });
+
+  it("refuses when an approval of the email's own proposal committed meanwhile, so the link rolls back", async () => {
+    const h = setup(tradeReceipt(), [investmentRow], null, {
+      appliedMeanwhile: true,
+    });
+    await expect(service_link(h)).rejects.toBeInstanceOf(ConflictException);
+    expect(h.receiptRepo.update).not.toHaveBeenCalled();
   });
 
   it("reads the transaction by id and owner and never a VOID one", async () => {
@@ -196,6 +245,7 @@ describe("EmailReceiptTradeLinkService.candidates", () => {
       USER,
       { accountId: "acc-1", symbol: "XCNS", action: "BUY", date: "2026-10-15" },
       "2026-10-16T00:00:00.000Z",
+      RECEIPT,
     );
     expect(out).toEqual([
       {
@@ -204,12 +254,16 @@ describe("EmailReceiptTradeLinkService.candidates", () => {
         amount: 2000,
         currencyCode: "CAD",
         payeeName: "XCNS.TO",
-        description: "75.9878",
+        description: null,
+        quantity: 75.9878,
       },
     ]);
     const [sql, params] = manager.query.mock.calls[0];
     expect(String(sql)).toContain("it.status != 'VOID'");
+    // A row another email accounts for is that email's trade, not a candidate.
+    expect(String(sql)).toContain("r.investment_transaction_id = it.id");
     expect(params.slice(0, 4)).toEqual([USER, "acc-1", "BUY", "2026-10-15"]);
+    expect(params[8]).toBe(RECEIPT);
   });
 
   it("dates the search by the email when the reading has no date, and offers nothing for a reading without an account", async () => {
@@ -220,8 +274,13 @@ describe("EmailReceiptTradeLinkService.candidates", () => {
       USER,
       { accountId: "acc-1", symbol: "XCNS", action: "SELL" },
       "2026-10-16T00:00:00.000Z",
+      RECEIPT,
     );
-    expect(manager.query.mock.calls[0][1][3]).toBe("2026-10-16");
+    // No timezone stored: the UTC day.
+    const search = manager.query.mock.calls.find((c) =>
+      String(c[0]).includes("FROM investment_transactions"),
+    );
+    expect(search?.[1][3]).toBe("2026-10-16");
     manager.query.mockClear();
     expect(
       await service.candidates(
@@ -229,6 +288,7 @@ describe("EmailReceiptTradeLinkService.candidates", () => {
         USER,
         { symbol: "X" },
         "2026-10-16T00:00:00Z",
+        RECEIPT,
       ),
     ).toEqual([]);
     expect(manager.query).not.toHaveBeenCalled();

@@ -162,11 +162,14 @@
     "tradeOnTradeRequest": "trade alanı yalnızca bir işlem isteğini yanıtlar.",
     "tradeDateRequired": "İşlemin tarihi gerekir (YYYY-AA-GG): e-posta artık yok, bu yüzden yedek bir gün yok.",
     "tradeInvalid": "İşlem için accountName, action (BUY veya SELL), symbol, quantity, totalAmount ve isteğe bağlı olarak commission ile date (YYYY-AA-GG) gerekir.",
-    "tradeSecurityAmbiguous": "\"{symbol}\" birden çok menkul kıymetinizle eşleşiyor ({list}). Kodun benzersiz olması için birinin adını değiştirin.",
-    "tradeSecurityUnknown": "\"{symbol}\" kodlu bir menkul kıymetiniz yok. Menkul kıymeti ekleyin, sonra e-postayı yeniden işleyin.",
+    "tradeSecurityAmbiguous": "\"{{ symbol }}\" birden çok menkul kıymetinizle eşleşiyor ({{ list }}). Kodun benzersiz olması için birinin adını değiştirin.",
+    "tradeSecurityUnknown": "\"{{ symbol }}\" kodlu bir menkul kıymetiniz yok. Menkul kıymeti ekleyin, sonra e-postayı yeniden işleyin.",
     "tagNamesInvalid": "Bir öneri en fazla {{ max }} etiket ekleyebilir; her etiket 1 ile {{ length }} karakter uzunluğunda olmalı ve denetim karakteri içermemelidir.",
     "noApprovableProposal": "Bu isteğin burada onaylanacak bir önerisi yok.",
-    "approveFailed": "Bu öneri onaylanamadı. Tek başına deneyin."
+    "approveFailed": "Bu öneri onaylanamadı. Tek başına deneyin.",
+    "tradeAlreadyBooked": "Bu işlem defterinizde zaten var. Tekrar kaydetmek yerine e-postayı ona bağlayın.",
+    "tradeScheduleMoved": "Bu işlemin ödeyeceği planlı işlem, önerildikten sonra kaydedildi veya değiştirildi. Bunun yerine e-postayı o işleme bağlayın ya da reddedin.",
+    "tradeCurrencyMismatch": "E-postadaki tutarlar {{ currency }} cinsinden, ancak {{ symbol }} menkul kıymetiniz {{ securityCurrency }} ile işlem görüyor. Hangi listelemenin alındığını kontrol edin, ardından işlemi kendiniz girin."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Çok fazla doğrulama denemesi. Lütfen tekrar giriş yapın.",
@@ -417,7 +420,12 @@
     "previewExpectedNotSelected": "Seçilenler arasında olmayan bir e-posta için beklenen bir işlem belirtildi.",
     "previewReceiptOutsideDomain": "Bir e-posta, bu ayrıştırıcının gönderen alan adlarından birinden gelmiyor.",
     "parserCategoryNameUnknown": "\"{{ name }}\" kategorisi bulunamadı. Kategorilerinizden birinin adını kullanın.",
-    "parserCategoryNameAmbiguous": "\"{{ name }}\" kategorisi birkaç kategoriye ({{ candidates }}) eşleşiyor. Tam adı kullanın, örneğin \"Üst: Alt\"."
+    "parserCategoryNameAmbiguous": "\"{{ name }}\" kategorisi birkaç kategoriye ({{ candidates }}) eşleşiyor. Tam adı kullanın, örneğin \"Üst: Alt\".",
+    "tradeNotBankLinkable": "Bu e-posta bir işlem onayı olarak okunuyor. Bunun yerine bir yatırım işlemine bağlayın.",
+    "tradeAccountedFor": "Bu e-posta zaten bir yatırım işlemine karşılık geliyor, bu yüzden tekrar okunmaz.",
+    "tradeLinkedElsewhere": "Başka bir e-posta zaten o işleme karşılık geliyor.",
+    "parserAccountNotFound": "Bu işlem profilinde belirtilen bir hesap, açık aracı kurum hesaplarınızdan biri değil.",
+    "generateSamplesForKind": "Fiş profili samples alanından (her e-posta, ödediği işlemle birlikte), işlem profili tradeReceiptIds alanından oluşturulur. Türe uygun olanı gönderin, diğerini göndermeyin."
   },
   "emergencyAccess": {
     "smtpNotConfigured": "E-posta yapılandırılmamış. SMTP kurulana kadar acil erişim etkinleştirilemiyor.",
