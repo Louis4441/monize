@@ -15,16 +15,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    const { statusCode, message, errorCode, errors } = httpErrorBody(
-      exception,
-      this.logger,
-    );
+    const { statusCode, message, errorCode, errors, currentCount } =
+      httpErrorBody(exception, this.logger);
 
     response.status(statusCode).json({
       statusCode,
       message,
       ...(errorCode ? { errorCode } : {}),
       ...(errors ? { errors } : {}),
+      ...(currentCount !== undefined ? { currentCount } : {}),
       ...(this.isProduction ? {} : { timestamp: new Date().toISOString() }),
     });
   }

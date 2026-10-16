@@ -7397,7 +7397,10 @@ Source of truth     email_receipts, email_receipt_mailboxes.last_uid
 Enforcement         UNIQUE (mailbox_id, uid_validity, uid) with INSERT ... ON
                     CONFLICT DO NOTHING; the cursor is advanced by a conditional
                     UPDATE (it only rises on one UIDVALIDITY) in the transaction
-                    that inserts the rows (email-receipt-poll.service.ts).
+                    that inserts the rows (email-receipt-poll.service.ts). The
+                    archive import stores under (mailbox_id, 0, hash uid) with
+                    the same ON CONFLICT and never moves the cursor
+                    (email-receipt-import.service.ts).
 Concurrency scope   mailbox
 Retry semantics     a failed poll leaves the cursor where it was; the next poll
                     re-reads and the unique key drops what was stored

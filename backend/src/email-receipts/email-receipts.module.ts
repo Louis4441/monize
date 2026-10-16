@@ -13,6 +13,7 @@ import {
   ImapFlowMailboxClient,
   ImapMailboxClient,
 } from "./imap/imap-mailbox-client";
+import { EmailReceiptImportService } from "./import/email-receipt-import.service";
 import { EmailReceiptMailboxController } from "./mailbox/email-receipt-mailbox.controller";
 import { EmailReceiptMailboxService } from "./mailbox/email-receipt-mailbox.service";
 import { OAuthAccessTokenService } from "./oauth/oauth-access-token.service";
@@ -90,6 +91,7 @@ import { EmailReceiptsService } from "./receipts/email-receipts.service";
     EmailReceiptTradeService,
     EmailReceiptTradeLinkService,
     EmailReceiptPollService,
+    EmailReceiptImportService,
     EmailReceiptsAttentionAlertService,
     EmailReceiptsService,
     EmailReceiptAiService,

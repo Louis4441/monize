@@ -8,7 +8,6 @@ import { DataSource, EntityManager } from "typeorm";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { tr } from "../../i18n/translate";
-import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import { EmailReceipt } from "../entities/email-receipt.entity";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
 import { orderFromStructuredData } from "../parsing/schema-org-order";
@@ -26,10 +25,15 @@ import {
   EMAIL_RECEIPTS_DEFAULT_LIST_LIMIT,
   EMAIL_RECEIPTS_MAX_BATCH_LIMIT,
   EMAIL_RECEIPTS_MAX_LIST_LIMIT,
+  EMAIL_RECEIPTS_MAX_LIST_OFFSET,
 } from "./dto/email-receipts.dto";
 import { describeFailure } from "../pipeline/receipt-failure";
 import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
 import { readTradeProposal } from "./email-receipt-trade-proposal";
+import { bulkActOnReceipts } from "./receipt-bulk";
+import type { ReceiptBulkResult, ReceiptBulkTarget } from "./receipt-bulk";
+import { receiptDomainClause, receiptDomainParams } from "./receipt-filter";
+import type { EmailReceiptBulkAction } from "./dto/email-receipts.dto";
 import type {
   EmailReceiptCandidateSummary,
   EmailReceiptDetail,
@@ -388,22 +392,16 @@ export class EmailReceiptsService {
     userId: string,
     options: { domain?: string } = {},
   ): Promise<EmailReceiptStatusCounts> {
-    const domain = options.domain?.trim().toLowerCase() || null;
+    const { domain, domainLike } = receiptDomainParams(options.domain);
     const rows = await withScopedDb(this.dataSource, async (m) =>
       returnedRows<{ status: EmailReceiptStatus; count: string | number }>(
         await m.query(
           `SELECT r.status, COUNT(*)::int AS count
              FROM email_receipts r
             WHERE r.user_id = $1
-              AND ($2::varchar IS NULL
-                   OR r.from_domain = $2::varchar
-                   OR r.from_domain LIKE $3::varchar ESCAPE '\\')
+              AND ${receiptDomainClause(2, 3)}
             GROUP BY r.status`,
-          [
-            userId,
-            domain,
-            domain === null ? null : `%.${escapeLikePattern(domain)}`,
-          ],
+          [userId, domain, domainLike],
         ),
       ),
     );
@@ -570,9 +568,7 @@ export class EmailReceiptsService {
       ),
       EMAIL_RECEIPTS_MAX_BATCH_LIMIT,
     );
-    const domain = options.domain?.trim().toLowerCase() || null;
-    const domainLike =
-      domain === null ? null : `%.${escapeLikePattern(domain)}`;
+    const { domain, domainLike } = receiptDomainParams(options.domain);
 
     const selected = await withScopedDb(this.dataSource, async (m) => {
       const [stamp] = returnedRows<{ since: string }>(
@@ -590,9 +586,7 @@ export class EmailReceiptsService {
              FROM email_receipts r
             WHERE r.user_id = $1
               AND r.status = ANY($2::varchar[])
-              AND ($3::varchar IS NULL
-                   OR r.from_domain = $3::varchar
-                   OR r.from_domain LIKE $4::varchar ESCAPE '\\')
+              AND ${receiptDomainClause(3, 4)}
               AND r.updated_at < $5::timestamptz
             ORDER BY r.received_at ASC, r.id ASC
             LIMIT $6`,
@@ -632,9 +626,7 @@ export class EmailReceiptsService {
              FROM email_receipts r
             WHERE r.user_id = $1
               AND r.status = ANY($2::varchar[])
-              AND ($3::varchar IS NULL
-                   OR r.from_domain = $3::varchar
-                   OR r.from_domain LIKE $4::varchar ESCAPE '\\')
+              AND ${receiptDomainClause(3, 4)}
               AND r.updated_at < $5::timestamptz`,
           [userId, statuses, domain, domainLike, selected.since],
         ),
@@ -678,6 +670,7 @@ export class EmailReceiptsService {
       status?: EmailReceiptStatus;
       domain?: string;
       limit?: number;
+      offset?: number;
     } = {},
   ): Promise<EmailReceiptListItem[]> {
     const limit = Math.min(
@@ -687,7 +680,11 @@ export class EmailReceiptsService {
       ),
       EMAIL_RECEIPTS_MAX_LIST_LIMIT,
     );
-    const domain = options.domain?.trim().toLowerCase() || null;
+    const offset = Math.min(
+      Math.max(Math.trunc(options.offset ?? 0), 0),
+      EMAIL_RECEIPTS_MAX_LIST_OFFSET,
+    );
+    const { domain, domainLike } = receiptDomainParams(options.domain);
     const rows = await withScopedDb(this.dataSource, async (m) =>
       returnedRows<ItemRow>(
         await m.query(
@@ -695,18 +692,10 @@ export class EmailReceiptsService {
              ${ITEM_JOINS}
             WHERE r.user_id = $1
               AND ($2::varchar IS NULL OR r.status = $2::varchar)
-              AND ($3::varchar IS NULL
-                   OR r.from_domain = $3::varchar
-                   OR r.from_domain LIKE $4::varchar ESCAPE '\\')
+              AND ${receiptDomainClause(3, 4)}
             ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id DESC
-            LIMIT $5`,
-          [
-            userId,
-            options.status ?? null,
-            domain,
-            domain === null ? null : `%.${escapeLikePattern(domain)}`,
-            limit,
-          ],
+            LIMIT $5 OFFSET $6`,
+          [userId, options.status ?? null, domain, domainLike, limit, offset],
         ),
       ),
     );
@@ -796,6 +785,23 @@ export class EmailReceiptsService {
       await closeReceiptRequests(m, userId, id);
       await m.getRepository(EmailReceipt).delete({ id, userId });
     });
+  }
+
+  /**
+   * Delete or ignore many emails at once, by id or by the list's filter, in ONE
+   * transaction that refuses before it writes (`bulkActOnReceipts`): a count that
+   * differs from `expectedCount` is a 409 and nothing was changed. Emails linked
+   * to a transaction are never touched.
+   */
+  async bulk(
+    userId: string,
+    action: EmailReceiptBulkAction,
+    target: ReceiptBulkTarget,
+    expectedCount: number,
+  ): Promise<ReceiptBulkResult> {
+    return withScopedDb(this.dataSource, (m) =>
+      bulkActOnReceipts(m, userId, action, target, expectedCount),
+    );
   }
 
   // ---------------------------------------------------------------------

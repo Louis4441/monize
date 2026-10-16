@@ -35,6 +35,16 @@ describe('emailReceiptsApi', () => {
       expect(client.put).toHaveBeenCalledWith('/email-receipts/mailbox', payload);
     });
 
+    it('uploads files to /import, with process=false only when asked', async () => {
+      client.post.mockResolvedValue({ data: { files: [], truncated: 0, processed: 0, busy: false } });
+      const file = new File(['x'], 'a.eml');
+      await emailReceiptsApi.mailbox.import([file]);
+      expect(client.post.mock.calls.at(-1)?.[0]).toBe('/email-receipts/mailbox/import');
+      expect(client.post.mock.calls.at(-1)?.[2]).not.toHaveProperty('params');
+      await emailReceiptsApi.mailbox.import([file], { process: false });
+      expect(client.post.mock.calls.at(-1)?.[2]).toMatchObject({ params: { process: 'false' } });
+    });
+
     it('changes settings with a PATCH to /settings', async () => {
       client.patch.mockResolvedValue({ data: { id: 'mb-1', enabled: false } });
       await emailReceiptsApi.mailbox.updateSettings({ enabled: false });
@@ -98,6 +108,29 @@ describe('emailReceiptsApi', () => {
       expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts');
     });
 
+    it('counts the emails matching a state and domain from status-counts, the same answer the state buttons read', async () => {
+      client.get.mockResolvedValue({ data: { total: 1234, byStatus: { no_parser: 1000, review: 234 } } });
+      expect(await emailReceiptsApi.receipts.countMatching(undefined, 'gmail.com')).toBe(1234);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts', { params: { domain: 'gmail.com' } });
+      expect(await emailReceiptsApi.receipts.countMatching('no_parser')).toBe(1000);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts', { params: undefined });
+      // A state with no email is absent from byStatus: zero.
+      expect(await emailReceiptsApi.receipts.countMatching('ignored', 'gmail.com')).toBe(0);
+    });
+
+    it('posts a bulk command with ids or a filter and answers the four counts', async () => {
+      const result = { affected: 2, skippedLinked: 1, unchanged: 0, notIgnorable: 0 };
+      client.post.mockResolvedValue({ data: result });
+      expect(await emailReceiptsApi.receipts.bulk({ action: 'delete', ids: ['a', 'b'], expectedCount: 2 })).toEqual(result);
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/bulk', { action: 'delete', ids: ['a', 'b'], expectedCount: 2 });
+      await emailReceiptsApi.receipts.bulk({ action: 'ignore', filter: { status: 'no_parser', domain: 'gmail.com' }, expectedCount: 9 });
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipts/bulk', {
+        action: 'ignore',
+        filter: { status: 'no_parser', domain: 'gmail.com' },
+        expectedCount: 9,
+      });
+    });
+
     it('approves a proposal by the review inbox batch route and throws on a refusal', async () => {
       client.post.mockResolvedValue({ data: { results: [{ id: 'rq-1', ok: true }] } });
       await emailReceiptsApi.receipts.approveProposal('rq-1');
@@ -112,6 +145,16 @@ describe('emailReceiptsApi', () => {
       expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: undefined });
       await emailReceiptsApi.receipts.list('unmatched', 20);
       expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: { status: 'unmatched', limit: 20 } });
+    });
+
+    it('sends an offset for a later page, and none for the first', async () => {
+      client.get.mockResolvedValue({ data: [] });
+      await emailReceiptsApi.receipts.list('review', undefined, 'shop.example.com', 100);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', {
+        params: { status: 'review', domain: 'shop.example.com', offset: 100 },
+      });
+      await emailReceiptsApi.receipts.list(undefined, undefined, undefined, 0);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: undefined });
     });
 
     it('lists with a sender domain beside the status, and reads the domain counts', async () => {

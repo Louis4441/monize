@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,18 +9,36 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Request,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
+import { memoryStorage } from "multer";
 import { Throttle } from "@nestjs/throttler";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
+import { tr } from "../../i18n/translate";
 import { OwnerOnly } from "../../delegation/decorators/delegate-access.decorator";
 import {
   TestEmailReceiptMailboxDto,
   UpsertEmailReceiptMailboxDto,
 } from "./dto/upsert-email-receipt-mailbox.dto";
+import { ImportEmailReceiptsQueryDto } from "./dto/import-email-receipts-query.dto";
 import { UpdateEmailReceiptMailboxSettingsDto } from "./dto/update-email-receipt-mailbox-settings.dto";
+import { EmailReceiptImportService } from "../import/email-receipt-import.service";
+import {
+  EMAIL_IMPORT_FILE_LIMIT_BYTES,
+  EMAIL_IMPORT_MAX_FILES,
+  EmailReceiptUploadErrorInterceptor,
+} from "../import/email-receipt-upload-error.interceptor";
 import { EmailReceiptPollService } from "../poll/email-receipt-poll.service";
 import { EmailReceiptMailboxService } from "./email-receipt-mailbox.service";
 
@@ -40,6 +59,7 @@ export class EmailReceiptMailboxController {
   constructor(
     private readonly mailbox: EmailReceiptMailboxService,
     private readonly poll: EmailReceiptPollService,
+    private readonly importer: EmailReceiptImportService,
   ) {}
 
   @Get()
@@ -106,5 +126,43 @@ export class EmailReceiptMailboxController {
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   pollNow(@Request() req: { user: { id: string } }) {
     return this.poll.pollNow(req.user.id);
+  }
+
+  @Post("import")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Import archived emails (.eml, .mbox, .msg, .zip) into my receipts mailbox, then process what is stored (unless process=false)",
+  })
+  @ApiConsumes("multipart/form-data")
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
+  @UseInterceptors(
+    // Outside the FilesInterceptor, so multer's untranslated size error is
+    // localized before it reaches the client.
+    new EmailReceiptUploadErrorInterceptor(),
+    FilesInterceptor("files", EMAIL_IMPORT_MAX_FILES, {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: EMAIL_IMPORT_FILE_LIMIT_BYTES,
+        files: EMAIL_IMPORT_MAX_FILES,
+      },
+    }),
+  )
+  importArchive(
+    @Request() req: { user: { id: string } },
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Query() query: ImportEmailReceiptsQueryDto,
+  ) {
+    if (!files?.length) {
+      throw new BadRequestException(
+        tr(
+          "errors.emailReceipts.importNoFile",
+          "Choose at least one .eml, .mbox, .msg or .zip file to import.",
+        ),
+      );
+    }
+    return this.importer.importFiles(req.user.id, files, {
+      process: query.process !== "false",
+    });
   }
 }

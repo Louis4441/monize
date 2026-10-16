@@ -114,6 +114,73 @@
       },
       "deleted": "Boîte mail supprimée",
       "deleteFailed": "Impossible de supprimer la boîte mail"
+    },
+    "import": {
+      "title": "Importer des e-mails archivés",
+      "description": "Un fichier conserve l'expéditeur et la date d'achat de la boutique, contrairement à un e-mail transféré. Envoyez des e-mails exportés pour lire d'anciennes confirmations de commande.",
+      "fileLabel": "Fichiers d'e-mails (.eml, .mbox, .msg ou .zip)",
+      "chooseFiles": "Choisir des fichiers",
+      "noFileChosen": "Aucun fichier choisi",
+      "selected": "Sélection : {count}",
+      "button": "Importer",
+      "preparing": "Préparation des fichiers...",
+      "sending": "Envoi de la partie {current} sur {total}",
+      "processing": "Traitement des e-mails : {done} sur {total}",
+      "cancel": "Annuler",
+      "tooLargeTotal": "Les fichiers sélectionnés dépassent ensemble {max}. Importez-les par groupes plus petits.",
+      "failed": "L'import a échoué",
+      "result": {
+        "heading": "Résultat de l'import",
+        "file": "{name} : {stored} enregistrés, {duplicates} doublons, {skipped} ignorés",
+        "summary": "{processed, plural, one {# e-mail en attente traité.} other {# e-mails en attente traités.}}",
+        "pendingLeft": "{count, plural, one {# e-mail attend encore d’être traité. Monize le traite à la prochaine lecture de la boîte aux lettres.} other {# e-mails attendent encore d’être traités. Monize les traite à la prochaine lecture de la boîte aux lettres.}}",
+        "processFailed": "{count, plural, one {# e-mail n’a pas pu être traité.} other {# e-mails n’ont pas pu être traités.}}",
+        "processingStopped": "Le traitement des e-mails importés s’est arrêté. Les e-mails sont conservés. Monize les traite à la prochaine lecture de la boîte aux lettres.",
+        "truncated": "{count} messages n'ont pas été lus, car un import a une limite. Importez-les à nouveau lors d'une seconde passe.",
+        "oversized": "{name} : {count} messages de plus de {max} n'ont pas été envoyés.",
+        "stopped": "L'importation s'est arrêtée après {done} parties sur {total}. Les e-mails déjà importés sont conservés. Importez de nouveau les mêmes fichiers pour continuer. Les e-mails déjà importés ne sont pas enregistrés deux fois.",
+        "cancelled": "L'importation a été annulée après {done} parties sur {total}. Les e-mails déjà importés sont conservés.",
+        "errors": {
+          "unsupported_format": "{name} : ce format n'est pas pris en charge. Les formats pris en charge sont .eml, .mbox, .msg et .zip.",
+          "invalid_archive": "{name} : le fichier ZIP est endommagé ou illisible.",
+          "archive_too_large": "{name} : le fichier ZIP décompressé dépasse la limite d'importation. Décompressez-le et importez le fichier .mbox qu'il contient.",
+          "empty": "{name} : le fichier ne contient aucun e-mail."
+        },
+        "ignored": "{name} : {count} autres fichiers de l'archive ont été ignorés."
+      },
+      "guide": {
+        "toggle": "Comment exporter les e-mails de votre fournisseur",
+        "gmailLabel": {
+          "title": "Gmail : tous les e-mails portant un libellé",
+          "step1": "Ouvrez takeout.google.com et choisissez « Tout désélectionner ».",
+          "step2": "Sélectionnez « Mail » et choisissez « Toutes les données Mail incluses ».",
+          "step3": "Choisissez uniquement votre libellé et créez l'export.",
+          "step4": "Envoyez le fichier .zip téléchargé tel quel, quelle que soit sa taille. Vous n'avez pas besoin de le décompresser."
+        },
+        "gmailOne": {
+          "title": "Gmail : un seul e-mail",
+          "step1": "Ouvrez l'e-mail.",
+          "step2": "Choisissez « Plus », puis « Télécharger le message ».",
+          "step3": "Envoyez le fichier .eml."
+        },
+        "imap": {
+          "title": "Autres fournisseurs : Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Ajoutez la boîte aux lettres à Thunderbird via IMAP et installez le module ImportExportTools NG.",
+          "step2": "Sélectionnez les e-mails ou un dossier, puis faites un clic droit.",
+          "step3": "Choisissez ImportExportTools NG, puis exportez au format EML ou mbox.",
+          "step4": "Envoyez les fichiers."
+        },
+        "outlook": {
+          "title": "Outlook pour ordinateur",
+          "body": "Sélectionnez les e-mails et faites-les glisser vers un dossier de votre disque. Outlook écrit des fichiers .msg. Envoyez-les, plusieurs à la fois ou regroupés dans un seul fichier .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Choisissez « Boîte aux lettres », puis « Exporter la boîte aux lettres ». Apple Mail écrit un dossier.",
+          "step2": "Envoyez le fichier nommé mbox dans le dossier, ou faites glisser des e-mails vers le Finder pour obtenir des fichiers .eml."
+        },
+        "tip": "Astuce : transférer des e-mails avec un script fait perdre l'expéditeur et la date de la boutique. L'import de fichiers les conserve."
+      }
     }
   },
   "parsers": {
@@ -682,11 +749,27 @@
     "selection": {
       "label": "E-mails sélectionnés",
       "select": "Sélectionner {subject}",
-      "selectAll": "Sélectionner tous les e-mails de cette liste (au maximum {max})",
-      "count": "{count, plural, one {# e-mail sélectionné} other {# e-mails sélectionnés}} (au plus {max})",
+      "selectAll": "Sélectionner tous les e-mails de cette liste",
+      "count": "{count, plural, one {# e-mail sélectionné} other {# e-mails sélectionnés}}",
       "draftButton": "Préparer un profil avec l'IA ({count})",
       "clear": "Effacer la sélection",
-      "differentSenders": "Les e-mails sélectionnés viennent d'expéditeurs différents ({domains}). Un profil lit les e-mails d'un seul expéditeur : sélectionnez des e-mails d'un seul expéditeur."
+      "deleteButton": "Supprimer ({count})",
+      "ignoreButton": "Ignorer ({count})",
+      "pageSelected": "Les {count} e-mails de cette page sont sélectionnés.",
+      "selectAllMatching": "Sélectionner les {total} e-mails correspondant à ce filtre.",
+      "allMatchingSelected": "Les {total} e-mails correspondant à ce filtre sont sélectionnés.",
+      "draftBlocked": {
+        "tooMany": "Un profil se prépare avec {max} e-mails au maximum. Sélectionnez {max} e-mails ou moins.",
+        "differentSenders": "Les e-mails sélectionnés viennent d'expéditeurs différents ({domains}). Un profil lit les e-mails d'un seul expéditeur : sélectionnez des e-mails d'un seul expéditeur.",
+        "skipped": "Un e-mail illisible n'a pas de texte pour préparer un profil. Retirez-le de la sélection.",
+        "allMatching": "Un profil se prépare avec des e-mails que vous sélectionnez vous-même, {max} au maximum. Effacez cette sélection et sélectionnez jusqu'à {max} e-mails.",
+        "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande."
+      }
+    },
+    "pager": {
+      "itemName": "e-mails",
+      "total": "{count, plural, one {# e-mail} other {# e-mails}}",
+      "page": "Page {page}"
     },
     "draft": {
       "failed": "Impossible de démarrer la rédaction d'un profil",
@@ -698,7 +781,31 @@
       "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande.",
       "chatPromptTrade": "Crée un profil d'opérations pour {count, plural, one {cette confirmation d'opération} other {ces # confirmations d'opération}} de {domain}. Prends en charge la demande de revue IA {requestId}, teste ton profil sur chaque e-mail joint avec l'outil email_receipt_parsers, corrige-le jusqu'à ce que chacun donne une opération complète, puis enregistre-le comme brouillon pour la demande {requestId}."
     },
-    "tradeBadge": "Opération"
+    "tradeBadge": "Opération",
+    "bulkDialog": {
+      "delete": {
+        "title": "Supprimer des e-mails ?",
+        "message": "{count, plural, one {Supprimer # e-mail} other {Supprimer # e-mails}}{scope, select, both { de {domain} à l'état {status}} domain { de {domain}} status { à l'état {status}} other {}} ? Cette action est irréversible. Pour garder les e-mails et les empêcher de proposer quoi que ce soit, choisissez plutôt « Ignorer ». Les e-mails liés à une transaction sont conservés."
+      },
+      "ignore": {
+        "title": "Ignorer des e-mails ?",
+        "message": "{count, plural, one {Ignorer # e-mail} other {Ignorer # e-mails}}{scope, select, both { de {domain} à l'état {status}} domain { de {domain}} status { à l'état {status}} other {}} ? Ils ne proposeront rien et leurs demandes de révision ouvertes seront rejetées. Les e-mails liés à une transaction restent inchangés.",
+        "confirm": "Ignorer"
+      },
+      "countChanged": "Le nombre d'e-mails correspondants est maintenant {count}. Rien n'a été modifié. Vérifiez le nombre et confirmez à nouveau."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# e-mail supprimé.} other {# e-mails supprimés.}}",
+        "ignored": "{count, plural, one {# e-mail ignoré.} other {# e-mails ignorés.}}",
+        "unchanged": "{count, plural, one {# e-mail était déjà ignoré.} other {# e-mails étaient déjà ignorés.}}",
+        "notIgnorable": "{count, plural, one {# e-mail n'a pas pu être ignoré : il était illisible, ou sa proposition a déjà été appliquée.} other {# e-mails n'ont pas pu être ignorés : ils étaient illisibles, ou leurs propositions ont déjà été appliquées.}}",
+        "skippedLinked": "{count, plural, one {# e-mail lié à une transaction a été conservé.} other {# e-mails liés à une transaction ont été conservés.}}"
+      },
+      "deleteFailed": "Impossible de supprimer les e-mails",
+      "ignoreFailed": "Impossible d'ignorer les e-mails",
+      "noneLeft": "Aucun e-mail ne correspond plus. Rien n'a été modifié."
+    }
   },
   "detail": {
     "title": "Reçu par e-mail",

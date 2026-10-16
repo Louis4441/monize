@@ -194,6 +194,29 @@ export function distinctSenderDomains(receipts: ReadonlyArray<Pick<EmailReceiptL
   return [...seen];
 }
 
+/** Why "Prepare a profile with AI" is off for a selection, or `null` when it is on. */
+export type DraftBlock = 'tooMany' | 'differentSenders' | 'skipped' | 'mixedKinds' | 'allMatching';
+
+/**
+ * Whether a selection can be drafted from: one to `max` emails, all from one
+ * sender, none of them unreadable (a skipped email has no text to write a profile
+ * from). `allMatching` is a selection by filter, not a list of emails a profile
+ * could be read from. The first reason that applies is the one returned.
+ */
+export function draftBlock(
+  selected: ReadonlyArray<Pick<EmailReceiptListItem, 'status' | 'fromDomain' | 'fromAddress' | 'isTrade'>>,
+  max: number,
+  allMatching: boolean,
+): DraftBlock | null {
+  if (allMatching) return 'allMatching';
+  if (selected.length > max) return 'tooMany';
+  if (selected.some((receipt) => receipt.status === 'skipped')) return 'skipped';
+  // One profile reads one kind of email: trade confirmations and order emails are never drafted together.
+  if (parserDraftKind(selected) === 'mixed') return 'mixedKinds';
+  if (distinctSenderDomains(selected).length > 1) return 'differentSenders';
+  return null;
+}
+
 /** Tags counted before a text with no `<html` or doctype is still taken for HTML. */
 const HTML_TAG_THRESHOLD = 5;
 /** Only this much of a text is scanned, and a tag is at most this long. */
