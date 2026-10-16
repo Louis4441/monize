@@ -114,6 +114,73 @@
       },
       "deleted": "[XX-Mailbox deleted-XX]",
       "deleteFailed": "[XX-Could not delete the mailbox-XX]"
+    },
+    "import": {
+      "title": "[XX-Import archived emails-XX]",
+      "description": "[XX-A file keeps the sender and the purchase date of the shop, unlike a forwarded email. Upload exported emails to read old order confirmations.-XX]",
+      "fileLabel": "[XX-Email files (.eml, .mbox, .msg or .zip)-XX]",
+      "chooseFiles": "[XX-Choose files-XX]",
+      "noFileChosen": "[XX-No files chosen-XX]",
+      "selected": "[XX-Selected: {count}-XX]",
+      "button": "[XX-Import-XX]",
+      "preparing": "[XX-Preparing files...-XX]",
+      "sending": "[XX-Sending part {current} of {total}-XX]",
+      "processing": "[XX-Processing emails: {done} of {total}-XX]",
+      "cancel": "[XX-Cancel-XX]",
+      "tooLargeTotal": "[XX-The selected files together are larger than {max}. Import them in smaller groups.-XX]",
+      "failed": "[XX-The import failed-XX]",
+      "result": {
+        "heading": "[XX-Import result-XX]",
+        "file": "[XX-{name}: {stored} stored, {duplicates} duplicates, {skipped} skipped-XX]",
+        "summary": "[XX-{processed, plural, one {Processed # waiting email.} other {Processed # waiting emails.}}-XX]",
+        "pendingLeft": "[XX-{count, plural, one {# email still waits to be processed. Monize processes it at the next mailbox read.} other {# emails still wait to be processed. Monize processes them at the next mailbox read.}}-XX]",
+        "processFailed": "[XX-{count, plural, one {# email could not be processed.} other {# emails could not be processed.}}-XX]",
+        "processingStopped": "[XX-Processing the imported emails stopped. The emails are kept. Monize processes them at the next mailbox read.-XX]",
+        "truncated": "[XX-{count} messages were not read because one import has a limit. Import them again in a second run.-XX]",
+        "oversized": "[XX-{name}: {count} messages larger than {max} were not sent.-XX]",
+        "stopped": "[XX-The import stopped after {done} of {total} parts. The emails already imported are kept. Import the same files again to continue. Emails already imported are not stored twice.-XX]",
+        "cancelled": "[XX-The import was cancelled after {done} of {total} parts. The emails already imported are kept.-XX]",
+        "errors": {
+          "unsupported_format": "[XX-{name}: this format is not supported. Supported formats are .eml, .mbox, .msg and .zip.-XX]",
+          "invalid_archive": "[XX-{name}: the ZIP file is damaged or cannot be read.-XX]",
+          "archive_too_large": "[XX-{name}: the ZIP file expands to more than the import limit. Unpack it and upload the .mbox file inside.-XX]",
+          "empty": "[XX-{name}: the file holds no emails.-XX]"
+        },
+        "ignored": "[XX-{name}: {count} other files in the archive were skipped.-XX]"
+      },
+      "guide": {
+        "toggle": "[XX-How to export emails from your provider-XX]",
+        "gmailLabel": {
+          "title": "[XX-Gmail: all emails with a label-XX]",
+          "step1": "[XX-Open takeout.google.com and choose Deselect all.-XX]",
+          "step2": "[XX-Select Mail and choose All Mail data included.-XX]",
+          "step3": "[XX-Choose only your label and create the export.-XX]",
+          "step4": "[XX-Upload the downloaded .zip file as it is, however large. You do not need to unpack it.-XX]"
+        },
+        "gmailOne": {
+          "title": "[XX-Gmail: one email-XX]",
+          "step1": "[XX-Open the email.-XX]",
+          "step2": "[XX-Choose More, then Download message.-XX]",
+          "step3": "[XX-Upload the .eml file.-XX]"
+        },
+        "imap": {
+          "title": "[XX-Other providers: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho-XX]",
+          "step1": "[XX-Add the mailbox to Thunderbird over IMAP and install the ImportExportTools NG add-on.-XX]",
+          "step2": "[XX-Select the emails or a folder and right-click.-XX]",
+          "step3": "[XX-Choose ImportExportTools NG, then export as EML or as mbox.-XX]",
+          "step4": "[XX-Upload the files.-XX]"
+        },
+        "outlook": {
+          "title": "[XX-Outlook desktop-XX]",
+          "body": "[XX-Select the emails and drag them to a folder on your disk. Outlook writes .msg files. Upload them, several at once or packed into one .zip file.-XX]"
+        },
+        "apple": {
+          "title": "[XX-Apple Mail-XX]",
+          "step1": "[XX-Choose Mailbox, then Export Mailbox. Apple Mail writes a folder.-XX]",
+          "step2": "[XX-Upload the file named mbox inside the folder, or drag emails to Finder to get .eml files.-XX]"
+        },
+        "tip": "[XX-Tip: forwarding emails with a script loses the sender and the date of the shop. Importing files keeps them.-XX]"
+      }
     }
   },
   "parsers": {
@@ -711,11 +778,55 @@
     "selection": {
       "label": "[XX-Selected emails-XX]",
       "select": "[XX-Select {subject}-XX]",
-      "selectAll": "[XX-Select all emails on this list (at most {max})-XX]",
-      "count": "[XX-{count, plural, one {# email selected} other {# emails selected}} (at most {max})-XX]",
+      "selectAll": "[XX-Select all emails on this list-XX]",
+      "count": "[XX-{count, plural, one {# email selected} other {# emails selected}}-XX]",
       "draftButton": "[XX-Prepare a profile with AI ({count})-XX]",
       "clear": "[XX-Clear selection-XX]",
-      "differentSenders": "[XX-The selected emails come from different senders ({domains}). A profile reads one sender's emails, so select emails from one sender.-XX]"
+      "deleteButton": "[XX-Delete ({count})-XX]",
+      "ignoreButton": "[XX-Ignore ({count})-XX]",
+      "pageSelected": "[XX-All {count} on this page are selected.-XX]",
+      "selectAllMatching": "[XX-Select all {total} matching this filter.-XX]",
+      "allMatchingSelected": "[XX-All {total} emails matching this filter are selected.-XX]",
+      "reprocessButton": "[XX-Reprocess ({count})-XX]",
+      "restoreButton": "[XX-Restore ignored ({count})-XX]",
+      "restoreButtonAll": "[XX-Restore ignored-XX]",
+      "approveButton": "[XX-Approve proposals ({count})-XX]",
+      "approveButtonAll": "[XX-Approve proposals-XX]",
+      "progress": "[XX-Processed {processed}, {remaining} left-XX]",
+      "progressStarting": "[XX-Starting-XX]",
+      "stop": "[XX-Stop-XX]",
+      "narrowedSelected": "[XX-{total} emails are selected: every email matching this filter, except those taken out below.-XX]",
+      "deselect": {
+        "label": "[XX-Deselect by-XX]",
+        "state": "[XX-State: {state}-XX]",
+        "sender": "[XX-Sender: {domain}-XX]",
+        "before": "[XX-Received before a day-XX]",
+        "after": "[XX-Received after a day-XX]",
+        "beforeLabel": "[XX-Deselect emails received before-XX]",
+        "afterLabel": "[XX-Deselect emails received after-XX]",
+        "apply": "[XX-Deselect-XX]",
+        "cancel": "[XX-Cancel-XX]"
+      },
+      "exclusion": {
+        "label": "[XX-Taken out of the selection-XX]",
+        "state": "[XX-Not in state {state}-XX]",
+        "sender": "[XX-Not from {domain}-XX]",
+        "from": "[XX-Received on or after {date}-XX]",
+        "to": "[XX-Received on or before {date}-XX]",
+        "remove": "[XX-Put back: {label}-XX]"
+      },
+      "draftBlocked": {
+        "tooMany": "[XX-A profile can be prepared from at most {max} emails. Select {max} or fewer emails to use it.-XX]",
+        "differentSenders": "[XX-The selected emails come from different senders ({domains}). A profile reads one sender's emails, so select emails from one sender.-XX]",
+        "skipped": "[XX-An email that could not be read has no text to prepare a profile from. Remove it from the selection to use this.-XX]",
+        "allMatching": "[XX-A profile is prepared from emails you select yourself, at most {max}. Clear this selection and select up to {max} emails.-XX]",
+        "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]"
+      }
+    },
+    "pager": {
+      "itemName": "[XX-emails-XX]",
+      "total": "[XX-{count, plural, one {# email} other {# emails}}-XX]",
+      "page": "[XX-Page {page}-XX]"
     },
     "draft": {
       "failed": "[XX-Could not start drafting a profile-XX]",
@@ -727,7 +838,48 @@
       "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]",
       "chatPromptTrade": "[XX-Build a trade profile for {count, plural, one {this trade confirmation email} other {these # trade confirmation emails}} from {domain}. Claim AI review request {requestId}, test your profile on every attached email with the email_receipt_parsers tool, fix it until each one reads a complete trade, then save it as a draft for request {requestId}.-XX]"
     },
-    "tradeBadge": "[XX-Trade-XX]"
+    "tradeBadge": "[XX-Trade-XX]",
+    "bulkDialog": {
+      "delete": {
+        "title": "[XX-Delete emails?-XX]",
+        "message": "[XX-{count, plural, one {Delete # email} other {Delete # emails}}{scope, select, both { from {domain} in the state {status}} domain { from {domain}} status { in the state {status}} other {}}? This cannot be undone. To keep the emails and stop them proposing anything, choose Ignore instead. Emails linked to a transaction are kept.-XX]"
+      },
+      "ignore": {
+        "title": "[XX-Ignore emails?-XX]",
+        "message": "[XX-{count, plural, one {Ignore # email} other {Ignore # emails}}{scope, select, both { from {domain} in the state {status}} domain { from {domain}} status { in the state {status}} other {}}? They will propose nothing, and their open review requests will be dismissed. Emails linked to a transaction are kept as they are.-XX]",
+        "confirm": "[XX-Ignore-XX]"
+      },
+      "countChanged": "[XX-The number of matching emails is now {count}. Nothing was changed. Check the number and confirm again.-XX]",
+      "approve": {
+        "title": "[XX-Approve proposals?-XX]",
+        "message": "[XX-{count, plural, one {Approve # proposal} other {Approve # proposals}}? Each one is applied as the Confirm button in the AI review inbox does.-XX]",
+        "trades": "[XX-{count, plural, one {# trade email is left out. Approve it on its card in the AI review inbox.} other {# trade emails are left out. Approve them on their cards in the AI review inbox.}}-XX]",
+        "confirm": "[XX-Approve-XX]"
+      },
+      "narrowedNote": "[XX-Emails taken out of the selection are not touched.-XX]"
+    },
+    "bulk": {
+      "result": {
+        "deleted": "[XX-{count, plural, one {# email deleted.} other {# emails deleted.}}-XX]",
+        "ignored": "[XX-{count, plural, one {# email ignored.} other {# emails ignored.}}-XX]",
+        "unchanged": "[XX-{count, plural, one {# email was already ignored.} other {# emails were already ignored.}}-XX]",
+        "notIgnorable": "[XX-{count, plural, one {# email could not be ignored: it could not be read, or its proposal was already applied.} other {# emails could not be ignored: they could not be read, or their proposals were already applied.}}-XX]",
+        "skippedLinked": "[XX-{count, plural, one {# email linked to a transaction was kept.} other {# emails linked to a transaction were kept.}}-XX]",
+        "reprocessed": "[XX-{count, plural, one {# email reprocessed.} other {# emails reprocessed.}}-XX]",
+        "restored": "[XX-{count, plural, one {# ignored email read again.} other {# ignored emails read again.}}-XX]",
+        "reprocessFailed": "[XX-{count, plural, one {# email failed.} other {# emails failed.}}-XX]",
+        "stopped": "[XX-Stopped. {count, plural, one {# email was left unprocessed.} other {# emails were left unprocessed.}}-XX]",
+        "approved": "[XX-{count, plural, one {# proposal approved.} other {# proposals approved.}}-XX]",
+        "approveFailed": "[XX-{count, plural, one {# proposal could not be approved.} other {# proposals could not be approved.}}-XX]"
+      },
+      "deleteFailed": "[XX-Could not delete the emails-XX]",
+      "ignoreFailed": "[XX-Could not ignore the emails-XX]",
+      "noneLeft": "[XX-No emails match any more. Nothing was changed.-XX]",
+      "reprocessFailed": "[XX-Could not reprocess the emails-XX]",
+      "approveFailed": "[XX-Could not approve the proposals-XX]",
+      "noApprovable": "[XX-No proposals in this selection can be approved.-XX]",
+      "narrowFailed": "[XX-Could not count the emails. The change was not applied.-XX]"
+    }
   },
   "detail": {
     "title": "[XX-Email receipt-XX]",

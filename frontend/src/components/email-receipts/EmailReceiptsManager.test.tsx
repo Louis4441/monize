@@ -184,7 +184,7 @@ describe('EmailReceiptsManager', () => {
   describe('the list', () => {
     it('shows each email with its sender, state and matched transaction', async () => {
       await renderManager();
-      expect(api.list).toHaveBeenCalledWith(undefined, undefined, undefined);
+      expect(api.list).toHaveBeenCalledWith(undefined, undefined, undefined, 0);
       const row = rowOf('Order proposed');
       expect(within(row).getByText('orders@allegro.pl')).toBeInTheDocument();
       expect(within(row).getByText('Waiting for approval')).toBeInTheDocument();
@@ -262,7 +262,7 @@ describe('EmailReceiptsManager', () => {
     it('asks the server for the chosen status', async () => {
       await renderManager();
       await click(screen.getByRole('button', { name: 'Could not be read (0)' }));
-      expect(api.list).toHaveBeenLastCalledWith('parse_failed', undefined, undefined);
+      expect(api.list).toHaveBeenLastCalledWith('parse_failed', undefined, undefined, 0);
       expect(screen.getByRole('button', { name: 'Could not be read (0)' })).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByRole('button', { name: 'All (10)' })).toHaveAttribute('aria-pressed', 'false');
     });
@@ -376,23 +376,23 @@ describe('EmailReceiptsManager', () => {
     it('toggles a domain: choosing the chosen tag again clears it', async () => {
       await renderManager();
       await choose(SHOP);
-      expect(api.list).toHaveBeenLastCalledWith(undefined, undefined, 'shop.example.com');
+      expect(api.list).toHaveBeenLastCalledWith(undefined, undefined, 'shop.example.com', 0);
       await choose(SHOP);
-      expect(api.list).toHaveBeenLastCalledWith(undefined, undefined, undefined);
+      expect(api.list).toHaveBeenLastCalledWith(undefined, undefined, undefined, 0);
     });
 
     it('asks the server for the chosen domain beside the status, and writes it to the URL', async () => {
       await renderManager();
       await choose(SHOP);
-      expect(api.list).toHaveBeenLastCalledWith(undefined, undefined, 'shop.example.com');
+      expect(api.list).toHaveBeenLastCalledWith(undefined, undefined, 'shop.example.com', 0);
       expect(nav.router.replace).toHaveBeenLastCalledWith('/email-receipts?tab=emails&domain=shop.example.com', { scroll: false });
       await click(screen.getByRole('button', { name: /^Could not be read/ }));
-      expect(api.list).toHaveBeenLastCalledWith('parse_failed', undefined, 'shop.example.com');
+      expect(api.list).toHaveBeenLastCalledWith('parse_failed', undefined, 'shop.example.com', 0);
       expect(
         screen.getByText('Showing emails from shop.example.com and its sub-domains. Select several of them to draft one profile for the sender.'),
       ).toBeInTheDocument();
       await choose('All senders');
-      expect(api.list).toHaveBeenLastCalledWith('parse_failed', undefined, undefined);
+      expect(api.list).toHaveBeenLastCalledWith('parse_failed', undefined, undefined, 0);
       expect(nav.router.replace).toHaveBeenLastCalledWith('/email-receipts?tab=emails', { scroll: false });
     });
 
@@ -406,14 +406,14 @@ describe('EmailReceiptsManager', () => {
     it('starts from ?domain= and asks for it on the first load', async () => {
       nav.params = new URLSearchParams('domain=Shop.Example.com');
       await renderManager();
-      expect(api.list).toHaveBeenCalledWith(undefined, undefined, 'shop.example.com');
+      expect(api.list).toHaveBeenCalledWith(undefined, undefined, 'shop.example.com', 0);
       expect(tag(SHOP)).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('treats a ?domain= that is no host name as no filter, and offers a domain the list does not know', async () => {
       nav.params = new URLSearchParams('domain=%3Cscript%3E');
       await renderManager();
-      expect(api.list).toHaveBeenCalledWith(undefined, undefined, undefined);
+      expect(api.list).toHaveBeenCalledWith(undefined, undefined, undefined, 0);
       expect(tag('All senders')).toHaveAttribute('aria-pressed', 'true');
       expect(nav.router.replace).not.toHaveBeenCalled();
     });

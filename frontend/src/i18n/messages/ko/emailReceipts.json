@@ -114,6 +114,73 @@
       },
       "deleted": "메일함을 삭제했습니다",
       "deleteFailed": "메일함을 삭제하지 못했습니다"
+    },
+    "import": {
+      "title": "보관된 이메일 가져오기",
+      "description": "파일은 전달된 이메일과 달리 쇼핑몰의 발신자와 구매 날짜를 유지합니다. 내보낸 이메일을 업로드하여 오래된 주문 확인 메일을 읽으세요.",
+      "fileLabel": "이메일 파일 (.eml, .mbox, .msg 또는 .zip)",
+      "chooseFiles": "파일 선택",
+      "noFileChosen": "선택한 파일 없음",
+      "selected": "선택됨: {count}",
+      "button": "가져오기",
+      "preparing": "파일을 준비하는 중...",
+      "sending": "{total}개 중 {current}번째 부분을 보내는 중",
+      "processing": "이메일 처리 중: {total}개 중 {done}개",
+      "cancel": "취소",
+      "tooLargeTotal": "선택한 파일을 모두 합치면 {max}보다 큽니다. 더 작은 묶음으로 나누어 가져오세요.",
+      "failed": "가져오기에 실패했습니다",
+      "result": {
+        "heading": "가져오기 결과",
+        "file": "{name}: {stored}개 저장, {duplicates}개 중복, {skipped}개 건너뜀",
+        "summary": "{processed, plural, other {대기 중이던 이메일 #개를 처리했습니다.}}",
+        "pendingLeft": "{count, plural, other {이메일 #개가 아직 처리를 기다리고 있습니다. Monize가 다음 메일함 읽기 때 처리합니다.}}",
+        "processFailed": "{count, plural, other {이메일 #개를 처리하지 못했습니다.}}",
+        "processingStopped": "가져온 이메일 처리가 중단되었습니다. 이메일은 보관됩니다. Monize가 다음 메일함 읽기 때 처리합니다.",
+        "truncated": "한 번의 가져오기에는 제한이 있어 메시지 {count}개를 읽지 못했습니다. 두 번째 실행에서 다시 가져오세요.",
+        "oversized": "{name}: {max}보다 큰 메시지 {count}개는 보내지 않았습니다.",
+        "stopped": "가져오기가 {total}개 중 {done}개 부분 후에 중지되었습니다. 이미 가져온 이메일은 유지됩니다. 계속하려면 같은 파일을 다시 가져오세요. 이미 가져온 이메일은 두 번 저장되지 않습니다.",
+        "cancelled": "가져오기가 {total}개 중 {done}개 부분 후에 취소되었습니다. 이미 가져온 이메일은 유지됩니다.",
+        "errors": {
+          "unsupported_format": "{name}: 이 형식은 지원하지 않습니다. 지원하는 형식은 .eml, .mbox, .msg, .zip입니다.",
+          "invalid_archive": "{name}: ZIP 파일이 손상되었거나 읽을 수 없습니다.",
+          "archive_too_large": "{name}: ZIP 파일의 압축을 풀면 가져오기 한도를 넘습니다. 압축을 풀고 안에 있는 .mbox 파일을 업로드하세요.",
+          "empty": "{name}: 파일에 이메일이 없습니다."
+        },
+        "ignored": "{name}: 압축 파일 안의 다른 파일 {count}개를 건너뛰었습니다."
+      },
+      "guide": {
+        "toggle": "사용 중인 서비스에서 이메일을 내보내는 방법",
+        "gmailLabel": {
+          "title": "Gmail: 라벨이 있는 모든 이메일",
+          "step1": "takeout.google.com을 열고 \"모두 선택 해제\"를 선택하세요.",
+          "step2": "\"메일\"을 선택하고 \"모든 메일 데이터 포함\"을 선택하세요.",
+          "step3": "내 라벨만 선택하고 내보내기를 만드세요.",
+          "step4": "다운로드한 .zip 파일은 크기와 관계없이 그대로 업로드하세요. 압축을 풀 필요가 없습니다."
+        },
+        "gmailOne": {
+          "title": "Gmail: 이메일 하나",
+          "step1": "이메일을 여세요.",
+          "step2": "\"더보기\"를 선택한 다음 \"메일 다운로드\"를 선택하세요.",
+          "step3": ".eml 파일을 업로드하세요."
+        },
+        "imap": {
+          "title": "기타 서비스: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "IMAP으로 Thunderbird에 메일함을 추가하고 ImportExportTools NG 추가 기능을 설치하세요.",
+          "step2": "이메일 또는 폴더를 선택하고 마우스 오른쪽 버튼으로 클릭하세요.",
+          "step3": "ImportExportTools NG를 선택한 다음 EML 또는 mbox로 내보내세요.",
+          "step4": "파일을 업로드하세요."
+        },
+        "outlook": {
+          "title": "Outlook 데스크톱",
+          "body": "이메일을 선택하여 디스크의 폴더로 끌어다 놓으세요. Outlook은 .msg 파일을 만듭니다. 여러 개를 한 번에 업로드하거나 .zip 파일 하나로 묶어 업로드하세요."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "\"메일함\"을 선택한 다음 \"메일함 내보내기\"를 선택하세요. Apple Mail은 폴더를 만듭니다.",
+          "step2": "폴더 안에 있는 mbox라는 이름의 파일을 업로드하거나, 이메일을 Finder로 끌어다 놓아 .eml 파일을 만드세요."
+        },
+        "tip": "팁: 스크립트로 이메일을 전달하면 쇼핑몰의 발신자와 날짜가 사라집니다. 파일을 가져오면 유지됩니다."
+      }
     }
   },
   "parsers": {
@@ -711,11 +778,55 @@
     "selection": {
       "label": "선택한 이메일",
       "select": "{subject} 선택",
-      "selectAll": "이 목록의 모든 메일 선택 (최대 {max}개)",
-      "count": "{count, plural, one {이메일 #개 선택됨} other {이메일 #개 선택됨}} (최대 {max}개)",
+      "selectAll": "이 목록의 모든 메일 선택",
+      "count": "{count, plural, one {이메일 #개 선택됨} other {이메일 #개 선택됨}}",
       "draftButton": "AI로 프로필 준비 ({count})",
       "clear": "선택 해제",
-      "differentSenders": "선택한 메일이 서로 다른 발신자({domains})에게서 온 것입니다. 프로필은 한 발신자의 메일을 읽으므로, 한 발신자의 메일만 선택하세요."
+      "deleteButton": "삭제 ({count})",
+      "ignoreButton": "제외 ({count})",
+      "pageSelected": "이 페이지의 메일 {count}개가 모두 선택되었습니다.",
+      "selectAllMatching": "이 필터와 일치하는 메일 {total}개 모두 선택",
+      "allMatchingSelected": "이 필터와 일치하는 메일 {total}개가 모두 선택되었습니다.",
+      "reprocessButton": "다시 처리 ({count})",
+      "restoreButton": "무시한 메일 복원 ({count})",
+      "restoreButtonAll": "무시한 메일 복원",
+      "approveButton": "제안 승인 ({count})",
+      "approveButtonAll": "제안 승인",
+      "progress": "처리됨: {processed}, 남음: {remaining}",
+      "progressStarting": "시작하는 중",
+      "stop": "중지",
+      "narrowedSelected": "메일 {total}개를 선택함: 이 필터와 일치하는 모든 메일(아래에서 제외한 메일 제외).",
+      "deselect": {
+        "label": "선택 해제 기준",
+        "state": "상태: {state}",
+        "sender": "보낸 사람: {domain}",
+        "before": "특정 날짜 이전에 받은 메일",
+        "after": "특정 날짜 이후에 받은 메일",
+        "beforeLabel": "이 날짜 이전에 받은 메일 선택 해제",
+        "afterLabel": "이 날짜 이후에 받은 메일 선택 해제",
+        "apply": "선택 해제",
+        "cancel": "취소"
+      },
+      "exclusion": {
+        "label": "선택에서 제외됨",
+        "state": "상태가 {state}이(가) 아님",
+        "sender": "{domain}에서 온 것이 아님",
+        "from": "{date} 이후에 받음",
+        "to": "{date} 이전에 받음",
+        "remove": "되돌리기: {label}"
+      },
+      "draftBlocked": {
+        "tooMany": "프로필은 최대 {max}개의 메일로 준비할 수 있습니다. 메일을 {max}개 이하로 선택하세요.",
+        "differentSenders": "선택한 메일이 서로 다른 발신자({domains})에게서 온 것입니다. 프로필은 한 발신자의 메일을 읽으므로, 한 발신자의 메일만 선택하세요.",
+        "skipped": "읽을 수 없는 메일에는 프로필을 준비할 텍스트가 없습니다. 선택에서 제외하세요.",
+        "allMatching": "프로필은 직접 선택한 메일(최대 {max}개)로 준비합니다. 이 선택을 해제하고 메일을 {max}개 이하로 선택하세요.",
+        "mixedKinds": "선택한 메일에 거래 확인 메일과 주문 메일이 섞여 있습니다. 프로필 하나는 한 종류만 읽으므로 거래 확인 메일만 또는 주문 메일만 선택하세요."
+      }
+    },
+    "pager": {
+      "itemName": "개의 이메일",
+      "total": "{count, plural, other {이메일 #개}}",
+      "page": "{page}페이지"
     },
     "draft": {
       "failed": "프로필 초안 작성을 시작하지 못했습니다",
@@ -727,7 +838,48 @@
       "mixedKinds": "선택한 메일에 거래 확인 메일과 주문 메일이 섞여 있습니다. 프로필 하나는 한 종류만 읽으므로 거래 확인 메일만 또는 주문 메일만 선택하세요.",
       "chatPromptTrade": "{domain}에서 온 {count, plural, one {거래 확인 이메일 #통} other {거래 확인 이메일 #통}}으로 거래 프로필을 만들어 주세요. AI 검토 요청 {requestId}을(를) 맡아서, email_receipt_parsers 도구로 첨부한 모든 이메일에서 프로필을 테스트하고, 각 이메일에서 완전한 거래가 읽힐 때까지 고친 다음, 요청 {requestId}의 초안으로 저장해 주세요."
     },
-    "tradeBadge": "거래"
+    "tradeBadge": "거래",
+    "bulkDialog": {
+      "delete": {
+        "title": "메일을 삭제할까요?",
+        "message": "{scope, select, both {{domain}에서 온 상태가 {status}인 } domain {{domain}에서 온 } status {상태가 {status}인 } other {}}{count, plural, one {메일 #개} other {메일 #개}}를 삭제할까요? 이 작업은 되돌릴 수 없습니다. 메일을 보관하고 제안하지 않게 하려면 대신 “제외”를 선택하세요. 거래에 연결된 메일은 보관됩니다."
+      },
+      "ignore": {
+        "title": "메일을 제외할까요?",
+        "message": "{scope, select, both {{domain}에서 온 상태가 {status}인 } domain {{domain}에서 온 } status {상태가 {status}인 } other {}}{count, plural, one {메일 #개} other {메일 #개}}를 제외할까요? 더 이상 제안하지 않으며 열려 있는 검토 요청은 닫힙니다. 거래에 연결된 메일은 그대로 유지됩니다.",
+        "confirm": "제외"
+      },
+      "countChanged": "일치하는 메일이 이제 {count}개입니다. 아무것도 변경되지 않았습니다. 개수를 확인하고 다시 확인하세요.",
+      "approve": {
+        "title": "제안을 승인할까요?",
+        "message": "{count, plural, one {제안 #개를 승인} other {제안 #개를 승인}}할까요? 각 제안은 AI 검토함의 확인 버튼과 같은 방식으로 적용됩니다.",
+        "trades": "{count, plural, one {거래 메일 #개는 제외되었습니다. AI 검토함의 해당 카드에서 승인하세요.} other {거래 메일 #개는 제외되었습니다. AI 검토함의 해당 카드에서 승인하세요.}}",
+        "confirm": "승인"
+      },
+      "narrowedNote": "선택에서 제외한 메일은 변경되지 않습니다."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {메일 #개를 삭제했습니다.} other {메일 #개를 삭제했습니다.}}",
+        "ignored": "{count, plural, one {메일 #개를 제외했습니다.} other {메일 #개를 제외했습니다.}}",
+        "unchanged": "{count, plural, one {메일 #개는 이미 제외되어 있었습니다.} other {메일 #개는 이미 제외되어 있었습니다.}}",
+        "notIgnorable": "{count, plural, one {메일 #개를 제외할 수 없었습니다. 읽을 수 없거나 제안이 이미 적용되었습니다.} other {메일 #개를 제외할 수 없었습니다. 읽을 수 없거나 제안이 이미 적용되었습니다.}}",
+        "skippedLinked": "{count, plural, one {거래에 연결된 메일 #개는 보관했습니다.} other {거래에 연결된 메일 #개는 보관했습니다.}}",
+        "reprocessed": "{count, plural, one {메일 #개를 다시 처리했습니다.} other {메일 #개를 다시 처리했습니다.}}",
+        "restored": "{count, plural, one {무시한 메일 #개를 다시 읽었습니다.} other {무시한 메일 #개를 다시 읽었습니다.}}",
+        "reprocessFailed": "{count, plural, one {메일 #개가 실패했습니다.} other {메일 #개가 실패했습니다.}}",
+        "stopped": "{count, plural, one {중지했습니다. 메일 #개가 처리되지 않았습니다.} other {중지했습니다. 메일 #개가 처리되지 않았습니다.}}",
+        "approved": "{count, plural, one {제안 #개를 승인했습니다.} other {제안 #개를 승인했습니다.}}",
+        "approveFailed": "{count, plural, one {제안 #개를 승인하지 못했습니다.} other {제안 #개를 승인하지 못했습니다.}}"
+      },
+      "deleteFailed": "메일을 삭제할 수 없습니다",
+      "ignoreFailed": "메일을 제외할 수 없습니다",
+      "noneLeft": "일치하는 메일이 더 이상 없습니다. 아무것도 변경되지 않았습니다.",
+      "reprocessFailed": "메일을 다시 처리하지 못했습니다",
+      "approveFailed": "제안을 승인하지 못했습니다",
+      "noApprovable": "이 선택에는 승인할 수 있는 제안이 없습니다.",
+      "narrowFailed": "메일 수를 세지 못했습니다. 변경이 적용되지 않았습니다."
+    }
   },
   "detail": {
     "title": "이메일 영수증",

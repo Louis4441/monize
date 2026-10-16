@@ -114,6 +114,73 @@
       },
       "deleted": "信箱已刪除",
       "deleteFailed": "無法刪除信箱"
+    },
+    "import": {
+      "title": "匯入已封存的電子郵件",
+      "description": "與轉寄的郵件不同，檔案會保留商店的寄件者和購買日期。上傳已匯出的郵件，即可讀取舊的訂單確認。",
+      "fileLabel": "電子郵件檔案（.eml、.mbox、.msg 或 .zip）",
+      "chooseFiles": "選擇檔案",
+      "noFileChosen": "未選擇檔案",
+      "selected": "已選取：{count}",
+      "button": "匯入",
+      "preparing": "正在準備檔案...",
+      "sending": "正在傳送第 {current} 部分，共 {total} 部分",
+      "processing": "正在處理郵件：{done} / {total}",
+      "cancel": "取消",
+      "tooLargeTotal": "所選檔案合計超過 {max}。請分成較小的批次匯入。",
+      "failed": "匯入失敗",
+      "result": {
+        "heading": "匯入結果",
+        "file": "{name}：已儲存 {stored} 封，重複 {duplicates} 封，已略過 {skipped} 封",
+        "summary": "{processed, plural, other {已處理 # 封等待中的郵件。}}",
+        "pendingLeft": "{count, plural, other {還有 # 封郵件等待處理。Monize 會在下次讀取信箱時處理它們。}}",
+        "processFailed": "{count, plural, other {有 # 封郵件無法處理。}}",
+        "processingStopped": "已匯入郵件的處理已停止。郵件已保留。Monize 會在下次讀取信箱時處理它們。",
+        "truncated": "由於單次匯入有上限，有 {count} 封郵件未被讀取。請在第二次執行中再次匯入。",
+        "oversized": "{name}：有 {count} 封大於 {max} 的郵件未傳送。",
+        "stopped": "匯入在完成 {done} 個部分（共 {total} 個）後停止。已匯入的郵件會保留。如要繼續，請再次匯入相同的檔案。已匯入的郵件不會重複儲存。",
+        "cancelled": "匯入在完成 {done} 個部分（共 {total} 個）後被取消。已匯入的郵件會保留。",
+        "errors": {
+          "unsupported_format": "{name}：不支援此格式。支援的格式為 .eml、.mbox、.msg 和 .zip。",
+          "invalid_archive": "{name}：ZIP 檔案已損毀或無法讀取。",
+          "archive_too_large": "{name}：ZIP 檔案解壓縮後超過匯入上限。請先解壓縮，再上傳其中的 .mbox 檔案。",
+          "empty": "{name}：檔案中沒有郵件。"
+        },
+        "ignored": "{name}：壓縮檔中另有 {count} 個檔案已略過。"
+      },
+      "guide": {
+        "toggle": "如何從您的郵件服務商匯出郵件",
+        "gmailLabel": {
+          "title": "Gmail：帶有標籤的所有郵件",
+          "step1": "開啟 takeout.google.com，然後選擇「全部取消選取」。",
+          "step2": "選取「郵件」，然後選擇「包含所有郵件資料」。",
+          "step3": "只選取您的標籤，然後建立匯出。",
+          "step4": "請原樣上傳下載的 .zip 檔案，無論它多大。不需要解壓縮。"
+        },
+        "gmailOne": {
+          "title": "Gmail：一封郵件",
+          "step1": "開啟該郵件。",
+          "step2": "選擇「更多」，然後選擇「下載郵件」。",
+          "step3": "上傳 .eml 檔案。"
+        },
+        "imap": {
+          "title": "其他服務商：Outlook.com、Yahoo、Onet、WP、Interia、o2、iCloud、Zoho",
+          "step1": "透過 IMAP 將信箱新增到 Thunderbird，並安裝 ImportExportTools NG 附加元件。",
+          "step2": "選取郵件或資料夾，然後按一下滑鼠右鍵。",
+          "step3": "選擇 ImportExportTools NG，然後匯出為 EML 或 mbox。",
+          "step4": "上傳這些檔案。"
+        },
+        "outlook": {
+          "title": "Outlook 桌面版",
+          "body": "選取郵件並將其拖曳到磁碟上的資料夾。Outlook 會寫入 .msg 檔案。可一次上傳多個，也可打包成一個 .zip 檔案上傳。"
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "選擇「郵箱」，然後選擇「輸出郵箱」。Apple Mail 會寫入一個資料夾。",
+          "step2": "上傳資料夾內名為 mbox 的檔案，或將郵件拖曳到 Finder 以取得 .eml 檔案。"
+        },
+        "tip": "提示：用指令碼轉寄郵件會遺失商店的寄件者和日期。匯入檔案則會保留。"
+      }
     }
   },
   "parsers": {
@@ -711,11 +778,55 @@
     "selection": {
       "label": "已選取的郵件",
       "select": "選取 {subject}",
-      "selectAll": "選取此清單中的所有電子郵件(最多 {max} 個)",
-      "count": "{count, plural, one {已選取 # 封郵件} other {已選取 # 封郵件}}（最多 {max} 封）",
+      "selectAll": "選取此清單中的所有郵件",
+      "count": "{count, plural, one {已選取 # 封郵件} other {已選取 # 封郵件}}",
       "draftButton": "用 AI 起草解析器（{count}）",
       "clear": "清除選取",
-      "differentSenders": "所選郵件來自不同的寄件者（{domains}）。解析器只讀取一個寄件者的郵件，請選取同一寄件者的郵件。"
+      "deleteButton": "刪除（{count}）",
+      "ignoreButton": "忽略（{count}）",
+      "pageSelected": "此頁面上的 {count} 封郵件已全部選取。",
+      "selectAllMatching": "選取符合此篩選條件的全部 {total} 封郵件。",
+      "allMatchingSelected": "符合此篩選條件的全部 {total} 封郵件已選取。",
+      "reprocessButton": "重新處理({count})",
+      "restoreButton": "還原已忽略({count})",
+      "restoreButtonAll": "還原已忽略",
+      "approveButton": "核准提案({count})",
+      "approveButtonAll": "核准提案",
+      "progress": "已處理:{processed},剩餘:{remaining}",
+      "progressStarting": "正在開始",
+      "stop": "停止",
+      "narrowedSelected": "已選取 {total} 封郵件:所有符合此篩選條件的郵件,不包括下方排除的郵件。",
+      "deselect": {
+        "label": "依下列條件取消選取",
+        "state": "狀態:{state}",
+        "sender": "寄件者:{domain}",
+        "before": "在某天之前收到",
+        "after": "在某天之後收到",
+        "beforeLabel": "取消選取在此日期之前收到的郵件",
+        "afterLabel": "取消選取在此日期之後收到的郵件",
+        "apply": "取消選取",
+        "cancel": "取消"
+      },
+      "exclusion": {
+        "label": "已從選取中排除",
+        "state": "狀態不是{state}",
+        "sender": "不是來自 {domain}",
+        "from": "收到時間在 {date} 或之後",
+        "to": "收到時間在 {date} 或之前",
+        "remove": "還原:{label}"
+      },
+      "draftBlocked": {
+        "tooMany": "最多可用 {max} 封郵件準備解析器。請選取不超過 {max} 封郵件。",
+        "differentSenders": "所選郵件來自不同的寄件者（{domains}）。解析器只讀取一個寄件者的郵件，請選取同一寄件者的郵件。",
+        "skipped": "無法讀取的郵件沒有可用於準備解析器的文字。請將其從選取中移除。",
+        "allMatching": "解析器需用您自己選取的郵件準備，最多 {max} 封。請清除目前的選取，再選取不超過 {max} 封郵件。",
+        "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。"
+      }
+    },
+    "pager": {
+      "itemName": "封郵件",
+      "total": "{count, plural, other {# 封郵件}}",
+      "page": "第 {page} 頁"
     },
     "draft": {
       "failed": "無法開始起草解析器",
@@ -727,7 +838,48 @@
       "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。",
       "chatPromptTrade": "請為來自 {domain} 的{count, plural, one {這封交易確認郵件} other {這 # 封交易確認郵件}}建立一個交易設定檔。請認領 AI 審核請求 {requestId}，用 email_receipt_parsers 工具在每封所附郵件上測試你的設定檔，修改到每封都能讀取出完整的交易，然後將其儲存為請求 {requestId} 的草稿。"
     },
-    "tradeBadge": "交易"
+    "tradeBadge": "交易",
+    "bulkDialog": {
+      "delete": {
+        "title": "刪除這些郵件？",
+        "message": "要刪除{scope, select, both {來自 {domain}、狀態為「{status}」的} domain {來自 {domain} 的} status {狀態為「{status}」的} other {}}{count, plural, one {# 封郵件} other {# 封郵件}}嗎？此操作無法復原。若要保留郵件並避免它們提出任何建議，請改選「忽略」。與交易關聯的郵件會保留。"
+      },
+      "ignore": {
+        "title": "忽略這些郵件？",
+        "message": "要忽略{scope, select, both {來自 {domain}、狀態為「{status}」的} domain {來自 {domain} 的} status {狀態為「{status}」的} other {}}{count, plural, one {# 封郵件} other {# 封郵件}}嗎？它們將不再提出任何建議，其未處理的審查請求將被關閉。與交易關聯的郵件維持不變。",
+        "confirm": "忽略"
+      },
+      "countChanged": "符合條件的郵件現在有 {count} 封。未做任何變更。請核對數量後再次確認。",
+      "approve": {
+        "title": "核准提案?",
+        "message": "{count, plural, one {核准 # 項提案} other {核准 # 項提案}}?每項提案的套用方式與 AI 審核收件匣中的「確認」按鈕相同。",
+        "trades": "{count, plural, one {已略過 # 封交易郵件。請在 AI 審核收件匣中對應的卡片上核准。} other {已略過 # 封交易郵件。請在 AI 審核收件匣中對應的卡片上核准。}}",
+        "confirm": "核准"
+      },
+      "narrowedNote": "從選取中排除的郵件不會被變更。"
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {已刪除 # 封郵件。} other {已刪除 # 封郵件。}}",
+        "ignored": "{count, plural, one {已忽略 # 封郵件。} other {已忽略 # 封郵件。}}",
+        "unchanged": "{count, plural, one {# 封郵件先前已被忽略。} other {# 封郵件先前已被忽略。}}",
+        "notIgnorable": "{count, plural, one {# 封郵件無法忽略：無法讀取，或其建議已被套用。} other {# 封郵件無法忽略：無法讀取，或其建議已被套用。}}",
+        "skippedLinked": "{count, plural, one {已保留 # 封與交易關聯的郵件。} other {已保留 # 封與交易關聯的郵件。}}",
+        "reprocessed": "{count, plural, one {已重新處理 # 封郵件。} other {已重新處理 # 封郵件。}}",
+        "restored": "{count, plural, one {已重新讀取 # 封已忽略的郵件。} other {已重新讀取 # 封已忽略的郵件。}}",
+        "reprocessFailed": "{count, plural, one {# 封郵件失敗。} other {# 封郵件失敗。}}",
+        "stopped": "{count, plural, one {已停止。有 # 封郵件未處理。} other {已停止。有 # 封郵件未處理。}}",
+        "approved": "{count, plural, one {已核准 # 項提案。} other {已核准 # 項提案。}}",
+        "approveFailed": "{count, plural, one {# 項提案無法核准。} other {# 項提案無法核准。}}"
+      },
+      "deleteFailed": "無法刪除郵件",
+      "ignoreFailed": "無法忽略郵件",
+      "noneLeft": "已沒有符合條件的郵件。未做任何變更。",
+      "reprocessFailed": "無法重新處理這些郵件",
+      "approveFailed": "無法核准這些提案",
+      "noApprovable": "此選取中沒有可核准的提案。",
+      "narrowFailed": "無法計算郵件數量。變更未套用。"
+    }
   },
   "detail": {
     "title": "郵件收據",

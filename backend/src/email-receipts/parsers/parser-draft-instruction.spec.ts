@@ -4,6 +4,7 @@ import {
 } from "./parser-draft-instruction";
 
 const RECEIPT = "30000000-0000-4000-8000-000000000001";
+const PARSER = "50000000-0000-4000-8000-000000000001";
 const TX = "40000000-0000-4000-8000-000000000001";
 
 type Paid = NonNullable<WizardInstructionSample["transaction"]>;
@@ -52,12 +53,15 @@ describe("buildWizardParserDraftInstruction", () => {
       domain: "shop.example.com",
       samples: [sample(1)],
       revision: {
+        parserId: PARSER,
         name: "Shop",
         definition: { version: 2, total: ["Order total: {amount}"] },
         feedback: "  add\nshipping  ",
       },
     });
-    expect(text).toContain('Revise the current draft "Shop".');
+    expect(text).toContain(
+      `Revise the current draft "Shop" (read it in full: get parserId ${PARSER}).`,
+    );
     expect(text).toContain("Order total: {amount}");
     expect(text).toContain("Note: add shipping");
   });
@@ -76,16 +80,40 @@ describe("buildWizardParserDraftInstruction", () => {
       domain: "shop.example.com",
       samples,
       revision: {
+        parserId: PARSER,
         name: "N".repeat(300),
         definition: { total: ["x".repeat(2000)] },
         feedback: "f".repeat(2000),
       },
     });
     expect(text.length).toBeLessThanOrEqual(1000);
+    expect(text).toContain(`get parserId ${PARSER}`);
     for (const s of samples) {
       expect(text).toContain(`tx:${s.transaction.id}`);
       expect(text).toContain("2026-09-11 -15.5 EUR");
     }
+  });
+
+  it("keeps the parserId at the tightest detail level", () => {
+    const samples = [1, 2, 3, 4, 5].map((i) =>
+      sample(i, {
+        payeeName: "P".repeat(200),
+        categories: [{ category: "C".repeat(200), amount: -1 }],
+      }),
+    );
+    const text = buildWizardParserDraftInstruction({
+      domain: "d".repeat(100),
+      samples,
+      revision: {
+        parserId: PARSER,
+        name: "N".repeat(300),
+        definition: { total: ["x".repeat(2000)] },
+        feedback: "f".repeat(2000),
+      },
+    });
+    expect(text.length).toBeLessThanOrEqual(1000);
+    expect(text).toContain(`get parserId ${PARSER}`);
+    expect(text).not.toContain("x".repeat(20));
   });
 
   it("hard-cuts as a last resort", () => {

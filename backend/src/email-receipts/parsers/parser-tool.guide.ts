@@ -19,6 +19,7 @@ export const EMAIL_RECEIPT_PARSER_OPERATIONS = [
   "test",
   "save_draft",
   "categories",
+  "get",
 ] as const;
 export type EmailReceiptParserOperation =
   (typeof EMAIL_RECEIPT_PARSER_OPERATIONS)[number];
@@ -34,6 +35,7 @@ export const EMAIL_RECEIPT_PARSER_TOOL_DESCRIPTION =
   "Captures: orderId {orderid}; total, shipping, discount {amount}; items {name} + {amount} (line total) or {price}, opt. {qty}. " +
   "patterns: one item per line. record: one item over several lines (a step per line, optional steps may be absent); skipLines drop lines first. startAfter/stopAt: substrings bounding the items. " +
   "categories: category ids and the full language guide. " +
+  "get: saved parsers; parserId: one in full, to copy as a new draft. " +
   "test: 1 to 5 emails (receiptIds), writes nothing. Test every email, fix until complete, then save_draft (requestId if claimed). The user must approve the draft; never say it was applied.";
 
 /**
@@ -58,5 +60,6 @@ export const EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE = [
   "categoryRules[{match, categoryId, field}]: match a capture-free glob; field item (default: the item name), payee (the parsed payee) or line (any line of the email); payee and line rules cover every item. First matching rule wins; then defaultCategoryId. shippingCategoryId is the shipping line's category (required when shipping is above 0); the discount line uses defaultCategoryId.",
   "requireLine, skipIfLine, waitIfLine: up to 10 capture-free globs each. requireLine: the parser applies only when a line matches (else the next parser for the sender is tried); skipIfLine: a matching line makes the email ignored; waitIfLine: it is held (unmatched) and read again later. discard: 'ignore' or 'delete' (absent: the emails are read): for a sender whose mail is never wanted, every email the pipeline gives the profile is ignored (status_reason profile_ignore) or deleted, before any guard or field; a person's own link still reads it. test answers outcome discard_ignore or discard_delete.",
   "trade (a brokerage \"order filled\" email): a section that makes the profile read ONE investment transaction to create instead of enriching a bank transaction. A profile with trade holds only trade, plus source, requireLine, skipIfLine, waitIfLine. trade.action {action} (text holding Buy or Sell), symbol {symbol}, quantity {quantity} (shares, up to 8 decimals) are required; total and/or price {amount} (one required; the executed total is the fact, the price a cross-check), commission {amount}, date {date} (YYYY-MM-DD or \"Month D, YYYY\"; else the email's day), account {account}: each a list of entries like orderId. accountRules[{match: g, accountId, currency?}] map the account text to one of the user's investment accounts (investmentAccounts, from categories, with each one's currencyCode), first match wins; a rule with currency (a 3-letter code) applies only to a trade in that currency, so two accounts the email prints alike (an RRSP in CAD and one in USD) get one rule each; with no account text only a * rule matches; defaultAccountId covers emails that print no account; accountRules or defaultAccountId is required. The trade's currency is the one its amounts name (USD, US$, C$, CAD, EUR...), else the first currencyMarkers[{match: g, currency}] glob that matches any line, else the user's security for the ticker; a currency rule never guesses: unknown currency is the reason trade_no_currency. test returns trade (what it read, complete, consistent: shares times price agrees with the total) and its trace, and no match.",
+  "get: with no parserId, the user's saved parsers (id, name, status, senders); with one, that parser in full (any status). Its definition, category names as they are, can be edited, tested and saved with save_draft WITHOUT parserId as a NEW draft; a saved parser is never changed by the tool.",
   "Bounds: 10 entries per field, 200 characters per pattern, 5 lines per pattern, 50 category rules, 100 characters per startAfter/stopAt. test also returns, per email, outcome (read, not_applicable, skip_line, wait_line or no_html), match and trace: for each field the entry index, the pattern and the line (number, text) that produced it (a multi-line pattern: also lines, every line it matched; a labelled entry: its label line too), and each item's patterns and lines.",
 ].join("\n");

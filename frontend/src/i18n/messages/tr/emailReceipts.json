@@ -114,6 +114,73 @@
       },
       "deleted": "Posta kutusu silindi",
       "deleteFailed": "Posta kutusu silinemedi"
+    },
+    "import": {
+      "title": "Arşivlenmiş e-postaları içe aktar",
+      "description": "Bir dosya, iletilen bir e-postadan farklı olarak mağazanın göndericisini ve satın alma tarihini korur. Eski sipariş onaylarını okumak için dışa aktarılmış e-postaları yükleyin.",
+      "fileLabel": "E-posta dosyaları (.eml, .mbox, .msg veya .zip)",
+      "chooseFiles": "Dosya seç",
+      "noFileChosen": "Dosya seçilmedi",
+      "selected": "Seçilen: {count}",
+      "button": "İçe aktar",
+      "preparing": "Dosyalar hazırlanıyor...",
+      "sending": "{total} parçadan {current}. parça gönderiliyor",
+      "processing": "E-postalar işleniyor: {done} / {total}",
+      "cancel": "İptal",
+      "tooLargeTotal": "Seçilen dosyalar birlikte {max} boyutundan büyük. Bunları daha küçük gruplar halinde içe aktarın.",
+      "failed": "İçe aktarma başarısız oldu",
+      "result": {
+        "heading": "İçe aktarma sonucu",
+        "file": "{name}: {stored} kaydedildi, {duplicates} yinelenen, {skipped} atlandı",
+        "summary": "{processed, plural, one {Bekleyen # e-posta işlendi.} other {Bekleyen # e-posta işlendi.}}",
+        "pendingLeft": "{count, plural, one {# e-posta hâlâ işlenmeyi bekliyor. Monize onu posta kutusunun bir sonraki okunuşunda işler.} other {# e-posta hâlâ işlenmeyi bekliyor. Monize bunları posta kutusunun bir sonraki okunuşunda işler.}}",
+        "processFailed": "{count, plural, one {# e-posta işlenemedi.} other {# e-posta işlenemedi.}}",
+        "processingStopped": "İçe aktarılan e-postaların işlenmesi durdu. E-postalar saklandı. Monize bunları posta kutusunun bir sonraki okunuşunda işler.",
+        "truncated": "Bir içe aktarmanın sınırı olduğu için {count} ileti okunmadı. Bunları ikinci bir çalıştırmada yeniden içe aktarın.",
+        "oversized": "{name}: {max} boyutundan büyük {count} ileti gönderilmedi.",
+        "stopped": "İçe aktarma {total} parçadan {done} parçadan sonra durdu. Daha önce içe aktarılan e-postalar korunur. Devam etmek için aynı dosyaları yeniden içe aktarın. Daha önce içe aktarılan e-postalar iki kez kaydedilmez.",
+        "cancelled": "İçe aktarma {total} parçadan {done} parçadan sonra iptal edildi. Daha önce içe aktarılan e-postalar korunur.",
+        "errors": {
+          "unsupported_format": "{name}: bu biçim desteklenmiyor. Desteklenen biçimler .eml, .mbox, .msg ve .zip.",
+          "invalid_archive": "{name}: ZIP dosyası hasarlı veya okunamıyor.",
+          "archive_too_large": "{name}: ZIP dosyası açıldığında içe aktarma sınırını aşıyor. Dosyayı açın ve içindeki .mbox dosyasını yükleyin.",
+          "empty": "{name}: dosyada e-posta yok."
+        },
+        "ignored": "{name}: arşivdeki {count} diğer dosya atlandı."
+      },
+      "guide": {
+        "toggle": "Sağlayıcınızdan e-postalar nasıl dışa aktarılır",
+        "gmailLabel": {
+          "title": "Gmail: etiketli tüm e-postalar",
+          "step1": "takeout.google.com adresini açın ve \"Deselect all\" seçeneğini seçin.",
+          "step2": "\"Mail\" seçeneğini işaretleyin ve \"All Mail data included\" seçeneğini seçin.",
+          "step3": "Yalnızca kendi etiketinizi seçin ve dışa aktarmayı oluşturun.",
+          "step4": "İndirdiğiniz .zip dosyasını, ne kadar büyük olursa olsun, olduğu gibi yükleyin. Dosyayı açmanız gerekmez."
+        },
+        "gmailOne": {
+          "title": "Gmail: tek bir e-posta",
+          "step1": "E-postayı açın.",
+          "step2": "\"Diğer\" seçeneğini, ardından \"İletiyi indir\" seçeneğini seçin.",
+          "step3": ".eml dosyasını yükleyin."
+        },
+        "imap": {
+          "title": "Diğer sağlayıcılar: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Posta kutusunu IMAP ile Thunderbird'e ekleyin ve ImportExportTools NG eklentisini yükleyin.",
+          "step2": "E-postaları veya bir klasörü seçin ve sağ tıklayın.",
+          "step3": "ImportExportTools NG seçeneğini seçin, ardından EML veya mbox olarak dışa aktarın.",
+          "step4": "Dosyaları yükleyin."
+        },
+        "outlook": {
+          "title": "Masaüstü Outlook",
+          "body": "E-postaları seçin ve diskinizdeki bir klasöre sürükleyin. Outlook .msg dosyaları yazar. Bunları birkaç tane birden veya tek bir .zip dosyasında paketlenmiş olarak yükleyin."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "\"Mailbox\" seçeneğini, ardından \"Export Mailbox\" seçeneğini seçin. Apple Mail bir klasör yazar.",
+          "step2": "Klasörün içindeki mbox adlı dosyayı yükleyin veya .eml dosyaları almak için e-postaları Finder'a sürükleyin."
+        },
+        "tip": "İpucu: e-postaları bir betikle iletmek mağazanın göndericisini ve tarihini kaybettirir. Dosyaları içe aktarmak bunları korur."
+      }
     }
   },
   "parsers": {
@@ -711,11 +778,55 @@
     "selection": {
       "label": "Seçilen e-postalar",
       "select": "{subject} e-postasını seç",
-      "selectAll": "Bu listedeki tüm e-postaları seçin (en fazla {max})",
-      "count": "{count, plural, one {# e-posta seçildi} other {# e-posta seçildi}} (en fazla {max})",
+      "selectAll": "Bu listedeki tüm e-postaları seç",
+      "count": "{count, plural, one {# e-posta seçildi} other {# e-posta seçildi}}",
       "draftButton": "Yapay zekâ ile ayrıştırıcı taslağı oluştur ({count})",
       "clear": "Seçimi temizle",
-      "differentSenders": "Seçilen e-postalar farklı göndericilerden geliyor ({domains}). Bir ayrıştırıcı tek bir göndericinin e-postalarını okur, bu yüzden tek bir göndericinin e-postalarını seçin."
+      "deleteButton": "Sil ({count})",
+      "ignoreButton": "Yoksay ({count})",
+      "pageSelected": "Bu sayfadaki {count} e-postanın tümü seçildi.",
+      "selectAllMatching": "Bu filtreye uyan {total} e-postanın tümünü seç.",
+      "allMatchingSelected": "Bu filtreye uyan {total} e-postanın tümü seçildi.",
+      "reprocessButton": "Yeniden işle ({count})",
+      "restoreButton": "Yok sayılanları geri yükle ({count})",
+      "restoreButtonAll": "Yok sayılanları geri yükle",
+      "approveButton": "Önerileri onayla ({count})",
+      "approveButtonAll": "Önerileri onayla",
+      "progress": "İşlenen: {processed}, kalan: {remaining}",
+      "progressStarting": "Başlıyor",
+      "stop": "Durdur",
+      "narrowedSelected": "{total} e-posta seçildi: bu filtreyle eşleşen tümü, aşağıda çıkarılanlar hariç.",
+      "deselect": {
+        "label": "Seçimi şuna göre kaldır",
+        "state": "Durum: {state}",
+        "sender": "Gönderen: {domain}",
+        "before": "Bir günden önce alınanlar",
+        "after": "Bir günden sonra alınanlar",
+        "beforeLabel": "Şu günden önce alınan e-postaların seçimini kaldır",
+        "afterLabel": "Şu günden sonra alınan e-postaların seçimini kaldır",
+        "apply": "Seçimi kaldır",
+        "cancel": "İptal"
+      },
+      "exclusion": {
+        "label": "Seçimden çıkarıldı",
+        "state": "{state} durumunda değil",
+        "sender": "{domain} göndericisinden değil",
+        "from": "{date} tarihinde veya sonra alınanlar",
+        "to": "{date} tarihinde veya önce alınanlar",
+        "remove": "Geri al: {label}"
+      },
+      "draftBlocked": {
+        "tooMany": "Bir ayrıştırıcı en çok {max} e-postadan hazırlanabilir. En fazla {max} e-posta seçin.",
+        "differentSenders": "Seçilen e-postalar farklı göndericilerden geliyor ({domains}). Bir ayrıştırıcı tek bir göndericinin e-postalarını okur, bu yüzden tek bir göndericinin e-postalarını seçin.",
+        "skipped": "Okunamayan bir e-postanın ayrıştırıcı için metni yoktur. Onu seçimden çıkarın.",
+        "allMatching": "Ayrıştırıcı, kendi seçtiğiniz e-postalardan hazırlanır; en çok {max} e-posta. Bu seçimi temizleyin ve en fazla {max} e-posta seçin.",
+        "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin."
+      }
+    },
+    "pager": {
+      "itemName": "e-posta",
+      "total": "{count, plural, one {# e-posta} other {# e-posta}}",
+      "page": "Sayfa {page}"
     },
     "draft": {
       "failed": "Ayrıştırıcı taslağı oluşturma başlatılamadı",
@@ -727,7 +838,48 @@
       "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin.",
       "chatPromptTrade": "{domain} alan adından gelen {count, plural, one {bu işlem onayı e-postası} other {bu # işlem onayı e-postası}} için bir işlem profili oluştur. {requestId} numaralı yapay zekâ inceleme isteğini üstlen, profilini ekli her e-postada email_receipt_parsers aracıyla dene, her birinden eksiksiz bir işlem okunana kadar düzelt, sonra {requestId} isteği için taslak olarak kaydet."
     },
-    "tradeBadge": "İşlem"
+    "tradeBadge": "İşlem",
+    "bulkDialog": {
+      "delete": {
+        "title": "E-postalar silinsin mi?",
+        "message": "{scope, select, both {{domain} alanından gelen, {status} durumundaki } domain {{domain} alanından gelen } status {{status} durumundaki } other {}}{count, plural, one {# e-posta} other {# e-posta}} silinsin mi? Bu işlem geri alınamaz. E-postaları tutmak ve bir şey önermelerini engellemek için bunun yerine “Yoksay” seçin. Bir işlemle bağlantılı e-postalar korunur."
+      },
+      "ignore": {
+        "title": "E-postalar yoksayılsın mı?",
+        "message": "{scope, select, both {{domain} alanından gelen, {status} durumundaki } domain {{domain} alanından gelen } status {{status} durumundaki } other {}}{count, plural, one {# e-posta} other {# e-posta}} yoksayılsın mı? Hiçbir şey önermezler ve açık inceleme istekleri kapatılır. Bir işlemle bağlantılı e-postalar olduğu gibi kalır.",
+        "confirm": "Yoksay"
+      },
+      "countChanged": "Uyan e-posta sayısı şimdi {count}. Hiçbir şey değiştirilmedi. Sayıyı kontrol edin ve yeniden onaylayın.",
+      "approve": {
+        "title": "Öneriler onaylansın mı?",
+        "message": "{count, plural, one {# öneri onaylansın} other {# öneri onaylansın}} mı? Her biri, yapay zekâ inceleme gelen kutusundaki Onayla düğmesinin yaptığı gibi uygulanır.",
+        "trades": "{count, plural, one {# işlem e-postası dışarıda bırakıldı. Yapay zekâ inceleme gelen kutusunda kendi kartından onaylayın.} other {# işlem e-postası dışarıda bırakıldı. Yapay zekâ inceleme gelen kutusunda kendi kartlarından onaylayın.}}",
+        "confirm": "Onayla"
+      },
+      "narrowedNote": "Seçimden çıkarılan e-postalar değiştirilmez."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# e-posta silindi.} other {# e-posta silindi.}}",
+        "ignored": "{count, plural, one {# e-posta yoksayıldı.} other {# e-posta yoksayıldı.}}",
+        "unchanged": "{count, plural, one {# e-posta zaten yoksayılmıştı.} other {# e-posta zaten yoksayılmıştı.}}",
+        "notIgnorable": "{count, plural, one {# e-posta yoksayılamadı: okunamadı veya önerisi zaten uygulanmıştı.} other {# e-posta yoksayılamadı: okunamadılar veya önerileri zaten uygulanmıştı.}}",
+        "skippedLinked": "{count, plural, one {Bir işlemle bağlantılı # e-posta korundu.} other {Bir işlemle bağlantılı # e-posta korundu.}}",
+        "reprocessed": "{count, plural, one {# e-posta yeniden işlendi.} other {# e-posta yeniden işlendi.}}",
+        "restored": "{count, plural, one {Yok sayılan # e-posta yeniden okundu.} other {Yok sayılan # e-posta yeniden okundu.}}",
+        "reprocessFailed": "{count, plural, one {# e-posta başarısız oldu.} other {# e-posta başarısız oldu.}}",
+        "stopped": "{count, plural, one {Durduruldu. # e-posta işlenmeden kaldı.} other {Durduruldu. # e-posta işlenmeden kaldı.}}",
+        "approved": "{count, plural, one {# öneri onaylandı.} other {# öneri onaylandı.}}",
+        "approveFailed": "{count, plural, one {# öneri onaylanamadı.} other {# öneri onaylanamadı.}}"
+      },
+      "deleteFailed": "E-postalar silinemedi",
+      "ignoreFailed": "E-postalar yoksayılamadı",
+      "noneLeft": "Artık uyan e-posta yok. Hiçbir şey değiştirilmedi.",
+      "reprocessFailed": "E-postalar yeniden işlenemedi",
+      "approveFailed": "Öneriler onaylanamadı",
+      "noApprovable": "Bu seçimdeki hiçbir öneri onaylanamaz.",
+      "narrowFailed": "E-postalar sayılamadı. Değişiklik uygulanmadı."
+    }
   },
   "detail": {
     "title": "E-posta makbuzu",

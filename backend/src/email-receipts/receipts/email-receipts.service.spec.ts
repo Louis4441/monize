@@ -1,5 +1,9 @@
 import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { MAX_PARSE_LINES } from "../parsing/receipt-parser.types";
 import { EmailReceipt } from "../entities/email-receipt.entity";
@@ -188,7 +192,7 @@ describe("EmailReceiptsService.list", () => {
       "ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id DESC",
     );
     expect(sql).not.toContain("body_text");
-    expect(params).toEqual([USER, "review", null, null, 20]);
+    expect(params).toEqual([USER, "review", null, null, 20, 0]);
     expect(items[0]).toEqual({
       id: ID,
       fromAddress: "orders@shop.example.com",
@@ -243,6 +247,7 @@ describe("EmailReceiptsService.list", () => {
         "shop.example.com",
         "%.shop.example.com",
         50,
+        0,
       ]);
     });
 
@@ -285,6 +290,7 @@ describe("EmailReceiptsService.list", () => {
         "shop.example.com",
         "%.shop.example.com",
         7,
+        0,
       ]);
     });
   });
@@ -326,11 +332,27 @@ describe("EmailReceiptsService.list", () => {
       null,
       null,
       50,
+      0,
     ]);
     await service.list(USER, { limit: 9999 });
     expect(manager.query.mock.calls[1][1][4]).toBe(200);
     await service.list(USER, { limit: 0 });
     expect(manager.query.mock.calls[2][1][4]).toBe(1);
+  });
+
+  it("skips `offset` emails after the stable order, as a parameter, and clamps it to 0..100000", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([]);
+    await service.list(USER, { limit: 50, offset: 100 });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toMatch(
+      /ORDER BY COALESCE\(r\.original_sent_at, r\.received_at\) DESC, r\.id DESC\s+LIMIT \$5 OFFSET \$6/,
+    );
+    expect(params[5]).toBe(100);
+    await service.list(USER, { offset: -5 });
+    expect(manager.query.mock.calls[1][1][5]).toBe(0);
+    await service.list(USER, { offset: 10_000_000 });
+    expect(manager.query.mock.calls[2][1][5]).toBe(100000);
   });
 
   it("carries why a request was closed", async () => {
@@ -1361,5 +1383,584 @@ describe("EmailReceiptsService.processBatch", () => {
       remaining: 0,
       since: SINCE,
     });
+  });
+});
+
+describe("EmailReceiptsService.bulk", () => {
+  const A = "11111111-1111-4111-8111-111111111111";
+  const B = "22222222-2222-4222-8222-222222222222";
+  const C = "33333333-3333-4333-8333-333333333333";
+  const D = "44444444-4444-4444-8444-444444444444";
+  const E = "55555555-5555-4555-8555-555555555555";
+
+  const locked = (
+    id: string,
+    over: Record<string, unknown> = {},
+  ): Record<string, unknown> => ({
+    id,
+    status: "no_parser",
+    transaction_id: null,
+    request_status: null,
+    ...over,
+  });
+
+  /** Routes each statement of the transaction to a canned answer, in the order they ran. */
+  function bulkSetup(rows: Array<Record<string, unknown>>) {
+    const h = setup();
+    h.manager.query.mockImplementation(async (sql: string, args: unknown[]) => {
+      const text = String(sql);
+      if (text.includes("FOR UPDATE")) return rows;
+      if (text.includes("RETURNING id")) {
+        const ids = args[0] as string[];
+        return [ids.map((id) => ({ id })), ids.length];
+      }
+      return [];
+    });
+    return h;
+  }
+
+  const statements = (h: ReturnType<typeof setup>) =>
+    h.manager.query.mock.calls.map(([sql]) => String(sql));
+  const writes = (h: ReturnType<typeof setup>) =>
+    statements(h).filter((sql) => /^\s*(DELETE|UPDATE)\b/.test(sql));
+
+  it("deletes the emails it was told, closing their open requests first", async () => {
+    const h = bulkSetup([locked(A), locked(B)]);
+    const out = await h.service.bulk(USER, "delete", { ids: [A, B] }, 2);
+    expect(out).toEqual({
+      affected: 2,
+      skippedLinked: 0,
+      unchanged: 0,
+      notIgnorable: 0,
+    });
+    const sql = statements(h);
+    const lock = sql.findIndex((s) => s.includes("FOR UPDATE OF r"));
+    const close = sql.findIndex((s) => s.includes("UPDATE ai_review_requests"));
+    const del = sql.findIndex((s) =>
+      s.startsWith("DELETE FROM email_receipts"),
+    );
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(close).toBeGreaterThan(lock);
+    expect(del).toBeGreaterThan(close);
+    const [closeSql, closeArgs] = h.manager.query.mock.calls[close];
+    expect(closeSql).toContain("email_receipt_id = ANY($2::uuid[])");
+    expect(closeArgs).toEqual([USER, [A, B]]);
+    expect(h.manager.query.mock.calls[del][1]).toEqual([[A, B], USER]);
+  });
+
+  it("keys every statement on the user, so another user's ids are never touched", async () => {
+    const h = bulkSetup([locked(A)]);
+    await h.service.bulk(USER, "delete", { ids: [A, B, C] }, 1);
+    for (const [sql, args] of h.manager.query.mock.calls) {
+      expect(String(sql)).toMatch(/user_id = \$\d/);
+      expect(args).toContain(USER);
+    }
+    // an id of another user simply does not match, so the count refuses it
+    await expect(
+      h.service.bulk(USER, "delete", { ids: [A, B, C] }, 3),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("reads a filter through the list's predicate: status, domain and its sub-domains", async () => {
+    const h = bulkSetup([locked(A), locked(B), locked(C)]);
+    await h.service.bulk(
+      USER,
+      "delete",
+      { filter: { status: "no_parser", domain: " Gmail.com " } },
+      3,
+    );
+    const [sql, args] = h.manager.query.mock.calls[0];
+    expect(String(sql)).toContain("r.from_domain LIKE $5::varchar ESCAPE");
+    expect(String(sql)).toContain("ORDER BY r.id");
+    expect(args).toEqual([
+      USER,
+      20001,
+      "no_parser",
+      "gmail.com",
+      "%.gmail.com",
+      [],
+      [],
+      [],
+      null,
+      null,
+    ]);
+  });
+
+  it("reads the exclusions and the received days of a filter as bind values", async () => {
+    const h = bulkSetup([locked(A)]);
+    await h.service.bulk(
+      USER,
+      "delete",
+      {
+        filter: {
+          excludeStatuses: ["ignored"],
+          excludeDomains: ["gmail.com"],
+          receivedFrom: "2026-01-01",
+          receivedTo: "2026-01-31",
+        },
+      },
+      1,
+    );
+    const [sql, args] = h.manager.query.mock.calls[0];
+    expect(String(sql)).toContain("NOT (r.status = ANY($6::varchar[]))");
+    expect(args).toEqual([
+      USER,
+      20001,
+      null,
+      null,
+      null,
+      ["ignored"],
+      ["gmail.com"],
+      ["%.gmail.com"],
+      "2026-01-01",
+      "2026-01-31",
+    ]);
+  });
+
+  it("a filter without status or domain binds nulls", async () => {
+    const h = bulkSetup([locked(A)]);
+    await h.service.bulk(USER, "ignore", { filter: {} }, 1);
+    expect(h.manager.query.mock.calls[0][1]).toEqual([
+      USER,
+      20001,
+      null,
+      null,
+      null,
+      [],
+      [],
+      [],
+      null,
+      null,
+    ]);
+  });
+
+  it("refuses a different count with 409 and the current count, before any write", async () => {
+    const h = bulkSetup([locked(A), locked(B), locked(C)]);
+    const error = await h.service
+      .bulk(USER, "delete", { filter: { domain: "gmail.com" } }, 5)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({
+      errorCode: "EMAIL_RECEIPTS_BULK_COUNT_CHANGED",
+      currentCount: 3,
+    });
+    expect(writes(h)).toEqual([]);
+    expect(statements(h)).toHaveLength(1);
+  });
+
+  it("refuses a smaller count too, writing nothing", async () => {
+    const h = bulkSetup([locked(A), locked(B), locked(C)]);
+    await expect(
+      h.service.bulk(USER, "ignore", { ids: [A, B, C] }, 2),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(writes(h)).toEqual([]);
+  });
+
+  it("refuses a filter that matches more than 20,000 emails with a 400, writing nothing", async () => {
+    const many = Array.from({ length: 20001 }, (_, i) => locked(`id-${i}`));
+    const h = bulkSetup(many);
+    await expect(
+      h.service.bulk(USER, "delete", { filter: {} }, 20000),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(writes(h)).toEqual([]);
+  });
+
+  it("accepts exactly 20,000 matching emails", async () => {
+    const many = Array.from({ length: 20000 }, (_, i) => locked(`id-${i}`));
+    const h = bulkSetup(many);
+    const out = await h.service.bulk(USER, "delete", { filter: {} }, 20000);
+    expect(out.affected).toBe(20000);
+  });
+
+  it("refuses more than 500 ids without touching the database", async () => {
+    const h = bulkSetup([]);
+    const ids = Array.from({ length: 501 }, (_, i) => `id-${i}`);
+    await expect(
+      h.service.bulk(USER, "delete", { ids }, 501),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(h.manager.query).not.toHaveBeenCalled();
+  });
+
+  it("skips and counts emails linked to a transaction on delete", async () => {
+    const h = bulkSetup([
+      locked(A),
+      locked(B, { transaction_id: "t1", status: "review" }),
+      locked(C, { transaction_id: "t2", status: "review" }),
+    ]);
+    const out = await h.service.bulk(USER, "delete", { ids: [A, B, C] }, 3);
+    expect(out).toEqual({
+      affected: 1,
+      skippedLinked: 2,
+      unchanged: 0,
+      notIgnorable: 0,
+    });
+    const del = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).startsWith("DELETE FROM email_receipts"),
+    );
+    expect(del?.[1]).toEqual([[A], USER]);
+    expect(String(del?.[0])).toContain("transaction_id IS NULL");
+  });
+
+  it("writes nothing when every email is linked", async () => {
+    const h = bulkSetup([locked(A, { transaction_id: "t1" })]);
+    const out = await h.service.bulk(USER, "delete", { ids: [A] }, 1);
+    expect(out.skippedLinked).toBe(1);
+    expect(out.affected).toBe(0);
+    expect(writes(h)).toEqual([]);
+  });
+
+  it("ignore follows ignore(): ignored is unchanged, skipped and applied are not ignorable, linked is skipped", async () => {
+    const h = bulkSetup([
+      locked(A),
+      locked(B, { status: "ignored" }),
+      locked(C, { status: "skipped" }),
+      locked(D, { status: "review", request_status: "applied" }),
+      locked(E, { status: "review", transaction_id: "t1" }),
+    ]);
+    const out = await h.service.bulk(
+      USER,
+      "ignore",
+      { ids: [A, B, C, D, E] },
+      5,
+    );
+    expect(out).toEqual({
+      affected: 1,
+      skippedLinked: 1,
+      unchanged: 1,
+      notIgnorable: 2,
+    });
+    const update = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("SET status = 'ignored'"),
+    );
+    expect(update?.[1]).toEqual([[A], USER]);
+    const close = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE ai_review_requests"),
+    );
+    expect(close?.[1]).toEqual([USER, [A]]);
+  });
+
+  it("an ignore that has nothing to ignore closes and writes nothing", async () => {
+    const h = bulkSetup([locked(A, { status: "ignored" })]);
+    const out = await h.service.bulk(USER, "ignore", { ids: [A] }, 1);
+    expect(out).toEqual({
+      affected: 0,
+      skippedLinked: 0,
+      unchanged: 1,
+      notIgnorable: 0,
+    });
+    expect(writes(h)).toEqual([]);
+  });
+
+  it("delete does not apply the ignore rules: an ignored or skipped email is deleted", async () => {
+    const h = bulkSetup([
+      locked(A, { status: "ignored" }),
+      locked(B, { status: "skipped" }),
+    ]);
+    const out = await h.service.bulk(USER, "delete", { ids: [A, B] }, 2);
+    expect(out.affected).toBe(2);
+    expect(out.unchanged).toBe(0);
+    expect(out.notIgnorable).toBe(0);
+  });
+
+  it("runs in one transaction", async () => {
+    const h = bulkSetup([locked(A)]);
+    await h.service.bulk(USER, "delete", { ids: [A] }, 1);
+    expect(h.manager.query.mock.calls.length).toBe(3);
+  });
+});
+
+describe("EmailReceiptsService.countSelection", () => {
+  it("counts through the selection predicate, capped one past the bulk limit", async () => {
+    const h = setup();
+    h.manager.query.mockResolvedValue([{ count: "7" }]);
+    const out = await h.service.countSelection(USER, {
+      status: "review",
+      excludeDomains: ["gmail.com"],
+      receivedFrom: "2026-01-01",
+    });
+    expect(out).toEqual({ count: 7 });
+    const [sql, args] = h.manager.query.mock.calls[0];
+    expect(String(sql)).toContain("user_id = $1");
+    expect(String(sql)).toContain("LIMIT $2");
+    expect(args).toEqual([
+      USER,
+      20001,
+      "review",
+      null,
+      null,
+      [],
+      ["gmail.com"],
+      ["%.gmail.com"],
+      "2026-01-01",
+      null,
+    ]);
+  });
+
+  it("counts zero when the database answers nothing", async () => {
+    const h = setup();
+    h.manager.query.mockResolvedValue([]);
+    await expect(h.service.countSelection(USER, {})).resolves.toEqual({
+      count: 0,
+    });
+  });
+});
+
+describe("EmailReceiptsService.reprocessSelection", () => {
+  const SINCE = "2026-10-04T12:00:00.123456Z";
+  const A = "11111111-1111-4111-8111-111111111111";
+
+  function run(ids: string[], remaining = 0) {
+    const h = setup();
+    h.manager.query.mockImplementation(async (sql: string) => {
+      const text = String(sql);
+      if (text.includes("AS since")) return [{ since: SINCE }];
+      if (text.includes("SELECT r.id")) return ids.map((id) => ({ id }));
+      if (text.includes("COUNT(*)::int AS remaining")) return [{ remaining }];
+      return [];
+    });
+    return h;
+  }
+  const result = (status: string, over: Record<string, unknown> = {}) => ({
+    status,
+    statusReason: null,
+    transactionId: null,
+    matchKind: null,
+    requestId: null,
+    autoApplied: false,
+    unchanged: false,
+    ...over,
+  });
+  const select = (h: ReturnType<typeof setup>) =>
+    h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("SELECT r.id"),
+    ) as [string, unknown[]];
+
+  it("runs the chunk oldest first, counts outcomes and answers remaining and since", async () => {
+    const h = run(["a", "b"], 5);
+    h.pipeline.process
+      .mockResolvedValueOnce(result("review") as never)
+      .mockResolvedValueOnce(result("unmatched") as never);
+    const out = await h.service.reprocessSelection(USER, { filter: {} });
+    expect(out).toEqual({
+      processed: 2,
+      byOutcome: { review: 1, unmatched: 1 },
+      deleted: 0,
+      failed: 0,
+      remaining: 5,
+      since: SINCE,
+    });
+    const [sql, args] = select(h);
+    expect(String(sql)).toContain("ORDER BY r.received_at ASC, r.id ASC");
+    expect(String(sql)).toContain("r.status NOT IN ('skipped', 'pending')");
+    expect(String(sql)).toContain("rq.status IS DISTINCT FROM 'applied'");
+    expect(String(sql)).toContain("r.updated_at < $3::timestamptz");
+    // user, onlyStatuses, since, the eight selection values, limit
+    expect(args.slice(0, 3)).toEqual([USER, [], SINCE]);
+    expect(args[args.length - 1]).toBe(10);
+  });
+
+  it("counts an email its profile deletes as processed and deleted, under no status, and does not touch it", async () => {
+    const h = run(["a", "b"]);
+    h.pipeline.process
+      .mockResolvedValueOnce(result("ignored", { deleted: true }) as never)
+      .mockResolvedValueOnce(result("review") as never);
+    const out = await h.service.reprocessSelection(USER, { filter: {} });
+    expect(out).toMatchObject({
+      processed: 2,
+      byOutcome: { review: 1 },
+      deleted: 1,
+      failed: 0,
+    });
+    expect(
+      h.manager.query.mock.calls.some(([sql]) =>
+        String(sql).includes("SET status_reason = status_reason"),
+      ),
+    ).toBe(false);
+  });
+
+  it("sends the caller's since back to the database clock and reads remaining with the same since", async () => {
+    const h = run([], 0);
+    await h.service.reprocessSelection(
+      USER,
+      { ids: [A] },
+      { since: "2026-10-01T00:00:00Z" },
+    );
+    const sinceCall = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("AS since"),
+    );
+    expect(sinceCall?.[1]).toEqual(["2026-10-01T00:00:00Z"]);
+    const left = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("COUNT(*)::int AS remaining"),
+    );
+    expect(left?.[1]).toEqual([USER, [], SINCE, [A]]);
+    expect(String(left?.[0])).toContain("r.id = ANY($4::uuid[])");
+  });
+
+  it.each([
+    [undefined, 10],
+    [0, 1],
+    [3, 3],
+    [25, 25],
+    [1000, 25],
+  ])("limit %p runs at most %i", async (limit, expected) => {
+    const h = run([]);
+    await h.service.reprocessSelection(USER, { filter: {} }, { limit });
+    const args = select(h)[1];
+    expect(args[args.length - 1]).toBe(expected);
+  });
+
+  it("guards by onlyStatuses and shares one AI budget", async () => {
+    const h = run(["a", "b"]);
+    h.pipeline.process.mockResolvedValue(result("review") as never);
+    await h.service.reprocessSelection(
+      USER,
+      { filter: {} },
+      { onlyStatuses: ["ignored"] },
+    );
+    expect(select(h)[1][1]).toEqual(["ignored"]);
+    const [first, second] = h.pipeline.process.mock.calls;
+    expect(first[2]).toMatchObject({ onlyWhenStatusIn: ["ignored"] });
+    expect(first[2]?.aiCategoryBudget).toBe(second[2]?.aiCategoryBudget);
+    expect(first[2]?.aiCategoryBudget?.remaining).toBe(
+      EMAIL_RECEIPTS_BATCH_AI_CATEGORY_CALLS,
+    );
+  });
+
+  it("runs the row action's reprocess when onlyStatuses is absent or empty", async () => {
+    const h = run(["a"]);
+    h.pipeline.process.mockResolvedValue(result("review") as never);
+    await h.service.reprocessSelection(USER, { filter: {} });
+    await h.service.reprocessSelection(
+      USER,
+      { filter: {} },
+      { onlyStatuses: [] },
+    );
+    for (const call of h.pipeline.process.mock.calls) {
+      expect(call[2]).not.toHaveProperty("onlyWhenStatusIn");
+    }
+  });
+
+  it("does not count an email left alone, and touches it so the run does not take it again", async () => {
+    const h = run(["a", "b"]);
+    h.pipeline.process
+      .mockResolvedValueOnce(result("review", { unchanged: true }) as never)
+      .mockResolvedValueOnce(result("review") as never);
+    const out = await h.service.reprocessSelection(
+      USER,
+      { filter: {} },
+      { onlyStatuses: ["review"] },
+    );
+    expect(out.processed).toBe(1);
+    const touch = h.manager.query.mock.calls.filter(([sql]) =>
+      String(sql).includes("SET status_reason = status_reason"),
+    );
+    expect(touch.map((c) => c[1])).toEqual([["a", USER]]);
+  });
+
+  it("counts a failed email, touches it and goes on", async () => {
+    const h = run(["a", "b"]);
+    h.pipeline.process
+      .mockRejectedValueOnce(new ConflictException("applied"))
+      .mockResolvedValueOnce(result("review") as never);
+    const out = await h.service.reprocessSelection(USER, { filter: {} });
+    expect(out).toMatchObject({ processed: 1, failed: 1 });
+    const touch = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("SET status_reason = status_reason"),
+    );
+    expect(touch?.[1]).toEqual(["a", USER]);
+  });
+
+  it("refuses more than 500 ids before reading anything", async () => {
+    const h = run([]);
+    const ids = Array.from({ length: 501 }, (_, i) => `id-${i}`);
+    await expect(
+      h.service.reprocessSelection(USER, { ids }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(h.manager.query).not.toHaveBeenCalled();
+    expect(h.pipeline.process).not.toHaveBeenCalled();
+  });
+
+  it("an empty selection is a quiet answer", async () => {
+    const h = run([]);
+    const out = await h.service.reprocessSelection(USER, { filter: {} });
+    expect(h.pipeline.process).not.toHaveBeenCalled();
+    expect(out).toEqual({
+      processed: 0,
+      byOutcome: {},
+      deleted: 0,
+      failed: 0,
+      remaining: 0,
+      since: SINCE,
+    });
+  });
+});
+
+describe("EmailReceiptsService.approvableSelection", () => {
+  const A = "11111111-1111-4111-8111-111111111111";
+
+  function approvable(requestIds: string[], trades = 0) {
+    const h = setup();
+    h.manager.query.mockImplementation(async (sql: string) => {
+      const text = String(sql);
+      if (text.includes("COUNT(*)::int AS trades")) return [{ trades }];
+      return requestIds.map((request_id) => ({ request_id }));
+    });
+    return h;
+  }
+
+  it("returns the proposed non-trade requests and counts the trades left out", async () => {
+    const h = approvable(["rq1", "rq2"], 3);
+    const out = await h.service.approvableSelection(USER, { ids: [A] });
+    expect(out).toEqual({ requestIds: ["rq1", "rq2"], trades: 3 });
+    const [list, count] = h.manager.query.mock.calls.map(([sql]) =>
+      String(sql),
+    );
+    for (const sql of [list, count]) {
+      expect(sql).toContain("r.status = 'review'");
+      expect(sql).toContain("rq.status = 'proposed'");
+      expect(sql).toContain("rq.expires_at > CURRENT_TIMESTAMP");
+      expect(sql).toContain("r.id = ANY($2::uuid[])");
+    }
+    expect(list).toContain(
+      "AND NOT (r.trade IS NOT NULL OR rq.kind = 'email_trade')",
+    );
+    expect(count).toContain(
+      "AND (r.trade IS NOT NULL OR rq.kind = 'email_trade')",
+    );
+    expect(h.manager.query.mock.calls[0][1]).toEqual([USER, [A], 2001]);
+  });
+
+  it("reads a filter through the selection predicate", async () => {
+    const h = approvable([]);
+    await h.service.approvableSelection(USER, {
+      filter: { excludeStatuses: ["ignored"] },
+    });
+    const args = h.manager.query.mock.calls[0][1] as unknown[];
+    expect(args[0]).toBe(USER);
+    expect(args).toContainEqual(["ignored"]);
+    expect(args[args.length - 1]).toBe(2001);
+  });
+
+  it("accepts exactly 2,000 proposals", async () => {
+    const h = approvable(Array.from({ length: 2000 }, (_, i) => `rq${i}`));
+    const out = await h.service.approvableSelection(USER, { filter: {} });
+    expect(out.requestIds).toHaveLength(2000);
+  });
+
+  it("refuses more than 2,000 proposals with a 400 before counting trades", async () => {
+    const h = approvable(Array.from({ length: 2001 }, (_, i) => `rq${i}`));
+    await expect(
+      h.service.approvableSelection(USER, { filter: {} }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(h.manager.query).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses more than 500 ids without touching the database", async () => {
+    const h = approvable([]);
+    const ids = Array.from({ length: 501 }, (_, i) => `id-${i}`);
+    await expect(
+      h.service.approvableSelection(USER, { ids }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(h.manager.query).not.toHaveBeenCalled();
   });
 });

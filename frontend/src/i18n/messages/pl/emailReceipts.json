@@ -114,6 +114,73 @@
       },
       "deleted": "Skrzynka pocztowa usunięta",
       "deleteFailed": "Nie udało się usunąć skrzynki pocztowej"
+    },
+    "import": {
+      "title": "Importuj zarchiwizowane wiadomości",
+      "description": "Plik zachowuje nadawcę i datę zakupu w sklepie, inaczej niż przekazana wiadomość. Wyślij wyeksportowane wiadomości, aby odczytać stare potwierdzenia zamówień.",
+      "fileLabel": "Pliki wiadomości (.eml, .mbox, .msg lub .zip)",
+      "chooseFiles": "Wybierz pliki",
+      "noFileChosen": "Nie wybrano plików",
+      "selected": "Wybrano: {count}",
+      "button": "Importuj",
+      "preparing": "Przygotowanie plików...",
+      "sending": "Wysyłanie części {current} z {total}",
+      "processing": "Przetwarzanie wiadomości: {done} z {total}",
+      "cancel": "Anuluj",
+      "tooLargeTotal": "Wybrane pliki razem są większe niż {max}. Importuj je w mniejszych grupach.",
+      "failed": "Import nie powiódł się",
+      "result": {
+        "heading": "Wynik importu",
+        "file": "{name}: zapisano {stored}, duplikaty {duplicates}, pominięto {skipped}",
+        "summary": "{processed, plural, one {Przetworzono # oczekującą wiadomość.} few {Przetworzono # oczekujące wiadomości.} many {Przetworzono # oczekujących wiadomości.} other {Przetworzono # oczekującej wiadomości.}}",
+        "pendingLeft": "{count, plural, one {# wiadomość nadal czeka na przetworzenie. Monize przetworzy ją przy następnym odczycie skrzynki.} few {# wiadomości nadal czekają na przetworzenie. Monize przetworzy je przy następnym odczycie skrzynki.} many {# wiadomości nadal czeka na przetworzenie. Monize przetworzy je przy następnym odczycie skrzynki.} other {# wiadomości nadal czeka na przetworzenie. Monize przetworzy je przy następnym odczycie skrzynki.}}",
+        "processFailed": "{count, plural, one {Nie udało się przetworzyć # wiadomości.} few {Nie udało się przetworzyć # wiadomości.} many {Nie udało się przetworzyć # wiadomości.} other {Nie udało się przetworzyć # wiadomości.}}",
+        "processingStopped": "Przetwarzanie zaimportowanych wiadomości zostało zatrzymane. Wiadomości zostały zachowane. Monize przetworzy je przy następnym odczycie skrzynki.",
+        "truncated": "Nie odczytano wiadomości: {count}, ponieważ jeden import ma limit. Importuj je ponownie w drugim przebiegu.",
+        "oversized": "{name}: nie wysłano wiadomości większych niż {max}: {count}.",
+        "stopped": "Import zatrzymał się po {done} z {total} części. Zaimportowane już e-maile zostają zachowane. Aby kontynuować, zaimportuj te same pliki jeszcze raz. E-maile zaimportowane wcześniej nie są zapisywane drugi raz.",
+        "cancelled": "Import został anulowany po {done} z {total} części. Zaimportowane już e-maile zostają zachowane.",
+        "errors": {
+          "unsupported_format": "{name}: ten format nie jest obsługiwany. Obsługiwane formaty to .eml, .mbox, .msg i .zip.",
+          "invalid_archive": "{name}: plik ZIP jest uszkodzony lub nie można go odczytać.",
+          "archive_too_large": "{name}: plik ZIP po rozpakowaniu przekracza limit importu. Rozpakuj go i prześlij plik .mbox ze środka.",
+          "empty": "{name}: plik nie zawiera wiadomości."
+        },
+        "ignored": "{name}: pominięto inne pliki w archiwum: {count}."
+      },
+      "guide": {
+        "toggle": "Jak wyeksportować wiadomości od dostawcy poczty",
+        "gmailLabel": {
+          "title": "Gmail: wszystkie wiadomości z etykietą",
+          "step1": "Otwórz takeout.google.com i wybierz „Deselect all”.",
+          "step2": "Zaznacz „Mail” i wybierz „All Mail data included”.",
+          "step3": "Wybierz tylko swoją etykietę i utwórz eksport.",
+          "step4": "Wyślij pobrany plik .zip bez zmian, niezależnie od jego rozmiaru. Nie musisz go rozpakowywać."
+        },
+        "gmailOne": {
+          "title": "Gmail: jedna wiadomość",
+          "step1": "Otwórz wiadomość.",
+          "step2": "Wybierz „Więcej”, a następnie „Pobierz wiadomość”.",
+          "step3": "Wyślij plik .eml."
+        },
+        "imap": {
+          "title": "Inni dostawcy: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Dodaj skrzynkę do programu Thunderbird przez IMAP i zainstaluj dodatek ImportExportTools NG.",
+          "step2": "Zaznacz wiadomości lub folder i kliknij prawym przyciskiem myszy.",
+          "step3": "Wybierz ImportExportTools NG, a następnie wyeksportuj jako EML lub jako mbox.",
+          "step4": "Wyślij pliki."
+        },
+        "outlook": {
+          "title": "Outlook na komputerze",
+          "body": "Zaznacz wiadomości i przeciągnij je do folderu na dysku. Outlook zapisuje pliki .msg. Wyślij je razem lub spakowane w jeden plik .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Wybierz „Skrzynka pocztowa”, a następnie „Eksportuj skrzynkę pocztową”. Apple Mail zapisuje folder.",
+          "step2": "Wyślij plik o nazwie mbox z wnętrza folderu lub przeciągnij wiadomości do programu Finder, aby uzyskać pliki .eml."
+        },
+        "tip": "Wskazówka: przekazywanie wiadomości skryptem gubi nadawcę i datę sklepu. Import plików je zachowuje."
+      }
     }
   },
   "parsers": {
@@ -711,11 +778,55 @@
     "selection": {
       "label": "Zaznaczone wiadomości",
       "select": "Zaznacz: {subject}",
-      "selectAll": "Zaznacz wszystkie wiadomości na tej liście (maksymalnie {max})",
-      "count": "{count, plural, one {Zaznaczono # wiadomość} few {Zaznaczono # wiadomości} many {Zaznaczono # wiadomości} other {Zaznaczono # wiadomości}} (maksymalnie {max})",
+      "selectAll": "Zaznacz wszystkie wiadomości na tej liście",
+      "count": "{count, plural, one {Zaznaczono # wiadomość} few {Zaznaczono # wiadomości} many {Zaznaczono # wiadomości} other {Zaznaczono # wiadomości}}",
       "draftButton": "Przygotuj parser z AI ({count})",
       "clear": "Wyczyść zaznaczenie",
-      "differentSenders": "Zaznaczone wiadomości pochodzą od różnych nadawców ({domains}). Parser odczytuje wiadomości jednego nadawcy, więc zaznacz wiadomości od jednego nadawcy."
+      "deleteButton": "Usuń ({count})",
+      "ignoreButton": "Zignoruj ({count})",
+      "pageSelected": "Zaznaczono wszystkie wiadomości na tej stronie: {count}.",
+      "selectAllMatching": "Zaznacz wszystkie wiadomości pasujące do filtra: {total}.",
+      "allMatchingSelected": "Zaznaczono wszystkie wiadomości pasujące do filtra: {total}.",
+      "reprocessButton": "Przetwórz ponownie ({count})",
+      "restoreButton": "Przywróć zignorowane ({count})",
+      "restoreButtonAll": "Przywróć zignorowane",
+      "approveButton": "Zatwierdź propozycje ({count})",
+      "approveButtonAll": "Zatwierdź propozycje",
+      "progress": "Przetworzono: {processed}, zostało: {remaining}",
+      "progressStarting": "Start",
+      "stop": "Zatrzymaj",
+      "narrowedSelected": "Zaznaczono {total} wiadomości: wszystkie pasujące do tego filtra, oprócz wyłączonych poniżej.",
+      "deselect": {
+        "label": "Odznacz według",
+        "state": "Stan: {state}",
+        "sender": "Nadawca: {domain}",
+        "before": "Odebrane przed dniem",
+        "after": "Odebrane po dniu",
+        "beforeLabel": "Odznacz wiadomości odebrane przed dniem",
+        "afterLabel": "Odznacz wiadomości odebrane po dniu",
+        "apply": "Odznacz",
+        "cancel": "Anuluj"
+      },
+      "exclusion": {
+        "label": "Wyłączone z zaznaczenia",
+        "state": "Nie w stanie {state}",
+        "sender": "Nie od {domain}",
+        "from": "Odebrane {date} lub później",
+        "to": "Odebrane {date} lub wcześniej",
+        "remove": "Przywróć: {label}"
+      },
+      "draftBlocked": {
+        "tooMany": "Parser można przygotować z maksymalnie {max} wiadomości. Zaznacz {max} wiadomości lub mniej.",
+        "differentSenders": "Zaznaczone wiadomości pochodzą od różnych nadawców ({domains}). Parser odczytuje wiadomości jednego nadawcy, więc zaznacz wiadomości od jednego nadawcy.",
+        "skipped": "Nie można odczytać tej wiadomości, więc nie ma tekstu do przygotowania parsera. Usuń ją z zaznaczenia.",
+        "allMatching": "Parser przygotowuje się z wiadomości, które zaznaczasz sam. Maksymalnie {max}. Wyczyść to zaznaczenie i zaznacz do {max} wiadomości.",
+        "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami."
+      }
+    },
+    "pager": {
+      "itemName": "e-maili",
+      "total": "{count, plural, one {# e-mail} few {# e-maile} many {# e-maili} other {# e-maila}}",
+      "page": "Strona {page}"
     },
     "draft": {
       "failed": "Nie udało się rozpocząć przygotowywania parsera",
@@ -727,7 +838,48 @@
       "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami.",
       "chatPromptTrade": "Zbuduj profil transakcji dla {count, plural, one {tego potwierdzenia transakcji} few {tych # potwierdzeń transakcji} many {tych # potwierdzeń transakcji} other {tych # potwierdzeń transakcji}} od {domain}. Przejmij prośbę o przegląd AI {requestId}, przetestuj profil na każdej dołączonej wiadomości za pomocą narzędzia email_receipt_parsers, poprawiaj go, aż z każdej wiadomości zostanie odczytana pełna transakcja, a następnie zapisz go jako szkic dla prośby {requestId}."
     },
-    "tradeBadge": "Transakcja"
+    "tradeBadge": "Transakcja",
+    "bulkDialog": {
+      "delete": {
+        "title": "Usunąć wiadomości?",
+        "message": "{count, plural, one {Usunąć # wiadomość} few {Usunąć # wiadomości} many {Usunąć # wiadomości} other {Usunąć # wiadomości}}{scope, select, both { od {domain} ze statusem {status}} domain { od {domain}} status { ze statusem {status}} other {}}? Tej operacji nie można cofnąć. Aby zachować wiadomości i zabronić im proponowania zmian, wybierz zamiast tego „Zignoruj”. Wiadomości powiązane z transakcją zostają zachowane."
+      },
+      "ignore": {
+        "title": "Zignorować wiadomości?",
+        "message": "{count, plural, one {Zignorować # wiadomość} few {Zignorować # wiadomości} many {Zignorować # wiadomości} other {Zignorować # wiadomości}}{scope, select, both { od {domain} ze statusem {status}} domain { od {domain}} status { ze statusem {status}} other {}}? Wiadomości nie będą niczego proponować. Ich otwarte żądania przeglądu zostaną odrzucone. Wiadomości powiązane z transakcją pozostają bez zmian.",
+        "confirm": "Zignoruj"
+      },
+      "countChanged": "Liczba pasujących wiadomości wynosi teraz {count}. Nic nie zmieniono. Sprawdź liczbę i potwierdź ponownie.",
+      "approve": {
+        "title": "Zatwierdzić propozycje?",
+        "message": "{count, plural, one {Zatwierdzić # propozycję} few {Zatwierdzić # propozycje} many {Zatwierdzić # propozycji} other {Zatwierdzić # propozycji}}? Każdą zastosuje się tak, jak robi to przycisk Potwierdź w skrzynce przeglądu AI.",
+        "trades": "{count, plural, one {# wiadomość o transakcji giełdowej jest pominięta. Zatwierdź ją na jej karcie w skrzynce przeglądu AI.} few {# wiadomości o transakcjach giełdowych są pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.} many {# wiadomości o transakcjach giełdowych jest pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.} other {# wiadomości o transakcjach giełdowych jest pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.}}",
+        "confirm": "Zatwierdź"
+      },
+      "narrowedNote": "Wiadomości wyłączone z zaznaczenia pozostają bez zmian."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {Usunięto # wiadomość.} few {Usunięto # wiadomości.} many {Usunięto # wiadomości.} other {Usunięto # wiadomości.}}",
+        "ignored": "{count, plural, one {Zignorowano # wiadomość.} few {Zignorowano # wiadomości.} many {Zignorowano # wiadomości.} other {Zignorowano # wiadomości.}}",
+        "unchanged": "{count, plural, one {# wiadomość była już zignorowana.} few {# wiadomości były już zignorowane.} many {# wiadomości było już zignorowanych.} other {# wiadomości było już zignorowanych.}}",
+        "notIgnorable": "{count, plural, one {Nie można zignorować # wiadomości: nie można jej odczytać albo jej propozycja jest już zastosowana.} few {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.} many {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.} other {Nie można zignorować # wiadomości: nie można ich odczytać albo ich propozycje są już zastosowane.}}",
+        "skippedLinked": "{count, plural, one {Zachowano # wiadomość powiązaną z transakcją.} few {Zachowano # wiadomości powiązane z transakcją.} many {Zachowano # wiadomości powiązanych z transakcją.} other {Zachowano # wiadomości powiązanych z transakcją.}}",
+        "reprocessed": "{count, plural, one {Ponownie przetworzono # wiadomość.} few {Ponownie przetworzono # wiadomości.} many {Ponownie przetworzono # wiadomości.} other {Ponownie przetworzono # wiadomości.}}",
+        "restored": "{count, plural, one {Ponownie odczytano # zignorowaną wiadomość.} few {Ponownie odczytano # zignorowane wiadomości.} many {Ponownie odczytano # zignorowanych wiadomości.} other {Ponownie odczytano # zignorowanych wiadomości.}}",
+        "reprocessFailed": "{count, plural, one {# wiadomość nie powiodła się.} few {# wiadomości nie powiodły się.} many {# wiadomości nie powiodło się.} other {# wiadomości nie powiodło się.}}",
+        "stopped": "{count, plural, one {Zatrzymano. # wiadomość czeka na przetworzenie.} few {Zatrzymano. # wiadomości czekają na przetworzenie.} many {Zatrzymano. # wiadomości czeka na przetworzenie.} other {Zatrzymano. # wiadomości czeka na przetworzenie.}}",
+        "approved": "{count, plural, one {Zatwierdzono # propozycję.} few {Zatwierdzono # propozycje.} many {Zatwierdzono # propozycji.} other {Zatwierdzono # propozycji.}}",
+        "approveFailed": "{count, plural, one {# propozycji nie udało się zatwierdzić.} few {# propozycji nie udało się zatwierdzić.} many {# propozycji nie udało się zatwierdzić.} other {# propozycji nie udało się zatwierdzić.}}"
+      },
+      "deleteFailed": "Nie można usunąć wiadomości",
+      "ignoreFailed": "Nie można zignorować wiadomości",
+      "noneLeft": "Żadna wiadomość już nie pasuje. Nic nie zmieniono.",
+      "reprocessFailed": "Nie udało się ponownie przetworzyć wiadomości",
+      "approveFailed": "Nie udało się zatwierdzić propozycji",
+      "noApprovable": "W tym zaznaczeniu nie ma propozycji do zatwierdzenia.",
+      "narrowFailed": "Nie udało się policzyć wiadomości. Zmiana nie została zastosowana."
+    }
   },
   "detail": {
     "title": "Paragon z e-maila",

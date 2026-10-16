@@ -114,6 +114,73 @@
       },
       "deleted": "Buzón eliminado",
       "deleteFailed": "No se pudo eliminar el buzón"
+    },
+    "import": {
+      "title": "Importar correos archivados",
+      "description": "Un archivo conserva el remitente y la fecha de compra de la tienda, a diferencia de un correo reenviado. Suba correos exportados para leer confirmaciones de pedido antiguas.",
+      "fileLabel": "Archivos de correo (.eml, .mbox, .msg o .zip)",
+      "chooseFiles": "Elegir archivos",
+      "noFileChosen": "No se ha elegido ningún archivo",
+      "selected": "Seleccionados: {count}",
+      "button": "Importar",
+      "preparing": "Preparando los archivos...",
+      "sending": "Enviando la parte {current} de {total}",
+      "processing": "Procesando correos: {done} de {total}",
+      "cancel": "Cancelar",
+      "tooLargeTotal": "Los archivos seleccionados juntos superan {max}. Impórtelos en grupos más pequeños.",
+      "failed": "La importación falló",
+      "result": {
+        "heading": "Resultado de la importación",
+        "file": "{name}: {stored} guardados, {duplicates} duplicados, {skipped} omitidos",
+        "summary": "{processed, plural, one {Se procesó # correo en espera.} other {Se procesaron # correos en espera.}}",
+        "pendingLeft": "{count, plural, one {# correo sigue esperando a ser procesado. Monize lo procesa en la próxima lectura del buzón.} other {# correos siguen esperando a ser procesados. Monize los procesa en la próxima lectura del buzón.}}",
+        "processFailed": "{count, plural, one {No se pudo procesar # correo.} other {No se pudieron procesar # correos.}}",
+        "processingStopped": "Se detuvo el procesamiento de los correos importados. Los correos se conservan. Monize los procesa en la próxima lectura del buzón.",
+        "truncated": "{count} mensajes no se leyeron porque una importación tiene un límite. Impórtelos de nuevo en una segunda ejecución.",
+        "oversized": "{name}: no se enviaron {count} mensajes de más de {max}.",
+        "stopped": "La importación se detuvo después de {done} de {total} partes. Los correos ya importados se conservan. Importe los mismos archivos otra vez para continuar. Los correos ya importados no se guardan dos veces.",
+        "cancelled": "La importación se canceló después de {done} de {total} partes. Los correos ya importados se conservan.",
+        "errors": {
+          "unsupported_format": "{name}: este formato no es compatible. Los formatos compatibles son .eml, .mbox, .msg y .zip.",
+          "invalid_archive": "{name}: el archivo ZIP está dañado o no se puede leer.",
+          "archive_too_large": "{name}: el archivo ZIP descomprimido supera el límite de importación. Descomprímalo y suba el archivo .mbox que contiene.",
+          "empty": "{name}: el archivo no contiene correos."
+        },
+        "ignored": "{name}: se omitieron {count} otros archivos del archivo comprimido."
+      },
+      "guide": {
+        "toggle": "Cómo exportar correos desde su proveedor",
+        "gmailLabel": {
+          "title": "Gmail: todos los correos con una etiqueta",
+          "step1": "Abra takeout.google.com y elija «Anular la selección de todo».",
+          "step2": "Seleccione «Correo» y elija «Se incluyen todos los datos de Correo».",
+          "step3": "Elija solo su etiqueta y cree la exportación.",
+          "step4": "Suba el archivo .zip descargado tal como está, sin importar su tamaño. No necesita descomprimirlo."
+        },
+        "gmailOne": {
+          "title": "Gmail: un solo correo",
+          "step1": "Abra el correo.",
+          "step2": "Elija «Más» y después «Descargar mensaje».",
+          "step3": "Suba el archivo .eml."
+        },
+        "imap": {
+          "title": "Otros proveedores: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Añada el buzón a Thunderbird mediante IMAP e instale el complemento ImportExportTools NG.",
+          "step2": "Seleccione los correos o una carpeta y haga clic con el botón derecho.",
+          "step3": "Elija ImportExportTools NG y exporte como EML o como mbox.",
+          "step4": "Suba los archivos."
+        },
+        "outlook": {
+          "title": "Outlook de escritorio",
+          "body": "Seleccione los correos y arrástrelos a una carpeta de su disco. Outlook escribe archivos .msg. Suba varios a la vez o empaquetados en un solo archivo .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Elija «Buzón» y después «Exportar buzón». Apple Mail escribe una carpeta.",
+          "step2": "Suba el archivo llamado mbox dentro de la carpeta, o arrastre correos al Finder para obtener archivos .eml."
+        },
+        "tip": "Consejo: reenviar correos con un script pierde el remitente y la fecha de la tienda. Importar archivos los conserva."
+      }
     }
   },
   "parsers": {
@@ -711,11 +778,55 @@
     "selection": {
       "label": "Correos seleccionados",
       "select": "Seleccionar {subject}",
-      "selectAll": "Seleccionar todos los correos de esta lista (como máximo {max})",
-      "count": "{count, plural, one {# correo seleccionado} other {# correos seleccionados}} (como máximo {max})",
+      "selectAll": "Seleccionar todos los correos de esta lista",
+      "count": "{count, plural, one {# correo seleccionado} other {# correos seleccionados}}",
       "draftButton": "Preparar un perfil con IA ({count})",
       "clear": "Borrar selección",
-      "differentSenders": "Los correos seleccionados vienen de remitentes distintos ({domains}). Un perfil lee los correos de un solo remitente, así que selecciona correos de uno solo."
+      "deleteButton": "Eliminar ({count})",
+      "ignoreButton": "Ignorar ({count})",
+      "pageSelected": "Los {count} correos de esta página están seleccionados.",
+      "selectAllMatching": "Seleccionar los {total} correos que coinciden con este filtro.",
+      "allMatchingSelected": "Los {total} correos que coinciden con este filtro están seleccionados.",
+      "reprocessButton": "Reprocesar ({count})",
+      "restoreButton": "Restaurar ignorados ({count})",
+      "restoreButtonAll": "Restaurar ignorados",
+      "approveButton": "Aprobar propuestas ({count})",
+      "approveButtonAll": "Aprobar propuestas",
+      "progress": "Procesados: {processed}, pendientes: {remaining}",
+      "progressStarting": "Iniciando",
+      "stop": "Detener",
+      "narrowedSelected": "{total} correos seleccionados: todos los que coinciden con este filtro, salvo los excluidos más abajo.",
+      "deselect": {
+        "label": "Deseleccionar por",
+        "state": "Estado: {state}",
+        "sender": "Remitente: {domain}",
+        "before": "Recibidos antes de un día",
+        "after": "Recibidos después de un día",
+        "beforeLabel": "Deseleccionar correos recibidos antes del",
+        "afterLabel": "Deseleccionar correos recibidos después del",
+        "apply": "Deseleccionar",
+        "cancel": "Cancelar"
+      },
+      "exclusion": {
+        "label": "Excluidos de la selección",
+        "state": "Sin el estado {state}",
+        "sender": "Sin los de {domain}",
+        "from": "Recibidos el {date} o después",
+        "to": "Recibidos el {date} o antes",
+        "remove": "Volver a incluir: {label}"
+      },
+      "draftBlocked": {
+        "tooMany": "Un perfil se prepara con {max} correos como máximo. Selecciona {max} correos o menos.",
+        "differentSenders": "Los correos seleccionados vienen de remitentes distintos ({domains}). Un perfil lee los correos de un solo remitente, así que selecciona correos de uno solo.",
+        "skipped": "Un correo que no se pudo leer no tiene texto para preparar un perfil. Quítalo de la selección.",
+        "allMatching": "Un perfil se prepara con correos que seleccionas tú, como máximo {max}. Borra esta selección y selecciona hasta {max} correos.",
+        "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos."
+      }
+    },
+    "pager": {
+      "itemName": "correos",
+      "total": "{count, plural, one {# correo} other {# correos}}",
+      "page": "Página {page}"
     },
     "draft": {
       "failed": "No se pudo iniciar la redacción de un perfil",
@@ -727,7 +838,48 @@
       "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos.",
       "chatPromptTrade": "Crea un perfil de operaciones para {count, plural, one {esta confirmación de operación} other {estas # confirmaciones de operación}} de {domain}. Reclama la solicitud de revisión de IA {requestId}, prueba tu perfil con cada correo adjunto mediante la herramienta email_receipt_parsers, corrígelo hasta que de cada uno se lea una operación completa y guárdalo después como borrador para la solicitud {requestId}."
     },
-    "tradeBadge": "Operación"
+    "tradeBadge": "Operación",
+    "bulkDialog": {
+      "delete": {
+        "title": "¿Eliminar correos?",
+        "message": "¿{count, plural, one {Eliminar # correo} other {Eliminar # correos}}{scope, select, both { de {domain} en el estado {status}} domain { de {domain}} status { en el estado {status}} other {}}? No se puede deshacer. Para conservar los correos y evitar que propongan nada, elige «Ignorar». Los correos vinculados a una transacción se conservan."
+      },
+      "ignore": {
+        "title": "¿Ignorar correos?",
+        "message": "¿{count, plural, one {Ignorar # correo} other {Ignorar # correos}}{scope, select, both { de {domain} en el estado {status}} domain { de {domain}} status { en el estado {status}} other {}}? No propondrán nada y se descartarán sus solicitudes de revisión abiertas. Los correos vinculados a una transacción se dejan como están.",
+        "confirm": "Ignorar"
+      },
+      "countChanged": "El número de correos coincidentes es ahora {count}. No se cambió nada. Revisa el número y confirma de nuevo.",
+      "approve": {
+        "title": "¿Aprobar propuestas?",
+        "message": "{count, plural, one {¿Aprobar # propuesta} other {¿Aprobar # propuestas}}? Cada una se aplica como lo hace el botón Confirmar de la bandeja de revisión de IA.",
+        "trades": "{count, plural, one {# correo de operación queda fuera. Apruébelo en su tarjeta de la bandeja de revisión de IA.} other {# correos de operaciones quedan fuera. Apruébelos en sus tarjetas de la bandeja de revisión de IA.}}",
+        "confirm": "Aprobar"
+      },
+      "narrowedNote": "Los correos excluidos de la selección no se modifican."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# correo eliminado.} other {# correos eliminados.}}",
+        "ignored": "{count, plural, one {# correo ignorado.} other {# correos ignorados.}}",
+        "unchanged": "{count, plural, one {# correo ya estaba ignorado.} other {# correos ya estaban ignorados.}}",
+        "notIgnorable": "{count, plural, one {# correo no se pudo ignorar: no se pudo leer o su propuesta ya se aplicó.} other {# correos no se pudieron ignorar: no se pudieron leer o sus propuestas ya se aplicaron.}}",
+        "skippedLinked": "{count, plural, one {Se conservó # correo vinculado a una transacción.} other {Se conservaron # correos vinculados a una transacción.}}",
+        "reprocessed": "{count, plural, one {# correo reprocesado.} other {# correos reprocesados.}}",
+        "restored": "{count, plural, one {# correo ignorado leído de nuevo.} other {# correos ignorados leídos de nuevo.}}",
+        "reprocessFailed": "{count, plural, one {# correo falló.} other {# correos fallaron.}}",
+        "stopped": "{count, plural, one {Detenido. # correo quedó sin procesar.} other {Detenido. # correos quedaron sin procesar.}}",
+        "approved": "{count, plural, one {# propuesta aprobada.} other {# propuestas aprobadas.}}",
+        "approveFailed": "{count, plural, one {# propuesta no se pudo aprobar.} other {# propuestas no se pudieron aprobar.}}"
+      },
+      "deleteFailed": "No se pudieron eliminar los correos",
+      "ignoreFailed": "No se pudieron ignorar los correos",
+      "noneLeft": "Ya no coincide ningún correo. No se cambió nada.",
+      "reprocessFailed": "No se pudieron reprocesar los correos",
+      "approveFailed": "No se pudieron aprobar las propuestas",
+      "noApprovable": "Ninguna propuesta de esta selección se puede aprobar.",
+      "narrowFailed": "No se pudieron contar los correos. El cambio no se aplicó."
+    }
   },
   "detail": {
     "title": "Recibo por correo",

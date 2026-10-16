@@ -6,7 +6,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { EnvelopeIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { BulkConfirmDialog } from '@/components/email-receipts/BulkConfirmDialog';
 import { EmailReceiptDetailDialog } from '@/components/email-receipts/EmailReceiptDetailDialog';
+import { ReceiptBulkBar } from '@/components/email-receipts/ReceiptBulkBar';
 import { RetryFailedEmailsButton } from '@/components/email-receipts/RetryFailedEmailsButton';
 import { SelectAllCheckbox } from '@/components/email-receipts/SelectAllCheckbox';
 import { SenderDomainCloud } from '@/components/email-receipts/SenderDomainCloud';
@@ -16,10 +18,14 @@ import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge
 import { useParserDraftWithAi } from '@/components/email-receipts/useParserDraftWithAi';
 import { useProfileDiscardOffer } from '@/components/email-receipts/useProfileDiscardOffer';
 import { Badge } from '@/components/ui/Badge';
+import { useReceiptBulkActions } from '@/components/email-receipts/useReceiptBulkActions';
+import { useReceiptBulkProcessing } from '@/components/email-receipts/useReceiptBulkProcessing';
+import { useReceiptNarrowing } from '@/components/email-receipts/useReceiptNarrowing';
 import { Button, buttonClassName } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ListBottomPager } from '@/components/ui/ListBottomPager';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RowActions, type RowAction } from '@/components/ui/row-actions';
 import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
@@ -34,17 +40,19 @@ import {
   canRecognizeWithAi,
   canReprocessReceipt,
   distinctSenderDomains,
+  draftBlock,
   isReceiptActionable,
   normalizeDomainFilter,
-  parserDraftKind,
   senderDomain,
 } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
 import { leadActionKey, orderActionsForCard, type ReceiptActionKey } from '@/lib/receipt-row-actions';
 import { createLogger } from '@/lib/logger';
+import { deselects, isBulkApprovable, isTradeProposal, type Deselection } from '@/lib/receipt-selection';
 import {
   EMAIL_RECEIPT_STATUSES,
   PARSER_DRAFT_MAX_RECEIPTS,
+  type EmailReceiptBulkScope,
   type EmailReceiptDomainCount,
   type EmailReceiptListItem,
   type EmailReceiptStatus,
@@ -53,18 +61,31 @@ import {
 
 const logger = createLogger('EmailReceipts');
 
+/** Emails per page: the server's default limit, which the request leaves unsent, so only the offset is. */
+const PAGE_SIZE = 50;
+
+/** Sender domains the "Deselect by" menu lists for an "every email matching" selection (the biggest first, as the cloud orders them). */
+const MAX_DOMAIN_OPTIONS = 8;
+
 const FILTERS = ['all', ...EMAIL_RECEIPT_STATUSES] as const;
 type ReceiptFilter = (typeof FILTERS)[number];
 
 /** States from which the detail dialog can link the email to a transaction. */
 const LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['ambiguous', 'unmatched', 'no_parser', 'parse_failed'];
 
-
-/** The list answers one pair of filters (state and sender domain, `''` for all); `items === null` is a request that failed. */
+/** The list answers one pair of filters (state and sender domain, `''` for all) and one page of it; `items === null` is a request that failed. */
 interface LoadedList {
   filter: ReceiptFilter;
   domain: string;
+  page: number;
   items: EmailReceiptListItem[] | null;
+}
+
+/** How many emails match one pair of filters, as the server counts them (the same answer the state buttons read). */
+interface MatchingCount {
+  filter: ReceiptFilter;
+  domain: string;
+  total: number;
 }
 
 /** Whether the user has a mailbox, as far as it is known: `none` is a loaded answer of "no mailbox". */
@@ -97,8 +118,12 @@ interface Notice {
  * "Draft parser with AI" and "Recognize with AI" are the person's own request to
  * the assistant, offered whatever the mailbox's AI mode: the request is queued and
  * the chat is opened (or the request waits in the review inbox) rather than a
- * provider being called from here. Up to five emails can be selected and drafted
- * from together.
+ * provider being called from here.
+ *
+ * Any number of rows can be selected. A selection of every row on the page can be
+ * widened to every email matching the filter, which the server counts (`matching`);
+ * a bulk delete or ignore then names the filter, not ids. A profile is drafted from
+ * one to five emails of one sender only (`draftBlock` says why it is off).
  */
 export function EmailReceiptsManager() {
   const t = useTranslations('emailReceipts.receipts');
@@ -115,6 +140,8 @@ export function EmailReceiptsManager() {
   // The sender domain filter starts from `?domain=` and is written back to it;
   // a value that is no host name is no filter.
   const [domain, setDomain] = useState<string>(() => normalizeDomainFilter(searchParams.get('domain')));
+  // The page of the list (1-based). It belongs to the filters: every handler that changes one returns to page 1.
+  const [page, setPage] = useState(1);
   // The sender domains with their counts for the filter; null while unknown or failed (the select then offers only "All" and the current one).
   const [domains, setDomains] = useState<EmailReceiptDomainCount[] | null>(null);
   // The same counts within the state the reader is on, for every state but "All"; null while unknown or failed.
@@ -123,9 +150,12 @@ export function EmailReceiptsManager() {
   const [counts, setCounts] = useState<EmailReceiptStatusCounts | null>(null);
   const [loaded, setLoaded] = useState<LoadedList | null>(null);
   const [mailbox, setMailbox] = useState<MailboxState>({ status: 'loading' });
-  // The emails ticked for "Draft parser with AI", by id. Only ids of the list on
-  // screen count (`selected` below), and a change of filter clears the set.
+  // The emails ticked, by id. Only ids of the list on screen count (`selected`
+  // below), and a change of filter clears the set.
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // How many emails match the filter (null while unknown or failed), and whether the selection is all of them (the count it was chosen with) rather than the ticked rows.
+  const [matching, setMatching] = useState<MatchingCount | null>(null);
+  const [allMatching, setAllMatching] = useState<number | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -141,25 +171,37 @@ export function EmailReceiptsManager() {
   const latestDomains = useRef(0);
   const latestCloud = useRef(0);
   const latestCounts = useRef(0);
-  const currentFilters = useRef({ filter, domain });
+  const latestMatching = useRef(0);
+  const currentFilters = useRef({ filter, domain, page });
   useEffect(() => {
-    currentFilters.current = { filter, domain };
-  }, [filter, domain]);
+    currentFilters.current = { filter, domain, page };
+  }, [filter, domain, page]);
 
-  const load = useCallback(async (forFilter: ReceiptFilter, forDomain: string) => {
+  const load = useCallback(async (forFilter: ReceiptFilter, forDomain: string, forPage: number) => {
     const request = ++latestLoad.current;
+    const status = forFilter === 'all' ? undefined : forFilter;
+    const sender = forDomain === '' ? undefined : forDomain;
     try {
-      const items = await emailReceiptsApi.receipts.list(
-        forFilter === 'all' ? undefined : forFilter,
-        undefined,
-        forDomain === '' ? undefined : forDomain,
-      );
+      const items = await emailReceiptsApi.receipts.list(status, undefined, sender, (forPage - 1) * PAGE_SIZE);
       if (request !== latestLoad.current) return;
-      setLoaded({ filter: forFilter, domain: forDomain, items });
+      if (items.length === 0 && forPage > 1) {
+        // The page no longer exists (its emails were deleted or left the filter): go to the last one that does.
+        let lastPage = forPage - 1;
+        try {
+          const total = await emailReceiptsApi.receipts.countMatching(status, sender);
+          lastPage = Math.max(1, Math.min(lastPage, Math.ceil(total / PAGE_SIZE)));
+        } catch (error) {
+          logger.error(error);
+        }
+        if (request !== latestLoad.current) return;
+        setPage(lastPage);
+        return;
+      }
+      setLoaded({ filter: forFilter, domain: forDomain, page: forPage, items });
     } catch (error) {
       if (request !== latestLoad.current) return;
       logger.error(error);
-      setLoaded({ filter: forFilter, domain: forDomain, items: null });
+      setLoaded({ filter: forFilter, domain: forDomain, page: forPage, items: null });
     }
   }, []);
 
@@ -206,19 +248,42 @@ export function EmailReceiptsManager() {
     }
   }, []);
 
+  /** How many emails match the filter; a failed read leaves it unknown, so no "select all N" is offered. */
+  const loadMatching = useCallback(async (forFilter: ReceiptFilter, forDomain: string) => {
+    const request = ++latestMatching.current;
+    try {
+      const total = await emailReceiptsApi.receipts.countMatching(
+        forFilter === 'all' ? undefined : forFilter,
+        forDomain === '' ? undefined : forDomain,
+      );
+      if (request !== latestMatching.current) return;
+      setMatching({ filter: forFilter, domain: forDomain, total });
+    } catch (error) {
+      if (request !== latestMatching.current) return;
+      logger.error(error);
+      setMatching(null);
+    }
+  }, []);
+
   // After a command or a change the list, the state counts and the domain counts are read again.
   const reload = useCallback(async () => {
     void loadDomains();
     void loadCounts();
+    void loadMatching(currentFilters.current.filter, currentFilters.current.domain);
     void loadCloud(currentFilters.current.filter);
-    await load(currentFilters.current.filter, currentFilters.current.domain);
-  }, [load, loadDomains, loadCounts, loadCloud]);
+    await load(currentFilters.current.filter, currentFilters.current.domain, currentFilters.current.page);
+  }, [load, loadDomains, loadCounts, loadCloud, loadMatching]);
   // A profile made here that ignores or deletes its emails offers to do so to the stored ones it matches.
   const discardOffer = useProfileDiscardOffer(() => void reload());
 
   useEffect(() => {
-    void load(filter, domain);
-  }, [filter, domain, load]);
+    void load(filter, domain, page);
+  }, [filter, domain, page, load]);
+
+  // The total belongs to the filters alone, so turning a page does not count again.
+  useEffect(() => {
+    void loadMatching(filter, domain);
+  }, [filter, domain, loadMatching]);
 
   useEffect(() => {
     void loadDomains();
@@ -229,9 +294,40 @@ export function EmailReceiptsManager() {
     void loadCloud(filter);
   }, [filter, loadCloud]);
 
+  // What was taken out of an "every email matching" selection, and the number it leaves.
+  const narrowBase = useMemo(
+    () => ({ ...(filter === 'all' ? {} : { status: filter }), ...(domain === '' ? {} : { domain }) }),
+    [filter, domain],
+  );
+  const narrowing = useReceiptNarrowing({
+    base: narrowBase,
+    onEmpty: () => {
+      setSelectedIds(new Set());
+      setAllMatching(null);
+    },
+  });
+  const resetNarrowing = narrowing.reset;
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setAllMatching(null);
+    resetNarrowing();
+  }, [resetNarrowing]);
+
+  // Ticked rows belong to the page they are on; "every email matching the filter" covers all pages and survives paging.
+  const changePage = (next: number) => {
+    setPage(next);
+    setSelectedIds(new Set());
+  };
+
+  const bulk = useReceiptBulkActions({ reload, onDone: clearSelection });
+  const processing = useReceiptBulkProcessing({ reload, onDone: clearSelection });
+  const locked = bulk.running || processing.running;
+
   const changeDomain = (next: string) => {
     setDomain(next);
-    setSelectedIds(new Set());
+    setPage(1);
+    clearSelection();
     const params = new URLSearchParams(searchParams.toString());
     // Without a domain a legacy `/email-receipts?domain=` link would fall back to the Overview, so the tab is named.
     params.set('tab', 'emails');
@@ -305,15 +401,15 @@ export function EmailReceiptsManager() {
       const outcome = await startParserDraft(receipts);
       if (outcome.kind === 'failed') {
         setNotice({ tone: 'error', text: outcome.message });
-      } else if (outcome.kind === 'queued') {
-        setNotice({
-          tone: 'success',
-          text: outcome.handoffFailed ? t('draft.handoffFailed') : t('draft.queued'),
-          link: { href: '/ai-reviews', label: t('draft.inboxLink') },
-        });
-        setSelectedIds(new Set());
       } else {
-        setSelectedIds(new Set());
+        if (outcome.kind === 'queued') {
+          setNotice({
+            tone: 'success',
+            text: outcome.handoffFailed ? t('draft.handoffFailed') : t('draft.queued'),
+            link: { href: '/ai-reviews', label: t('draft.inboxLink') },
+          });
+        }
+        clearSelection();
       }
     } finally {
       setDrafting(false);
@@ -340,13 +436,15 @@ export function EmailReceiptsManager() {
     );
   };
 
-  const toggleSelected = (receipt: EmailReceiptListItem) =>
-    setSelectedIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(receipt.id)) next.delete(receipt.id);
-      else if (next.size < PARSER_DRAFT_MAX_RECEIPTS) next.add(receipt.id);
-      return next;
-    });
+  // Ticking or unticking a row leaves "every email matching the filter": what is selected is then the rows.
+  const toggleSelected = (receipt: EmailReceiptListItem) => {
+    const next = new Set(allMatching !== null ? pageItems.map((row) => row.id) : selectedIds);
+    if (next.has(receipt.id)) next.delete(receipt.id);
+    else next.add(receipt.id);
+    setAllMatching(null);
+    resetNarrowing();
+    setSelectedIds(next);
+  };
 
   const handleConfirm = async () => {
     const target = confirmation;
@@ -484,22 +582,88 @@ export function EmailReceiptsManager() {
     return orderActionsForCard(actions, leadActionKey(filter, receipt));
   };
 
-  const current = loaded !== null && loaded.filter === filter && loaded.domain === domain ? loaded : null;
+  const current =
+    loaded !== null && loaded.filter === filter && loaded.domain === domain && loaded.page === page ? loaded : null;
+  const pageItems = current?.items ?? [];
   // What is ticked AND still on screen: an email a reload dropped is not selected.
-  const selected = (current?.items ?? []).filter((receipt) => selectedIds.has(receipt.id));
+  const selected = pageItems.filter((receipt) => selectedIds.has(receipt.id));
   const selectedDomains = distinctSenderDomains(selected);
-  // One profile reads one kind of email: trade confirmations and order emails are never drafted together.
-  const selectedMixed = parserDraftKind(selected) === 'mixed';
+  const matchingTotal = matching !== null && matching.filter === filter && matching.domain === domain ? matching.total : null;
+  // The narrowed number once exclusions are on; until its count arrives the unnarrowed one stands in and the commands wait (`narrowing.pending`).
+  const allMatchingCount =
+    allMatching !== null ? ((narrowing.active ? narrowing.count : null) ?? matchingTotal ?? allMatching) : null;
+
+  // Pages come from the total the server counted for this filter. Unknown (the count failed) is not zero: Next stays open while the page came back full.
+  const totalPages = matchingTotal !== null ? Math.max(1, Math.ceil(matchingTotal / PAGE_SIZE)) : null;
+  const unknownTotalPager =
+    matchingTotal === null && current !== null && current.items !== null && (page > 1 || current.items.length >= PAGE_SIZE)
+      ? current.items
+      : null;
 
   // The tag cloud counts within the state on screen; "All" reads the unfiltered list.
   const cloudDomains = filter === 'all' ? domains : cloud !== null && cloud.filter === filter ? cloud.items : null;
 
-  // Which emails the header checkbox covers: the selectable ones, as many as a draft may hold.
-  const selectable = (current?.items ?? []).filter((receipt) => receipt.status !== 'skipped').slice(0, PARSER_DRAFT_MAX_RECEIPTS);
-  const allSelected = selectable.length > 0 && selectable.every((receipt) => selectedIds.has(receipt.id));
-  const someSelected = selected.length > 0 && !allSelected;
+  // The header checkbox covers every row of the page.
+  const isChecked = (receipt: EmailReceiptListItem) => allMatching !== null || selectedIds.has(receipt.id);
+  const allSelected = pageItems.length > 0 && pageItems.every(isChecked);
+  const someSelected = (allMatching !== null || selected.length > 0) && !allSelected;
+  // Gmail style: a full page, and more emails matching the filter than the page holds.
+  const canSelectAllMatching = allMatching === null && allSelected && matchingTotal !== null && matchingTotal > pageItems.length;
 
-  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(selectable.map((receipt) => receipt.id)));
+  const toggleAll = () => {
+    clearSelection();
+    if (!allSelected) setSelectedIds(new Set(pageItems.map((receipt) => receipt.id)));
+  };
+
+  const askBulk = (action: 'delete' | 'ignore') =>
+    allMatchingCount !== null
+      ? bulk.ask(action, { filter: narrowing.filter }, allMatchingCount)
+      : bulk.ask(action, { ids: selected.map((receipt) => receipt.id) }, selected.length);
+
+  // Every command names the same emails: the ticked ids, or the filter with what was taken out of it.
+  const bulkScope = (): EmailReceiptBulkScope =>
+    allMatching !== null ? { filter: narrowing.filter } : { ids: selected.map((receipt) => receipt.id) };
+
+  const approvableSelected = selected.filter(isBulkApprovable);
+  const ignoredSelected = selected.filter((receipt) => receipt.status === 'ignored').length;
+  const excludedStatuses = narrowing.exclusions.statuses;
+  // An "every email matching" selection can hold what its state filter and exclusions leave in.
+  const canHoldState = (status: EmailReceiptStatus) =>
+    (filter === 'all' || filter === status) && !excludedStatuses.includes(status);
+
+  const handleBulkApprove = () =>
+    allMatching !== null
+      ? void processing.askApprovalFor({ filter: narrowing.filter })
+      : processing.offerApproval({
+          requestIds: approvableSelected.flatMap((receipt) => (receipt.aiReviewRequestId ? [receipt.aiReviewRequestId] : [])),
+          trades: selected.filter(isTradeProposal).length,
+        });
+
+  // Ticked rows are judged by their own state, sender and day; "every email matching" is narrowed on the server.
+  const handleDeselect = (deselection: Deselection) => {
+    if (allMatching !== null) {
+      narrowing.narrow(deselection);
+      return;
+    }
+    setSelectedIds(new Set(selected.filter((receipt) => !deselects(receipt, deselection)).map((receipt) => receipt.id)));
+  };
+
+  const statusOptions: EmailReceiptStatus[] =
+    allMatching === null
+      ? EMAIL_RECEIPT_STATUSES.filter((status) => selected.some((receipt) => receipt.status === status))
+      : filter !== 'all' || counts === null
+        ? []
+        : EMAIL_RECEIPT_STATUSES.filter((status) => (counts[status] ?? 0) > 0 && !excludedStatuses.includes(status));
+  const excludedDomains = narrowing.exclusions.domains;
+  const domainOptions: string[] =
+    allMatching === null
+      ? selectedDomains
+      : domain !== ''
+        ? []
+        : (cloudDomains ?? [])
+            .map((item) => item.domain)
+            .filter((name) => !excludedDomains.includes(name))
+            .slice(0, MAX_DOMAIN_OPTIONS);
 
   /** The label of a state's button: its name with how many emails are in it, when that is known. */
   const filterLabel = (option: ReceiptFilter) => {
@@ -556,8 +720,8 @@ export function EmailReceiptsManager() {
                 <SelectAllCheckbox
                   checked={allSelected}
                   indeterminate={someSelected}
-                  disabled={drafting || selectable.length === 0}
-                  label={t('selection.selectAll', { max: PARSER_DRAFT_MAX_RECEIPTS })}
+                  disabled={drafting || locked}
+                  label={t('selection.selectAll')}
                   onChange={toggleAll}
                 />
               </Th>
@@ -599,14 +763,8 @@ export function EmailReceiptsManager() {
                   <Td className="px-2 align-top sm:px-4">
                     <input
                       type="checkbox"
-                      checked={selectedIds.has(receipt.id)}
-                      // A skipped email has no text to write a parser from, and at
-                      // most five are drafted from together.
-                      disabled={
-                        drafting ||
-                        receipt.status === 'skipped' ||
-                        (!selectedIds.has(receipt.id) && selected.length >= PARSER_DRAFT_MAX_RECEIPTS)
-                      }
+                      checked={isChecked(receipt)}
+                      disabled={drafting || locked}
                       onChange={() => toggleSelected(receipt)}
                       aria-label={t('selection.select', { subject: receipt.subject })}
                       className="h-4 w-4 cursor-pointer rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600"
@@ -676,7 +834,8 @@ export function EmailReceiptsManager() {
               aria-pressed={filter === option}
               onClick={() => {
                 setFilter(option);
-                setSelectedIds(new Set());
+                setPage(1);
+                clearSelection();
               }}
               className={segmentClass(filter === option)}
             >
@@ -720,40 +879,75 @@ export function EmailReceiptsManager() {
         </div>
       )}
 
-      {selected.length > 0 && (
-        <div
-          role="region"
-          aria-label={t('selection.label')}
-          className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-900/60 dark:bg-blue-900/20 dark:text-blue-100"
-        >
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span>{t('selection.count', { count: selected.length, max: PARSER_DRAFT_MAX_RECEIPTS })}</span>
-            <Button
-              isLoading={drafting}
-              disabled={drafting || selectedMixed}
-              aria-describedby={selectedMixed ? 'receipts-selection-mixed' : undefined}
-              onClick={() => void handleDraftParser(selected)}
-            >
-              {t('selection.draftButton', { count: selected.length })}
-            </Button>
-            <Button variant="outline" disabled={drafting} onClick={() => setSelectedIds(new Set())}>
-              {t('selection.clear')}
-            </Button>
-          </div>
-          {selectedMixed && (
-            <p id="receipts-selection-mixed" role="alert" className="text-amber-800 dark:text-amber-200">
-              {t('draft.mixedKinds')}
-            </p>
-          )}
-          {selectedDomains.length > 1 && (
-            <p role="alert" className="text-amber-800 dark:text-amber-200">
-              {t('selection.differentSenders', { domains: selectedDomains.join(', ') })}
-            </p>
-          )}
-        </div>
+      {(allMatching !== null || selected.length > 0) && (
+        <ReceiptBulkBar
+          count={allMatchingCount ?? selected.length}
+          allMatching={allMatching !== null}
+          pageCount={pageItems.length}
+          matchingTotal={matchingTotal}
+          canSelectAllMatching={canSelectAllMatching}
+          draftBlock={draftBlock(selected, PARSER_DRAFT_MAX_RECEIPTS, allMatching !== null)}
+          senderDomains={selectedDomains}
+          busy={locked}
+          drafting={drafting}
+          countPending={narrowing.pending}
+          progress={processing.progress}
+          restore={
+            allMatching !== null
+              ? { visible: canHoldState('ignored'), count: null }
+              : { visible: ignoredSelected > 0, count: ignoredSelected }
+          }
+          approve={
+            allMatching !== null
+              ? { visible: canHoldState('review'), count: null }
+              : { visible: approvableSelected.length > 0, count: approvableSelected.length }
+          }
+          statusOptions={statusOptions}
+          domainOptions={domainOptions}
+          exclusions={narrowing.exclusions}
+          onSelectAllMatching={() => setAllMatching(matchingTotal)}
+          onReprocess={() => void processing.reprocess(bulkScope(), 'reprocess')}
+          onRestore={() => void processing.reprocess(bulkScope(), 'restore')}
+          onApprove={handleBulkApprove}
+          onStop={processing.stop}
+          onDeselect={handleDeselect}
+          onChangeExclusions={narrowing.restore}
+          onDelete={() => askBulk('delete')}
+          onIgnore={() => askBulk('ignore')}
+          onDraft={() => void handleDraftParser(selected)}
+          onClear={clearSelection}
+        />
       )}
 
       <Card className="overflow-hidden">{body}</Card>
+
+      {totalPages !== null && matchingTotal !== null && (
+        <ListBottomPager
+          currentPage={Math.min(page, totalPages)}
+          totalPages={totalPages}
+          totalItems={matchingTotal}
+          pageSize={PAGE_SIZE}
+          onPageChange={changePage}
+          itemName={t('pager.itemName')}
+          totalLabel={t('pager.total', { count: matchingTotal })}
+        />
+      )}
+      {unknownTotalPager !== null && (
+        <div className="flex items-center justify-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => changePage(page - 1)}>
+            {tc('pagination.previousPage')}
+          </Button>
+          <span>{t('pager.page', { page })}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={unknownTotalPager.length < PAGE_SIZE}
+            onClick={() => changePage(page + 1)}
+          >
+            {tc('pagination.nextPage')}
+          </Button>
+        </div>
+      )}
 
       {detailId !== null && (
         <EmailReceiptDetailDialog
@@ -798,6 +992,32 @@ export function EmailReceiptsManager() {
           onChanged={() => void reload()}
         />
       )}
+
+      <BulkConfirmDialog
+        request={bulk.request}
+        running={bulk.running}
+        onConfirm={() => void bulk.confirm()}
+        onCancel={bulk.cancel}
+      />
+
+      <ConfirmDialog
+        isOpen={processing.approval !== null}
+        title={t('bulkDialog.approve.title')}
+        message={
+          processing.approval === null
+            ? ''
+            : [
+                t('bulkDialog.approve.message', { count: processing.approval.requestIds.length }),
+                ...(processing.approval.trades > 0
+                  ? [t('bulkDialog.approve.trades', { count: processing.approval.trades })]
+                  : []),
+              ].join(' ')
+        }
+        confirmLabel={t('bulkDialog.approve.confirm')}
+        variant="info"
+        onConfirm={() => void processing.confirmApproval()}
+        onCancel={processing.cancelApproval}
+      />
 
       <ConfirmDialog
         isOpen={confirmation !== null}

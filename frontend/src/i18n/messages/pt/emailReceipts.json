@@ -114,6 +114,73 @@
       },
       "deleted": "Caixa de correio eliminada",
       "deleteFailed": "Não foi possível eliminar a caixa de correio"
+    },
+    "import": {
+      "title": "Importar e-mails arquivados",
+      "description": "Um ficheiro mantém o remetente e a data de compra da loja, ao contrário de um e-mail reencaminhado. Carregue e-mails exportados para ler confirmações de encomenda antigas.",
+      "fileLabel": "Ficheiros de e-mail (.eml, .mbox, .msg ou .zip)",
+      "chooseFiles": "Escolher ficheiros",
+      "noFileChosen": "Nenhum ficheiro escolhido",
+      "selected": "Selecionados: {count}",
+      "button": "Importar",
+      "preparing": "A preparar os ficheiros...",
+      "sending": "A enviar a parte {current} de {total}",
+      "processing": "A processar e-mails: {done} de {total}",
+      "cancel": "Cancelar",
+      "tooLargeTotal": "Os ficheiros selecionados em conjunto excedem {max}. Importe-os em grupos mais pequenos.",
+      "failed": "A importação falhou",
+      "result": {
+        "heading": "Resultado da importação",
+        "file": "{name}: {stored} guardados, {duplicates} duplicados, {skipped} ignorados",
+        "summary": "{processed, plural, one {Processado # e-mail em espera.} other {Processados # e-mails em espera.}}",
+        "pendingLeft": "{count, plural, one {# e-mail ainda aguarda processamento. O Monize processa-o na próxima leitura da caixa de correio.} other {# e-mails ainda aguardam processamento. O Monize processa-os na próxima leitura da caixa de correio.}}",
+        "processFailed": "{count, plural, one {Não foi possível processar # e-mail.} other {Não foi possível processar # e-mails.}}",
+        "processingStopped": "O processamento dos e-mails importados parou. Os e-mails foram mantidos. O Monize processa-os na próxima leitura da caixa de correio.",
+        "truncated": "{count} mensagens não foram lidas porque uma importação tem um limite. Importe-as de novo numa segunda execução.",
+        "oversized": "{name}: {count} mensagens maiores do que {max} não foram enviadas.",
+        "stopped": "A importação parou após {done} de {total} partes. Os e-mails já importados são mantidos. Importe os mesmos ficheiros outra vez para continuar. Os e-mails já importados não são guardados duas vezes.",
+        "cancelled": "A importação foi cancelada após {done} de {total} partes. Os e-mails já importados são mantidos.",
+        "errors": {
+          "unsupported_format": "{name}: este formato não é suportado. Os formatos suportados são .eml, .mbox, .msg e .zip.",
+          "invalid_archive": "{name}: o ficheiro ZIP está danificado ou não pode ser lido.",
+          "archive_too_large": "{name}: o ficheiro ZIP descomprimido excede o limite de importação. Descomprima-o e carregue o ficheiro .mbox que contém.",
+          "empty": "{name}: o ficheiro não contém e-mails."
+        },
+        "ignored": "{name}: {count} outros ficheiros do arquivo foram ignorados."
+      },
+      "guide": {
+        "toggle": "Como exportar e-mails do seu fornecedor",
+        "gmailLabel": {
+          "title": "Gmail: todos os e-mails com uma etiqueta",
+          "step1": "Abra takeout.google.com e escolha \"Deselect all\".",
+          "step2": "Selecione \"Mail\" e escolha \"All Mail data included\".",
+          "step3": "Escolha apenas a sua etiqueta e crie a exportação.",
+          "step4": "Carregue o ficheiro .zip transferido tal como está, qualquer que seja o seu tamanho. Não precisa de o descompactar."
+        },
+        "gmailOne": {
+          "title": "Gmail: um e-mail",
+          "step1": "Abra o e-mail.",
+          "step2": "Escolha \"Mais\" e depois \"Transferir mensagem\".",
+          "step3": "Carregue o ficheiro .eml."
+        },
+        "imap": {
+          "title": "Outros fornecedores: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Adicione a caixa de correio ao Thunderbird por IMAP e instale o suplemento ImportExportTools NG.",
+          "step2": "Selecione os e-mails ou uma pasta e clique com o botão direito.",
+          "step3": "Escolha ImportExportTools NG e depois exporte como EML ou como mbox.",
+          "step4": "Carregue os ficheiros."
+        },
+        "outlook": {
+          "title": "Outlook para computador",
+          "body": "Selecione os e-mails e arraste-os para uma pasta no disco. O Outlook escreve ficheiros .msg. Carregue-os, vários de uma vez ou agrupados num único ficheiro .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Escolha \"Caixa de Correio\" e depois \"Exportar Caixa de Correio\". O Apple Mail escreve uma pasta.",
+          "step2": "Carregue o ficheiro chamado mbox dentro da pasta, ou arraste e-mails para o Finder para obter ficheiros .eml."
+        },
+        "tip": "Dica: reencaminhar e-mails com um script perde o remetente e a data da loja. Importar ficheiros mantém-nos."
+      }
     }
   },
   "parsers": {
@@ -711,11 +778,55 @@
     "selection": {
       "label": "E-mails selecionados",
       "select": "Selecionar {subject}",
-      "selectAll": "Selecionar todos os e-mails nesta lista (no máximo {max})",
-      "count": "{count, plural, one {# e-mail selecionado} other {# e-mails selecionados}} (no máximo {max})",
+      "selectAll": "Selecionar todos os e-mails desta lista",
+      "count": "{count, plural, one {# e-mail selecionado} other {# e-mails selecionados}}",
       "draftButton": "Redigir analisador com IA ({count})",
       "clear": "Limpar seleção",
-      "differentSenders": "Os e-mails selecionados vêm de remetentes diferentes ({domains}). Um analisador lê os e-mails de um só remetente, por isso selecione e-mails de um único remetente."
+      "deleteButton": "Eliminar ({count})",
+      "ignoreButton": "Ignorar ({count})",
+      "pageSelected": "Todos os {count} e-mails desta página estão selecionados.",
+      "selectAllMatching": "Selecionar todos os {total} e-mails que correspondem a este filtro.",
+      "allMatchingSelected": "Todos os {total} e-mails que correspondem a este filtro estão selecionados.",
+      "reprocessButton": "Reprocessar ({count})",
+      "restoreButton": "Restaurar ignorados ({count})",
+      "restoreButtonAll": "Restaurar ignorados",
+      "approveButton": "Aprovar propostas ({count})",
+      "approveButtonAll": "Aprovar propostas",
+      "progress": "Processados: {processed}, restantes: {remaining}",
+      "progressStarting": "A iniciar",
+      "stop": "Parar",
+      "narrowedSelected": "{total} e-mails selecionados: todos os que correspondem a este filtro, exceto os excluídos abaixo.",
+      "deselect": {
+        "label": "Desmarcar por",
+        "state": "Estado: {state}",
+        "sender": "Remetente: {domain}",
+        "before": "Recebidos antes de um dia",
+        "after": "Recebidos depois de um dia",
+        "beforeLabel": "Desmarcar e-mails recebidos antes de",
+        "afterLabel": "Desmarcar e-mails recebidos depois de",
+        "apply": "Desmarcar",
+        "cancel": "Cancelar"
+      },
+      "exclusion": {
+        "label": "Retirados da seleção",
+        "state": "Não no estado {state}",
+        "sender": "Não de {domain}",
+        "from": "Recebidos em {date} ou depois",
+        "to": "Recebidos em {date} ou antes",
+        "remove": "Repor: {label}"
+      },
+      "draftBlocked": {
+        "tooMany": "Um analisador é preparado com, no máximo, {max} e-mails. Selecione {max} e-mails ou menos.",
+        "differentSenders": "Os e-mails selecionados vêm de remetentes diferentes ({domains}). Um analisador lê os e-mails de um só remetente, por isso selecione e-mails de um único remetente.",
+        "skipped": "Um e-mail que não foi possível ler não tem texto para preparar um analisador. Retire-o da seleção.",
+        "allMatching": "Um analisador é preparado com e-mails que selecionar, no máximo {max}. Limpe esta seleção e selecione até {max} e-mails.",
+        "mixedKinds": "Os e-mails selecionados misturam confirmações de negociação e e-mails de encomenda. Um perfil lê um só tipo, por isso selecione apenas confirmações de negociação ou apenas e-mails de encomenda."
+      }
+    },
+    "pager": {
+      "itemName": "e-mails",
+      "total": "{count, plural, one {# e-mail} other {# e-mails}}",
+      "page": "Página {page}"
     },
     "draft": {
       "failed": "Não foi possível iniciar a redação de um analisador",
@@ -727,7 +838,48 @@
       "mixedKinds": "Os e-mails selecionados misturam confirmações de negociação e e-mails de encomenda. Um perfil lê um só tipo, por isso selecione apenas confirmações de negociação ou apenas e-mails de encomenda.",
       "chatPromptTrade": "Crie um perfil de negociações para {count, plural, one {esta confirmação de negociação} other {estas # confirmações de negociação}} de {domain}. Reclame o pedido de revisão de IA {requestId}, teste o seu perfil em cada e-mail anexado com a ferramenta email_receipt_parsers, corrija-o até que de cada um se leia uma negociação completa e depois guarde-o como rascunho para o pedido {requestId}."
     },
-    "tradeBadge": "Negociação"
+    "tradeBadge": "Negociação",
+    "bulkDialog": {
+      "delete": {
+        "title": "Eliminar e-mails?",
+        "message": "{count, plural, one {Eliminar # e-mail} other {Eliminar # e-mails}}{scope, select, both { de {domain} no estado {status}} domain { de {domain}} status { no estado {status}} other {}}? Esta ação não pode ser anulada. Para manter os e-mails e impedir que proponham algo, escolha antes «Ignorar». Os e-mails associados a uma transação são mantidos."
+      },
+      "ignore": {
+        "title": "Ignorar e-mails?",
+        "message": "{count, plural, one {Ignorar # e-mail} other {Ignorar # e-mails}}{scope, select, both { de {domain} no estado {status}} domain { de {domain}} status { no estado {status}} other {}}? Não vão propor nada e os pedidos de revisão abertos serão dispensados. Os e-mails associados a uma transação ficam como estão.",
+        "confirm": "Ignorar"
+      },
+      "countChanged": "O número de e-mails correspondentes é agora {count}. Nada foi alterado. Verifique o número e confirme de novo.",
+      "approve": {
+        "title": "Aprovar propostas?",
+        "message": "{count, plural, one {Aprovar # proposta} other {Aprovar # propostas}}? Cada uma é aplicada como o botão Confirmar da caixa de revisão de IA.",
+        "trades": "{count, plural, one {# e-mail de operação fica de fora. Aprove-o no cartão dele na caixa de revisão de IA.} other {# e-mails de operações ficam de fora. Aprove-os nos cartões deles na caixa de revisão de IA.}}",
+        "confirm": "Aprovar"
+      },
+      "narrowedNote": "Os e-mails retirados da seleção não são alterados."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# e-mail eliminado.} other {# e-mails eliminados.}}",
+        "ignored": "{count, plural, one {# e-mail ignorado.} other {# e-mails ignorados.}}",
+        "unchanged": "{count, plural, one {# e-mail já estava ignorado.} other {# e-mails já estavam ignorados.}}",
+        "notIgnorable": "{count, plural, one {# e-mail não pôde ser ignorado: não foi possível lê-lo ou a proposta já foi aplicada.} other {# e-mails não puderam ser ignorados: não foi possível lê-los ou as propostas já foram aplicadas.}}",
+        "skippedLinked": "{count, plural, one {# e-mail associado a uma transação foi mantido.} other {# e-mails associados a uma transação foram mantidos.}}",
+        "reprocessed": "{count, plural, one {# e-mail reprocessado.} other {# e-mails reprocessados.}}",
+        "restored": "{count, plural, one {# e-mail ignorado lido de novo.} other {# e-mails ignorados lidos de novo.}}",
+        "reprocessFailed": "{count, plural, one {# e-mail falhou.} other {# e-mails falharam.}}",
+        "stopped": "{count, plural, one {Parado. # e-mail ficou por processar.} other {Parado. # e-mails ficaram por processar.}}",
+        "approved": "{count, plural, one {# proposta aprovada.} other {# propostas aprovadas.}}",
+        "approveFailed": "{count, plural, one {# proposta não pôde ser aprovada.} other {# propostas não puderam ser aprovadas.}}"
+      },
+      "deleteFailed": "Não foi possível eliminar os e-mails",
+      "ignoreFailed": "Não foi possível ignorar os e-mails",
+      "noneLeft": "Já nenhum e-mail corresponde. Nada foi alterado.",
+      "reprocessFailed": "Não foi possível reprocessar os e-mails",
+      "approveFailed": "Não foi possível aprovar as propostas",
+      "noApprovable": "Nenhuma proposta desta seleção pode ser aprovada.",
+      "narrowFailed": "Não foi possível contar os e-mails. A alteração não foi aplicada."
+    }
   },
   "detail": {
     "title": "Recibo por e-mail",

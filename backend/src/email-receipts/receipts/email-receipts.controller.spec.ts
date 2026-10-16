@@ -6,7 +6,11 @@ import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { ALLOW_DELEGATE_KEY } from "../../delegation/decorators/delegate-access.decorator";
 import {
+  ApprovableEmailReceiptsDto,
   AskAiEmailReceiptDto,
+  BulkEmailReceiptsDto,
+  BulkReprocessEmailReceiptsDto,
+  CountEmailReceiptsDto,
   EmailReceiptStatusCountsDto,
   ListEmailReceiptDomainsDto,
   ListEmailReceiptsDto,
@@ -24,6 +28,10 @@ describe("EmailReceiptsController", () => {
     overview: jest.fn(),
     statusCounts: jest.fn(),
     processBatch: jest.fn(),
+    bulk: jest.fn(),
+    countSelection: jest.fn(),
+    reprocessSelection: jest.fn(),
+    approvableSelection: jest.fn(),
     get: jest.fn(),
     reprocess: jest.fn(),
     link: jest.fn(),
@@ -47,10 +55,16 @@ describe("EmailReceiptsController", () => {
 
   it("lists for the JWT user with the status and limit of the query", async () => {
     receipts.list.mockResolvedValue([]);
-    await controller.list(req, { status: "review", limit: 10 } as never);
-    expect(receipts.list).toHaveBeenCalledWith("user-1", {
+    await controller.list(req, {
       status: "review",
       limit: 10,
+      offset: 50,
+    } as never);
+    expect(receipts.list).toHaveBeenCalledWith("user-1", {
+      status: "review",
+      domain: undefined,
+      limit: 10,
+      offset: 50,
     });
   });
 
@@ -65,6 +79,7 @@ describe("EmailReceiptsController", () => {
       status: "review",
       domain: "shop.example.com",
       limit: undefined,
+      offset: undefined,
     });
   });
 
@@ -204,6 +219,21 @@ describe("EmailReceiptsController", () => {
     ])("refuses the domain %j", async (domain) => {
       expect((await check({ domain })).errors.length).toBeGreaterThan(0);
     });
+
+    it("accepts an offset from 0 to 100000, read from the query string", async () => {
+      expect((await check({})).dto.offset).toBeUndefined();
+      expect((await check({ offset: "50" })).dto.offset).toBe(50);
+      for (const offset of [0, 100000]) {
+        expect((await check({ offset })).errors).toHaveLength(0);
+      }
+    });
+
+    it.each([-1, 100001, 1.5, "abc"])(
+      "refuses the offset %j",
+      async (offset) => {
+        expect((await check({ offset })).errors.length).toBeGreaterThan(0);
+      },
+    );
 
     it("refuses a key the query does not have", async () => {
       expect((await check({ userId: "x" })).errors.length).toBeGreaterThan(0);
@@ -416,6 +446,183 @@ describe("EmailReceiptsController", () => {
     });
   });
 
+  describe("the bulk route", () => {
+    const UUID_A = "0b9c6b1e-0f3a-4a55-9d57-0c5d3d9f1a11";
+    const UUID_B = "1b9c6b1e-0f3a-4a55-9d57-0c5d3d9f1a12";
+
+    const check = async (body: object) => {
+      const dto = plainToInstance(BulkEmailReceiptsDto, body);
+      const errors = await validate(dto, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      return { dto, errors };
+    };
+
+    it("is a POST declared before :id, throttled to 10 a minute, answering 200", () => {
+      const names = Object.getOwnPropertyNames(
+        EmailReceiptsController.prototype,
+      );
+      expect(names.indexOf("bulk")).toBeLessThan(names.indexOf("get"));
+      expect(Reflect.getMetadata("path", proto.bulk)).toBe("bulk");
+      expect(Reflect.getMetadata("method", proto.bulk)).toBe(1); // POST
+      expect(Reflect.getMetadata("THROTTLER:LIMITdefault", proto.bulk)).toBe(
+        10,
+      );
+      expect(Reflect.getMetadata("__httpCode__", proto.bulk)).toBe(200);
+    });
+
+    it("sends ids to the service for the JWT user only", async () => {
+      receipts.bulk.mockResolvedValue({ affected: 2 });
+      const out = await controller.bulk(req, {
+        action: "delete",
+        ids: [UUID_A, UUID_B],
+        expectedCount: 2,
+        userId: "someone-else",
+      } as never);
+      expect(out).toEqual({ affected: 2 });
+      expect(receipts.bulk).toHaveBeenCalledWith(
+        "user-1",
+        "delete",
+        { ids: [UUID_A, UUID_B] },
+        2,
+      );
+    });
+
+    it("sends a filter to the service", async () => {
+      receipts.bulk.mockResolvedValue({ affected: 9 });
+      await controller.bulk(req, {
+        action: "ignore",
+        filter: { status: "no_parser", domain: "gmail.com" },
+        expectedCount: 9,
+      } as never);
+      expect(receipts.bulk).toHaveBeenCalledWith(
+        "user-1",
+        "ignore",
+        { filter: { status: "no_parser", domain: "gmail.com" } },
+        9,
+      );
+    });
+
+    it.each([
+      { action: "delete", ids: [UUID_A], expectedCount: 1 },
+      { action: "ignore", ids: [UUID_A, UUID_B], expectedCount: 2 },
+      { action: "delete", filter: {}, expectedCount: 20000 },
+      {
+        action: "ignore",
+        filter: { status: "unmatched", domain: " Gmail.com " },
+        expectedCount: 3,
+      },
+    ])("accepts %j", async (body) => {
+      expect((await check(body)).errors).toHaveLength(0);
+    });
+
+    it("normalises the filter domain like the list does", async () => {
+      const { dto } = await check({
+        action: "delete",
+        filter: { domain: " @Gmail.COM. " },
+        expectedCount: 1,
+      });
+      expect(dto.filter?.domain).toBe("gmail.com");
+    });
+
+    it.each([
+      ["neither ids nor filter", { action: "delete", expectedCount: 1 }],
+      [
+        "both ids and filter",
+        {
+          action: "delete",
+          ids: [UUID_A],
+          filter: { domain: "gmail.com" },
+          expectedCount: 1,
+        },
+      ],
+      ["an empty ids list", { action: "delete", ids: [], expectedCount: 1 }],
+      [
+        "a null ids list with no filter",
+        { action: "delete", ids: null, expectedCount: 1 },
+      ],
+      ["a non-UUID id", { action: "delete", ids: ["nope"], expectedCount: 1 }],
+      [
+        "a repeated id",
+        { action: "delete", ids: [UUID_A, UUID_A], expectedCount: 2 },
+      ],
+      [
+        "501 ids",
+        {
+          action: "delete",
+          ids: Array.from(
+            { length: 501 },
+            (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+          ),
+          expectedCount: 501,
+        },
+      ],
+      [
+        "an unknown action",
+        { action: "archive", ids: [UUID_A], expectedCount: 1 },
+      ],
+      ["no action", { ids: [UUID_A], expectedCount: 1 }],
+      ["no expectedCount", { action: "delete", ids: [UUID_A] }],
+      [
+        "a zero expectedCount",
+        { action: "delete", ids: [UUID_A], expectedCount: 0 },
+      ],
+      [
+        "an expectedCount above 20000",
+        { action: "delete", filter: {}, expectedCount: 20001 },
+      ],
+      [
+        "a fractional expectedCount",
+        { action: "delete", ids: [UUID_A], expectedCount: 1.5 },
+      ],
+      [
+        "an unknown status in the filter",
+        {
+          action: "delete",
+          filter: { status: "bogus" },
+          expectedCount: 1,
+        },
+      ],
+      [
+        "a bad domain in the filter",
+        {
+          action: "delete",
+          filter: { domain: "not a domain" },
+          expectedCount: 1,
+        },
+      ],
+      [
+        "an unknown field in the filter",
+        {
+          action: "delete",
+          filter: { userId: "x" },
+          expectedCount: 1,
+        },
+      ],
+      [
+        "an unknown field in the body",
+        { action: "delete", ids: [UUID_A], expectedCount: 1, userId: "x" },
+      ],
+      [
+        "a filter that is not an object",
+        { action: "delete", filter: "gmail.com", expectedCount: 1 },
+      ],
+    ])("refuses %s", async (_name, body) => {
+      expect((await check(body as object)).errors).not.toHaveLength(0);
+    });
+
+    it("accepts exactly 500 ids", async () => {
+      const ids = Array.from(
+        { length: 500 },
+        (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      );
+      expect(
+        (await check({ action: "delete", ids, expectedCount: 500 })).errors,
+      ).toHaveLength(0);
+    });
+  });
+
   it("is under the JWT guard and refuses a delegate session on every route", () => {
     expect(
       Reflect.getMetadata(GUARDS_METADATA, EmailReceiptsController),
@@ -447,6 +654,10 @@ describe("EmailReceiptsController", () => {
           "statusCounts",
           "processBatch",
           "profileBatch",
+          "bulk",
+          "bulkCount",
+          "bulkReprocess",
+          "bulkApprovable",
         ].includes(name),
     );
     expect(routes).toHaveLength(6);
@@ -467,5 +678,234 @@ describe("EmailReceiptsController", () => {
       Reflect.getMetadata("THROTTLER:LIMITdefault", proto[name]) as
         number | undefined;
     expect(limitOf("askAi")).toBe(10);
+  });
+});
+
+describe("the selection routes under bulk/", () => {
+  const UUID_A = "0b9c6b1e-0f3a-4a55-9d57-0c5d3d9f1a11";
+  const req = { user: { id: "user-1" } };
+  const receipts = {
+    countSelection: jest.fn(),
+    reprocessSelection: jest.fn(),
+    approvableSelection: jest.fn(),
+  };
+  const controller = new EmailReceiptsController(
+    receipts as never,
+    { askAi: jest.fn() } as never,
+    { run: jest.fn() } as never,
+  );
+  const proto = EmailReceiptsController.prototype as unknown as Record<
+    string,
+    (...args: never[]) => unknown
+  >;
+  beforeEach(() => jest.clearAllMocks());
+
+  const check = async <T extends object>(
+    cls: new () => T,
+    body: object,
+  ): Promise<{ dto: T; errors: unknown[] }> => {
+    const dto = plainToInstance(cls, body);
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+    return { dto, errors };
+  };
+
+  it.each([
+    ["bulkCount", "bulk/count", 60],
+    ["bulkReprocess", "bulk/reprocess", 60],
+    ["bulkApprovable", "bulk/approvable", 30],
+  ])(
+    "%s is a POST on %s declared before :id, throttled to %i a minute, answering 200",
+    (name, path, limit) => {
+      const names = Object.getOwnPropertyNames(
+        EmailReceiptsController.prototype,
+      );
+      expect(names.indexOf(name)).toBeLessThan(names.indexOf("get"));
+      expect(Reflect.getMetadata("path", proto[name])).toBe(path);
+      expect(Reflect.getMetadata("method", proto[name])).toBe(1);
+      expect(Reflect.getMetadata("THROTTLER:LIMITdefault", proto[name])).toBe(
+        limit,
+      );
+      expect(Reflect.getMetadata("__httpCode__", proto[name])).toBe(200);
+    },
+  );
+
+  it("counts a filter, new fields included, for the JWT user", async () => {
+    receipts.countSelection.mockResolvedValue({ count: 4 });
+    const filter = {
+      status: "review",
+      excludeStatuses: ["ignored"],
+      excludeDomains: ["gmail.com"],
+      receivedFrom: "2026-01-01",
+      receivedTo: "2026-02-01",
+    };
+    await expect(
+      controller.bulkCount(req, { filter } as never),
+    ).resolves.toEqual({ count: 4 });
+    expect(receipts.countSelection).toHaveBeenCalledWith("user-1", filter);
+  });
+
+  it("reprocesses ids or a filter with its options", async () => {
+    receipts.reprocessSelection.mockResolvedValue({ remaining: 0 });
+    await controller.bulkReprocess(req, {
+      ids: [UUID_A],
+      onlyStatuses: ["ignored"],
+      since: "2026-10-01T00:00:00Z",
+      limit: 5,
+    } as never);
+    expect(receipts.reprocessSelection).toHaveBeenCalledWith(
+      "user-1",
+      { ids: [UUID_A] },
+      { onlyStatuses: ["ignored"], since: "2026-10-01T00:00:00Z", limit: 5 },
+    );
+    await controller.bulkReprocess(req, {
+      filter: { domain: "gmail.com" },
+    } as never);
+    expect(receipts.reprocessSelection).toHaveBeenLastCalledWith(
+      "user-1",
+      { filter: expect.objectContaining({ domain: "gmail.com" }) },
+      { onlyStatuses: undefined, since: undefined, limit: undefined },
+    );
+  });
+
+  it("lists the approvable proposals of ids or a filter", async () => {
+    receipts.approvableSelection.mockResolvedValue({
+      requestIds: ["r1"],
+      trades: 2,
+    });
+    await expect(
+      controller.bulkApprovable(req, { ids: [UUID_A] } as never),
+    ).resolves.toEqual({ requestIds: ["r1"], trades: 2 });
+    expect(receipts.approvableSelection).toHaveBeenCalledWith("user-1", {
+      ids: [UUID_A],
+    });
+  });
+
+  describe("the filter of every selection body", () => {
+    const manyDomains = Array.from(
+      { length: 51 },
+      (_, i) => `d${i}.example.com`,
+    );
+    it.each([
+      ["a state to exclude", { excludeStatuses: ["ignored", "review"] }],
+      ["a domain to exclude, normalised", { excludeDomains: [" @Gmail.com "] }],
+      [
+        "a date range",
+        { receivedFrom: "2026-01-31", receivedTo: "2026-01-31" },
+      ],
+      ["only a start", { receivedFrom: "2026-01-31" }],
+    ])("accepts %s", async (_n, filter) => {
+      const { dto, errors } = await check(CountEmailReceiptsDto, { filter });
+      expect(errors).toHaveLength(0);
+      if ("excludeDomains" in filter) {
+        expect(dto.filter.excludeDomains).toEqual(["gmail.com"]);
+      }
+    });
+
+    it.each([
+      ["an unknown excluded state", { excludeStatuses: ["bogus"] }],
+      ["a repeated excluded state", { excludeStatuses: ["review", "review"] }],
+      [
+        "more excluded states than there are",
+        {
+          excludeStatuses: [
+            "pending",
+            "skipped",
+            "no_parser",
+            "parse_failed",
+            "unmatched",
+            "ambiguous",
+            "review_conflict",
+            "review",
+            "ignored",
+            "ignored",
+          ],
+        },
+      ],
+      ["excluded states that are not a list", { excludeStatuses: "review" }],
+      ["a bad excluded domain", { excludeDomains: ["not a domain"] }],
+      ["51 excluded domains", { excludeDomains: manyDomains }],
+      ["a repeated excluded domain", { excludeDomains: ["a.io", "A.io"] }],
+      ["a non-calendar day", { receivedFrom: "2026-02-30" }],
+      ["a malformed day", { receivedTo: "2026-1-5" }],
+      ["a timestamp for a day", { receivedFrom: "2026-01-01T00:00:00Z" }],
+      [
+        "a start after the end",
+        { receivedFrom: "2026-03-02", receivedTo: "2026-03-01" },
+      ],
+      ["an unknown field", { userId: "x" }],
+    ])("refuses %s", async (_n, filter) => {
+      expect(
+        (await check(CountEmailReceiptsDto, { filter })).errors,
+      ).not.toHaveLength(0);
+    });
+
+    it("refuses a count without a filter", async () => {
+      expect((await check(CountEmailReceiptsDto, {})).errors).not.toHaveLength(
+        0,
+      );
+    });
+  });
+
+  describe("the reprocess body", () => {
+    const run = (body: object) => check(BulkReprocessEmailReceiptsDto, body);
+    it.each([
+      { ids: [UUID_A] },
+      { filter: {} },
+      {
+        filter: {},
+        onlyStatuses: ["ignored"],
+        limit: 25,
+        since: "2026-10-01T00:00:00Z",
+      },
+      { ids: [UUID_A], limit: 1 },
+    ])("accepts %j", async (body) => {
+      expect((await run(body)).errors).toHaveLength(0);
+    });
+
+    it.each([
+      ["neither ids nor filter", {}],
+      ["both ids and filter", { ids: [UUID_A], filter: {} }],
+      ["an empty ids list", { ids: [] }],
+      [
+        "501 ids",
+        {
+          ids: Array.from(
+            { length: 501 },
+            (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+          ),
+        },
+      ],
+      ["a limit of 0", { ids: [UUID_A], limit: 0 }],
+      ["a limit of 26", { ids: [UUID_A], limit: 26 }],
+      ["a fractional limit", { ids: [UUID_A], limit: 1.5 }],
+      [
+        "an unknown onlyStatuses member",
+        { ids: [UUID_A], onlyStatuses: ["x"] },
+      ],
+      ["a bad since", { ids: [UUID_A], since: "yesterday" }],
+      ["an unknown field", { ids: [UUID_A], expectedCount: 1 }],
+    ])("refuses %s", async (_n, body) => {
+      expect((await run(body)).errors).not.toHaveLength(0);
+    });
+  });
+
+  describe("the approvable body", () => {
+    const run = (body: object) => check(ApprovableEmailReceiptsDto, body);
+    it("accepts ids or a filter", async () => {
+      expect((await run({ ids: [UUID_A] })).errors).toHaveLength(0);
+      expect((await run({ filter: { status: "review" } })).errors).toHaveLength(
+        0,
+      );
+    });
+    it.each([
+      ["neither", {}],
+      ["both", { ids: [UUID_A], filter: {} }],
+      ["a limit", { ids: [UUID_A], limit: 5 }],
+    ])("refuses %s", async (_n, body) => {
+      expect((await run(body)).errors).not.toHaveLength(0);
+    });
   });
 });

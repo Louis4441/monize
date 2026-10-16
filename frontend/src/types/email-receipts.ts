@@ -180,6 +180,41 @@ export interface EmailReceiptPollResult {
   error?: string;
 }
 
+/** Why one uploaded archive file was refused; `null` on a file that was read. */
+export type EmailReceiptImportFileError =
+  | 'unsupported_format'
+  | 'invalid_archive'
+  | 'archive_too_large'
+  | 'empty';
+
+/** What the import did with one uploaded file. */
+export interface EmailReceiptImportFileResult {
+  name: string;
+  /** `null` when the file was refused. */
+  format: 'eml' | 'mbox' | 'msg' | 'zip' | null;
+  /** Messages found in the file. */
+  messages: number;
+  /** New rows, stored as pending. */
+  stored: number;
+  /** Messages that were already imported. */
+  duplicates: number;
+  /** Messages stored as skipped (too large or undecodable). */
+  skipped: number;
+  /** ZIP entries that are not mail files; 0 for any other format. */
+  ignoredEntries: number;
+  error: EmailReceiptImportFileError | null;
+}
+
+export interface EmailReceiptImportResult {
+  files: EmailReceiptImportFileResult[];
+  /** Messages not read because of the per-request message cap. */
+  truncated: number;
+  /** Stored emails the run took through the pipeline. */
+  processed: number;
+  /** The poll lease was held: nothing was processed, the rows wait for the next read. */
+  busy: boolean;
+}
+
 /** Which OAuth providers the operator configured, and the redirect URI to register. */
 export interface EmailReceiptOAuthProviders {
   google: boolean;
@@ -530,6 +565,81 @@ export interface EmailReceiptParserDraftRequestResult {
 
 /** Most emails one "Draft parser with AI" request names (the server's bound). */
 export const PARSER_DRAFT_MAX_RECEIPTS = 5;
+
+/** What a bulk command does to the emails it names. */
+export type EmailReceiptBulkAction = 'delete' | 'ignore';
+
+/** The list's own filter (state and sender domain), as a bulk command names its emails. */
+export interface EmailReceiptBulkFilter {
+  status?: EmailReceiptStatus;
+  domain?: string;
+  /** States taken out of the selection (the server takes each state once). */
+  excludeStatuses?: EmailReceiptStatus[];
+  /** Sender domains taken out of the selection, each with its sub-domains (the server's bound is 50). */
+  excludeDomains?: string[];
+  /** `YYYY-MM-DD`, inclusive, on the UTC day of `receivedAt`: earlier emails are out of the selection. */
+  receivedFrom?: string;
+  /** `YYYY-MM-DD`, inclusive, on the UTC day of `receivedAt`: later emails are out of the selection. */
+  receivedTo?: string;
+}
+
+/** The emails a bulk command names: the ticked rows' ids, or the list's (narrowed) filter. */
+export type EmailReceiptBulkScope = { ids: string[] } | { filter: EmailReceiptBulkFilter };
+
+/** Body of `POST /email-receipts/bulk/reprocess`: one call runs at most `limit` emails; send the answer's `since` back to continue. */
+export type EmailReceiptBulkReprocessPayload = EmailReceiptBulkScope & {
+  onlyStatuses?: EmailReceiptStatus[];
+  since?: string;
+  limit?: number;
+};
+
+/** What one reprocess call did, and how many eligible emails are left in the run. */
+export interface EmailReceiptBulkReprocessResult {
+  processed: number;
+  failed: number;
+  byOutcome: Record<string, number>;
+  remaining: number;
+  since: string;
+}
+
+/** `POST /email-receipts/bulk/approvable`: the proposals a selection can approve and the trade emails left out. */
+export interface EmailReceiptBulkApprovable {
+  requestIds: string[];
+  trades: number;
+}
+
+/** What approving many proposals did. */
+export interface EmailReceiptApproveResult {
+  approved: number;
+  failed: number;
+}
+
+/** Most review requests one `approve-batch` call takes (the server's bound). */
+export const AI_REVIEW_APPROVE_BATCH_MAX = 100;
+
+/**
+ * Body of `POST /email-receipts/bulk`: the emails by id, or by the list's
+ * filter, and how many the person was told. A different count is refused (409).
+ */
+export type EmailReceiptBulkPayload = {
+  action: EmailReceiptBulkAction;
+  expectedCount: number;
+} & ({ ids: string[] } | { filter: EmailReceiptBulkFilter });
+
+/** What a bulk command did; the four counts partition the matching emails. */
+export interface EmailReceiptBulkResult {
+  /** Deleted, or turned to ignored. */
+  affected: number;
+  /** Linked to a transaction: a bulk command never touches them. */
+  skippedLinked: number;
+  /** Ignore only: already ignored. */
+  unchanged: number;
+  /** Ignore only: unreadable, or a proposal already applied. */
+  notIgnorable: number;
+}
+
+/** Most emails one bulk request may name by id (the server's bound). */
+export const EMAIL_RECEIPT_BULK_MAX_IDS = 500;
 
 // ---------------------------------------------------------------- parsers
 

@@ -6,7 +6,7 @@ import { makeMailbox, makeOAuthMailbox } from './email-receipts-fixtures';
 const api = vi.hoisted(() => ({ get: vi.fn(), providers: vi.fn() }));
 vi.mock('@/lib/email-receipts-api', () => ({
   emailReceiptsApi: {
-    mailbox: { get: api.get, upsert: vi.fn(), test: vi.fn(), pollNow: vi.fn(), remove: vi.fn(), updateSettings: vi.fn() },
+    mailbox: { get: api.get, upsert: vi.fn(), test: vi.fn(), pollNow: vi.fn(), remove: vi.fn(), updateSettings: vi.fn(), import: vi.fn() },
     oauth: { providers: api.providers, start: vi.fn(), disconnect: vi.fn() },
   },
 }));
@@ -74,6 +74,18 @@ describe('MailboxSection', () => {
     expect((screen.getByLabelText('IMAP server') as HTMLInputElement).value).toBe('imap.example.com');
     expect(screen.getByRole('button', { name: 'Poll now' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete mailbox' })).toBeInTheDocument();
+  });
+
+  it('offers the archive import only when a mailbox exists', async () => {
+    api.get.mockResolvedValue(null);
+    await renderSection();
+    expect(screen.queryByRole('heading', { name: 'Import archived emails' })).not.toBeInTheDocument();
+  });
+
+  it('offers the archive import below an existing mailbox', async () => {
+    api.get.mockResolvedValue(makeMailbox());
+    await renderSection();
+    expect(screen.getByRole('heading', { name: 'Import archived emails' })).toBeInTheDocument();
   });
 
   it('shows an OAuth mailbox as connected, in place of the manual form', async () => {

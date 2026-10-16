@@ -1,10 +1,20 @@
 import apiClient from './api';
 import { clearAllCache } from './apiCache';
+import { AI_REVIEW_APPROVE_BATCH_MAX } from '@/types/email-receipts';
 import type {
+  EmailReceiptApproveResult,
+  EmailReceiptBulkApprovable,
+  EmailReceiptBulkFilter,
+  EmailReceiptBulkPayload,
+  EmailReceiptBulkReprocessPayload,
+  EmailReceiptBulkReprocessResult,
+  EmailReceiptBulkScope,
+  EmailReceiptBulkResult,
   EmailReceiptDomainCount,
   CreateEmailReceiptParserPayload,
   EmailReceiptAskAiResult,
   EmailReceiptDetail,
+  EmailReceiptImportResult,
   EmailReceiptListItem,
   EmailReceiptMailbox,
   EmailReceiptMailboxTestResult,
@@ -87,6 +97,28 @@ export const emailReceiptsApi = {
       const response = await apiClient.post<EmailReceiptPollResult>(`${MAILBOX}/poll`);
       return response.data;
     },
+
+    /**
+     * Upload exported `.eml`, `.mbox`, `.msg` or `.zip` files into the mailbox (at most 20 files,
+     * 25 MB each). Each file is answered on its own: a refused one carries an
+     * `error` and the rest are still read. The multipart header replaces the
+     * client's JSON default, as in the other uploads; axios adds the boundary.
+     * `process: false` only stores the emails (the answer has `processed` 0); the
+     * caller processes them afterwards with `receipts.processBatch`.
+     */
+    import: async (
+      files: readonly File[],
+      options: { process?: boolean } = {},
+    ): Promise<EmailReceiptImportResult> => {
+      const formData = new FormData();
+      for (const file of files) formData.append('files', file);
+      const response = await apiClient.post<EmailReceiptImportResult>(`${MAILBOX}/import`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        ...(options.process === undefined ? {} : { params: { process: String(options.process) } }),
+        timeout: 180_000,
+      });
+      return response.data;
+    },
   },
 
   oauth: {
@@ -115,8 +147,18 @@ export const emailReceiptsApi = {
 
   receipts: {
     /** `domain` keeps the emails from that sender domain or one of its sub-domains; it combines with `status`. */
-    list: async (status?: EmailReceiptStatus, limit?: number, domain?: string): Promise<EmailReceiptListItem[]> => {
-      const params = { ...(status ? { status } : {}), ...(domain ? { domain } : {}), ...(limit ? { limit } : {}) };
+    list: async (
+      status?: EmailReceiptStatus,
+      limit?: number,
+      domain?: string,
+      offset?: number,
+    ): Promise<EmailReceiptListItem[]> => {
+      const params = {
+        ...(status ? { status } : {}),
+        ...(domain ? { domain } : {}),
+        ...(limit ? { limit } : {}),
+        ...(offset ? { offset } : {}),
+      };
       const response = await apiClient.get<EmailReceiptListItem[]>(RECEIPTS, {
         params: Object.keys(params).length > 0 ? params : undefined,
       });
@@ -150,6 +192,81 @@ export const emailReceiptsApi = {
         byStatus: EmailReceiptStatusCounts;
       }>(`${RECEIPTS}/status-counts`);
       return response.data.byStatus;
+    },
+
+    /**
+     * How many stored emails match a filter (state and sender domain, as the
+     * list reads them): the same `status-counts` answer the state buttons print,
+     * so a bulk command's number and the page's number come from one place.
+     * Without `status` it is every state.
+     */
+    countMatching: async (status?: EmailReceiptStatus, domain?: string): Promise<number> => {
+      const response = await apiClient.get<{
+        total: number;
+        byStatus: EmailReceiptStatusCounts;
+      }>(`${RECEIPTS}/status-counts`, { params: domain ? { domain } : undefined });
+      return status ? (response.data.byStatus[status] ?? 0) : response.data.total;
+    },
+
+    /**
+     * Delete or ignore many emails, by id or by the list's filter, in one
+     * transaction. `expectedCount` is what the person was told: a different
+     * number answers 409 with `currentCount` and changes nothing. Emails linked
+     * to a transaction are skipped and counted.
+     */
+    bulk: async (payload: EmailReceiptBulkPayload): Promise<EmailReceiptBulkResult> => {
+      const response = await apiClient.post<EmailReceiptBulkResult>(`${RECEIPTS}/bulk`, payload);
+      return response.data;
+    },
+
+    /** How many emails a narrowed filter selects, the number a bulk command acts on. */
+    bulkCount: async (filter: EmailReceiptBulkFilter): Promise<number> => {
+      const response = await apiClient.post<{ count: number }>(`${RECEIPTS}/bulk/count`, { filter });
+      return response.data.count;
+    },
+
+    /**
+     * Reprocess up to `limit` emails of a selection (oldest first, each once per
+     * run). Call again with the answer's `since` until `remaining` is 0.
+     */
+    bulkReprocess: async (payload: EmailReceiptBulkReprocessPayload): Promise<EmailReceiptBulkReprocessResult> => {
+      const response = await apiClient.post<EmailReceiptBulkReprocessResult>(`${RECEIPTS}/bulk/reprocess`, payload);
+      return response.data;
+    },
+
+    /** The review requests of the selection's proposals that can be approved, and how many trade emails were left out. */
+    bulkApprovable: async (scope: EmailReceiptBulkScope): Promise<EmailReceiptBulkApprovable> => {
+      const response = await apiClient.post<EmailReceiptBulkApprovable>(`${RECEIPTS}/bulk/approvable`, scope);
+      return response.data;
+    },
+
+    /**
+     * Approve many proposals by the review inbox's batch route, 100 requests a
+     * call. A call that fails counts all its requests as failed and the rest
+     * still run. It edits transactions, so every cached balance is dropped.
+     */
+    approveRequests: async (ids: readonly string[]): Promise<EmailReceiptApproveResult> => {
+      let approved = 0;
+      let failed = 0;
+      try {
+        for (let start = 0; start < ids.length; start += AI_REVIEW_APPROVE_BATCH_MAX) {
+          const chunk = ids.slice(start, start + AI_REVIEW_APPROVE_BATCH_MAX);
+          try {
+            const response = await apiClient.post<{ results: { id: string; ok: boolean; error?: string }[] }>(
+              '/ai-review-requests/approve-batch',
+              { ids: chunk },
+            );
+            const ok = response.data.results.filter((r) => r.ok).length;
+            approved += ok;
+            failed += chunk.length - ok;
+          } catch {
+            failed += chunk.length;
+          }
+        }
+      } finally {
+        clearAllCache();
+      }
+      return { approved, failed };
     },
 
     /**
