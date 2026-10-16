@@ -56,7 +56,8 @@
     "viewTransaction": "Lihat transaksi",
     "waitingForAgent": "Menunggu agen AI. <link>Hubungkan penyedia AI di Pengaturan</link>, atau biarkan klien MCP mengambilnya.",
     "parserDraftReady": "Draf profil siap. <link>Uji dan setujui di pengaturan profil</link>.",
-    "tradePending": "Transaksi dari email, belum dibaca"
+    "tradePending": "Transaksi dari email, belum dibaca",
+    "tradeEmail": "Surel konfirmasi perdagangan"
   },
   "actions": {
     "dismiss": "Abaikan"

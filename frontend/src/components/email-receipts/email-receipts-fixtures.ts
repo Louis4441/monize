@@ -67,6 +67,7 @@ export function makeParser(overrides: Partial<EmailReceiptParser> = {}): EmailRe
   };
 }
 
+/** One stored email as `GET /email-receipts` answers it, every field the server always sends included; `overrides` win. */
 export function makeReceipt(overrides: Partial<EmailReceiptListItem> = {}): EmailReceiptListItem {
   return {
     id: 'r-1',
@@ -84,9 +85,11 @@ export function makeReceipt(overrides: Partial<EmailReceiptListItem> = {}): Emai
     parserName: null,
     aiReviewRequestId: null,
     isTrade: false,
+    tradeSource: null,
     displayState: null,
     requestNote: null,
     transaction: null,
+    investmentTransaction: null,
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   };
@@ -101,6 +104,7 @@ export function makeDetail(overrides: Partial<EmailReceiptDetail> = {}): EmailRe
     structuredOrder: null,
     parsed: null,
     trade: null,
+    tradeProposal: null,
     candidates: [],
     ...overrides,
   };

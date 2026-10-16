@@ -231,7 +231,11 @@
       "category": "Definir a categoria como {name}",
       "payee": "Definir o favorecido como {name}",
       "aiReview": "{count, plural, one {Colocar na fila # pedido de revisão da IA} other {Colocar na fila # pedidos de revisão da IA}}"
-    }
+    },
+    "aiCategory": "sugerida pela IA",
+    "tags": "Tags",
+    "newTag": "(nova tag)",
+    "marksPaidDue": "{name} (vence em {date})"
   },
   "table": {
     "downloadTitle": "Baixar tabela como CSV",

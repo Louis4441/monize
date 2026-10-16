@@ -9,6 +9,7 @@ import { TradeReadingView } from '@/components/email-receipts/TradeReadingView';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import type { ReceiptParserAccountOption } from '@/hooks/useReceiptParserLookups';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { getErrorMessage } from '@/lib/errors';
@@ -31,6 +32,8 @@ interface ParserTestPanelProps {
   /** A stored email to preselect, such as the one the parser is being written for. */
   initialReceiptId?: string;
   categoryLabels: ReadonlyMap<string, string>;
+  /** The user's accounts, so a trade profile's test names the account it would book to. */
+  accounts?: readonly ReceiptParserAccountOption[];
 }
 
 /**
@@ -40,7 +43,7 @@ interface ParserTestPanelProps {
  * when Test is pressed, so the answer is always about what is on screen at that
  * moment; an earlier result is cleared as soon as the choice of email changes.
  */
-export function ParserTestPanel({ definition, payeeId, initialReceiptId, categoryLabels }: ParserTestPanelProps) {
+export function ParserTestPanel({ definition, payeeId, initialReceiptId, categoryLabels, accounts }: ParserTestPanelProps) {
   const t = useTranslations('emailReceipts.test');
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
@@ -172,7 +175,12 @@ export function ParserTestPanel({ definition, payeeId, initialReceiptId, categor
           {result.trade ? (
             // A trade profile creates an investment transaction: there is no bank transaction to match.
             <>
-              <TradeReadingView trade={result.trade.parsed} fallbackDate={testedReceipt?.effectiveDate ?? null} showReason />
+              <TradeReadingView
+                trade={result.trade.parsed}
+                fallbackDate={testedReceipt?.effectiveDate ?? null}
+                accounts={accounts}
+                showReason
+              />
               {result.trade.trace && <ParserTraceList trace={result.trade.trace} />}
             </>
           ) : (

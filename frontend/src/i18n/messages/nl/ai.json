@@ -231,7 +231,11 @@
       "category": "Categorie instellen op {name}",
       "payee": "Begunstigde instellen op {name}",
       "aiReview": "{count, plural, one {# AI-controleverzoek in de wachtrij zetten} other {# AI-controleverzoeken in de wachtrij zetten}}"
-    }
+    },
+    "aiCategory": "voorgesteld door AI",
+    "tags": "Tags",
+    "newTag": "(nieuwe tag)",
+    "marksPaidDue": "{name} (vervalt op {date})"
   },
   "table": {
     "downloadTitle": "Tabel downloaden als CSV",

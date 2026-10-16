@@ -16,6 +16,11 @@ vi.mock('@/lib/transactions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/transactions')>()),
   transactionsApi: txApi,
 }));
+const accountsApi = vi.hoisted(() => ({ getAll: vi.fn() }));
+vi.mock('@/lib/accounts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/accounts')>()),
+  accountsApi,
+}));
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
@@ -42,9 +47,19 @@ async function renderDialog(categoryLabels: ReadonlyMap<string, string> | null =
   await act(async () => {});
 }
 
+async function renderDialogWithUnmount() {
+  let result!: ReturnType<typeof render>;
+  await act(async () => {
+    result = render(<EmailReceiptDetailDialog receiptId="r-1" categoryLabels={labels} onClose={onClose} onChanged={onChanged} />);
+  });
+  await act(async () => {});
+  return result;
+}
+
 describe('EmailReceiptDetailDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    accountsApi.getAll.mockResolvedValue([]);
     api.get.mockResolvedValue(makeDetail());
     txApi.getAll.mockResolvedValue({
       data: [
@@ -342,9 +357,91 @@ describe('EmailReceiptDetailDialog', () => {
         displayState: 'proposed',
         parserName: 'Wealthsimple',
         isTrade: true,
+        tradeSource: 'profile',
         trade: PARSED_TRADE,
         ...over,
       });
+    const tradeCandidate = { id: 'it-1', date: '2026-10-15', amount: 2000, currencyCode: 'CAD', payeeName: 'XCNS.TO', description: null, quantity: 75.9878 };
+    const resolvedProposal = {
+      accountName: 'CA RRSP - Brokerage',
+      date: '2026-10-15',
+      action: 'BUY' as const,
+      symbol: 'XCNS.TO',
+      securityName: 'iShares Core Conservative Balanced ETF Portfolio',
+      quantity: 75.9878,
+      price: 26.32,
+      commission: 0,
+      totalAmount: 2000,
+      currencyCode: 'CAD',
+    };
+
+    it('shows the proposal beside the reading: the account and the security the trade resolved to', async () => {
+      api.get.mockResolvedValue(tradeDetail({ aiReviewRequestId: 'rq-1', tradeProposal: resolvedProposal }));
+      await renderDialog();
+      expect(screen.getByRole('heading', { name: 'Trade read from the email' })).toBeInTheDocument();
+      expect(screen.getByText(/Buy 75\.9878 shares of XCNS for 2,000\.00/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'What its proposal would book' })).toBeInTheDocument();
+      expect(screen.getByText('Account: CA RRSP - Brokerage')).toBeInTheDocument();
+      expect(screen.getByText('Security: iShares Core Conservative Balanced ETF Portfolio')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Review it in the inbox' })).toBeInTheDocument();
+    });
+
+    it('names the account the rules chose, with its currency, so two RRSPs printed alike are told apart', async () => {
+      accountsApi.getAll.mockResolvedValue([
+        { id: 'acc-rrsp', name: 'RRSP', currencyCode: 'USD', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE', isClosed: false },
+        { id: 'acc-rrsp-cad', name: 'RRSP', currencyCode: 'CAD', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE', isClosed: false },
+      ]);
+      api.get.mockResolvedValue(tradeDetail({ trade: { ...PARSED_TRADE, currency: 'USD', currencySource: 'amount' } }));
+      await renderDialog();
+      expect(accountsApi.getAll).toHaveBeenCalledWith(true);
+      expect(screen.getByText('Books to: RRSP (USD)')).toBeInTheDocument();
+    });
+
+    it('heads the proposal as the AI agent\'s when "Recognize as a trade" wrote it', async () => {
+      api.get.mockResolvedValue(
+        tradeDetail({ aiReviewRequestId: 'rq-1', tradeProposal: resolvedProposal, tradeRequestSource: 'ai' }),
+      );
+      await renderDialog();
+      expect(screen.getByRole('heading', { name: 'Trade read from the email' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Trade the AI agent proposes' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'What its proposal would book' })).not.toBeInTheDocument();
+    });
+
+    it('shows no proposal section for a reading with no proposal waiting', async () => {
+      api.get.mockResolvedValue(tradeDetail());
+      await renderDialog();
+      expect(screen.queryByRole('heading', { name: 'What its proposal would book' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Account: /)).not.toBeInTheDocument();
+    });
+
+    it('offers the link for every email the server would link, a partial reading and a person-ignored one included', async () => {
+      for (const over of [
+        { status: 'parse_failed', statusReason: 'trade_no_account', displayState: null },
+        { status: 'ignored', statusReason: null, displayState: null },
+      ]) {
+        api.get.mockResolvedValue(tradeDetail({ ...over, candidates: [tradeCandidate] }));
+        const { unmount } = await renderDialogWithUnmount();
+        expect(screen.getByRole('heading', { name: 'Existing transactions that could be this trade' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Link to this transaction' })).toBeInTheDocument();
+        unmount();
+      }
+    });
+
+    it('lists no candidates for an email already linked, whose own row would be among them', async () => {
+      api.get.mockResolvedValue(
+        tradeDetail({
+          status: 'ignored',
+          statusReason: 'trade_linked',
+          displayState: null,
+          investmentTransaction: { id: 'it-1', date: '2026-10-15', action: 'BUY', symbol: 'XCNS.TO', quantity: 75.9878, totalAmount: 2000, currencyCode: 'CAD' },
+          candidates: [tradeCandidate],
+        }),
+      );
+      await renderDialog();
+      expect(screen.queryByRole('heading', { name: 'Existing transactions that could be this trade' })).not.toBeInTheDocument();
+      expect(screen.queryByText('75.9878 shares')).not.toBeInTheDocument();
+      expect(screen.queryByText(/No investment transaction of this account/)).not.toBeInTheDocument();
+    });
 
     it('lists the existing investment transactions a trade email could be, and links the chosen one', async () => {
       api.get.mockResolvedValue(
@@ -380,6 +477,8 @@ describe('EmailReceiptDetailDialog', () => {
       await renderDialog();
       expect(screen.getByRole('heading', { name: 'Existing transactions that could be this trade' })).toBeInTheDocument();
       expect(screen.getByText(/a scheduled bill or deposit it pays is marked paid/)).toBeInTheDocument();
+      // The candidate's shares are formatted, not the raw database string.
+      expect(screen.getByText('75.9878 shares')).toBeInTheDocument();
       expect(screen.queryByText('Several transactions fit this email equally well. Choose the one it paid for.')).not.toBeInTheDocument();
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Link to this transaction' }));
@@ -394,8 +493,8 @@ describe('EmailReceiptDetailDialog', () => {
       expect(screen.getByText(/Bought 75\.9878 XCNS\.TO for/)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'View transaction' })).toHaveAttribute('href', '/investments?edit=it-1');
       expect(screen.queryByRole('button', { name: 'Link to this transaction' })).not.toBeInTheDocument();
-      // The candidate's shares are formatted, not the raw database string.
-      expect(screen.getByText('75.9878 shares')).toBeInTheDocument();
+      // Linked, the email lists no candidates: its own row would be the first.
+      expect(screen.queryByRole('heading', { name: 'Existing transactions that could be this trade' })).not.toBeInTheDocument();
     });
 
     it('explains why there is nothing to link when no investment transaction fits', async () => {
@@ -405,7 +504,7 @@ describe('EmailReceiptDetailDialog', () => {
       expect(screen.getByText(/None yet: the trade is booked when you approve its proposal/)).toBeInTheDocument();
     });
 
-    it('offers no link once the proposal was applied', async () => {
+    it('offers no link, and lists no candidates, once the proposal was applied', async () => {
       api.get.mockResolvedValue(
         tradeDetail({
           displayState: 'applied',
@@ -414,6 +513,7 @@ describe('EmailReceiptDetailDialog', () => {
       );
       await renderDialog();
       expect(screen.queryByRole('button', { name: 'Link to this transaction' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Existing transactions that could be this trade' })).not.toBeInTheDocument();
     });
 
     it('shows the trade the profile read instead of a receipt, with no candidates or structured data', async () => {

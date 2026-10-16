@@ -132,6 +132,44 @@ describe('ParserProblems', () => {
     expect(text[4]).toMatch(/^Balance tolerance: /);
   });
 
+  it('says where a trade profile problem is, with the bound and an account wording for an account id', () => {
+    render(
+      <ParserProblems
+        problems={[
+          { path: 'trade.symbol', code: 'empty' },
+          { path: 'trade.quantity[1]', code: 'capture_missing' },
+          { path: 'trade.date[0].label', code: 'too_long' },
+          { path: 'trade.total', code: 'trade_amount_missing' },
+          { path: 'trade.defaultAccountId', code: 'trade_account_missing' },
+          { path: 'trade.accountRules', code: 'too_many' },
+          { path: 'trade.accountRules[1].currency', code: 'invalid_currency' },
+          { path: 'trade.accountRules[0].accountId', code: 'invalid_uuid' },
+          { path: 'trade.defaultAccountId', code: 'invalid_uuid' },
+          { path: 'trade.currencyMarkers', code: 'too_many' },
+          { path: 'trade.currencyMarkers[2].match', code: 'capture_not_allowed' },
+          { path: 'trade.currencyMarkers[0]', code: 'invalid_type' },
+          { path: 'items', code: 'trade_conflict' },
+        ]}
+      />,
+    );
+    const text = screen.getAllByRole('listitem').map((item) => item.textContent ?? '');
+    expect(text).toEqual([
+      'Ticker patterns: must not be empty',
+      'Share count patterns, line 2: is missing a capture this field needs',
+      'Trade date patterns, entry 1, label: is too long (at most 200 characters)',
+      'Trade total patterns: needs total or price patterns (at least one of the two)',
+      'Default account: needs a default account, or account rules',
+      'Account rules: has too many entries (at most 20)',
+      'Account rule 2, currency: is not a 3-letter currency code, such as USD',
+      'Account rule 1, account: is not a valid account',
+      'Default account: is not a valid account',
+      'Currency markers: has too many entries (at most 20)',
+      'Currency marker 3, pattern: uses a capture name this field does not accept',
+      'Currency marker 1: has the wrong kind of value',
+      'Line items: cannot be in a brokerage trade profile, which reads only the trade',
+    ]);
+  });
+
   it('shows a path and a code this client has not heard of as they are, never drops them', () => {
     render(<ParserProblems problems={[{ path: 'somethingNew', code: 'brand_new_code' }]} />);
     expect(screen.getByText('somethingNew: brand_new_code')).toBeInTheDocument();

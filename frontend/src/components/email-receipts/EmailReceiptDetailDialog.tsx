@@ -18,8 +18,10 @@ import { LinkifiedText } from '@/components/ui/LinkifiedText';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { toReceiptAccountOptions, type ReceiptParserAccountOption } from '@/hooks/useReceiptParserLookups';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { clearAllCache } from '@/lib/apiCache';
+import { accountsApi } from '@/lib/accounts';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { canLinkTradeEmail, isReceiptActionable, readParsedReceipt } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
@@ -80,6 +82,28 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     };
   }, [receiptId, attempt]);
 
+  // A trade reading names the account its rules chose, so two accounts the
+  // broker prints alike (an RRSP in CAD and one in USD) can be told apart.
+  // Closed accounts too, so a stored id is named. Until they load (or if they
+  // fail) the reading shows no account name, never a wrong one.
+  const tradeEmail = state.status === 'ready' && (state.detail.isTrade || state.detail.trade !== null);
+  const [accounts, setAccounts] = useState<readonly ReceiptParserAccountOption[] | undefined>(undefined);
+  useEffect(() => {
+    if (!tradeEmail) return;
+    let cancelled = false;
+    accountsApi
+      .getAll(true)
+      .then((list) => {
+        if (!cancelled) setAccounts(toReceiptAccountOptions(list));
+      })
+      .catch((error) => {
+        if (!cancelled) logger.error(error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tradeEmail]);
+
   const handleLink = async (transactionId: string) => {
     setLinkingId(transactionId);
     setLinkError(null);
@@ -129,9 +153,15 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     // as a trade. Either way it books an investment transaction, never a bank one.
     const isTradeEmail = detail.isTrade || trade !== null;
     const readByAi = isTradeEmail && trade === null;
+    // What the email's open `email_trade` request proposes, whoever wrote it: the
+    // profile's own reading resolved to an account and a security, or the AI's
+    // answer to "Recognize as a trade" (also for an email a profile read).
+    const proposal = detail.tradeProposal ?? null;
     // A trade email is linked to the investment transaction it reports, even once it was
     // closed as already booked (that is when linking marks its scheduled bill paid), but
-    // only once: an email linked or booked already accounts for its row.
+    // only once: an email linked or booked already accounts for its row. The
+    // candidates of one that cannot be linked are not listed at all: its own row
+    // would be among them.
     const tradeLinkable = isTradeEmail && canLinkTradeEmail(detail);
     const canLink = detail.candidates.length > 0 && (isTradeEmail ? tradeLinkable : isReceiptActionable(detail));
     const booked = detail.investmentTransaction ?? null;
@@ -252,13 +282,17 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
               {trade ? t('tradeHeading') : t('aiTradeHeading')}
             </h3>
             {trade ? (
-              <TradeReadingView trade={trade} fallbackDate={detail.effectiveDate} />
+              <TradeReadingView trade={trade} fallbackDate={detail.effectiveDate} accounts={accounts} />
             ) : (
-              <TradeProposalView
-                proposal={detail.tradeProposal ?? null}
-                booked={booked !== null}
-                displayState={detail.displayState}
-              />
+              <TradeProposalView proposal={proposal} booked={booked !== null} displayState={detail.displayState} />
+            )}
+            {trade && proposal && (
+              <div className="space-y-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {detail.tradeRequestSource === 'ai' ? t('aiTradeHeading') : t('tradeProposalHeading')}
+                </h4>
+                <TradeProposalView proposal={proposal} booked={booked !== null} displayState={detail.displayState} />
+              </div>
             )}
           </section>
         ) : (
@@ -284,7 +318,7 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
           </>
         )}
 
-        {detail.candidates.length > 0 && (
+        {detail.candidates.length > 0 && (!isTradeEmail || tradeLinkable) && (
           <section aria-labelledby="receipt-candidates-heading" className="space-y-2">
             <h3 id="receipt-candidates-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {isTradeEmail ? t('tradeCandidatesHeading') : t('candidatesHeading')}

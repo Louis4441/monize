@@ -192,6 +192,10 @@ describe('MailboxForm', () => {
       expect(help).toHaveAccessibleName(/an approved profile read the whole email/);
       expect(help).toHaveAccessibleName(/by an order number or a reference, or by exact amount and payee, with a single candidate/);
       expect(help).toHaveAccessibleName(/adds up to the cent/);
+      // Trade confirmations are booked by the same switch, behind a gate of their own.
+      expect(help).toHaveAccessibleName(/A trade confirmation is booked without asking only when its trade profile is approved/);
+      expect(help).toHaveAccessibleName(/the price agrees with the shares and the total/);
+      expect(help).toHaveAccessibleName(/your ledger does not already hold a matching trade/);
       expect(help).toHaveAccessibleName(/Everything else waits for your approval/);
     });
   });

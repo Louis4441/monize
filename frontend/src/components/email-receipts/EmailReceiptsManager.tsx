@@ -14,6 +14,7 @@ import { ParserEditorDialog } from '@/components/email-receipts/ParserEditorDial
 import { RecognizeWithAiDialog } from '@/components/email-receipts/RecognizeWithAiDialog';
 import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge';
 import { useParserDraftWithAi } from '@/components/email-receipts/useParserDraftWithAi';
+import { Badge } from '@/components/ui/Badge';
 import { Button, buttonClassName } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -30,9 +31,11 @@ import {
   canDraftParser,
   canLinkTradeEmail,
   canRecognizeWithAi,
+  canReprocessReceipt,
   distinctSenderDomains,
   isReceiptActionable,
   normalizeDomainFilter,
+  parserDraftKind,
   senderDomain,
 } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
@@ -98,9 +101,10 @@ interface Notice {
  */
 export function EmailReceiptsManager() {
   const t = useTranslations('emailReceipts.receipts');
+  const tDetail = useTranslations('emailReceipts.detail');
   const tc = useTranslations('common');
   const { formatDate, formatDateTime } = useDateFormat();
-  const { formatCurrency, formatNumber } = useNumberFormat();
+  const { formatCurrency, formatNumber, formatShareQuantity } = useNumberFormat();
   const { state: lookups, reload: reloadLookups } = useReceiptParserLookups();
 
   const router = useRouter();
@@ -450,7 +454,8 @@ export function EmailReceiptsManager() {
         icon: 'reopen',
         tone: 'primary',
         onClick: () => void handleReprocess(receipt),
-        hidden: !actionable || receipt.status === 'pending',
+        // A trade the ledger already held is read again too: it may have been entered by mistake.
+        hidden: !canReprocessReceipt(receipt),
         disabled,
       },
       {
@@ -480,6 +485,8 @@ export function EmailReceiptsManager() {
   // What is ticked AND still on screen: an email a reload dropped is not selected.
   const selected = (current?.items ?? []).filter((receipt) => selectedIds.has(receipt.id));
   const selectedDomains = distinctSenderDomains(selected);
+  // One profile reads one kind of email: trade confirmations and order emails are never drafted together.
+  const selectedMixed = parserDraftKind(selected) === 'mixed';
 
   // The tag cloud counts within the state on screen; "All" reads the unfiltered list.
   const cloudDomains = filter === 'all' ? domains : cloud !== null && cloud.filter === filter ? cloud.items : null;
@@ -562,13 +569,28 @@ export function EmailReceiptsManager() {
           </thead>
           <tbody className={TABLE_BODY_CLASS}>
             {current.items.map((receipt) => {
-              const summary = receipt.transaction
-                ? t('transactionSummary', {
-                    date: formatDate(receipt.transaction.date),
-                    amount: formatCurrency(receipt.transaction.amount, receipt.transaction.currencyCode),
-                    payee: receipt.transaction.payeeName ?? t('noPayee'),
+              // A trade email accounts for an investment transaction, never a bank one.
+              const booked = receipt.isTrade ? (receipt.investmentTransaction ?? null) : null;
+              const summary = booked
+                ? tDetail('tradeTransactionSummary', {
+                    action: booked.action === 'SELL' ? 'SELL' : 'BUY',
+                    quantity: formatShareQuantity(booked.quantity),
+                    symbol: booked.symbol,
+                    total: formatCurrency(booked.totalAmount, booked.currencyCode),
+                    date: formatDate(booked.date),
                   })
-                : null;
+                : receipt.transaction && !receipt.isTrade
+                  ? t('transactionSummary', {
+                      date: formatDate(receipt.transaction.date),
+                      amount: formatCurrency(receipt.transaction.amount, receipt.transaction.currencyCode),
+                      payee: receipt.transaction.payeeName ?? t('noPayee'),
+                    })
+                  : null;
+              const summaryHref = booked
+                ? `/investments?edit=${booked.id}`
+                : receipt.transaction
+                  ? `/transactions?targetTransactionId=${receipt.transaction.id}`
+                  : null;
               return (
                 <tr key={receipt.id}>
                   <Td className="px-2 align-top sm:px-4">
@@ -589,18 +611,25 @@ export function EmailReceiptsManager() {
                   </Td>
                   <Td className="px-2 align-top whitespace-nowrap sm:px-4">{formatDateTime(receipt.effectiveDate)}</Td>
                   <Td className="min-w-0 px-2 align-top break-words sm:px-4">
-                    <div className="font-medium">{receipt.subject}</div>
+                    <div className="font-medium">
+                      {receipt.subject}
+                      {receipt.isTrade && (
+                        <>
+                          {' '}
+                          <Badge variant="blue" className="align-middle">
+                            {t('tradeBadge')}
+                          </Badge>
+                        </>
+                      )}
+                    </div>
                     <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{receipt.fromAddress}</div>
                     {summary && (
                       <div className="mt-1 text-xs text-gray-700 dark:text-gray-300 sm:hidden">{summary}</div>
                     )}
                   </Td>
                   <Td className="hidden px-2 align-top sm:table-cell sm:px-4">
-                    {receipt.transaction ? (
-                      <Link
-                        href={`/transactions?targetTransactionId=${receipt.transaction.id}`}
-                        className="text-blue-600 hover:underline dark:text-blue-400"
-                      >
+                    {summary && summaryHref ? (
+                      <Link href={summaryHref} className="text-blue-600 hover:underline dark:text-blue-400">
                         {summary}
                       </Link>
                     ) : (
@@ -696,13 +725,23 @@ export function EmailReceiptsManager() {
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <span>{t('selection.count', { count: selected.length, max: PARSER_DRAFT_MAX_RECEIPTS })}</span>
-            <Button isLoading={drafting} disabled={drafting} onClick={() => void handleDraftParser(selected)}>
+            <Button
+              isLoading={drafting}
+              disabled={drafting || selectedMixed}
+              aria-describedby={selectedMixed ? 'receipts-selection-mixed' : undefined}
+              onClick={() => void handleDraftParser(selected)}
+            >
               {t('selection.draftButton', { count: selected.length })}
             </Button>
             <Button variant="outline" disabled={drafting} onClick={() => setSelectedIds(new Set())}>
               {t('selection.clear')}
             </Button>
           </div>
+          {selectedMixed && (
+            <p id="receipts-selection-mixed" role="alert" className="text-amber-800 dark:text-amber-200">
+              {t('draft.mixedKinds')}
+            </p>
+          )}
           {selectedDomains.length > 1 && (
             <p role="alert" className="text-amber-800 dark:text-amber-200">
               {t('selection.differentSenders', { domains: selectedDomains.join(', ') })}

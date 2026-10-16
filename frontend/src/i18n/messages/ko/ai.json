@@ -231,7 +231,11 @@
       "category": "카테고리를 {name}(으)로 지정",
       "payee": "수취인을 {name}(으)로 지정",
       "aiReview": "{count, plural, other {AI 검토 요청 #건을 대기열에 추가}}"
-    }
+    },
+    "aiCategory": "AI 제안",
+    "tags": "태그",
+    "newTag": "(새 태그)",
+    "marksPaidDue": "{name} (만기 {date})"
   },
   "table": {
     "downloadTitle": "CSV로 표 다운로드",

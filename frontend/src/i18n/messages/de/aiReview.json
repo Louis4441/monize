@@ -56,7 +56,8 @@
     "viewTransaction": "Buchung anzeigen",
     "waitingForAgent": "Wartet auf einen KI-Agenten. <link>Verbinde in den Einstellungen einen KI-Anbieter</link> oder lass einen MCP-Client die Anfrage übernehmen.",
     "parserDraftReady": "Profil-Entwurf bereit. <link>Teste und gib ihn in den Profil-Einstellungen frei</link>.",
-    "tradePending": "Ein Trade aus einer E-Mail, noch nicht gelesen"
+    "tradePending": "Ein Trade aus einer E-Mail, noch nicht gelesen",
+    "tradeEmail": "E-Mail mit Handelsbestätigung"
   },
   "actions": {
     "dismiss": "Verwerfen"

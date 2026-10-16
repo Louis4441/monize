@@ -56,7 +56,8 @@
     "viewTransaction": "Ver transação",
     "waitingForAgent": "A aguardar um agente de IA. <link>Ligue um fornecedor de IA nas Definições</link> ou deixe um cliente MCP assumi-lo.",
     "parserDraftReady": "Rascunho de perfil pronto. <link>Teste e aprove-o nas configurações de perfis</link>.",
-    "tradePending": "Uma operação de um email, ainda por ler"
+    "tradePending": "Uma operação de um email, ainda por ler",
+    "tradeEmail": "E-mail de confirmação de negociação"
   },
   "actions": {
     "dismiss": "Dispensar"

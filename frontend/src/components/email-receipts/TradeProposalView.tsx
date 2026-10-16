@@ -18,9 +18,11 @@ interface TradeProposalViewProps {
 }
 
 /**
- * What the AI agent made of an email handed to it as a trade (no profile read
- * it): the trade its proposal would book, with the figures of the review card,
- * or why there is none to show. The total and the price are in the security's
+ * The trade an email's open `email_trade` proposal would book, with the figures
+ * of the review card (the account and the security resolved): the AI agent's
+ * answer for an email handed to it as a trade, or a trade profile's reading
+ * beside that reading. With no proposal (only for an email no profile read), why
+ * there is none to show. The total and the price are in the security's
  * currency, as the card states them.
  */
 export function TradeProposalView({ proposal, booked, displayState }: TradeProposalViewProps) {

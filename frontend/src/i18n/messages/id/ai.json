@@ -231,7 +231,11 @@
       "category": "Atur kategori ke {name}",
       "payee": "Atur penerima ke {name}",
       "aiReview": "{count, plural, other {Antrekan # permintaan peninjauan AI}}"
-    }
+    },
+    "aiCategory": "disarankan AI",
+    "tags": "Tag",
+    "newTag": "(tag baru)",
+    "marksPaidDue": "{name} (jatuh tempo {date})"
   },
   "table": {
     "downloadTitle": "Unduh tabel sebagai CSV",

@@ -106,23 +106,34 @@ export const RECEIPT_TRADE_EXISTS_REASON = 'trade_exists';
 export const RECEIPT_TRADE_LINKED_REASON = 'trade_linked';
 
 /**
- * Whether a trade email can be linked to the investment transaction it reports
- * (the server's own refusals, `EmailReceiptTradeLinkService.link`): its
- * proposal waits or was refused (`review`, `review_conflict`), or the trade was
- * already in the ledger (`ignored` as `trade_exists`, which may be pointed at
- * the right row). Never once it accounts for a row it was linked to or booked,
- * nor once its proposal was applied, nor for an email the AI reads as a trade.
+ * Whether "Reprocess" is offered for an email: one a person can still change
+ * (`isReceiptActionable`), and a trade email closed because the ledger already
+ * held the trade (`ignored` as `trade_exists`), which the server reads again
+ * (`refuseUnprocessable` in the pipeline) so a trade entered by mistake can be
+ * proposed after all.
+ */
+export function canReprocessReceipt(receipt: Pick<EmailReceiptListItem, 'status' | 'statusReason' | 'displayState'>): boolean {
+  if (receipt.status === 'pending') return false;
+  return isReceiptActionable(receipt) || (receipt.status === 'ignored' && receipt.statusReason === RECEIPT_TRADE_EXISTS_REASON);
+}
+
+/**
+ * Whether a trade email can be linked to the investment transaction it reports:
+ * exactly the server's own refusals (`EmailReceiptTradeLinkService.link`), and
+ * nothing stricter, so a candidate the dialog lists always has its Link button.
+ * Refused: an email no profile read (the AI reads it, so there is no reading and
+ * no candidate), a skipped one, one whose proposal was applied, and one that
+ * already accounts for a row it was linked to or booked (only a `trade_exists`
+ * email may be pointed at the right row instead).
  */
 export function canLinkTradeEmail(
   receipt: Pick<EmailReceiptListItem, 'isTrade' | 'tradeSource' | 'status' | 'statusReason' | 'displayState' | 'investmentTransaction'>,
 ): boolean {
-  if (!receipt.isTrade || receipt.displayState === 'applied') return false;
-  // The candidates come from a profile's reading; an email the AI reads has none.
-  if (receipt.tradeSource === 'ai') return false;
-  if (receipt.statusReason === RECEIPT_TRADE_LINKED_REASON) return false;
-  if (receipt.investmentTransaction && receipt.statusReason !== RECEIPT_TRADE_EXISTS_REASON) return false;
-  if (receipt.status === 'ignored') return receipt.statusReason === RECEIPT_TRADE_EXISTS_REASON;
-  return receipt.status === 'review' || receipt.status === 'review_conflict';
+  if (!receipt.isTrade || receipt.tradeSource === 'ai') return false;
+  if (receipt.status === 'skipped' || receipt.displayState === 'applied') return false;
+  // A linked email whose row is not known (a server that predates the summary) is taken to account for it.
+  if (receipt.statusReason === RECEIPT_TRADE_LINKED_REASON && receipt.investmentTransaction !== null) return false;
+  return !receipt.investmentTransaction || receipt.statusReason === RECEIPT_TRADE_EXISTS_REASON;
 }
 
 /** The states from which "Recognize with AI" is offered: nothing read it, or what read it was dismissed or lost. */
@@ -154,6 +165,20 @@ const DRAFTABLE_STATES: readonly EmailReceiptShownState[] = ['no_parser', 'parse
 /** Whether the row's own "Draft parser with AI" action is offered for an email. */
 export function canDraftParser(receipt: Pick<EmailReceiptListItem, 'status' | 'displayState'>): boolean {
   return DRAFTABLE_STATES.includes(shownReceiptState(receipt));
+}
+
+/** What a "Draft parser with AI" request asks for (`kind` of `POST /email-receipt-parsers/draft-with-ai`). */
+export type ParserDraftKind = 'receipt' | 'trade';
+
+/**
+ * The kind of profile some emails are drafted into: a trade profile when every
+ * one is a trade confirmation, a receipt profile when none is, and `mixed` (no
+ * request can be made) when they are some of each, since one profile reads one kind.
+ */
+export function parserDraftKind(receipts: ReadonlyArray<Pick<EmailReceiptListItem, 'isTrade'>>): ParserDraftKind | 'mixed' {
+  const trades = receipts.filter((receipt) => receipt.isTrade).length;
+  if (trades === 0) return 'receipt';
+  return trades === receipts.length ? 'trade' : 'mixed';
 }
 
 /**

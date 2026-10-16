@@ -93,7 +93,7 @@
         "automatic": "승인된 프로필이 완전히 읽지 못한 일치한 영수증에 대해 확인 시 AI에 문의하고, 프로필이 없는 발신자에게는 프로필 초안을 작성합니다."
       },
       "autoApplyLabel": "제안 자동 적용",
-      "autoApplyHelp": "기본값은 꺼짐입니다. 제안은 다음이 모두 충족될 때만 묻지 않고 적용됩니다. 승인된 프로필이 메일 전체를 읽었고, 거래가 주문 번호나 참조 번호 또는 정확한 금액과 거래처로 후보 하나만 남은 상태에서 발견되었으며, 제안이 끝자리까지 정확히 맞아떨어질 때입니다. 그 외는 모두 사용자의 승인을 기다립니다.",
+      "autoApplyHelp": "기본값은 꺼짐입니다. 제안은 다음이 모두 충족될 때만 묻지 않고 적용됩니다. 승인된 프로필이 메일 전체를 읽었고, 거래가 주문 번호나 참조 번호 또는 정확한 금액과 거래처로 후보 하나만 남은 상태에서 발견되었으며, 제안이 끝자리까지 정확히 맞아떨어질 때입니다. 거래 확인 메일은 해당 거래 프로필이 승인되었고, 거래 전체를 읽었으며, 가격이 수량과 합계와 맞고, 같은 거래가 아직 계좌에 없을 때만 묻지 않고 기록됩니다. 그 외는 모두 사용자의 승인을 기다립니다.",
       "profileLimitLabel": "프로필 제안을 일일 AI 한도에 포함",
       "profileLimitHelp": "기본값은 켜짐입니다. 프로필이 메일에서 제안한 수정은 다른 AI 제안과 마찬가지로 AI가 제안하는 변경의 일일 한도에 포함됩니다. 저장된 메일이 대량으로 있어 한도가 소진될 때는 끄세요. 프로필의 제안만 제외되며, 모든 제안은 여전히 사용자의 승인을 기다립니다."
     },
@@ -177,14 +177,15 @@
       "confirm": "지금 처리",
       "later": "나중에"
     },
-    "reparse": "메일 다시 분석 ({count})"
+    "reparse": "메일 다시 분석 ({count})",
+    "kindTrade": "증권 거래"
   },
   "editor": {
     "createTitle": "새 프로필",
     "editTitle": "프로필 편집",
-    "loading": "수취인과 카테고리를 불러오는 중",
+    "loading": "수취인, 카테고리, 계좌, 통화를 불러오는 중",
     "lookupsError": {
-      "title": "수취인과 카테고리를 불러오지 못했습니다",
+      "title": "수취인, 카테고리, 계좌 또는 통화를 불러오지 못했습니다",
       "body": "선택 항목에 필요하므로 편집기를 아직 열 수 없습니다. 다시 시도하세요.",
       "retry": "다시 시도"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "태그 이름",
       "aiCategoriesLabel": "어떤 규칙에도 해당하지 않는 품목의 카테고리를 AI가 고르게 하기",
       "aiCategoriesHelp": "품목이 어떤 카테고리 규칙에도 해당하지 않고 기본 카테고리도 없으면, AI에게 내 카테고리 목록에서 카테고리를 묻습니다. 그 선택은 제안에 AI의 선택으로 표시됩니다. 이 옵션을 끄면 AI에게 묻지 않습니다."
+    },
+    "kind": {
+      "label": "프로필 종류",
+      "receipt": "주문 영수증",
+      "trade": "증권 거래",
+      "receiptHelp": "주문 확인 메일을 읽고 그 대금을 치른 은행 거래를 찾습니다.",
+      "tradeHelp": "증권사의 체결 확인 메일을 읽고 거기에 적힌 투자 거래(매수 또는 매도)를 제안합니다."
+    },
+    "trade": {
+      "guardsHeading": "보낸 사람의 어떤 메일을 읽는지",
+      "guardsHelp": "선택 사항입니다. 각 패턴은 메일의 한 줄 전체와 비교되며, 한 줄에 패턴 하나입니다.",
+      "guards": {
+        "requireLine": "필수 줄",
+        "requireLineHint": "이 줄 중 하나가 있는 메일만 읽습니다. 없으면 보낸 사람의 다음 프로필을 시도합니다.",
+        "skipIfLine": "이메일을 건너뛰게 하는 줄",
+        "skipIfLineHint": "이 줄 중 하나가 있는 메일은 따로 둡니다. 예: 취소된 주문.",
+        "waitIfLine": "이메일을 보류하게 하는 줄",
+        "waitIfLineHint": "이 줄 중 하나가 있는 메일은 보류했다가 나중에 다시 읽습니다. 예: 일부 체결."
+      },
+      "fieldsHeading": "거래",
+      "fieldsHelp": "매수 또는 매도, 종목 코드, 주식 수는 필수이며 합계나 가격도 필요합니다. 각 필드에는 패턴을 한 줄에 하나씩 적고, 순서대로 시도합니다.",
+      "fields": {
+        "tradeAction": "매수 또는 매도 패턴",
+        "tradeSymbol": "종목 코드 패턴",
+        "tradeQuantity": "주식 수 패턴",
+        "tradeTotal": "거래 합계 패턴",
+        "tradePrice": "주당 가격 패턴",
+        "tradeCommission": "수수료 패턴",
+        "tradeDate": "거래일 패턴",
+        "tradeAccount": "계좌 패턴"
+      },
+      "fieldHint": "{capture}을(를) 가져와야 합니다. 예: {example}",
+      "amountsHelp": "합계는 체결 금액이며 매수에는 수수료가 포함됩니다. 가격은 대조용이며, 메일에 합계가 없으면 가격으로 합계를 구합니다. 통화를 밝힌 금액(US$, C$, USD, €)은 거래의 통화도 정합니다.",
+      "rulesHeading": "계좌 규칙",
+      "rulesHelp": "거래를 어느 계좌에 기록할지 정합니다. 규칙은 계좌 패턴이 읽은 계좌 텍스트에 대해 순서대로 시도되며, 처음 적용되는 규칙이 이깁니다. {star}는 아무 텍스트입니다. 통화가 있는 규칙은 그 통화의 거래에만 적용되므로, 증권사가 똑같이 표기하는 두 계좌(둘 다 RRSP로 표시되는 CAD RRSP와 USD RRSP 등)는 텍스트가 같고 통화가 다른 두 규칙이 됩니다. 메일에 계좌 텍스트가 없으면 텍스트가 {star}인 규칙만 적용될 수 있습니다. 나머지는 기본 계좌가 맡습니다.",
+      "currencyOrder": "거래의 통화는 다음 순서로 정해집니다. 금액이 통화를 밝히면 그 통화(US$, C$, USD, €), 다음으로 메일의 줄과 일치하는 아래의 첫 통화 표시, 다음으로 그 종목 코드에 대한 내 증권의 통화입니다. 통화가 있는 규칙은 절대 추측하지 않습니다. 셋 중 어느 것도 통화를 알려 주지 않으면 메일은 어느 계좌에도 기록되지 않고 확인을 기다립니다.",
+      "ruleMatchLabel": "규칙 {rule}의 계좌 텍스트",
+      "ruleMatchPlaceholder": "계좌 텍스트(예: RRSP)",
+      "ruleCurrencyLabel": "규칙 {rule}의 통화",
+      "ruleAccountLabel": "규칙 {rule}의 계좌",
+      "ruleMoveUp": "규칙 {rule}을(를) 위로",
+      "ruleMoveDown": "규칙 {rule}을(를) 아래로",
+      "ruleRemove": "규칙 {rule} 삭제",
+      "ruleAdd": "계좌 규칙 추가",
+      "rulesMax": "규칙은 최대 {max}개입니다.",
+      "rulesWithoutAccountText": "계좌 패턴이 없어서 규칙을 빈 텍스트에 대해 시도합니다. 텍스트가 {star}인 규칙만 적용될 수 있습니다.",
+      "anyCurrency": "모든 통화",
+      "baseCurrency": "{code}(기준 통화)",
+      "currencyPlaceholder": "통화 선택",
+      "accountPlaceholder": "계좌 선택",
+      "accountOption": "{name}({currency})",
+      "accountNotTradableOption": "{name}(열려 있는 증권 계좌 아님)",
+      "accountUnknownOption": "목록에 없는 계좌",
+      "accountNotTradable": "이 계좌에는 거래를 기록할 수 없습니다. 닫혔거나, 현금 계좌이거나, 투자 계좌가 아닙니다.",
+      "accountUnknown": "이 계좌는 목록에 없습니다. 삭제되었을 수 있습니다. 다른 계좌를 고르세요.",
+      "defaultAccountLabel": "기본 계좌",
+      "defaultAccountNone": "기본 계좌 없음",
+      "defaultAccountHint": "적용되는 규칙이 없을 때의 계좌입니다. 없으면 규칙이 적용되지 않는 메일은 확인을 기다립니다.",
+      "markersHeading": "통화 표시",
+      "markersHelp": "금액이 통화를 밝히지 않을 때 거래의 통화를 알려 주는 텍스트입니다. 예를 들어 그냥 $ 옆에 금액이 미국 달러라고 적힌 줄입니다. 각 표시는 메일의 모든 줄과 비교되며({star}는 아무 텍스트), 순서상 처음 일치하는 표시가 통화를 정합니다. 표시는 금액이 통화를 밝히지 않을 때만 쓰입니다.",
+      "markerMatchLabel": "표시 {marker}의 텍스트",
+      "markerMatchPlaceholder": "예: *U.S. dollars*",
+      "markerCurrencyLabel": "표시 {marker}의 통화",
+      "markerMoveUp": "표시 {marker}을(를) 위로",
+      "markerMoveDown": "표시 {marker}을(를) 아래로",
+      "markerRemove": "표시 {marker} 삭제",
+      "markerAdd": "통화 표시 추가",
+      "markersMax": "표시는 최대 {max}개입니다."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "건너뛸 줄 {line}",
       "recordStep": "레코드 단계 {step}",
       "recordStepPart": "레코드 단계 {step}, {part}",
-      "recordAlternative": "레코드 단계 {step}, 대체 {alternative}"
+      "recordAlternative": "레코드 단계 {step}, 대체 {alternative}",
+      "accountRule": "계좌 규칙 {rule}",
+      "accountRulePart": "계좌 규칙 {rule}, {part}",
+      "currencyMarker": "통화 표시 {marker}",
+      "currencyMarkerPart": "통화 표시 {marker}, {part}"
     },
     "fields": {
       "orderId": "주문 번호 패턴",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "구매 후 일수",
       "matchTolerance": "금액 허용 오차",
       "tag": "태그",
-      "aiCategories": "AI 카테고리"
+      "aiCategories": "AI 카테고리",
+      "trade": "거래 섹션",
+      "tradeAction": "매수 또는 매도 패턴",
+      "tradeSymbol": "종목 코드 패턴",
+      "tradeQuantity": "주식 수 패턴",
+      "tradeTotal": "거래 합계 패턴",
+      "tradePrice": "주당 가격 패턴",
+      "tradeCommission": "수수료 패턴",
+      "tradeDate": "거래일 패턴",
+      "tradeAccount": "계좌 패턴",
+      "accountRules": "계좌 규칙",
+      "currencyMarkers": "통화 표시",
+      "defaultAccount": "기본 계좌",
+      "ruleAccount": "계좌",
+      "ruleCurrency": "통화"
     },
     "codes": {
       "not_object": "은(는) 유효한 정의가 아닙니다",
@@ -376,7 +463,12 @@
       "duplicate_entry": "에 같은 항목이 두 번 있습니다",
       "reference_field_missing": "에는 참조 패턴이 필요합니다 (참조 방식이 켜져 있습니다)",
       "out_of_range_days": "은(는) 0부터 {max}까지의 정수여야 합니다",
-      "out_of_range_tolerance": "은(는) 0.00부터 {max}까지의 금액이어야 합니다"
+      "out_of_range_tolerance": "은(는) 0.00부터 {max}까지의 금액이어야 합니다",
+      "trade_conflict": "은(는) 거래만 읽는 증권 거래 프로필에 둘 수 없습니다",
+      "trade_amount_missing": "에는 합계 또는 가격 패턴이 필요합니다(둘 중 하나 이상)",
+      "trade_account_missing": "에는 기본 계좌나 계좌 규칙이 필요합니다",
+      "invalid_currency": "은(는) USD 같은 3글자 통화 코드가 아닙니다",
+      "invalid_uuid_account": "은(는) 올바른 계좌가 아닙니다"
     }
   },
   "test": {
@@ -429,7 +521,8 @@
         "price": "가격",
         "commission": "수수료",
         "date": "날짜",
-        "account": "계좌"
+        "account": "계좌",
+        "currency": "통화 표시"
       },
       "entryLine": "항목 {entry} ({pattern}), {line}번째 줄: {text}",
       "entrySubject": "항목 {entry} ({pattern}), 제목: {text}",
@@ -601,8 +694,11 @@
       "handoffFailed": "요청은 대기열에 추가되었지만 채팅에서 이메일을 열 수 없었습니다. AI 검토 수신함에서 에이전트를 기다립니다.",
       "inboxLink": "AI 검토 수신함 열기",
       "opened": "이메일을 첨부한 채로 채팅을 열었습니다. 메시지를 읽고 보내기를 누르세요.",
-      "chatPrompt": "{domain}에서 온 {count, plural, one {주문 이메일 #통} other {주문 이메일 #통}}으로 이메일 영수증 프로필를 만들어 주세요. AI 검토 요청 {requestId}을(를) 맡아서, email_receipt_profiles 도구로 첨부한 모든 이메일에서 프로필를 테스트하고, 각 이메일이 끝까지 읽힐 때까지 고친 다음, 요청 {requestId}의 초안으로 저장해 주세요."
-    }
+      "chatPrompt": "{domain}에서 온 {count, plural, one {주문 이메일 #통} other {주문 이메일 #통}}으로 이메일 영수증 프로필를 만들어 주세요. AI 검토 요청 {requestId}을(를) 맡아서, email_receipt_profiles 도구로 첨부한 모든 이메일에서 프로필를 테스트하고, 각 이메일이 끝까지 읽힐 때까지 고친 다음, 요청 {requestId}의 초안으로 저장해 주세요.",
+      "mixedKinds": "선택한 메일에 거래 확인 메일과 주문 메일이 섞여 있습니다. 프로필 하나는 한 종류만 읽으므로 거래 확인 메일만 또는 주문 메일만 선택하세요.",
+      "chatPromptTrade": "{domain}에서 온 {count, plural, one {거래 확인 이메일 #통} other {거래 확인 이메일 #통}}으로 거래 프로필을 만들어 주세요. AI 검토 요청 {requestId}을(를) 맡아서, email_receipt_parsers 도구로 첨부한 모든 이메일에서 프로필을 테스트하고, 각 이메일에서 완전한 거래가 읽힐 때까지 고친 다음, 요청 {requestId}의 초안으로 저장해 주세요."
+    },
+    "tradeBadge": "거래"
   },
   "detail": {
     "title": "이메일 영수증",
@@ -660,7 +756,8 @@
       "trade_no_amount": "프로필이 이 메일에서 합계도 가격도 찾지 못했습니다.",
       "trade_no_account": "프로필이 이 거래가 어느 계좌의 것인지 알아내지 못했습니다.",
       "trade_exists": "계좌에 이미 이 거래가 있어 아무것도 제안하지 않았습니다.",
-      "trade_linked": "보고된 거래에 연결했으므로 아무것도 제안하지 않았습니다."
+      "trade_linked": "보고된 거래에 연결했으므로 아무것도 제안하지 않았습니다.",
+      "trade_no_currency": "프로필이 이 거래의 통화를 알아낼 수 없어 계좌를 고르지 못했습니다."
     },
     "reasonUnknown": "사유: {reason}",
     "requestNote": "검토 요청 ({state}): {note}",
@@ -714,7 +811,8 @@
     "tradeNoCandidates": "거래일 전후 일주일 안에 이 계좌, 방향, 종목 코드로 연결할 수 있는 투자 거래가 없습니다. 직접 입력했다면 계좌와 날짜를 확인하고, 그렇지 않다면 검토함에서 제안을 승인하세요.",
     "aiTradeHeading": "AI 에이전트가 제안하는 거래",
     "aiTradeReader": "없음: AI 에이전트가 거래로 읽습니다",
-    "noAiTradeTransaction": "아직 없음: AI 에이전트의 제안을 승인하면 거래가 기록됩니다."
+    "noAiTradeTransaction": "아직 없음: AI 에이전트의 제안을 승인하면 거래가 기록됩니다.",
+    "tradeProposalHeading": "이 제안이 기록할 내용"
   },
   "picker": {
     "heading": "거래 선택",
@@ -1032,7 +1130,12 @@
         "no_html": "HTML 부분 없음",
         "trade": "거래를 제안함",
         "trade_exists": "이미 원장에 있음"
-      }
+      },
+      "parsedTradeAccount": "계좌: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "알 수 없음",
+      "parsedTradeNoAccount": "이 거래의 계좌를 찾지 못했습니다",
+      "parsedTradeCurrency": "통화: {currency}"
     }
   },
   "trade": {
@@ -1051,6 +1154,10 @@
     "proposalReviewLink": "받은편지함에서 검토",
     "aiWaiting": "AI 에이전트가 아직 거래를 제안하지 않았습니다. 제안은 여기와 검토 받은편지함에 표시됩니다.",
     "aiBooked": "AI 에이전트의 제안으로 기록됨: 위의 거래를 확인하세요.",
-    "aiNoProposal": "이 이메일에 대해 대기 중인 AI 에이전트 제안이 없습니다."
+    "aiNoProposal": "이 이메일에 대해 대기 중인 AI 에이전트 제안이 없습니다.",
+    "currencyFrom": "통화: {currency}, {source, select, amount {금액이 밝힌 통화} marker {프로필의 통화 표시에서} other {종목 코드에 대한 내 증권에서}}",
+    "bookTo": "기록할 계좌: {account}",
+    "bookToNotTradable": "{account}에 기록되지만, 열려 있는 증권 계좌가 아니어서 거래를 그곳에 기록할 수 없습니다.",
+    "bookToUnknown": "목록에 없는 계좌에 기록되므로 거래를 그곳에 기록할 수 없습니다."
   }
 }

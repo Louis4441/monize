@@ -5,6 +5,7 @@ import { render, screen, fireEvent, act, within } from '@/test/render';
 import { ParserEditorDialog } from './ParserEditorDialog';
 import { makeParser, makeReceipt, PARSED_RECEIPT } from './email-receipts-fixtures';
 import type { ReceiptParserLookupsState } from '@/hooks/useReceiptParserLookups';
+import { usePreferencesStore } from '@/store/preferencesStore';
 
 const api = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), test: vi.fn(), list: vi.fn() }));
 vi.mock('@/lib/email-receipts-api', () => ({
@@ -19,6 +20,9 @@ vi.mock('@/lib/logger', () => ({
 
 const CAT_CABLES = '11111111-1111-4111-8111-111111111111';
 const CAT_SHIPPING = '22222222-2222-4222-8222-222222222222';
+const RRSP_CAD = '33333333-3333-4333-8333-333333333333';
+const RRSP_USD = '44444444-4444-4444-8444-444444444444';
+const RRSP_CASH = '55555555-5555-4555-8555-555555555555';
 
 const ready: ReceiptParserLookupsState = {
   status: 'ready',
@@ -31,6 +35,12 @@ const ready: ReceiptParserLookupsState = {
       { value: CAT_CABLES, label: 'Electronics: Cables' },
       { value: CAT_SHIPPING, label: 'Shipping' },
     ],
+    accounts: [
+      { value: RRSP_CAD, label: 'RRSP', currencyCode: 'CAD', tradable: true },
+      { value: RRSP_CASH, label: 'RRSP Cash', currencyCode: 'CAD', tradable: false },
+      { value: RRSP_USD, label: 'RRSP', currencyCode: 'USD', tradable: true },
+    ],
+    currencyCodes: ['USD', 'CAD', 'EUR'],
   },
 };
 
@@ -538,18 +548,154 @@ describe('ParserEditorDialog', () => {
   describe('payees and categories', () => {
     it('waits for them, since the pickers are useless without', async () => {
       await renderEditor({ lookups: { status: 'loading' } });
-      expect(screen.getByText('Loading payees and categories')).toBeInTheDocument();
+      expect(screen.getByText('Loading payees, categories, accounts and currencies')).toBeInTheDocument();
       expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
     });
 
     it('shows a failed read as an error with a retry instead of a form that would blank stored ids', async () => {
       await renderEditor({ lookups: { status: 'error' } });
-      expect(screen.getByRole('alert')).toHaveTextContent('Payees and categories could not be loaded');
+      expect(screen.getByRole('alert')).toHaveTextContent('Payees, categories, accounts or currencies could not be loaded');
       expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
       });
       expect(onReloadLookups).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('a brokerage trade profile', () => {
+    const optionTexts = (label: string) =>
+      within(screen.getByLabelText(label)).getAllByRole('option').map((option) => option.textContent);
+    const choose = async (label: string, value: string) => {
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(label), { target: { value } });
+      });
+    };
+    const clickButton = async (name: string) => {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name }));
+      });
+    };
+
+    beforeEach(() => {
+      usePreferencesStore.setState({ preferences: { defaultCurrency: 'CAD' } as never });
+    });
+
+    it('is picked for a new profile, and shows the trade fields instead of the receipt ones', async () => {
+      await renderEditor();
+      expect(screen.getByRole('button', { name: 'Order receipt' })).toHaveAttribute('aria-pressed', 'true');
+      await clickButton('Brokerage trade');
+      expect(screen.getByRole('button', { name: 'Brokerage trade' })).toHaveAttribute('aria-pressed', 'true');
+      for (const gone of ['Payee', 'Total patterns', 'Item patterns', 'Default category', 'Reference patterns', 'Tag name']) {
+        expect(screen.queryByLabelText(gone)).not.toBeInTheDocument();
+      }
+      for (const shown of ['Lines source', 'Required lines', 'Buy or sell patterns', 'Ticker patterns', 'Share count patterns', 'Trade total patterns', 'Account patterns', 'Default account']) {
+        expect(screen.getByLabelText(shown)).toBeInTheDocument();
+      }
+      expect(screen.getByText(/the amount itself when it names one/)).toBeInTheDocument();
+    });
+
+    it('offers any currency, the base one and the other active ones, and only the open brokerage accounts', async () => {
+      await renderEditor();
+      await clickButton('Brokerage trade');
+      await clickButton('Add an account rule');
+      expect(optionTexts('Currency of rule 1')).toEqual(['Any currency', 'CAD (your base currency)', 'EUR', 'USD']);
+      expect(optionTexts('Account of rule 1')).toEqual(['Choose an account', 'RRSP (CAD)', 'RRSP (USD)']);
+      await clickButton('Add a currency marker');
+      expect(optionTexts('Currency of marker 1')).toEqual(['Choose a currency', 'CAD (your base currency)', 'EUR', 'USD']);
+    });
+
+    it('tells two accounts printed the same way apart by currency, and saves the trade definition with no payee', async () => {
+      api.create.mockResolvedValue(makeParser());
+      await renderEditor({ prefill: { payeeId: 'payee-1' } });
+      await clickButton('Brokerage trade');
+      await type('Name', 'Broker');
+      await type('Sender domains', 'broker.example');
+      await type('Required lines', '*has been filled*');
+      await type('Buy or sell patterns', 'You {action} *');
+      await type('Ticker patterns', 'Symbol: {symbol}');
+      await type('Share count patterns', 'Shares: {quantity}');
+      await type('Trade total patterns', 'Total: {amount}');
+      await type('Account patterns', 'Account: {account}');
+      await clickButton('Add an account rule');
+      await clickButton('Add an account rule');
+      await clickButton('Add an account rule');
+      await type('Account text of rule 1', 'RRSP');
+      await choose('Currency of rule 1', 'USD');
+      await choose('Account of rule 1', RRSP_USD);
+      await type('Account text of rule 2', 'RRSP');
+      await choose('Currency of rule 2', 'CAD');
+      await choose('Account of rule 2', RRSP_CAD);
+      await type('Account text of rule 3', 'unused');
+      await clickButton('Remove rule 3');
+      expect(screen.queryByLabelText('Account text of rule 3')).not.toBeInTheDocument();
+      await clickButton('Add a currency marker');
+      await type('Text of marker 1', '*U.S. dollars*');
+      await choose('Currency of marker 1', 'USD');
+      await save();
+
+      expect(api.create).toHaveBeenCalledWith({
+        name: 'Broker',
+        payeeId: null,
+        fromDomains: ['broker.example'],
+        subjectContains: [],
+        definition: {
+          version: 2,
+          trade: {
+            action: ['You {action} *'],
+            symbol: ['Symbol: {symbol}'],
+            quantity: ['Shares: {quantity}'],
+            total: ['Total: {amount}'],
+            account: ['Account: {account}'],
+            accountRules: [
+              { match: 'RRSP', accountId: RRSP_USD, currency: 'USD' },
+              { match: 'RRSP', accountId: RRSP_CAD, currency: 'CAD' },
+            ],
+            currencyMarkers: [{ match: '*U.S. dollars*', currency: 'USD' }],
+          },
+          requireLine: ['*has been filled*'],
+        },
+      });
+    });
+
+    it('moves a rule earlier, since the first that applies wins', async () => {
+      await renderEditor();
+      await clickButton('Brokerage trade');
+      await clickButton('Add an account rule');
+      await clickButton('Add an account rule');
+      await type('Account text of rule 2', 'TFSA');
+      await clickButton('Move rule 2 earlier');
+      expect((screen.getByLabelText('Account text of rule 1') as HTMLInputElement).value).toBe('TFSA');
+      expect(screen.getByRole('button', { name: 'Move rule 1 earlier' })).toBeDisabled();
+    });
+
+    it('opens a stored trade profile on the form, with no kind switch, and flags an account a trade cannot book to', async () => {
+      const stored = makeParser({
+        definition: {
+          version: 2,
+          trade: {
+            action: ['{action}'],
+            symbol: ['{symbol}'],
+            quantity: ['{quantity}'],
+            total: ['{amount}'],
+            accountRules: [{ match: '*', accountId: RRSP_CASH, currency: 'GBP' }],
+            defaultAccountId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+          },
+        },
+      });
+      api.update.mockResolvedValue(stored);
+      await renderEditor({ parser: stored });
+      expect(screen.getByRole('button', { name: 'Form' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByRole('button', { name: 'Brokerage trade' })).not.toBeInTheDocument();
+      expect((screen.getByLabelText('Currency of rule 1') as HTMLSelectElement).value).toBe('GBP');
+      expect((screen.getByLabelText('Account of rule 1') as HTMLSelectElement).value).toBe(RRSP_CASH);
+      expect(optionTexts('Account of rule 1')).toContain('RRSP Cash (not an open brokerage account)');
+      expect(optionTexts('Default account')).toContain('An account not in your list');
+      const notes = screen.getAllByRole('note').map((note) => note.textContent);
+      expect(notes).toContain('A trade cannot be booked to this account: it is closed, a cash account or not an investment account.');
+      expect(notes).toContain('This account is not in your list: it may have been deleted. Pick another one.');
+      await save();
+      expect(api.update.mock.calls[0][1].definition).toEqual(stored.definition);
     });
   });
 

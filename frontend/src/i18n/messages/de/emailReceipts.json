@@ -93,7 +93,7 @@
         "automatic": "Beim Abruf fragt die KI zu einem zugeordneten Beleg nach, den kein freigegebenes Profil vollständig lesen konnte, und entwirft ein Profil für einen Absender, der noch keines hat."
       },
       "autoApplyLabel": "Vorschläge automatisch anwenden",
-      "autoApplyHelp": "Standardmäßig aus. Ein Vorschlag wird nur dann ohne Nachfrage angewendet, wenn alles Folgende zutrifft: Ein freigegebenes Profil hat die ganze E-Mail gelesen, die Buchung wurde über eine Bestellnummer oder eine Referenz gefunden oder über genauen Betrag und Empfänger, mit genau einem Kandidaten, und der Vorschlag geht auf den Cent auf. Alles andere wartet auf deine Freigabe.",
+      "autoApplyHelp": "Standardmäßig aus. Ein Vorschlag wird nur dann ohne Nachfrage angewendet, wenn alles Folgende zutrifft: Ein freigegebenes Profil hat die ganze E-Mail gelesen, die Buchung wurde über eine Bestellnummer oder eine Referenz gefunden oder über genauen Betrag und Empfänger, mit genau einem Kandidaten, und der Vorschlag geht auf den Cent auf. Eine Handelsbestätigung wird nur dann ohne Nachfrage gebucht, wenn ihr Handelsprofil freigegeben ist, es den ganzen Handel gelesen hat, der Kurs zu den Anteilen und der Summe passt und deine Konten noch keinen passenden Handel enthalten. Alles andere wartet auf deine Freigabe.",
       "profileLimitLabel": "Vorschläge von Profilen auf das tägliche KI-Limit anrechnen",
       "profileLimitHelp": "Standardmäßig an: Eine Änderung, die ein Profil aus einer E-Mail vorschlägt, zählt wie jeder andere KI-Vorschlag zum Tageslimit KI-vorgeschlagener Änderungen. Schalte es aus, wenn ein großer Stapel gespeicherter E-Mails das Limit sonst aufbrauchen würde. Nur Vorschläge von Profilen sind ausgenommen; jeder Vorschlag wartet weiterhin auf deine Freigabe."
     },
@@ -177,14 +177,15 @@
       "confirm": "Jetzt verarbeiten",
       "later": "Nicht jetzt"
     },
-    "reparse": "E-Mails erneut auslesen ({count})"
+    "reparse": "E-Mails erneut auslesen ({count})",
+    "kindTrade": "Wertpapierhandel"
   },
   "editor": {
     "createTitle": "Neues Profil",
     "editTitle": "Profil bearbeiten",
-    "loading": "Zahlungsempfänger und Kategorien werden geladen",
+    "loading": "Zahlungsempfänger, Kategorien, Konten und Währungen werden geladen",
     "lookupsError": {
-      "title": "Zahlungsempfänger und Kategorien konnten nicht geladen werden",
+      "title": "Zahlungsempfänger, Kategorien, Konten oder Währungen konnten nicht geladen werden",
       "body": "Die Auswahlfelder brauchen sie, daher kann der Editor noch nicht geöffnet werden. Versuche es erneut.",
       "retry": "Erneut versuchen"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "Tag-Name",
       "aiCategoriesLabel": "Die KI die Kategorie von Positionen wählen lassen, auf die keine Regel passt",
       "aiCategoriesHelp": "Wenn eine Position auf keine Kategorieregel passt und es keine Standardkategorie gibt, wird die KI nach ihrer Kategorie aus deiner Kategorienliste gefragt. Die Wahl wird im Vorschlag als die der KI gekennzeichnet. Ist die Option aus, wird die KI nie gefragt."
+    },
+    "kind": {
+      "label": "Art des Profils",
+      "receipt": "Bestellbeleg",
+      "trade": "Wertpapierhandel",
+      "receiptHelp": "Liest eine Bestellbestätigung und findet die Banktransaktion, mit der sie bezahlt wurde.",
+      "tradeHelp": "Liest eine Handelsbestätigung des Brokers und schlägt die Anlagetransaktion vor, die sie meldet, einen Kauf oder einen Verkauf."
+    },
+    "trade": {
+      "guardsHeading": "Welche E-Mails des Absenders es liest",
+      "guardsHelp": "Optional. Jedes Muster wird mit einer ganzen Zeile der E-Mail verglichen, ein Muster pro Zeile.",
+      "guards": {
+        "requireLine": "Erforderliche Zeilen",
+        "requireLineHint": "Das Profil liest eine E-Mail nur, wenn eine dieser Zeilen darin steht; sonst wird das nächste Profil des Absenders versucht.",
+        "skipIfLine": "Zeilen, die die E-Mail überspringen",
+        "skipIfLineHint": "Eine E-Mail mit einer dieser Zeilen wird beiseitegelegt, etwa eine stornierte Order.",
+        "waitIfLine": "Zeilen, die die E-Mail zurückhalten",
+        "waitIfLineHint": "Eine E-Mail mit einer dieser Zeilen wird zurückgehalten und später erneut gelesen, etwa eine Teilausführung."
+      },
+      "fieldsHeading": "Der Handel",
+      "fieldsHelp": "Kauf oder Verkauf, das Kürzel und die Stückzahl sind Pflicht, dazu eine Summe oder ein Preis. Jedes Feld nimmt Muster auf, eines pro Zeile, in Reihenfolge versucht.",
+      "fields": {
+        "tradeAction": "Muster für Kauf oder Verkauf",
+        "tradeSymbol": "Muster für das Kürzel",
+        "tradeQuantity": "Muster für die Stückzahl",
+        "tradeTotal": "Muster für die Handelssumme",
+        "tradePrice": "Muster für den Preis pro Anteil",
+        "tradeCommission": "Muster für die Provision",
+        "tradeDate": "Muster für das Handelsdatum",
+        "tradeAccount": "Muster für das Konto"
+      },
+      "fieldHint": "Muss {capture} erfassen. Beispiel: {example}",
+      "amountsHelp": "Die Summe ist der ausgeführte Betrag, bei einem Kauf mit Provision. Der Preis dient zur Gegenprüfung und ergibt die Summe, wenn die E-Mail keine nennt. Ein Betrag, der seine Währung nennt (US$, C$, USD, €), legt auch die Währung des Handels fest.",
+      "rulesHeading": "Kontoregeln",
+      "rulesHelp": "Auf welches Konto der Handel gebucht wird. Die Regeln werden der Reihe nach mit dem Kontotext verglichen, den die Kontomuster lesen, und die erste passende gewinnt; {star} steht für beliebigen Text. Eine Regel mit Währung gilt nur für einen Handel in dieser Währung, daher sind zwei Konten, die der Broker gleich schreibt, etwa ein RRSP in CAD und eines in USD, beide als RRSP angezeigt, zwei Regeln mit demselben Text und verschiedenen Währungen. Nennt die E-Mail keinen Kontotext, kann nur eine Regel mit dem Text {star} gelten. Das Standardkonto nimmt den Rest.",
+      "currencyOrder": "Die Währung des Handels wird in dieser Reihenfolge bestimmt: aus dem Betrag selbst, wenn er eine nennt (US$, C$, USD, €), dann aus der ersten Währungsmarkierung unten, die zu einer Zeile der E-Mail passt, dann aus der Währung deines Wertpapiers für das Kürzel. Eine Regel mit Währung rät nie: Wenn keine der drei die Währung verrät, wartet die E-Mail auf dich, statt auf eines der Konten gebucht zu werden.",
+      "ruleMatchLabel": "Kontotext der Regel {rule}",
+      "ruleMatchPlaceholder": "Kontotext, etwa RRSP",
+      "ruleCurrencyLabel": "Währung der Regel {rule}",
+      "ruleAccountLabel": "Konto der Regel {rule}",
+      "ruleMoveUp": "Regel {rule} nach oben",
+      "ruleMoveDown": "Regel {rule} nach unten",
+      "ruleRemove": "Regel {rule} entfernen",
+      "ruleAdd": "Kontoregel hinzufügen",
+      "rulesMax": "Höchstens {max} Regeln.",
+      "rulesWithoutAccountText": "Es gibt keine Kontomuster, daher werden die Regeln mit leerem Text verglichen: Nur eine Regel mit dem Text {star} kann gelten.",
+      "anyCurrency": "Jede Währung",
+      "baseCurrency": "{code} (deine Basiswährung)",
+      "currencyPlaceholder": "Währung wählen",
+      "accountPlaceholder": "Konto wählen",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (kein offenes Depotkonto)",
+      "accountUnknownOption": "Ein Konto, das nicht in deiner Liste ist",
+      "accountNotTradable": "Auf dieses Konto kann kein Handel gebucht werden: Es ist geschlossen, ein Verrechnungskonto oder kein Anlagekonto.",
+      "accountUnknown": "Dieses Konto ist nicht in deiner Liste: Es wurde vielleicht gelöscht. Wähle ein anderes.",
+      "defaultAccountLabel": "Standardkonto",
+      "defaultAccountNone": "Kein Standardkonto",
+      "defaultAccountHint": "Das Konto, wenn keine Regel gilt. Ohne eines wartet eine E-Mail, für die keine Regel gilt, auf dich.",
+      "markersHeading": "Währungsmarkierungen",
+      "markersHelp": "Text, der die Währung des Handels nennt, wenn die Beträge es nicht tun, etwa eine Zeile, dass die Beträge in US-Dollar sind, neben einem bloßen $. Jede Markierung wird mit jeder Zeile der E-Mail verglichen ({star} steht für beliebigen Text), und die erste passende Markierung in der Reihenfolge nennt die Währung. Markierungen werden nur genutzt, wenn der Betrag keine Währung nennt.",
+      "markerMatchLabel": "Text der Markierung {marker}",
+      "markerMatchPlaceholder": "Etwa *U.S. dollars*",
+      "markerCurrencyLabel": "Währung der Markierung {marker}",
+      "markerMoveUp": "Markierung {marker} nach oben",
+      "markerMoveDown": "Markierung {marker} nach unten",
+      "markerRemove": "Markierung {marker} entfernen",
+      "markerAdd": "Währungsmarkierung hinzufügen",
+      "markersMax": "Höchstens {max} Markierungen."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "Zu überspringende Zeile {line}",
       "recordStep": "Datensatzschritt {step}",
       "recordStepPart": "Datensatzschritt {step}, {part}",
-      "recordAlternative": "Datensatzschritt {step}, Alternative {alternative}"
+      "recordAlternative": "Datensatzschritt {step}, Alternative {alternative}",
+      "accountRule": "Kontoregel {rule}",
+      "accountRulePart": "Kontoregel {rule}, {part}",
+      "currencyMarker": "Währungsmarkierung {marker}",
+      "currencyMarkerPart": "Währungsmarkierung {marker}, {part}"
     },
     "fields": {
       "orderId": "Muster für die Bestellnummer",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "Tage nach dem Kauf",
       "matchTolerance": "Betragstoleranz",
       "tag": "Tag",
-      "aiCategories": "KI-Kategorien"
+      "aiCategories": "KI-Kategorien",
+      "trade": "Der Handelsabschnitt",
+      "tradeAction": "Muster für Kauf oder Verkauf",
+      "tradeSymbol": "Muster für das Kürzel",
+      "tradeQuantity": "Muster für die Stückzahl",
+      "tradeTotal": "Muster für die Handelssumme",
+      "tradePrice": "Muster für den Preis pro Anteil",
+      "tradeCommission": "Muster für die Provision",
+      "tradeDate": "Muster für das Handelsdatum",
+      "tradeAccount": "Muster für das Konto",
+      "accountRules": "Kontoregeln",
+      "currencyMarkers": "Währungsmarkierungen",
+      "defaultAccount": "Standardkonto",
+      "ruleAccount": "Konto",
+      "ruleCurrency": "Währung"
     },
     "codes": {
       "not_object": "ist keine gültige Definition",
@@ -376,7 +463,12 @@
       "duplicate_entry": "führt denselben Eintrag zweimal auf",
       "reference_field_missing": "braucht Referenzmuster (die Referenzstrategie ist aktiv)",
       "out_of_range_days": "muss eine ganze Zahl von 0 bis {max} sein",
-      "out_of_range_tolerance": "muss ein Betrag von 0,00 bis {max} sein"
+      "out_of_range_tolerance": "muss ein Betrag von 0,00 bis {max} sein",
+      "trade_conflict": "darf nicht in einem Profil für Wertpapierhandel stehen, das nur den Handel liest",
+      "trade_amount_missing": "braucht Muster für die Summe oder den Preis (mindestens eines von beiden)",
+      "trade_account_missing": "braucht ein Standardkonto oder Kontoregeln",
+      "invalid_currency": "ist kein dreistelliger Währungscode wie USD",
+      "invalid_uuid_account": "ist kein gültiges Konto"
     }
   },
   "test": {
@@ -429,7 +521,8 @@
         "price": "Preis",
         "commission": "Provision",
         "date": "Datum",
-        "account": "Konto"
+        "account": "Konto",
+        "currency": "Währungsmarkierung"
       },
       "entryLine": "Eintrag {entry} ({pattern}), Zeile {line}: {text}",
       "entrySubject": "Eintrag {entry} ({pattern}), der Betreff: {text}",
@@ -601,8 +694,11 @@
       "handoffFailed": "Die Anfrage ist in der Warteschlange, aber die E-Mails konnten nicht im Chat geöffnet werden. Sie wartet im KI-Prüfungseingang auf einen Agenten.",
       "inboxLink": "KI-Prüfungseingang öffnen",
       "opened": "Der Chat wurde mit den angehängten E-Mails geöffnet. Lies die Nachricht und drücke auf Senden.",
-      "chatPrompt": "Erstelle einen Profile für E-Mail-Belege für {count, plural, one {diese Bestell-E-Mail} other {diese # Bestell-E-Mails}} von {domain}. Übernimm die KI-Prüfanfrage {requestId}, teste deinen Profile mit dem Tool email_receipt_profiles an jeder angehängten E-Mail, korrigiere ihn, bis jede vollständig gelesen wird, und speichere ihn dann als Entwurf für die Anfrage {requestId}."
-    }
+      "chatPrompt": "Erstelle einen Profile für E-Mail-Belege für {count, plural, one {diese Bestell-E-Mail} other {diese # Bestell-E-Mails}} von {domain}. Übernimm die KI-Prüfanfrage {requestId}, teste deinen Profile mit dem Tool email_receipt_profiles an jeder angehängten E-Mail, korrigiere ihn, bis jede vollständig gelesen wird, und speichere ihn dann als Entwurf für die Anfrage {requestId}.",
+      "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails.",
+      "chatPromptTrade": "Erstelle ein Handelsprofil für {count, plural, one {diese Handelsbestätigung} other {diese # Handelsbestätigungen}} von {domain}. Übernimm die KI-Prüfanfrage {requestId}, teste dein Profil mit dem Tool email_receipt_parsers an jeder angehängten E-Mail, korrigiere es, bis jede einen vollständigen Handel ergibt, und speichere es dann als Entwurf für die Anfrage {requestId}."
+    },
+    "tradeBadge": "Handel"
   },
   "detail": {
     "title": "E-Mail-Beleg",
@@ -660,7 +756,8 @@
       "trade_no_amount": "Das Profil hat in dieser E-Mail weder eine Summe noch einen Preis gefunden.",
       "trade_no_account": "Das Profil konnte nicht erkennen, für welches Konto dieser Handel gilt.",
       "trade_exists": "Deine Konten enthalten diesen Handel bereits, daher wurde nichts vorgeschlagen.",
-      "trade_linked": "Mit der Buchung verknüpft, die sie meldet, daher wurde nichts vorgeschlagen."
+      "trade_linked": "Mit der Buchung verknüpft, die sie meldet, daher wurde nichts vorgeschlagen.",
+      "trade_no_currency": "Das Profil konnte nicht erkennen, in welcher Währung dieser Handel ist, und daher sein Konto nicht wählen."
     },
     "reasonUnknown": "Grund: {reason}",
     "requestNote": "Prüfanfrage ({state}): {note}",
@@ -714,7 +811,8 @@
     "tradeNoCandidates": "Keine Investmenttransaktion dieses Kontos, dieser Richtung und dieses Kürzels innerhalb einer Woche um den Handelstag ist frei zum Verknüpfen. Wenn du den Trade selbst erfasst hast, prüfe Konto und Datum; andernfalls gib den Vorschlag im Prüfeingang frei.",
     "aiTradeHeading": "Vom KI-Agenten vorgeschlagener Handel",
     "aiTradeReader": "Keins: Der KI-Agent liest sie als Handel",
-    "noAiTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag des KI-Agenten freigibst."
+    "noAiTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag des KI-Agenten freigibst.",
+    "tradeProposalHeading": "Was der Vorschlag buchen würde"
   },
   "picker": {
     "heading": "Buchung auswählen",
@@ -1032,7 +1130,12 @@
         "no_html": "Kein HTML-Teil",
         "trade": "Schlägt einen Handel vor",
         "trade_exists": "Bereits gebucht"
-      }
+      },
+      "parsedTradeAccount": "Konto: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "unbekannt",
+      "parsedTradeNoAccount": "Kein Konto für diesen Handel gefunden",
+      "parsedTradeCurrency": "Währung: {currency}"
     }
   },
   "trade": {
@@ -1051,6 +1154,10 @@
     "proposalReviewLink": "Im Posteingang prüfen",
     "aiWaiting": "Der KI-Agent hat den Trade noch nicht vorgeschlagen. Sein Vorschlag erscheint hier und im Prüfungs-Posteingang.",
     "aiBooked": "Aus dem Vorschlag des KI-Agenten gebucht: siehe die Transaktion oben.",
-    "aiNoProposal": "Für diese E-Mail wartet kein Vorschlag des KI-Agenten."
+    "aiNoProposal": "Für diese E-Mail wartet kein Vorschlag des KI-Agenten.",
+    "currencyFrom": "Währung: {currency}, {source, select, amount {vom Betrag genannt} marker {aus einer Währungsmarkierung des Profils} other {aus deinem Wertpapier für das Kürzel}}",
+    "bookTo": "Gebucht auf: {account}",
+    "bookToNotTradable": "Gebucht auf {account}, das kein offenes Depotkonto ist, daher kann der Handel dort nicht gebucht werden.",
+    "bookToUnknown": "Gebucht auf ein Konto, das nicht in deiner Liste ist, daher kann der Handel dort nicht gebucht werden."
   }
 }

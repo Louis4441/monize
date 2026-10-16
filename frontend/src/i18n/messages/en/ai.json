@@ -231,7 +231,11 @@
       "category": "Set the category to {name}",
       "payee": "Set the payee to {name}",
       "aiReview": "{count, plural, one {Queue # AI review request} other {Queue # AI review requests}}"
-    }
+    },
+    "aiCategory": "suggested by AI",
+    "tags": "Tags",
+    "newTag": "(new tag)",
+    "marksPaidDue": "{name} (due {date})"
   },
   "table": {
     "downloadTitle": "Download table as CSV",

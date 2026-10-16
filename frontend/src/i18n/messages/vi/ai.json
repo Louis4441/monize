@@ -231,7 +231,11 @@
       "category": "Đặt danh mục thành {name}",
       "payee": "Đặt người nhận thành {name}",
       "aiReview": "{count, plural, other {Đưa # yêu cầu AI xem xét vào hàng đợi}}"
-    }
+    },
+    "aiCategory": "AI đề xuất",
+    "tags": "Thẻ",
+    "newTag": "(thẻ mới)",
+    "marksPaidDue": "{name} (đến hạn {date})"
   },
   "table": {
     "downloadTitle": "Tải bảng dưới dạng CSV",

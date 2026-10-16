@@ -231,7 +231,11 @@
       "category": "Ustaw kategorię na {name}",
       "payee": "Ustaw odbiorcę na {name}",
       "aiReview": "{count, plural, one {Dodaj do kolejki # prośbę o przegląd AI} few {Dodaj do kolejki # prośby o przegląd AI} many {Dodaj do kolejki # próśb o przegląd AI} other {Dodaj do kolejki # prośby o przegląd AI}}"
-    }
+    },
+    "aiCategory": "zaproponowana przez AI",
+    "tags": "Tagi",
+    "newTag": "(nowy tag)",
+    "marksPaidDue": "{name} (termin {date})"
   },
   "table": {
     "downloadTitle": "Pobierz tabelę jako CSV",

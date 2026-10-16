@@ -56,7 +56,8 @@
     "viewTransaction": "View transaction",
     "waitingForAgent": "Waiting for an AI agent. <link>Connect an AI provider in Settings</link>, or let an MCP client claim it.",
     "parserDraftReady": "Draft profile ready. <link>Test and approve it in the profile settings</link>.",
-    "tradePending": "A trade from an email, not read yet"
+    "tradePending": "A trade from an email, not read yet",
+    "tradeEmail": "Trade confirmation email"
   },
   "actions": {
     "dismiss": "Dismiss"

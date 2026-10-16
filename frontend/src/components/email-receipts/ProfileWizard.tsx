@@ -196,6 +196,7 @@ export function ProfileWizard({ domain, onClose, onFinished }: ProfileWizardProp
           key={`${draft.parserId}:${draft.revision}`}
           domain={domain}
           draft={draft}
+          kind={kind}
           answer={answer}
           pairs={pairs}
           selectedReceiptIds={tradeIds}

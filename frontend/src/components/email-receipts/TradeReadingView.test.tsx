@@ -57,7 +57,56 @@ describe('TradeReadingView', () => {
     const { rerender } = render(<TradeReadingView trade={incomplete} fallbackDate={null} />);
     expect(screen.queryByText(/account/i)).not.toBeInTheDocument();
     rerender(<TradeReadingView trade={incomplete} fallbackDate={null} showReason />);
-    expect(screen.getByText(/account/i)).toBeInTheDocument();
+    expect(screen.getByText('The profile could not tell which account this trade is for.')).toBeInTheDocument();
+    // What the account rules were tried against.
+    expect(screen.getByText('Account named in the email: RRSP')).toBeInTheDocument();
+  });
+
+  it('says a rule needed the currency and nothing named it', () => {
+    const incomplete = trade({ complete: false, accountId: null, reason: 'trade_no_currency' });
+    render(<TradeReadingView trade={incomplete} fallbackDate={null} showReason />);
+    expect(screen.getByText(/could not tell which currency/)).toBeInTheDocument();
+  });
+
+  it('says the currency and where it came from', () => {
+    const { rerender } = render(
+      <TradeReadingView trade={trade({ currency: 'USD', currencySource: 'amount' })} fallbackDate={null} />,
+    );
+    expect(screen.getByText('Currency: USD, named by the amount')).toBeInTheDocument();
+    rerender(<TradeReadingView trade={trade({ currency: 'USD', currencySource: 'marker' })} fallbackDate={null} />);
+    expect(screen.getByText('Currency: USD, from a currency marker of the profile')).toBeInTheDocument();
+    rerender(<TradeReadingView trade={trade({ currency: 'CAD', currencySource: 'security' })} fallbackDate={null} />);
+    expect(screen.getByText('Currency: CAD, from your security for the ticker')).toBeInTheDocument();
+    // A server that predates the source says no line.
+    rerender(<TradeReadingView trade={trade({ currency: 'USD' })} fallbackDate={null} />);
+    expect(screen.queryByText(/^Currency:/)).not.toBeInTheDocument();
+  });
+
+  describe('the account the profile chose', () => {
+    const accounts = [
+      { value: 'acc-rrsp', label: 'RRSP USD', currencyCode: 'USD', tradable: true },
+      { value: 'acc-chq', label: 'Chequing', currencyCode: 'CAD', tradable: false },
+    ];
+
+    it('is named', () => {
+      render(<TradeReadingView trade={trade()} fallbackDate={null} accounts={accounts} />);
+      expect(screen.getByText('Books to: RRSP USD (USD)')).toBeInTheDocument();
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    });
+
+    it('is flagged when it is not an open brokerage account, or not one of yours', () => {
+      const { rerender } = render(
+        <TradeReadingView trade={trade({ accountId: 'acc-chq' })} fallbackDate={null} accounts={accounts} />,
+      );
+      expect(screen.getByRole('note')).toHaveTextContent('Chequing, which is not an open brokerage account');
+      rerender(<TradeReadingView trade={trade({ accountId: 'acc-gone' })} fallbackDate={null} accounts={accounts} />);
+      expect(screen.getByRole('note')).toHaveTextContent('an account that is not in your list');
+    });
+
+    it('is not shown without the account list', () => {
+      render(<TradeReadingView trade={trade()} fallbackDate={null} />);
+      expect(screen.queryByText(/Books to/)).not.toBeInTheDocument();
+    });
   });
 
   it('says nothing was read rather than inventing a sentence from an incomplete reading', () => {
@@ -70,7 +119,12 @@ describe('TradeReadingView', () => {
 
 describe('readParsedTrade', () => {
   it('reads what the API stores', () => {
-    expect(readParsedTrade(PARSED_TRADE)).toEqual(PARSED_TRADE);
+    expect(readParsedTrade(PARSED_TRADE)).toEqual({ ...PARSED_TRADE, currencySource: null });
+  });
+
+  it('reads where the currency came from, and an unknown source as none', () => {
+    expect(readParsedTrade({ ...PARSED_TRADE, currency: 'USD', currencySource: 'marker' })?.currencySource).toBe('marker');
+    expect(readParsedTrade({ ...PARSED_TRADE, currency: 'USD', currencySource: 'guess' })?.currencySource).toBeNull();
   });
 
   it.each([

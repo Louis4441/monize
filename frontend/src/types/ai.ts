@@ -375,6 +375,8 @@ export interface PendingActionPreview {
   bondSeriesCode?: string | null;
   /** create_investment_transaction: the scheduled bill or deposit that approving this marks paid. */
   scheduledName?: string | null;
+  /** create_investment_transaction: the due day (YYYY-MM-DD) of the occurrence of `scheduledName` it marks paid. */
+  scheduledDueDate?: string | null;
   /** REDEEM of a bond-linked security: what the redemption pays, split. */
   bondRedemptionSplit?: PendingActionRedemptionSplit | null;
   // create_security display fields (symbol/securityName/securityCurrency above

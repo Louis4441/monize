@@ -258,9 +258,40 @@ describe('ParserTestPanel', () => {
     await choose('r-1');
     await runTest();
     expect(screen.getByText('The profile could not read a complete trade from this email.')).toBeInTheDocument();
-    expect(screen.getByText(/account/i, { selector: 'p' })).toBeInTheDocument();
+    expect(screen.getByText('The profile could not tell which account this trade is for.')).toBeInTheDocument();
     expect(screen.getByText('Ticker')).toBeInTheDocument();
     expect(screen.getByText(/Symbol: XCNS/)).toBeInTheDocument();
+  });
+
+  it('names the account a trade would book to, the currency with its source and the marker that named it', async () => {
+    api.test.mockResolvedValue({
+      trade: {
+        parsed: { ...PARSED_TRADE, currency: 'USD', currencySource: 'marker' },
+        trace: {
+          action: null,
+          symbol: null,
+          quantity: null,
+          total: null,
+          price: null,
+          commission: null,
+          date: null,
+          account: null,
+          currency: { entry: 1, pattern: '*U.S. dollars*', line: { line: 9, text: 'Amounts in U.S. dollars' } },
+        },
+      },
+      parsed: { ...PARSED_RECEIPT, total: null, complete: false, reason: 'no_total' },
+      outcome: 'read',
+      match: { kind: 'unmatched', considered: 0, attempts: [] },
+      candidateCount: 0,
+      transaction: null,
+    });
+    await renderPanel({ accounts: [{ value: 'acc-rrsp', label: 'RRSP USD', currencyCode: 'USD', tradable: true }] });
+    await choose('r-1');
+    await runTest();
+    expect(screen.getByText('Books to: RRSP USD (USD)')).toBeInTheDocument();
+    expect(screen.getByText('Currency: USD, from a currency marker of the profile')).toBeInTheDocument();
+    expect(screen.getByText('Currency marker')).toBeInTheDocument();
+    expect(screen.getByText(/entry 2 \(\*U\.S\. dollars\*\), line 9: Amounts in U\.S\. dollars/)).toBeInTheDocument();
   });
 
   it('shows the trade a trade profile read and no bank-transaction match', async () => {

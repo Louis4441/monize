@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { AiReviewRow } from './AiReviewRow';
-import { makeReviewItem, makeTradeItem, PROPOSED_ACTION } from './ai-review-fixtures';
+import { makeReviewItem, makeTradeItem, PROPOSED_ACTION, TRADE_ACTION } from './ai-review-fixtures';
 import type { AiReviewItem } from '@/types/ai-review';
 
 function renderRow(item: AiReviewItem) {
@@ -292,15 +292,18 @@ describe('AiReviewRow', () => {
       expect(screen.queryByText(/Waiting for an AI agent/)).not.toBeInTheDocument();
     });
 
-    it('shows the confirmation card of a proposed trade', () => {
-      renderRow(makeTradeItem({ proposal: { action: PROPOSED_ACTION } }));
-      expect(screen.getByRole('button', { name: /confirm|approve/i })).toBeInTheDocument();
+    it('shows the investment card of a proposed trade, with the scheduled deposit it marks paid', () => {
+      renderRow(makeTradeItem({ proposal: { action: TRADE_ACTION } }));
+      expect(screen.getByText('Create this investment transaction?')).toBeInTheDocument();
+      expect(screen.getByText('XCNS (iShares Core Conservative Balanced ETF Portfolio)')).toBeInTheDocument();
+      expect(screen.getByText('Marks as paid').nextElementSibling).toHaveTextContent(/^Monthly XCNS \(due .+\)$/);
+      expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
     });
 
     it('shows the total in its amount column: as money with the currency the card names, else as a number', () => {
       const amountCell = () => screen.getAllByRole('cell')[2];
       const { unmount } = renderRow(
-        makeTradeItem({ proposal: { action: { ...PROPOSED_ACTION, preview: { ...PROPOSED_ACTION.preview, securityCurrency: 'CAD' } } } }),
+        makeTradeItem({ proposal: { action: TRADE_ACTION } }),
       );
       expect(amountCell()).toHaveTextContent('$2,000.00');
       unmount();
@@ -313,6 +316,17 @@ describe('AiReviewRow', () => {
       expect(screen.getByText('A trade from an email, not read yet')).toBeInTheDocument();
       expect(screen.queryByText('This transaction no longer exists')).not.toBeInTheDocument();
       expect(screen.getByText(/Waiting for an AI agent/)).toBeInTheDocument();
+    });
+
+    it('says a claimed trade request is not read yet too', () => {
+      renderRow(makeTradeItem({ status: 'claimed', trade: null }));
+      expect(screen.getByText('A trade from an email, not read yet')).toBeInTheDocument();
+    });
+
+    it.each(['rejected', 'expired'] as const)('names a %s trade request with no trade as a trade email, never as one still to be read', (status) => {
+      renderRow(makeTradeItem({ status, trade: null }));
+      expect(screen.getByText('Trade confirmation email')).toBeInTheDocument();
+      expect(screen.queryByText('A trade from an email, not read yet')).not.toBeInTheDocument();
     });
 
     it('lets the person dismiss one whose card can no longer be built, with the reason', () => {

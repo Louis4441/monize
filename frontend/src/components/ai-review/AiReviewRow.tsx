@@ -107,7 +107,12 @@ export function AiReviewRow({
             ) : trade ? (
               t('row.trade', { action: trade.action, quantity: formatShareQuantity(trade.quantity), symbol: trade.symbol })
             ) : tradeRequest ? (
-              t('row.tradePending')
+              // "Not read yet" only while an agent may still answer it; a closed one never will.
+              item.status === 'pending' || item.status === 'claimed' ? (
+                t('row.tradePending')
+              ) : (
+                t('row.tradeEmail')
+              )
             ) : transaction ? (
               (transaction.payeeName ?? <span className="text-gray-500 dark:text-gray-400">{t('row.noPayee')}</span>)
             ) : (

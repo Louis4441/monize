@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeReviewItem, makeTradeItem, PROPOSED_ACTION } from '@/components/ai-review/ai-review-fixtures';
+import { makeReviewItem, makeTradeItem, PROPOSED_ACTION, TRADE_ACTION } from '@/components/ai-review/ai-review-fixtures';
 import { isApprovable, parseKindFilter, reviewItemLabel } from './ai-review';
 
 describe('parseKindFilter', () => {
@@ -62,7 +62,7 @@ describe('a trade confirmation', () => {
   });
 
   it('is approvable once proposed with a card, though it has no transaction', () => {
-    expect(isApprovable(makeTradeItem({ proposal: { action: PROPOSED_ACTION } }))).toBe(true);
+    expect(isApprovable(makeTradeItem({ proposal: { action: TRADE_ACTION } }))).toBe(true);
     expect(isApprovable(makeTradeItem())).toBe(false);
   });
 });

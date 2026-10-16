@@ -22,6 +22,7 @@ import { useProcessStoredEmails } from '@/hooks/useProcessStoredEmails';
 import { useReceiptParserLookups } from '@/hooks/useReceiptParserLookups';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { processableForDomains } from '@/lib/email-receipts-format';
+import { isTradeDefinition } from '@/lib/receipt-parser-form';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
@@ -256,6 +257,8 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
                       {t(`status.${parser.status}`)}
                     </Badge>
                     <Badge variant={parser.source === 'ai' ? 'purple' : 'gray'}>{t(`source.${parser.source}`)}</Badge>
+                    {/* A trade profile books investment transactions, not bank-transaction splits. */}
+                    {isTradeDefinition(parser.definition) && <Badge variant="blue">{t('kindTrade')}</Badge>}
                     {!parser.definitionValid && <Badge variant="red">{t('invalid')}</Badge>}
                   </div>
                 </Td>

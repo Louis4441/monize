@@ -27,7 +27,7 @@ const result = (over: Partial<ParserPreviewResult> = {}): ParserPreviewResult =>
 
 describe('WizardPreviewTables of a trade profile', () => {
   it('shows the trade each email reports, with the total as a plain number, and no line count', () => {
-    render(<WizardPreviewTables result={result({ selected: [item()] })} />);
+    render(<WizardPreviewTables kind="trade" result={result({ selected: [item()] })} />);
     const row = screen.getByRole('row', { name: /Your order has been filled/ });
     expect(within(row).getByText('Buys 75.9878 shares of XCNS')).toBeInTheDocument();
     expect(within(row).getByText('Total: 2,000.00')).toBeInTheDocument();
@@ -36,7 +36,7 @@ describe('WizardPreviewTables of a trade profile', () => {
 
   it('says how each trade sample would end instead of an expectation it cannot have, so an unreadable one is not a success', () => {
     render(
-      <WizardPreviewTables
+      <WizardPreviewTables kind="trade"
         result={result({
           selected: [
             item(),
@@ -61,7 +61,7 @@ describe('WizardPreviewTables of a trade profile', () => {
 
   it('says a trade whose price does not fit the total will not auto-apply', () => {
     render(
-      <WizardPreviewTables
+      <WizardPreviewTables kind="trade"
         result={result({ selected: [item({ trade: { action: 'SELL', symbol: 'XCNS', quantity: 10, consistent: false } })] })}
       />,
     );
@@ -71,7 +71,7 @@ describe('WizardPreviewTables of a trade profile', () => {
 
   it('labels the outcome and names why an incomplete trade could not be read', () => {
     render(
-      <WizardPreviewTables
+      <WizardPreviewTables kind="trade"
         result={result({
           others: [
             item({ receiptId: 'r-2', subject: 'Filled A' }),
@@ -93,5 +93,75 @@ describe('WizardPreviewTables of a trade profile', () => {
     expect(within(failed).getByText('Could not be read')).toBeInTheDocument();
     expect(within(failed).getByText('The profile found no ticker symbol in this email.')).toBeInTheDocument();
     expect(within(failed).getByText('Nothing could be read')).toBeInTheDocument();
+  });
+
+  it('keeps the trade columns for a sample a guard stopped before any reading (no trade sent)', () => {
+    render(
+      <WizardPreviewTables
+        kind="trade"
+        result={result({
+          selected: [
+            item(),
+            item({ receiptId: 'r-5', subject: 'Too large', outcome: 'not_applicable', statusReason: null, trade: null, parsed: null }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByRole('columnheader', { name: 'Expected transaction' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Agrees' })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Outcome' })).toBeInTheDocument();
+    expect(within(screen.getByRole('row', { name: /Too large/ })).getByText('Nothing could be read')).toBeInTheDocument();
+  });
+
+  it('names the account each sample books to with its currency, and the trade\'s currency', () => {
+    const accounts = new Map([
+      ['acc-cad', { name: 'RRSP', currencyCode: 'CAD' }],
+      ['acc-usd', { name: 'RRSP', currencyCode: 'USD' }],
+    ]);
+    render(
+      <WizardPreviewTables
+        kind="trade"
+        accounts={accounts}
+        result={result({
+          selected: [
+            item({ trade: { action: 'BUY', symbol: 'XCNS', quantity: 75.9878, consistent: true, accountId: 'acc-cad', currency: 'CAD' } }),
+            item({
+              receiptId: 'r-2',
+              subject: 'US fill',
+              trade: { action: 'BUY', symbol: 'VTI', quantity: 3, consistent: true, accountId: 'acc-usd', currency: 'USD' },
+              parsed: { date: '2026-10-15', total: 900, currency: 'USD', lineCount: 0 },
+            }),
+            item({
+              receiptId: 'r-3',
+              subject: 'No account',
+              outcome: 'parse_failed',
+              statusReason: 'trade_no_account',
+              trade: { action: 'BUY', symbol: 'XCNS', quantity: 1, consistent: null, accountId: null, currency: null },
+            }),
+          ],
+        })}
+      />,
+    );
+    const cad = screen.getByRole('row', { name: /Your order has been filled/ });
+    expect(within(cad).getByText('Account: RRSP (CAD)')).toBeInTheDocument();
+    expect(within(cad).getByText('Currency: CAD')).toBeInTheDocument();
+    const usd = screen.getByRole('row', { name: /US fill/ });
+    expect(within(usd).getByText('Account: RRSP (USD)')).toBeInTheDocument();
+    expect(within(usd).getByText('Currency: USD')).toBeInTheDocument();
+    const none = screen.getByRole('row', { name: /No account/ });
+    expect(within(none).getByText('No account found for this trade')).toBeInTheDocument();
+    expect(within(none).getByText('Currency: not stated')).toBeInTheDocument();
+  });
+
+  it('says the account is unknown, never blank, while the accounts are not known', () => {
+    render(
+      <WizardPreviewTables
+        kind="trade"
+        result={result({
+          selected: [item({ trade: { action: 'BUY', symbol: 'XCNS', quantity: 1, consistent: true, accountId: 'acc-cad', currency: 'CAD' } })],
+        })}
+      />,
+    );
+    expect(screen.getByText('Account: unknown')).toBeInTheDocument();
   });
 });

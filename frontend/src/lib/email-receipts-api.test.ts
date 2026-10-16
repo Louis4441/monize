@@ -177,6 +177,12 @@ describe('emailReceiptsApi', () => {
       expect(client.post).toHaveBeenLastCalledWith('/email-receipt-parsers/draft-with-ai', { receiptIds: ['r-1', 'r-2'] });
     });
 
+    it('asks for a trade profile when the emails are trade confirmations', async () => {
+      client.post.mockResolvedValue({ data: { ok: true, requestId: 'req-2' } });
+      await emailReceiptsApi.parsers.draftWithAi(['r-1'], 'trade');
+      expect(client.post).toHaveBeenLastCalledWith('/email-receipt-parsers/draft-with-ai', { receiptIds: ['r-1'], kind: 'trade' });
+    });
+
     const definition = { version: 2 as const, total: ['Total {amount}'] };
 
     it('lists, reads, creates, updates and deletes', async () => {

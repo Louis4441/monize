@@ -56,7 +56,8 @@
     "viewTransaction": "Vedi transazione",
     "waitingForAgent": "In attesa di un agente IA. <link>Collega un provider IA nelle Impostazioni</link> oppure lascia che la prenda in carico un client MCP.",
     "parserDraftReady": "Bozza di parser pronta. <link>Provala e approvala nelle impostazioni dei parser</link>.",
-    "tradePending": "Un'operazione da un'email, non ancora letta"
+    "tradePending": "Un'operazione da un'email, non ancora letta",
+    "tradeEmail": "Email di conferma di operazione"
   },
   "actions": {
     "dismiss": "Ignora"

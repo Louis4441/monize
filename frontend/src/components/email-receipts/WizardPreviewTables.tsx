@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from '@/components/ui/Table';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import type { WizardKind } from '@/components/email-receipts/profile-wizard-types';
 import {
   PARSED_RECEIPT_REASONS,
   type ParsedReceiptReason,
@@ -14,12 +15,44 @@ import {
 } from '@/types/email-receipts';
 
 /** The reasons a trade profile gives for a reading it could not complete (`ParsedTradeReason`). */
-const TRADE_REASONS: readonly string[] = ['trade_no_action', 'trade_no_symbol', 'trade_no_quantity', 'trade_no_amount', 'trade_no_account'] as const;
+const TRADE_REASONS: readonly string[] = [
+  'trade_no_action',
+  'trade_no_symbol',
+  'trade_no_quantity',
+  'trade_no_amount',
+  'trade_no_account',
+  'trade_no_currency',
+] as const;
 
 const MUTED = 'text-gray-500 dark:text-gray-400';
 
+/** An account a trade sample may book to, as the preview names it. */
+export interface PreviewAccount {
+  name: string;
+  currencyCode: string;
+}
+
+/** The user's accounts by id; null while unknown (loading, failed, or a receipt preview, which names none). */
+type PreviewAccounts = ReadonlyMap<string, PreviewAccount> | null;
+
+/** The account a trade reading books to, by name and currency; said to be unknown, never left blank, when it cannot be named. */
+function TradeAccountLine({ accountId, accounts }: { accountId: string | null | undefined; accounts: PreviewAccounts }) {
+  const t = useTranslations('emailReceipts.profileWizard.preview');
+  // A server that predates the field says nothing about the account.
+  if (accountId === undefined) return null;
+  if (accountId === null) return <div className="text-xs text-amber-800 dark:text-amber-300">{t('parsedTradeNoAccount')}</div>;
+  const account = accounts?.get(accountId);
+  return (
+    <div>
+      {t('parsedTradeAccount', {
+        account: account ? t('accountWithCurrency', { name: account.name, currency: account.currencyCode }) : t('accountUnknown'),
+      })}
+    </div>
+  );
+}
+
 /** What the draft read from one email: date, total and the number of lines, each "not stated" when the email did not say. */
-function ParsedCell({ item }: { item: ParserPreviewItem }) {
+function ParsedCell({ item, accounts }: { item: ParserPreviewItem; accounts: PreviewAccounts }) {
   const t = useTranslations('emailReceipts.profileWizard.preview');
   const { formatDate } = useDateFormat();
   const { formatCurrency, formatNumber } = useNumberFormat();
@@ -34,7 +67,9 @@ function ParsedCell({ item }: { item: ParserPreviewItem }) {
         ? formatCurrency(parsed.total, parsed.currency)
         : formatNumber(parsed.total, 2);
   if (item.trade !== null) {
-    // A trade profile: what the confirmation reports. The total has no currency of its own here.
+    // A trade profile: what the confirmation reports, the account it books to and
+    // the trade's currency (the total is in it; a bare number when it is unknown).
+    const currency = item.trade.currency ?? parsed.currency;
     return (
       <div className="space-y-0.5">
         {item.trade.action !== null && item.trade.symbol !== null && item.trade.quantity !== null ? (
@@ -50,6 +85,10 @@ function ParsedCell({ item }: { item: ParserPreviewItem }) {
         )}
         <div>{t('parsedDate', { date: parsed.date === null ? t('notStated') : formatDate(parsed.date) })}</div>
         <div>{t('parsedTotal', { total })}</div>
+        <TradeAccountLine accountId={item.trade.accountId} accounts={accounts} />
+        {item.trade.currency !== undefined && (
+          <div>{t('parsedTradeCurrency', { currency: currency ?? t('notStated') })}</div>
+        )}
         {item.trade.consistent === false && <div className="text-xs text-amber-800 dark:text-amber-300">{t('tradeInconsistent')}</div>}
       </div>
     );
@@ -87,13 +126,13 @@ function ReasonLabel({ reason }: { reason: string }) {
   return <>{known ? t(reason as ParsedReceiptReason) : reason}</>;
 }
 
-/** How the draft would end an email, with why when it could not read it completely. */
-function OutcomeCell({ item }: { item: ParserPreviewItem }) {
+/** How the draft would end an email, with why when it could not read it completely; `trade` shows it as a pill. */
+function OutcomeCell({ item, trade }: { item: ParserPreviewItem; trade: boolean }) {
   const done = item.outcome === 'trade' || item.outcome === 'matched';
   return (
     <>
       <div>
-        {item.trade !== null ? (
+        {trade ? (
           <Badge variant={done ? 'green' : 'amber'}>
             <OutcomeLabel outcome={item.outcome} />
           </Badge>
@@ -115,13 +154,24 @@ function OutcomeCell({ item }: { item: ParserPreviewItem }) {
  * the draft read, and whether they agree) and, only when there are any, the domain's
  * other emails (how the draft would read them and which transaction it would match).
  */
-export function WizardPreviewTables({ result }: { result: ParserPreviewResult }) {
+export function WizardPreviewTables({
+  result,
+  kind,
+  accounts = null,
+}: {
+  result: ParserPreviewResult;
+  kind: WizardKind;
+  /** The user's accounts by id, for a trade preview; null while they are unknown. */
+  accounts?: PreviewAccounts;
+}) {
   const t = useTranslations('emailReceipts.profileWizard.preview');
   const { formatNumber } = useNumberFormat();
   // A trade profile's samples pay no bank transaction, so nothing is expected and
   // nothing can agree: the table says how each would end instead, so a reading
   // that would never propose (no account, no ticker) is not shown as a success.
-  const tradeSamples = result.selected.length > 0 && result.selected.every((item) => item.trade !== null);
+  // The wizard's own kind decides, never the samples: a sample a guard stopped
+  // before any reading comes back with no trade, and must not flip the columns.
+  const tradeSamples = kind === 'trade';
 
   return (
     <div className="space-y-6">
@@ -150,11 +200,11 @@ export function WizardPreviewTables({ result }: { result: ParserPreviewResult })
                       </Td>
                     )}
                     <Td className="px-2 align-top sm:px-4">
-                      <ParsedCell item={item} />
+                      <ParsedCell item={item} accounts={accounts} />
                     </Td>
                     <Td className="px-2 align-top sm:px-4">
                       {tradeSamples ? (
-                        <OutcomeCell item={item} />
+                        <OutcomeCell item={item} trade />
                       ) : item.agrees === null ? (
                         <span className={MUTED}>{t('agreesUnknown')}</span>
                       ) : (
@@ -194,10 +244,10 @@ export function WizardPreviewTables({ result }: { result: ParserPreviewResult })
                   <tr key={item.receiptId}>
                     <EmailCell item={item} />
                     <Td className="px-2 align-top sm:px-4">
-                      <OutcomeCell item={item} />
+                      <OutcomeCell item={item} trade={tradeSamples || item.trade !== null} />
                     </Td>
                     <Td className="px-2 align-top sm:px-4">
-                      <ParsedCell item={item} />
+                      <ParsedCell item={item} accounts={accounts} />
                     </Td>
                     <Td className="min-w-0 px-2 align-top break-words sm:px-4">
                       {item.match ? item.match.summary : <span className={MUTED}>{t('noMatch')}</span>}

@@ -93,7 +93,7 @@
         "automatic": "La consulta pregunta a la IA sobre un recibo asociado que ningún perfil aprobado pudo leer por completo, y redacta un perfil para un remitente que no tiene ninguno."
       },
       "autoApplyLabel": "Aplicar las propuestas automáticamente",
-      "autoApplyHelp": "Desactivado por defecto. Una propuesta se aplica sin preguntar solo cuando se cumple todo lo siguiente: un perfil aprobado leyó todo el correo, la transacción se encontró por un número de pedido o una referencia, o por importe y beneficiario exactos, con un único candidato, y la propuesta cuadra al céntimo. Todo lo demás espera tu aprobación.",
+      "autoApplyHelp": "Desactivado por defecto. Una propuesta se aplica sin preguntar solo cuando se cumple todo lo siguiente: un perfil aprobado leyó todo el correo, la transacción se encontró por un número de pedido o una referencia, o por importe y beneficiario exactos, con un único candidato, y la propuesta cuadra al céntimo. Una confirmación de operación se registra sin preguntar solo cuando su perfil de operaciones está aprobado, leyó la operación completa, el precio cuadra con las participaciones y el total, y tus cuentas aún no contienen una operación igual. Todo lo demás espera tu aprobación.",
       "profileLimitLabel": "Contar las propuestas de perfiles en el límite diario de la IA",
       "profileLimitHelp": "Activado por defecto: una edición que un perfil propone a partir de un correo cuenta en el límite diario de cambios propuestos por la IA, como cualquier otra propuesta de la IA. Desactívalo cuando un lote grande de correos guardados agotaría el límite. Solo las propuestas de perfiles están exentas; toda propuesta sigue esperando tu aprobación."
     },
@@ -177,14 +177,15 @@
       "confirm": "Procesar ahora",
       "later": "Ahora no"
     },
-    "reparse": "Volver a analizar los correos ({count})"
+    "reparse": "Volver a analizar los correos ({count})",
+    "kindTrade": "Operaciones bursátiles"
   },
   "editor": {
     "createTitle": "Nuevo perfil",
     "editTitle": "Editar perfil",
-    "loading": "Cargando beneficiarios y categorías",
+    "loading": "Cargando beneficiarios, categorías, cuentas y monedas",
     "lookupsError": {
-      "title": "No se pudieron cargar los beneficiarios y las categorías",
+      "title": "No se pudieron cargar los beneficiarios, las categorías, las cuentas o las monedas",
       "body": "Los selectores los necesitan, así que el editor todavía no se puede abrir. Inténtalo de nuevo.",
       "retry": "Reintentar"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "Nombre de la etiqueta",
       "aiCategoriesLabel": "Dejar que la IA elija la categoría de los artículos que no coinciden con ninguna regla",
       "aiCategoriesHelp": "Cuando un artículo no coincide con ninguna regla de categoría y no hay categoría predeterminada, se pregunta a la IA por su categoría de entre tu lista de categorías. La elección se marca como de la IA en la propuesta. Con esto desactivado, nunca se pregunta a la IA."
+    },
+    "kind": {
+      "label": "Tipo de perfil",
+      "receipt": "Recibo de pedido",
+      "trade": "Operación bursátil",
+      "receiptHelp": "Lee una confirmación de pedido y encuentra la transacción bancaria que la pagó.",
+      "tradeHelp": "Lee una confirmación de operación del bróker y propone la transacción de inversión que informa, una compra o una venta."
+    },
+    "trade": {
+      "guardsHeading": "Qué correos del remitente lee",
+      "guardsHelp": "Opcional. Cada patrón se compara con una línea completa del correo, un patrón por línea.",
+      "guards": {
+        "requireLine": "Líneas obligatorias",
+        "requireLineHint": "El perfil lee un correo solo cuando contiene una de estas líneas; si no, se prueba el siguiente perfil del remitente.",
+        "skipIfLine": "Líneas que omiten el correo",
+        "skipIfLineHint": "Un correo con una de estas líneas se aparta, como una orden cancelada.",
+        "waitIfLine": "Líneas que retienen el correo",
+        "waitIfLineHint": "Un correo con una de estas líneas se retiene y se vuelve a leer más tarde, como una ejecución parcial."
+      },
+      "fieldsHeading": "La operación",
+      "fieldsHelp": "Compra o venta, el símbolo y el número de acciones son obligatorios, y un total o un precio. Cada campo admite patrones, uno por línea, probados en orden.",
+      "fields": {
+        "tradeAction": "Patrones de compra o venta",
+        "tradeSymbol": "Patrones del símbolo",
+        "tradeQuantity": "Patrones del número de acciones",
+        "tradeTotal": "Patrones del total de la operación",
+        "tradePrice": "Patrones del precio por acción",
+        "tradeCommission": "Patrones de la comisión",
+        "tradeDate": "Patrones de la fecha de la operación",
+        "tradeAccount": "Patrones de la cuenta"
+      },
+      "fieldHint": "Debe capturar {capture}. Ejemplo: {example}",
+      "amountsHelp": "El total es el importe ejecutado, con la comisión incluida en una compra. El precio sirve de comprobación y da el total cuando el correo no indica ninguno. Un importe que nombra su moneda (US$, C$, USD, €) fija también la moneda de la operación.",
+      "rulesHeading": "Reglas de cuenta",
+      "rulesHelp": "En qué cuenta se registra la operación. Las reglas se prueban en orden contra el texto de cuenta que leen los patrones de la cuenta, y gana la primera que se aplica; {star} es cualquier texto. Una regla con moneda solo se aplica a una operación en esa moneda, así que dos cuentas que el bróker escribe igual, como un RRSP en CAD y otro en USD mostrados ambos como RRSP, son dos reglas con el mismo texto y monedas distintas. Si el correo no muestra texto de cuenta, solo puede aplicarse una regla cuyo texto sea {star}. La cuenta predeterminada cubre el resto.",
+      "currencyOrder": "La moneda de la operación se toma, en este orden: del propio importe cuando nombra una (US$, C$, USD, €), luego del primer marcador de moneda de abajo que coincida con una línea del correo, luego de la moneda de tu valor para el símbolo. Una regla con moneda nunca adivina: si ninguno de los tres indica la moneda, el correo te espera en vez de registrarse en una de las cuentas.",
+      "ruleMatchLabel": "Texto de cuenta de la regla {rule}",
+      "ruleMatchPlaceholder": "Texto de cuenta, como RRSP",
+      "ruleCurrencyLabel": "Moneda de la regla {rule}",
+      "ruleAccountLabel": "Cuenta de la regla {rule}",
+      "ruleMoveUp": "Subir la regla {rule}",
+      "ruleMoveDown": "Bajar la regla {rule}",
+      "ruleRemove": "Quitar la regla {rule}",
+      "ruleAdd": "Añadir una regla de cuenta",
+      "rulesMax": "Como máximo {max} reglas.",
+      "rulesWithoutAccountText": "No hay patrones de la cuenta, así que las reglas se prueban contra un texto vacío: solo puede aplicarse una regla cuyo texto sea {star}.",
+      "anyCurrency": "Cualquier moneda",
+      "baseCurrency": "{code} (tu moneda base)",
+      "currencyPlaceholder": "Elige una moneda",
+      "accountPlaceholder": "Elige una cuenta",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (no es una cuenta de corretaje abierta)",
+      "accountUnknownOption": "Una cuenta que no está en tu lista",
+      "accountNotTradable": "No se puede registrar una operación en esta cuenta: está cerrada, es una cuenta de efectivo o no es una cuenta de inversión.",
+      "accountUnknown": "Esta cuenta no está en tu lista: puede que se haya eliminado. Elige otra.",
+      "defaultAccountLabel": "Cuenta predeterminada",
+      "defaultAccountNone": "Sin cuenta predeterminada",
+      "defaultAccountHint": "La cuenta cuando no se aplica ninguna regla. Sin ella, un correo al que no se aplica ninguna regla te espera.",
+      "markersHeading": "Marcadores de moneda",
+      "markersHelp": "Texto que nombra la moneda de la operación cuando sus importes no lo hacen, como una línea que dice que los importes están en dólares estadounidenses junto a un $ sin más. Cada marcador se compara con cada línea del correo ({star} es cualquier texto), y el primer marcador, en orden, que coincide nombra la moneda. Los marcadores solo se usan cuando el importe no nombra ninguna moneda.",
+      "markerMatchLabel": "Texto del marcador {marker}",
+      "markerMatchPlaceholder": "Como *U.S. dollars*",
+      "markerCurrencyLabel": "Moneda del marcador {marker}",
+      "markerMoveUp": "Subir el marcador {marker}",
+      "markerMoveDown": "Bajar el marcador {marker}",
+      "markerRemove": "Quitar el marcador {marker}",
+      "markerAdd": "Añadir un marcador de moneda",
+      "markersMax": "Como máximo {max} marcadores."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "Línea que se omite {line}",
       "recordStep": "Paso de registro {step}",
       "recordStepPart": "Paso de registro {step}, {part}",
-      "recordAlternative": "Paso de registro {step}, alternativa {alternative}"
+      "recordAlternative": "Paso de registro {step}, alternativa {alternative}",
+      "accountRule": "Regla de cuenta {rule}",
+      "accountRulePart": "Regla de cuenta {rule}, {part}",
+      "currencyMarker": "Marcador de moneda {marker}",
+      "currencyMarkerPart": "Marcador de moneda {marker}, {part}"
     },
     "fields": {
       "orderId": "Patrones del número de pedido",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "Días después de la compra",
       "matchTolerance": "Tolerancia del importe",
       "tag": "Etiqueta",
-      "aiCategories": "Categorías de la IA"
+      "aiCategories": "Categorías de la IA",
+      "trade": "La sección de la operación",
+      "tradeAction": "Patrones de compra o venta",
+      "tradeSymbol": "Patrones del símbolo",
+      "tradeQuantity": "Patrones del número de acciones",
+      "tradeTotal": "Patrones del total de la operación",
+      "tradePrice": "Patrones del precio por acción",
+      "tradeCommission": "Patrones de la comisión",
+      "tradeDate": "Patrones de la fecha de la operación",
+      "tradeAccount": "Patrones de la cuenta",
+      "accountRules": "Reglas de cuenta",
+      "currencyMarkers": "Marcadores de moneda",
+      "defaultAccount": "Cuenta predeterminada",
+      "ruleAccount": "cuenta",
+      "ruleCurrency": "moneda"
     },
     "codes": {
       "not_object": "no es una definición válida",
@@ -376,7 +463,12 @@
       "duplicate_entry": "enumera dos veces la misma entrada",
       "reference_field_missing": "necesita patrones de referencia (la estrategia de referencia está activada)",
       "out_of_range_days": "debe ser un número entero de 0 a {max}",
-      "out_of_range_tolerance": "debe ser un importe de 0,00 a {max}"
+      "out_of_range_tolerance": "debe ser un importe de 0,00 a {max}",
+      "trade_conflict": "no puede estar en un perfil de operación bursátil, que solo lee la operación",
+      "trade_amount_missing": "necesita patrones del total o del precio (al menos uno de los dos)",
+      "trade_account_missing": "necesita una cuenta predeterminada o reglas de cuenta",
+      "invalid_currency": "no es un código de moneda de 3 letras, como USD",
+      "invalid_uuid_account": "no es una cuenta válida"
     }
   },
   "test": {
@@ -429,7 +521,8 @@
         "price": "Precio",
         "commission": "Comisión",
         "date": "Fecha",
-        "account": "Cuenta"
+        "account": "Cuenta",
+        "currency": "Marcador de moneda"
       },
       "entryLine": "entrada {entry} ({pattern}), línea {line}: {text}",
       "entrySubject": "entrada {entry} ({pattern}), el asunto: {text}",
@@ -601,8 +694,11 @@
       "handoffFailed": "La solicitud está en cola, pero no se pudieron abrir los correos en el chat. Espera a un agente en la bandeja de revisión de IA.",
       "inboxLink": "Abrir la bandeja de revisión de IA",
       "opened": "Se abrió el chat con los correos adjuntos. Lee el mensaje y pulsa Enviar.",
-      "chatPrompt": "Crea un perfil de recibos de correo para {count, plural, one {este correo de pedido} other {estos # correos de pedido}} de {domain}. Reclama la solicitud de revisión de IA {requestId}, prueba tu perfil con cada correo adjunto mediante la herramienta email_receipt_profiles, corrígelo hasta que cada uno se lea por completo y guárdalo después como borrador para la solicitud {requestId}."
-    }
+      "chatPrompt": "Crea un perfil de recibos de correo para {count, plural, one {este correo de pedido} other {estos # correos de pedido}} de {domain}. Reclama la solicitud de revisión de IA {requestId}, prueba tu perfil con cada correo adjunto mediante la herramienta email_receipt_profiles, corrígelo hasta que cada uno se lea por completo y guárdalo después como borrador para la solicitud {requestId}.",
+      "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos.",
+      "chatPromptTrade": "Crea un perfil de operaciones para {count, plural, one {esta confirmación de operación} other {estas # confirmaciones de operación}} de {domain}. Reclama la solicitud de revisión de IA {requestId}, prueba tu perfil con cada correo adjunto mediante la herramienta email_receipt_parsers, corrígelo hasta que de cada uno se lea una operación completa y guárdalo después como borrador para la solicitud {requestId}."
+    },
+    "tradeBadge": "Operación"
   },
   "detail": {
     "title": "Recibo por correo",
@@ -660,7 +756,8 @@
       "trade_no_amount": "El perfil no encontró ni un total ni un precio en este correo.",
       "trade_no_account": "El perfil no pudo saber a qué cuenta corresponde esta operación.",
       "trade_exists": "Tus cuentas ya contienen esta operación, así que no se propuso nada.",
-      "trade_linked": "Vinculado a la transacción que informa, así que no se propuso nada."
+      "trade_linked": "Vinculado a la transacción que informa, así que no se propuso nada.",
+      "trade_no_currency": "El perfil no pudo saber en qué moneda está esta operación, así que no pudo elegir su cuenta."
     },
     "reasonUnknown": "Motivo: {reason}",
     "requestNote": "Solicitud de revisión ({state}): {note}",
@@ -714,7 +811,8 @@
     "tradeNoCandidates": "Ninguna transacción de inversión de esta cuenta, sentido y símbolo dentro de una semana del día de la operación está libre para vincular. Si registraste la operación tú mismo, revisa su cuenta y fecha; si no, aprueba la propuesta en la bandeja de revisión.",
     "aiTradeHeading": "Operación que propone el agente de IA",
     "aiTradeReader": "Ninguno: el agente de IA lo lee como una operación",
-    "noAiTradeTransaction": "Ninguna todavía: la operación se registra al aprobar la propuesta del agente de IA."
+    "noAiTradeTransaction": "Ninguna todavía: la operación se registra al aprobar la propuesta del agente de IA.",
+    "tradeProposalHeading": "Lo que registraría su propuesta"
   },
   "picker": {
     "heading": "Elige la transacción",
@@ -1032,7 +1130,12 @@
         "no_html": "Sin parte HTML",
         "trade": "Propone una operación",
         "trade_exists": "Ya está en tu registro"
-      }
+      },
+      "parsedTradeAccount": "Cuenta: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "desconocida",
+      "parsedTradeNoAccount": "No se encontró ninguna cuenta para esta operación",
+      "parsedTradeCurrency": "Moneda: {currency}"
     }
   },
   "trade": {
@@ -1051,6 +1154,10 @@
     "proposalReviewLink": "Revisarla en la bandeja",
     "aiWaiting": "El agente de IA aún no ha propuesto la operación. Su propuesta aparecerá aquí y en la bandeja de revisión.",
     "aiBooked": "Registrada a partir de la propuesta del agente de IA: consulta la transacción de arriba.",
-    "aiNoProposal": "No hay ninguna propuesta del agente de IA pendiente para este correo."
+    "aiNoProposal": "No hay ninguna propuesta del agente de IA pendiente para este correo.",
+    "currencyFrom": "Moneda: {currency}, {source, select, amount {nombrada por el importe} marker {de un marcador de moneda del perfil} other {de tu valor para el símbolo}}",
+    "bookTo": "Se registra en: {account}",
+    "bookToNotTradable": "Se registra en {account}, que no es una cuenta de corretaje abierta, así que la operación no puede registrarse allí.",
+    "bookToUnknown": "Se registra en una cuenta que no está en tu lista, así que la operación no puede registrarse allí."
   }
 }

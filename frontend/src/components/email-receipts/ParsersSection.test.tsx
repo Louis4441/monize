@@ -20,6 +20,8 @@ const api = vi.hoisted(() => ({
 }));
 const payeesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
 const categoriesApi = vi.hoisted(() => ({ getAll: vi.fn() }));
+const accountsApi = vi.hoisted(() => ({ getAll: vi.fn() }));
+const exchangeRatesApi = vi.hoisted(() => ({ getCurrencies: vi.fn() }));
 
 vi.mock('@/lib/email-receipts-api', () => ({
   emailReceiptsApi: {
@@ -34,6 +36,14 @@ vi.mock('@/lib/payees', async (importOriginal) => ({
 vi.mock('@/lib/categories', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/categories')>()),
   categoriesApi,
+}));
+vi.mock('@/lib/accounts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/accounts')>()),
+  accountsApi,
+}));
+vi.mock('@/lib/exchange-rates', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/exchange-rates')>()),
+  exchangeRatesApi,
 }));
 vi.mock('@/components/email-receipts/ProfileWizard', () => ({
   ProfileWizard: ({ domain, onClose, onFinished }: { domain: string; onClose: () => void; onFinished: () => void }) => (
@@ -82,6 +92,18 @@ describe('ParsersSection', () => {
     api.listUncovered.mockResolvedValue([]);
     payeesApi.getAll.mockResolvedValue([{ id: 'payee-1', name: 'Allegro' }]);
     categoriesApi.getAll.mockResolvedValue([]);
+    accountsApi.getAll.mockResolvedValue([]);
+    exchangeRatesApi.getCurrencies.mockResolvedValue([]);
+  });
+
+  it('marks a brokerage trade profile, and only that one', async () => {
+    api.list.mockResolvedValue([
+      approved,
+      makeParser({ id: 'p-t', name: 'Broker trades', definition: { version: 2, trade: { action: ['{action}'] } } }),
+    ]);
+    await renderSection();
+    expect(within(screen.getByRole('row', { name: /Broker trades/ })).getByText('Brokerage trades')).toBeInTheDocument();
+    expect(within(screen.getByRole('row', { name: /Allegro parser/ })).queryByText('Brokerage trades')).not.toBeInTheDocument();
   });
 
   it('lists each profile with its domains, status, source and payee', async () => {

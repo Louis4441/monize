@@ -46,18 +46,11 @@ interface ParserPatternFieldsProps {
   onChange: ParserFormChange;
 }
 
-/**
- * The extraction patterns of a parser: what to read the order id and the
- * amounts from, and how to read the line items. Every pattern is a rule glob
- * matched against one whole line (`*` any text, `{name}` a capture); the hint
- * under each box names the captures that field accepts, because the server
- * refuses any other.
- */
-export function ParserPatternFields({ form, onChange }: ParserPatternFieldsProps) {
+/** Which rendering of the email the patterns read (text or HTML), with the rule-glob help under it: shared by both kinds of profile. */
+export function ParserSourceField({ form, onChange }: ParserPatternFieldsProps) {
   const t = useTranslations('emailReceipts.editor.patterns');
-
   return (
-    <div className="space-y-4">
+    <>
       <div>
         <Select
           id="parser-source"
@@ -72,6 +65,23 @@ export function ParserPatternFields({ form, onChange }: ParserPatternFieldsProps
       <p className="text-sm text-gray-600 dark:text-gray-400">
         {t('globHelp', { star: '*', capture: '{name}', max: RECEIPT_PARSER_LIMITS.maxPatternsPerField })}
       </p>
+    </>
+  );
+}
+
+/**
+ * The extraction patterns of a parser: what to read the order id and the
+ * amounts from, and how to read the line items. Every pattern is a rule glob
+ * matched against one whole line (`*` any text, `{name}` a capture); the hint
+ * under each box names the captures that field accepts, because the server
+ * refuses any other.
+ */
+export function ParserPatternFields({ form, onChange }: ParserPatternFieldsProps) {
+  const t = useTranslations('emailReceipts.editor.patterns');
+
+  return (
+    <div className="space-y-4">
+      <ParserSourceField form={form} onChange={onChange} />
 
       <PatternArea
         id="parser-order-id"

@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { accountStanding, type ReceiptParserAccountOption } from '@/hooks/useReceiptParserLookups';
 import { fromReceiptUnits } from '@/lib/email-receipts-format';
 import type { ParsedTrade } from '@/types/email-receipts';
 
@@ -15,6 +16,12 @@ interface TradeReadingViewProps {
    * need it (its status line says so); the profile test panel has no status line.
    */
   showReason?: boolean;
+  /**
+   * The user's accounts: with them the account the profile chose is named (and
+   * flagged when it is not an open brokerage account of theirs). Without them
+   * the chosen account is not shown.
+   */
+  accounts?: readonly ReceiptParserAccountOption[];
 }
 
 /**
@@ -27,10 +34,15 @@ interface TradeReadingViewProps {
  * is shown as a plain number unless the email named its currency; the review
  * card shows it with the security's. An incomplete reading names its reason only
  * when asked (`showReason`): in the detail dialog the status line above does.
+ *
+ * The currency is said with where it came from (the amount, a currency marker
+ * of the profile, the security), because an account rule with a currency
+ * decided the account by it.
  */
-export function TradeReadingView({ trade, fallbackDate, showReason = false }: TradeReadingViewProps) {
+export function TradeReadingView({ trade, fallbackDate, showReason = false, accounts }: TradeReadingViewProps) {
   const t = useTranslations('emailReceipts.trade');
   const tReason = useTranslations('emailReceipts.detail.reasons');
+  const tEditor = useTranslations('emailReceipts.editor.trade');
   const { formatCurrency, formatNumber, formatShareQuantity } = useNumberFormat();
   const money = (units: number, decimals: number) =>
     trade.currency
@@ -40,12 +52,33 @@ export function TradeReadingView({ trade, fallbackDate, showReason = false }: Tr
 
   const tradeDate = trade.date ?? fallbackDate;
 
+  const currencyLine = trade.currency && trade.currencySource && (
+    <p>{t('currencyFrom', { currency: trade.currency, source: trade.currencySource })}</p>
+  );
+  const accountLine = (() => {
+    if (accounts === undefined || trade.accountId === null) return null;
+    const standing = accountStanding(accounts, trade.accountId);
+    const account = accounts.find((option) => option.value === trade.accountId);
+    const name = account?.label ?? '';
+    // With its currency: two accounts the broker prints alike often share a name too.
+    if (standing === 'tradable' && account) {
+      return <p>{t('bookTo', { account: tEditor('accountOption', { name, currency: account.currencyCode }) })}</p>;
+    }
+    return (
+      <p role="note" className="text-amber-800 dark:text-amber-300">
+        {standing === 'unknown' ? t('bookToUnknown') : t('bookToNotTradable', { account: name })}
+      </p>
+    );
+  })();
+
   if (!trade.complete || trade.action === null || trade.symbol === null || trade.quantity === null) {
     const reasonKey = trade.reason;
     return (
       <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
         <p>{t('incomplete')}</p>
         {showReason && reasonKey && tReason.has(reasonKey) && <p>{tReason(reasonKey)}</p>}
+        {/* What the rules were tried against: the account text the email printed. */}
+        {showReason && trade.accountText && <p>{t('account', { account: trade.accountText })}</p>}
       </div>
     );
   }
@@ -63,7 +96,9 @@ export function TradeReadingView({ trade, fallbackDate, showReason = false }: Tr
         })}
       </p>
       {trade.price !== null && <p>{t('price', { price: money(trade.price, 4) })}</p>}
+      {currencyLine}
       {trade.accountText && <p>{t('account', { account: trade.accountText })}</p>}
+      {accountLine}
       {trade.consistent === false && (
         <p role="note" className="text-amber-800 dark:text-amber-300">
           {t('priceMismatch')}

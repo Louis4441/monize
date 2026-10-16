@@ -93,7 +93,7 @@
         "automatic": "Yoklama sırasında, onaylı hiçbir ayrıştırıcının tamamen okuyamadığı eşleşmiş bir makbuz için yapay zekâya sorulur ve ayrıştırıcısı olmayan bir gönderen için ayrıştırıcı taslağı oluşturulur."
       },
       "autoApplyLabel": "Önerileri otomatik uygula",
-      "autoApplyHelp": "Varsayılan olarak kapalıdır. Bir öneri, ancak şunların hepsi geçerliyse sormadan uygulanır: onaylı bir profil e-postanın tamamını okudu, işlem bir sipariş numarası veya referansla ya da tam tutar ve alıcıyla tek bir adayla bulundu ve öneri kuruşu kuruşuna tutuyor. Geri kalan her şey onayınızı bekler.",
+      "autoApplyHelp": "Varsayılan olarak kapalıdır. Bir öneri, ancak şunların hepsi geçerliyse sormadan uygulanır: onaylı bir profil e-postanın tamamını okudu, işlem bir sipariş numarası veya referansla ya da tam tutar ve alıcıyla tek bir adayla bulundu ve öneri kuruşu kuruşuna tutuyor. Bir işlem onayı, ancak işlem profili onaylıysa, işlemin tamamını okuduysa, fiyat adet ve toplamla uyuşuyorsa ve hesaplarınızda aynı işlem henüz yoksa sormadan kaydedilir. Geri kalan her şey onayınızı bekler.",
       "profileLimitLabel": "Profil önerilerini günlük yapay zekâ sınırına say",
       "profileLimitHelp": "Varsayılan olarak açıktır: bir profilin bir e-postadan önerdiği düzenleme, diğer yapay zekâ önerileri gibi yapay zekânın önerdiği değişikliklerin günlük sınırına sayılır. Saklanan çok sayıda e-posta sınırı tüketecekse bunu kapatın. Yalnızca profillerden gelen öneriler muaftır; her öneri yine de onayınızı bekler."
     },
@@ -177,14 +177,15 @@
       "confirm": "Şimdi işle",
       "later": "Şimdi değil"
     },
-    "reparse": "E-postaları yeniden ayrıştır ({count})"
+    "reparse": "E-postaları yeniden ayrıştır ({count})",
+    "kindTrade": "Aracı kurum işlemleri"
   },
   "editor": {
     "createTitle": "Yeni ayrıştırıcı",
     "editTitle": "Ayrıştırıcıyı düzenle",
-    "loading": "Alıcılar ve kategoriler yükleniyor",
+    "loading": "Alacaklılar, kategoriler, hesaplar ve para birimleri yükleniyor",
     "lookupsError": {
-      "title": "Alıcılar ve kategoriler yüklenemedi",
+      "title": "Alacaklılar, kategoriler, hesaplar veya para birimleri yüklenemedi",
       "body": "Seçiciler bunlara ihtiyaç duyuyor, bu yüzden düzenleyici henüz açılamıyor. Yeniden deneyin.",
       "retry": "Yeniden dene"
     },
@@ -290,6 +291,74 @@
       "tagNameLabel": "Etiket adı",
       "aiCategoriesLabel": "Hiçbir kuralın eşleşmediği kalemlerin kategorisini yapay zekâ seçsin",
       "aiCategoriesHelp": "Bir kalem hiçbir kategori kuralıyla eşleşmiyorsa ve varsayılan kategori yoksa, yapay zekâdan kategori listenizden bir kategori istenir. Seçim, öneride yapay zekânın seçimi olarak işaretlenir. Bu kapalıyken yapay zekâya hiç sorulmaz."
+    },
+    "kind": {
+      "label": "Profil türü",
+      "receipt": "Sipariş makbuzu",
+      "trade": "Aracı kurum işlemi",
+      "receiptHelp": "Bir sipariş onayını okur ve onu ödeyen banka işlemini bulur.",
+      "tradeHelp": "Aracı kurumun işlem onayını okur ve bildirdiği yatırım işlemini, bir alım ya da satımı önerir."
+    },
+    "trade": {
+      "guardsHeading": "Gönderenin hangi e-postalarını okur",
+      "guardsHelp": "İsteğe bağlı. Her desen e-postanın bütün bir satırıyla karşılaştırılır, satır başına bir desen.",
+      "guards": {
+        "requireLine": "Zorunlu satırlar",
+        "requireLineHint": "Profil bir e-postayı yalnızca bu satırlardan biri içindeyse okur; değilse gönderenin sonraki profili denenir.",
+        "skipIfLine": "E-postayı atlatan satırlar",
+        "skipIfLineHint": "Bu satırlardan birini içeren e-posta kenara ayrılır, örneğin iptal edilmiş bir emir.",
+        "waitIfLine": "E-postayı bekleten satırlar",
+        "waitIfLineHint": "Bu satırlardan birini içeren e-posta bekletilir ve daha sonra yeniden okunur, örneğin kısmi gerçekleşme."
+      },
+      "fieldsHeading": "İşlem",
+      "fieldsHelp": "Alım ya da satım, sembol ve pay adedi zorunludur; ayrıca bir toplam ya da fiyat gerekir. Her alan desenleri satır başına bir tane alır ve sırayla dener.",
+      "fields": {
+        "tradeAction": "Alım veya satım desenleri",
+        "tradeSymbol": "Sembol desenleri",
+        "tradeQuantity": "Pay adedi desenleri",
+        "tradeTotal": "İşlem toplamı desenleri",
+        "tradePrice": "Pay başına fiyat desenleri",
+        "tradeCommission": "Komisyon desenleri",
+        "tradeDate": "İşlem tarihi desenleri",
+        "tradeAccount": "Hesap desenleri"
+      },
+      "fieldHint": "{capture} değerini yakalamalıdır. Örnek: {example}",
+      "amountsHelp": "Toplam, gerçekleşen tutardır; alımda komisyon dahildir. Fiyat bir çapraz kontroldür ve e-posta toplam belirtmediğinde toplamı verir. Para birimini belirten bir tutar (US$, C$, USD, €) işlemin para birimini de belirler.",
+      "rulesHeading": "Hesap kuralları",
+      "rulesHelp": "İşlemin hangi hesaba kaydedileceği. Kurallar, hesap desenlerinin okuduğu hesap metnine karşı sırayla denenir ve uyan ilk kural kazanır; {star} herhangi bir metindir. Para birimi olan bir kural yalnızca o para birimindeki işleme uyar; bu yüzden aracı kurumun aynı yazdığı iki hesap, örneğin ikisi de RRSP olarak görünen CAD ve USD RRSP hesapları, aynı metinli ve farklı para birimli iki kuraldır. E-posta hesap metni göstermediğinde yalnızca metni {star} olan bir kural uyabilir. Gerisini varsayılan hesap alır.",
+      "currencyOrder": "İşlemin para birimi sırayla şuradan alınır: tutarın kendisi bir tane belirtiyorsa oradan (US$, C$, USD, €), sonra aşağıdaki, e-postanın bir satırına uyan ilk para birimi işaretinden, sonra o sembol için menkul kıymetinizin para biriminden. Para birimi olan bir kural asla tahmin etmez: üçünden hiçbiri para birimini söylemezse e-posta hesaplardan birine kaydedilmek yerine sizi bekler.",
+      "ruleMatchLabel": "{rule}. kuralın hesap metni",
+      "ruleMatchPlaceholder": "Hesap metni, örneğin RRSP",
+      "ruleCurrencyLabel": "{rule}. kuralın para birimi",
+      "ruleAccountLabel": "{rule}. kuralın hesabı",
+      "ruleMoveUp": "{rule}. kuralı yukarı taşı",
+      "ruleMoveDown": "{rule}. kuralı aşağı taşı",
+      "ruleRemove": "{rule}. kuralı kaldır",
+      "ruleAdd": "Hesap kuralı ekle",
+      "rulesMax": "En fazla {max} kural.",
+      "rulesWithoutAccountText": "Hesap deseni yok, bu yüzden kurallar boş metne karşı denenir: yalnızca metni {star} olan bir kural uyabilir.",
+      "anyCurrency": "Herhangi bir para birimi",
+      "baseCurrency": "{code} (temel para biriminiz)",
+      "currencyPlaceholder": "Para birimi seçin",
+      "accountPlaceholder": "Hesap seçin",
+      "accountOption": "{name} ({currency})",
+      "accountNotTradableOption": "{name} (açık bir aracı kurum hesabı değil)",
+      "accountUnknownOption": "Listenizde olmayan bir hesap",
+      "accountNotTradable": "Bu hesaba işlem kaydedilemez: kapalı, bir nakit hesabı ya da yatırım hesabı değil.",
+      "accountUnknown": "Bu hesap listenizde yok: silinmiş olabilir. Başka bir hesap seçin.",
+      "defaultAccountLabel": "Varsayılan hesap",
+      "defaultAccountNone": "Varsayılan hesap yok",
+      "defaultAccountHint": "Hiçbir kural uymadığında kullanılan hesap. Yoksa hiçbir kuralın uymadığı bir e-posta sizi bekler.",
+      "markersHeading": "Para birimi işaretleri",
+      "markersHelp": "Tutarlar belirtmediğinde işlemin para birimini söyleyen metin; örneğin yalnız bir $ işaretinin yanında tutarların ABD doları olduğunu söyleyen bir satır. Her işaret e-postanın her satırıyla karşılaştırılır ({star} herhangi bir metindir) ve sırayla uyan ilk işaret para birimini belirler. İşaretler yalnızca tutar bir para birimi belirtmediğinde kullanılır.",
+      "markerMatchLabel": "{marker}. işaretin metni",
+      "markerMatchPlaceholder": "Örneğin *U.S. dollars*",
+      "markerCurrencyLabel": "{marker}. işaretin para birimi",
+      "markerMoveUp": "{marker}. işareti yukarı taşı",
+      "markerMoveDown": "{marker}. işareti aşağı taşı",
+      "markerRemove": "{marker}. işareti kaldır",
+      "markerAdd": "Para birimi işareti ekle",
+      "markersMax": "En fazla {max} işaret."
     }
   },
   "problems": {
@@ -303,7 +372,11 @@
       "skipLine": "Atlanacak satır {line}",
       "recordStep": "Kayıt adımı {step}",
       "recordStepPart": "Kayıt adımı {step}, {part}",
-      "recordAlternative": "Kayıt adımı {step}, alternatif {alternative}"
+      "recordAlternative": "Kayıt adımı {step}, alternatif {alternative}",
+      "accountRule": "Hesap kuralı {rule}",
+      "accountRulePart": "Hesap kuralı {rule}, {part}",
+      "currencyMarker": "Para birimi işareti {marker}",
+      "currencyMarkerPart": "Para birimi işareti {marker}, {part}"
     },
     "fields": {
       "orderId": "Sipariş numarası desenleri",
@@ -347,7 +420,21 @@
       "matchDaysAfter": "Alışverişten sonraki gün sayısı",
       "matchTolerance": "Tutar toleransı",
       "tag": "Etiket",
-      "aiCategories": "Yapay zekâ kategorileri"
+      "aiCategories": "Yapay zekâ kategorileri",
+      "trade": "İşlem bölümü",
+      "tradeAction": "Alım veya satım desenleri",
+      "tradeSymbol": "Sembol desenleri",
+      "tradeQuantity": "Pay adedi desenleri",
+      "tradeTotal": "İşlem toplamı desenleri",
+      "tradePrice": "Pay başına fiyat desenleri",
+      "tradeCommission": "Komisyon desenleri",
+      "tradeDate": "İşlem tarihi desenleri",
+      "tradeAccount": "Hesap desenleri",
+      "accountRules": "Hesap kuralları",
+      "currencyMarkers": "Para birimi işaretleri",
+      "defaultAccount": "Varsayılan hesap",
+      "ruleAccount": "hesap",
+      "ruleCurrency": "para birimi"
     },
     "codes": {
       "not_object": "geçerli bir tanım değil",
@@ -376,7 +463,12 @@
       "duplicate_entry": "aynı girdiyi iki kez listeliyor",
       "reference_field_missing": "referans desenleri gerekiyor (referans stratejisi açık)",
       "out_of_range_days": "0 ile {max} arasında bir tam sayı olmalıdır",
-      "out_of_range_tolerance": "0.00 ile {max} arasında bir tutar olmalıdır"
+      "out_of_range_tolerance": "0.00 ile {max} arasında bir tutar olmalıdır",
+      "trade_conflict": "yalnızca işlemi okuyan bir aracı kurum işlemi profilinde bulunamaz",
+      "trade_amount_missing": "toplam veya fiyat desenleri gerekiyor (ikisinden en az biri)",
+      "trade_account_missing": "varsayılan hesap veya hesap kuralları gerekiyor",
+      "invalid_currency": "USD gibi 3 harfli bir para birimi kodu değil",
+      "invalid_uuid_account": "geçerli bir hesap değil"
     }
   },
   "test": {
@@ -429,7 +521,8 @@
         "price": "Fiyat",
         "commission": "Komisyon",
         "date": "Tarih",
-        "account": "Hesap"
+        "account": "Hesap",
+        "currency": "Para birimi işareti"
       },
       "entryLine": "girdi {entry} ({pattern}), {line}. satır: {text}",
       "entrySubject": "girdi {entry} ({pattern}), konu: {text}",
@@ -601,8 +694,11 @@
       "handoffFailed": "İstek kuyruğa alındı, ancak e-postalar sohbette açılamadı. Bir ajan için yapay zekâ inceleme kutusunda bekliyor.",
       "inboxLink": "Yapay zekâ inceleme kutusunu aç",
       "opened": "Sohbet, e-postalar ekli olarak açıldı. Mesajı okuyun ve Gönder'e basın.",
-      "chatPrompt": "{domain} alan adından gelen {count, plural, one {bu sipariş e-postası} other {bu # sipariş e-postası}} için bir e-posta makbuzu ayrıştırıcısı oluştur. {requestId} numaralı yapay zekâ inceleme isteğini üstlen, ayrıştırıcını ekli her e-postada email_receipt_parsers aracıyla dene, her biri eksiksiz okunana kadar düzelt, sonra {requestId} isteği için taslak olarak kaydet."
-    }
+      "chatPrompt": "{domain} alan adından gelen {count, plural, one {bu sipariş e-postası} other {bu # sipariş e-postası}} için bir e-posta makbuzu ayrıştırıcısı oluştur. {requestId} numaralı yapay zekâ inceleme isteğini üstlen, ayrıştırıcını ekli her e-postada email_receipt_parsers aracıyla dene, her biri eksiksiz okunana kadar düzelt, sonra {requestId} isteği için taslak olarak kaydet.",
+      "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin.",
+      "chatPromptTrade": "{domain} alan adından gelen {count, plural, one {bu işlem onayı e-postası} other {bu # işlem onayı e-postası}} için bir işlem profili oluştur. {requestId} numaralı yapay zekâ inceleme isteğini üstlen, profilini ekli her e-postada email_receipt_parsers aracıyla dene, her birinden eksiksiz bir işlem okunana kadar düzelt, sonra {requestId} isteği için taslak olarak kaydet."
+    },
+    "tradeBadge": "İşlem"
   },
   "detail": {
     "title": "E-posta makbuzu",
@@ -660,7 +756,8 @@
       "trade_no_amount": "Ayrıştırıcı bu e-postada ne toplam ne de fiyat buldu.",
       "trade_no_account": "Ayrıştırıcı bu işlemin hangi hesaba ait olduğunu belirleyemedi.",
       "trade_exists": "Hesaplarınızda bu işlem zaten var, bu yüzden hiçbir şey önerilmedi.",
-      "trade_linked": "Bildirdiği işleme bağlandı, bu yüzden hiçbir şey önerilmedi."
+      "trade_linked": "Bildirdiği işleme bağlandı, bu yüzden hiçbir şey önerilmedi.",
+      "trade_no_currency": "Profil bu işlemin para birimini anlayamadı, bu yüzden hesabını seçemedi."
     },
     "reasonUnknown": "Neden: {reason}",
     "requestNote": "İnceleme isteği ({state}): {note}",
@@ -714,7 +811,8 @@
     "tradeNoCandidates": "İşlem gününden bir hafta içinde bu hesap, yön ve sembole ait bağlanabilecek bir yatırım işlemi yok. İşlemi kendiniz girdiyseniz hesabını ve tarihini kontrol edin; aksi halde öneriyi inceleme kutusunda onaylayın.",
     "aiTradeHeading": "Yapay zekâ ajanının önerdiği işlem",
     "aiTradeReader": "Yok: yapay zekâ ajanı bunu bir işlem olarak okuyor",
-    "noAiTradeTransaction": "Henüz yok: yapay zekâ ajanının önerisini onayladığınızda işlem kaydedilir."
+    "noAiTradeTransaction": "Henüz yok: yapay zekâ ajanının önerisini onayladığınızda işlem kaydedilir.",
+    "tradeProposalHeading": "Önerisinin kaydedeceği"
   },
   "picker": {
     "heading": "İşlemi seçin",
@@ -1032,7 +1130,12 @@
         "no_html": "HTML bölümü yok",
         "trade": "Bir işlem önerir",
         "trade_exists": "Defterinizde zaten var"
-      }
+      },
+      "parsedTradeAccount": "Hesap: {account}",
+      "accountWithCurrency": "{name} ({currency})",
+      "accountUnknown": "bilinmiyor",
+      "parsedTradeNoAccount": "Bu işlem için hesap bulunamadı",
+      "parsedTradeCurrency": "Para birimi: {currency}"
     }
   },
   "trade": {
@@ -1051,6 +1154,10 @@
     "proposalReviewLink": "Gelen kutusunda inceleyin",
     "aiWaiting": "Yapay zekâ ajanı işlemi henüz önermedi. Önerisi burada ve inceleme gelen kutusunda görünür.",
     "aiBooked": "Yapay zekâ ajanının önerisinden kaydedildi: yukarıdaki işleme bakın.",
-    "aiNoProposal": "Bu e-posta için bekleyen bir yapay zekâ ajanı önerisi yok."
+    "aiNoProposal": "Bu e-posta için bekleyen bir yapay zekâ ajanı önerisi yok.",
+    "currencyFrom": "Para birimi: {currency}, {source, select, amount {tutarda belirtilen} marker {profilin bir para birimi işaretinden} other {sembol için menkul kıymetinizden}}",
+    "bookTo": "Kaydedileceği hesap: {account}",
+    "bookToNotTradable": "{account} hesabına kaydedilir; bu açık bir aracı kurum hesabı olmadığından işlem oraya kaydedilemez.",
+    "bookToUnknown": "Listenizde olmayan bir hesaba kaydedilir, bu yüzden işlem oraya kaydedilemez."
   }
 }

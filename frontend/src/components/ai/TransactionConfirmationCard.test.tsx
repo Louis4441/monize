@@ -342,6 +342,18 @@ describe('TransactionConfirmationCard', () => {
     expect(screen.getByText('Marks as paid').nextElementSibling).toHaveTextContent('Monthly XCNS');
   });
 
+  it('names the due day of the occurrence it marks paid, in the reader\'s date format', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeInvestmentAction({ scheduledName: 'Monthly XCNS', scheduledDueDate: '2026-10-15' })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const value = screen.getByText('Marks as paid').nextElementSibling;
+    expect(value).toHaveTextContent(/^Monthly XCNS \(due .+\)$/);
+  });
+
   it('says nothing about a schedule for a trade that pays none', () => {
     render(<TransactionConfirmationCard action={makeInvestmentAction()} onConfirm={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.queryByText('Marks as paid')).not.toBeInTheDocument();
