@@ -28,7 +28,14 @@ export function ProcessStatus({ state, onCancel, onDismiss }: ProcessStatusProps
   if (state.status === 'idle') return null;
 
   // "3 Review, 2 No parser": each count with its state's name as the list's own reading, so the separators are the locale's.
-  const outcomes = format.list(outcomeEntries(state.totals).map(([status, count]) => t('outcome', { count, state: tf(status) })), { type: 'unit' });
+  // Emails a profile deleted have no state to end in: they are listed as deleted, last.
+  const outcomes = format.list(
+    [
+      ...outcomeEntries(state.totals).map(([status, count]) => t('outcome', { count, state: tf(status) })),
+      ...(state.totals.deleted > 0 ? [t('deletedOutcome', { count: state.totals.deleted })] : []),
+    ],
+    { type: 'unit' },
+  );
 
   if (state.status === 'running') {
     return (

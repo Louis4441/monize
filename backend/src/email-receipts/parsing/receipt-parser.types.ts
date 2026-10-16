@@ -315,7 +315,20 @@ export interface ReceiptParserDefinition {
   skipIfLine?: string[];
   /** A line matching one of these leaves the receipt `unmatched` (`wait_line`) for a later re-read. */
   waitIfLine?: string[];
+  /**
+   * The profile's emails are never read: every email the pipeline gives this
+   * profile is ignored or deleted (see {@link RECEIPT_DISCARD_MODES}), before
+   * any guard or field. For senders whose mail is never wanted.
+   */
+  discard?: ReceiptDiscardMode;
 }
+
+/**
+ * What a profile does with the emails it matches instead of reading them:
+ * `ignore` marks each one `ignored` (`profile_ignore`), `delete` removes it.
+ */
+export const RECEIPT_DISCARD_MODES = ["ignore", "delete"] as const;
+export type ReceiptDiscardMode = (typeof RECEIPT_DISCARD_MODES)[number];
 
 /** One line item as read from the email. */
 export interface ParsedReceiptItem {

@@ -14,6 +14,7 @@ import { ParserEditorDialog } from '@/components/email-receipts/ParserEditorDial
 import { RecognizeWithAiDialog } from '@/components/email-receipts/RecognizeWithAiDialog';
 import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge';
 import { useParserDraftWithAi } from '@/components/email-receipts/useParserDraftWithAi';
+import { useProfileDiscardOffer } from '@/components/email-receipts/useProfileDiscardOffer';
 import { Badge } from '@/components/ui/Badge';
 import { Button, buttonClassName } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -212,6 +213,8 @@ export function EmailReceiptsManager() {
     void loadCloud(currentFilters.current.filter);
     await load(currentFilters.current.filter, currentFilters.current.domain);
   }, [load, loadDomains, loadCounts, loadCloud]);
+  // A profile made here that ignores or deletes its emails offers to do so to the stored ones it matches.
+  const discardOffer = useProfileDiscardOffer(() => void reload());
 
   useEffect(() => {
     void load(filter, domain);
@@ -775,13 +778,16 @@ export function EmailReceiptsManager() {
           lookups={lookups}
           onReloadLookups={reloadLookups}
           onClose={() => setParserFor(null)}
-          onSaved={() => {
+          onSaved={(saved) => {
             setParserFor(null);
             void reload();
+            void discardOffer.offer(saved);
           }}
           onConflict={() => setParserFor(null)}
         />
       )}
+
+      {discardOffer.dialog}
 
       {recognizeFor !== null && (
         <RecognizeWithAiDialog

@@ -1164,3 +1164,34 @@ describe("validateReceiptParserDefinition: multi-line patterns", () => {
     }
   });
 });
+
+describe("validateReceiptParserDefinition: discard", () => {
+  it.each(["ignore", "delete"])(
+    "accepts %s, alone or beside anything else",
+    (discard) => {
+      for (const input of [
+        { version: 2, discard },
+        { ...valid(), discard },
+      ]) {
+        expect(validateReceiptParserDefinition(input)).toEqual({
+          ok: true,
+          definition: input,
+        });
+      }
+    },
+  );
+
+  it("is compatible with a trade section", () => {
+    expect(
+      codesAt({ version: 2, discard: "ignore", trade: {} }, "discard"),
+    ).toEqual([]);
+  });
+
+  it("refuses anything else as invalid_value, whatever its type", () => {
+    for (const discard of ["archive", "IGNORE", "", true, 1, null, [], {}]) {
+      expect(codesAt({ version: 2, discard }, "discard")).toEqual([
+        "invalid_value",
+      ]);
+    }
+  });
+});

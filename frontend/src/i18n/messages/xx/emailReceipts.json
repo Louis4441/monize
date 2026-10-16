@@ -150,9 +150,7 @@
     "payeeUnavailable": "[XX-Payee list unavailable-XX]",
     "actions": {
       "approve": "[XX-Approve-XX]",
-      "viewJson": "[XX-View JSON-XX]",
-      "ignoreEmails": "[XX-Ignore matching emails-XX]",
-      "deleteEmails": "[XX-Delete matching emails-XX]"
+      "viewJson": "[XX-View JSON-XX]"
     },
     "toasts": {
       "approved": "[XX-Profile approved-XX]",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "[XX-Ignore emails-XX]",
       "deleteTitle": "[XX-Delete this profile's emails?-XX]",
       "deleteMessage": "[XX-{count, plural, one {# email} other {# emails}} that {name} reads will be deleted, with their open proposals. This cannot be undone.{kept, plural, =0 {} one { # email whose proposal was already applied stays.} other { # emails whose proposals were already applied stay.}}-XX]",
-      "deleteConfirm": "[XX-Delete emails-XX]",
-      "noneToIgnore": "[XX-This profile reads no emails that can be ignored.-XX]",
-      "noneToDelete": "[XX-This profile reads no emails that can be deleted.-XX]"
+      "deleteConfirm": "[XX-Delete emails-XX]"
     },
     "deleteDialog": {
       "title": "[XX-Delete the profile?-XX]",
@@ -193,7 +189,9 @@
       "later": "[XX-Not now-XX]"
     },
     "reparse": "[XX-Re-parse emails ({count})-XX]",
-    "kindTrade": "[XX-Brokerage trades-XX]"
+    "kindTrade": "[XX-Brokerage trades-XX]",
+    "discardIgnore": "[XX-Ignores its emails-XX]",
+    "discardDelete": "[XX-Deletes its emails-XX]"
   },
   "editor": {
     "createTitle": "[XX-New profile-XX]",
@@ -374,6 +372,16 @@
       "markerRemove": "[XX-Remove marker {marker}-XX]",
       "markerAdd": "[XX-Add a currency marker-XX]",
       "markersMax": "[XX-At most {max} markers.-XX]"
+    },
+    "discard": {
+      "label": "[XX-Matching emails-XX]",
+      "read": "[XX-Read them-XX]",
+      "ignore": "[XX-Ignore them-XX]",
+      "delete": "[XX-Delete them-XX]",
+      "readHelp": "[XX-The profile reads each email it matches with the patterns below.-XX]",
+      "ignoreHelp": "[XX-Every email this profile matches is ignored as it arrives: it proposes nothing. For senders whose mail you never want to deal with.-XX]",
+      "deleteHelp": "[XX-Every email this profile matches is deleted from Monize as it arrives (it stays in your mailbox). A deleted email cannot be brought back.-XX]",
+      "noReading": "[XX-This profile reads nothing, so it needs no patterns, categories or matching. The sender domains and subject words above decide which emails it takes.-XX]"
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "[XX-This profile would not read this email: none of its required lines is in it, so the next profile for the sender would be tried.-XX]",
       "skip_line": "[XX-This profile would set this email aside: a line it skips on is in it.-XX]",
       "wait_line": "[XX-This profile would hold this email: a line says the order is not final, so it is read again later.-XX]",
+      "discard_ignore": "[XX-This profile would ignore this email: it ignores every email it matches.-XX]",
+      "discard_delete": "[XX-This profile would delete this email: it deletes every email it matches.-XX]",
       "no_html": "[XX-This profile reads the HTML part of the email, and this email has none, so it would be marked as unreadable (no HTML).-XX]"
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "[XX-The proposal was refused, so nothing was proposed.-XX]",
       "skip_line": "[XX-A line this profile skips on was found, so the email was ignored.-XX]",
       "wait_line": "[XX-A line says the order is not final yet, so the email will be read again later.-XX]",
+      "profile_ignore": "[XX-This email's profile ignores every email it matches.-XX]",
       "no_html": "[XX-This profile reads the HTML part of the email, and this email has none.-XX]",
       "schema_org": "[XX-No profile was needed: the order was read from the structured data (schema.org) in the email.-XX]",
       "item_amount_missing": "[XX-An item has no amount, and the email has no single total to give it.-XX]",
@@ -941,6 +952,7 @@
     "failed": "[XX-Processing stopped because a request failed.-XX]",
     "failedWithReason": "[XX-Processing stopped: {reason}-XX]",
     "outcome": "[XX-{count} {state}-XX]",
+    "deletedOutcome": "[XX-{count} deleted-XX]",
     "close": "[XX-Close-XX]"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "[XX-Not read by this profile-XX]",
         "skip_line": "[XX-Skipped (skip line found)-XX]",
         "wait_line": "[XX-On hold (order not final)-XX]",
+        "discard_ignore": "[XX-Ignored by this profile-XX]",
+        "discard_delete": "[XX-Deleted by this profile-XX]",
         "no_html": "[XX-No HTML part-XX]",
         "trade": "[XX-Proposes a trade-XX]",
         "trade_exists": "[XX-Already in your ledger-XX]"

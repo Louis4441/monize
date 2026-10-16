@@ -70,6 +70,8 @@ export interface ProcessBatchResult {
   processed: number;
   /** Where the processed emails ended, by their new status. */
   byOutcome: Partial<Record<EmailReceiptStatus, number>>;
+  /** Processed emails that are gone: their profile deletes every email it matches. */
+  deleted: number;
   /** Emails that raised an error and were passed over (they are not retried by this run). */
   failed: number;
   /** Matching emails this run has not touched yet; 0 ends the run. */
@@ -602,6 +604,7 @@ export class EmailReceiptsService {
 
     const byOutcome: ProcessBatchResult["byOutcome"] = {};
     let processed = 0;
+    let deleted = 0;
     let failed = 0;
     const budget = { remaining: EMAIL_RECEIPTS_BATCH_AI_CATEGORY_CALLS };
     for (const id of selected.ids) {
@@ -610,7 +613,10 @@ export class EmailReceiptsService {
           onlyWhenStatusIn: statuses,
           aiCategoryBudget: budget,
         });
-        if (!result.unchanged) {
+        if (result.deleted) {
+          processed++;
+          deleted++;
+        } else if (!result.unchanged) {
           processed++;
           byOutcome[result.status] = (byOutcome[result.status] ?? 0) + 1;
         }
@@ -641,6 +647,7 @@ export class EmailReceiptsService {
     return {
       processed,
       byOutcome,
+      deleted,
       failed,
       remaining: Number(left?.remaining ?? 0),
       since: selected.since,
@@ -720,10 +727,17 @@ export class EmailReceiptsService {
     return detail;
   }
 
-  /** Back to the top of the pipeline (design section 6); a closed request is not reopened. */
-  async reprocess(userId: string, id: string): Promise<EmailReceiptDetail> {
-    await this.pipeline.process(userId, id);
-    return this.get(userId, id);
+  /**
+   * Back to the top of the pipeline (design section 6); a closed request is not
+   * reopened. Null when the email is gone: its profile deletes every email it
+   * matches.
+   */
+  async reprocess(
+    userId: string,
+    id: string,
+  ): Promise<EmailReceiptDetail | null> {
+    const result = await this.pipeline.process(userId, id);
+    return result.deleted ? null : this.get(userId, id);
   }
 
   /**

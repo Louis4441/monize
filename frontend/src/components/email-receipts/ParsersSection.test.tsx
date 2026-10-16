@@ -448,7 +448,7 @@ describe('ParsersSection', () => {
     });
   });
 
-  describe("a profile's emails, in bulk", () => {
+  describe("a profile that discards its emails", () => {
     const page = (over: Record<string, unknown> = {}) => ({
       matched: 0,
       applied: 0,
@@ -458,58 +458,81 @@ describe('ParsersSection', () => {
       next: null,
       ...over,
     });
-    const openMenuItem = async (name: string) => {
-      const row = screen.getByRole('row', { name: /Allegro parser/ });
-      await click(within(row).getByRole('button', { name: 'More actions' }));
-      await click(screen.getByRole('menuitem', { name }));
-    };
+    const ignoring = makeParser({
+      id: 'p-9',
+      name: 'Newsletters',
+      definition: { version: 2, discard: 'ignore' },
+    });
+    const deleting = makeParser({
+      id: 'p-8',
+      name: 'Spam shop',
+      definition: { version: 2, discard: 'delete' },
+    });
 
-    it('counts first and asks with the numbers, then ignores every page and says how many', async () => {
+    it('marks the profile on its row, and offers no bulk action in the menu', async () => {
+      api.list.mockResolvedValue([ignoring, deleting]);
       await renderSection();
+      expect(within(screen.getByRole('row', { name: /Newsletters/ })).getByText('Ignores its emails')).toBeInTheDocument();
+      expect(within(screen.getByRole('row', { name: /Spam shop/ })).getByText('Deletes its emails')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
+    });
+
+    it('after a save, counts the stored emails it matches and offers to ignore them, every page', async () => {
+      api.list.mockResolvedValue([ignoring]);
+      api.update.mockResolvedValue(ignoring);
       api.profileBatch
         .mockResolvedValueOnce(page({ matched: 3, applied: 1, next: 'c-1' }))
         .mockResolvedValueOnce(page({ matched: 2, ignored: 1 }))
         .mockResolvedValueOnce(page({ matched: 3, done: 2, next: 'c-1' }))
         .mockResolvedValueOnce(page({ matched: 2, done: 1 }));
-      await openMenuItem('Ignore matching emails');
+      await renderSection();
+      await click(within(screen.getByRole('row', { name: /Newsletters/ })).getByRole('button', { name: 'Edit' }));
+      await click(screen.getByRole('button', { name: 'Save profile' }));
       const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent("Ignore this profile's emails?");
       expect(dialog).toHaveTextContent(
-        '3 emails that Allegro parser reads will be ignored: they propose nothing, and their open proposals are closed. 1 email that was already applied or could not be read stays as it is.',
+        '3 emails that Newsletters reads will be ignored: they propose nothing, and their open proposals are closed. 1 email that was already applied or could not be read stays as it is.',
       );
-      expect(api.profileBatch).toHaveBeenCalledTimes(2);
-      expect(api.profileBatch).toHaveBeenNthCalledWith(2, { parserId: approved.id, action: 'count', after: 'c-1' });
+      expect(api.profileBatch).toHaveBeenNthCalledWith(2, { parserId: 'p-9', action: 'count', after: 'c-1' });
 
       await click(within(dialog).getByRole('button', { name: 'Ignore emails' }));
-      expect(api.profileBatch).toHaveBeenNthCalledWith(3, { parserId: approved.id, action: 'ignore' });
-      expect(api.profileBatch).toHaveBeenNthCalledWith(4, { parserId: approved.id, action: 'ignore', after: 'c-1' });
+      expect(api.profileBatch).toHaveBeenNthCalledWith(3, { parserId: 'p-9', action: 'ignore' });
+      expect(api.profileBatch).toHaveBeenNthCalledWith(4, { parserId: 'p-9', action: 'ignore', after: 'c-1' });
       expect(toast.success).toHaveBeenCalledWith('3 emails ignored');
     });
 
-    it('deletes nothing when the person cancels', async () => {
-      await renderSection();
+    it('deletes nothing when the person says not now', async () => {
+      api.list.mockResolvedValue([deleting]);
+      api.update.mockResolvedValue(deleting);
       api.profileBatch.mockResolvedValueOnce(page({ matched: 2 }));
-      await openMenuItem('Delete matching emails');
+      await renderSection();
+      await click(within(screen.getByRole('row', { name: /Spam shop/ })).getByRole('button', { name: 'Edit' }));
+      await click(screen.getByRole('button', { name: 'Save profile' }));
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveTextContent('2 emails that Allegro parser reads will be deleted, with their open proposals. This cannot be undone.');
-      await click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(dialog).toHaveTextContent("Delete this profile's emails?");
+      expect(dialog).toHaveTextContent('2 emails that Spam shop reads will be deleted, with their open proposals. This cannot be undone.');
+      await click(within(dialog).getByRole('button', { name: 'Not now' }));
       expect(api.profileBatch).toHaveBeenCalledTimes(1);
-      expect(api.profileBatch).toHaveBeenCalledWith({ parserId: approved.id, action: 'count' });
     });
 
-    it('says so, and asks nothing, when there is nothing to act on', async () => {
+    it('asks nothing when no stored email is left to act on, or the count fails', async () => {
+      api.list.mockResolvedValue([deleting]);
+      api.update.mockResolvedValue(deleting);
+      api.profileBatch.mockResolvedValueOnce(page({ matched: 1, applied: 1 })).mockRejectedValueOnce(new Error('boom'));
       await renderSection();
-      api.profileBatch.mockResolvedValueOnce(page({ matched: 1, applied: 1 }));
-      await openMenuItem('Delete matching emails');
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(toast).toHaveBeenCalledWith('This profile reads no emails that can be deleted.');
+      for (let i = 0; i < 2; i++) {
+        await click(within(screen.getByRole('row', { name: /Spam shop/ })).getByRole('button', { name: 'Edit' }));
+        await click(screen.getByRole('button', { name: 'Save profile' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      }
     });
 
-    it('names a failure', async () => {
+    it('offers nothing for a profile that reads its emails, or a draft', async () => {
+      api.update.mockResolvedValue(approved);
       await renderSection();
-      api.profileBatch.mockRejectedValueOnce(new Error('boom'));
-      await openMenuItem('Ignore matching emails');
-      expect(toast.error).toHaveBeenCalled();
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      await click(within(screen.getByRole('row', { name: /Allegro parser/ })).getByRole('button', { name: 'Edit' }));
+      await click(screen.getByRole('button', { name: 'Save profile' }));
+      expect(api.profileBatch).not.toHaveBeenCalled();
     });
   });
 });

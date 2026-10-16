@@ -178,7 +178,7 @@ async function dryRunTrade(
     outcome:
       lines === null
         ? "no_html"
-        : receiptOutcome(readLineGuards(definition, lines)),
+        : receiptOutcome(readLineGuards(definition, lines), definition.discard),
     effectiveDate,
     purchaseDate: effectiveDate.toISOString().slice(0, 10),
     matchConfig: resolveMatchConfig(undefined),

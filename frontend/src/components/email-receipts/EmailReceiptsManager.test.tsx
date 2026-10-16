@@ -23,6 +23,7 @@ const api = vi.hoisted(() => ({
   parserCreate: vi.fn(),
   parserTest: vi.fn(),
   draftWithAi: vi.fn(),
+  profileBatch: vi.fn(),
 }));
 const nav = vi.hoisted(() => ({
   params: new URLSearchParams(),
@@ -55,6 +56,7 @@ vi.mock('@/lib/email-receipts-api', () => ({
       ignore: api.ignore,
       remove: api.remove,
       askAi: api.askAi,
+      profileBatch: api.profileBatch,
     },
     mailbox: { get: api.mailboxGet },
     parsers: { create: api.parserCreate, test: api.parserTest, draftWithAi: api.draftWithAi },
@@ -810,6 +812,21 @@ describe('EmailReceiptsManager', () => {
       const pageLists = api.list.mock.calls.filter(([, limit]) => limit === undefined);
       expect(pageLists).toHaveLength(2);
     });
+  });
+
+  it('offers to delete the stored emails a profile made here deletes, and does so on confirmation', async () => {
+    api.list.mockResolvedValue([noParser]);
+    api.parserCreate.mockResolvedValue(makeParser({ name: 'Spam shop', definition: { version: 2, discard: 'delete' } }));
+    const page = { matched: 4, applied: 0, unreadable: 0, ignored: 0, done: 0, next: null };
+    api.profileBatch.mockResolvedValueOnce(page).mockResolvedValueOnce({ ...page, done: 4 });
+    await renderManager();
+    await runAction('Order no profile', 'Create profile');
+    await click(screen.getByRole('button', { name: 'Save profile' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('4 emails that Spam shop reads will be deleted');
+    await click(within(dialog).getByRole('button', { name: 'Delete emails' }));
+    expect(api.profileBatch).toHaveBeenLastCalledWith({ parserId: makeParser().id, action: 'delete' });
+    expect(toast.success).toHaveBeenCalledWith('4 emails deleted');
   });
 
   describe('ignore and delete ask first', () => {

@@ -369,6 +369,8 @@ export interface ProcessEmailReceiptsResult {
   processed: number;
   /** Where the processed emails ended, by their new status (a status with none is absent). */
   byOutcome: Partial<Record<EmailReceiptStatus, number>>;
+  /** Processed emails that are gone: their profile deletes every email it matches. Absent from a server that predates it. */
+  deleted?: number;
   /** Emails that raised an error and were passed over. */
   failed: number;
   /** Matching emails this run has not touched yet; 0 ends the run. */
@@ -677,6 +679,10 @@ export interface ReceiptTradeDefinition {
 }
 
 /** A parser definition, version 2 (`definition` of an `email_receipt_parsers` row). */
+/** What a profile does with the emails it matches instead of reading them: ignore them, or delete them. */
+export const RECEIPT_DISCARD_MODES = ['ignore', 'delete'] as const;
+export type ReceiptDiscardMode = (typeof RECEIPT_DISCARD_MODES)[number];
+
 export interface ReceiptParserDefinition {
   version: 2;
   /** The lines the patterns read: the email's text (default) or its HTML part. */
@@ -714,6 +720,8 @@ export interface ReceiptParserDefinition {
   requireLine?: string[];
   skipIfLine?: string[];
   waitIfLine?: string[];
+  /** What the profile does with every email it matches instead of reading it; absent: it reads them. */
+  discard?: ReceiptDiscardMode;
 }
 
 /** One problem the server's validator found: where, and a machine-readable code. */
@@ -893,7 +901,14 @@ export type ReceiptTradeTrace = Record<Exclude<ReceiptTradeTraceField, 'currency
 };
 
 /** What the pipeline would do with the email under this parser (`no_html`: it reads the HTML part and the email has none). */
-export type ReceiptOutcome = 'read' | 'not_applicable' | 'skip_line' | 'wait_line' | 'no_html';
+export type ReceiptOutcome =
+  | 'read'
+  | 'not_applicable'
+  | 'skip_line'
+  | 'wait_line'
+  | 'discard_ignore'
+  | 'discard_delete'
+  | 'no_html';
 
 export interface EmailReceiptParserTestResult {
   /**
@@ -983,6 +998,8 @@ export const PARSER_PREVIEW_OUTCOMES = [
   'not_applicable',
   'skip_line',
   'wait_line',
+  'discard_ignore',
+  'discard_delete',
   'no_html',
   'trade',
   'trade_exists',

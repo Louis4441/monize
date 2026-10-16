@@ -150,9 +150,7 @@
     "payeeUnavailable": "Lista de beneficiários indisponível",
     "actions": {
       "approve": "Aprovar",
-      "viewJson": "Ver JSON",
-      "ignoreEmails": "Ignorar os e-mails correspondentes",
-      "deleteEmails": "Excluir os e-mails correspondentes"
+      "viewJson": "Ver JSON"
     },
     "toasts": {
       "approved": "Analisador aprovado",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "Ignorar e-mails",
       "deleteTitle": "Excluir os e-mails deste analisador?",
       "deleteMessage": "{count, plural, one {# e-mail lido por {name} será excluído} other {# e-mails lidos por {name} serão excluídos}}, junto com as propostas abertas. Esta ação não pode ser desfeita.{kept, plural, =0 {} one { # e-mail cuja proposta já foi aplicada continua.} other { # e-mails cujas propostas já foram aplicadas continuam.}}",
-      "deleteConfirm": "Excluir e-mails",
-      "noneToIgnore": "Este analisador não lê e-mails que possam ser ignorados.",
-      "noneToDelete": "Este analisador não lê e-mails que possam ser excluídos."
+      "deleteConfirm": "Excluir e-mails"
     },
     "deleteDialog": {
       "title": "Excluir o analisador?",
@@ -193,7 +189,9 @@
       "later": "Agora não"
     },
     "reparse": "Reanalisar os e-mails ({count})",
-    "kindTrade": "Operações na bolsa"
+    "kindTrade": "Operações na bolsa",
+    "discardIgnore": "Ignora os seus e-mails",
+    "discardDelete": "Exclui os seus e-mails"
   },
   "editor": {
     "createTitle": "Novo analisador",
@@ -374,6 +372,16 @@
       "markerRemove": "Remover o marcador {marker}",
       "markerAdd": "Adicionar um marcador de moeda",
       "markersMax": "No máximo {max} marcadores."
+    },
+    "discard": {
+      "label": "E-mails correspondentes",
+      "read": "Ler",
+      "ignore": "Ignorar",
+      "delete": "Excluir",
+      "readHelp": "O analisador lê cada e-mail correspondente com os padrões abaixo.",
+      "ignoreHelp": "Cada e-mail que corresponde a este analisador é ignorado quando chega: não propõe nada. Para remetentes com cujos e-mails você nunca quer lidar.",
+      "deleteHelp": "Cada e-mail que corresponde a este analisador é excluído do Monize quando chega (continua na sua caixa de entrada). Um e-mail excluído não pode ser recuperado.",
+      "noReading": "Este analisador não lê nada, então não precisa de padrões, categorias nem correspondência. Os domínios dos remetentes e as palavras do assunto acima decidem quais e-mails ele recebe."
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "Este analisador não leria este e-mail: nenhuma de suas linhas obrigatórias está nele, então o próximo analisador do remetente seria tentado.",
       "skip_line": "Este analisador deixaria este e-mail de lado: ele contém uma linha que faz o analisador ignorá-lo.",
       "wait_line": "Este analisador seguraria este e-mail: uma linha indica que o pedido ainda não é definitivo, então ele será lido de novo mais tarde.",
+      "discard_ignore": "Este analisador ignoraria este e-mail: ele ignora cada e-mail correspondente.",
+      "discard_delete": "Este analisador excluiria este e-mail: ele exclui cada e-mail correspondente.",
       "no_html": "Este analisador lê a parte HTML do e-mail e este e-mail não tem nenhuma, então ele seria marcado como ilegível (sem HTML)."
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "A proposta foi recusada, então nada foi proposto.",
       "skip_line": "Foi encontrada uma linha que faz este analisador ignorar o e-mail, então ele foi ignorado.",
       "wait_line": "Uma linha indica que o pedido ainda não é definitivo, então o e-mail será lido de novo mais tarde.",
+      "profile_ignore": "O analisador deste e-mail ignora cada e-mail correspondente.",
       "no_html": "Este analisador lê a parte HTML do e-mail e este e-mail não tem nenhuma.",
       "schema_org": "Nenhum analisador foi necessário: o pedido foi lido a partir dos dados estruturados (schema.org) do e-mail.",
       "item_amount_missing": "Um item não tem valor, e o e-mail não tem um total único para atribuir a ele.",
@@ -941,6 +952,7 @@
     "failed": "O processamento parou porque uma solicitação falhou.",
     "failedWithReason": "O processamento parou: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} excluídos",
     "close": "Fechar"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "Não lido por este perfil",
         "skip_line": "Ignorado (linha de exclusão encontrada)",
         "wait_line": "Em espera (pedido não final)",
+        "discard_ignore": "Ignorado por este analisador",
+        "discard_delete": "Excluído por este analisador",
         "no_html": "Sem parte HTML",
         "trade": "Propõe uma negociação",
         "trade_exists": "Já está no seu registro"

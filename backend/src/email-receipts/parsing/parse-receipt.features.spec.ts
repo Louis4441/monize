@@ -728,3 +728,33 @@ describe("the trace", () => {
     ]);
   });
 });
+
+describe("the outcome of a profile that discards its emails", () => {
+  const body = "Order total: 5.00";
+
+  it.each([
+    ["ignore", "discard_ignore"],
+    ["delete", "discard_delete"],
+  ] as const)(
+    "is %s -> %s, ahead of the skip and wait guards",
+    (discard, outcome) => {
+      const traced = parseReceiptTraced(
+        { version: 2, discard, skipIfLine: ["*"], waitIfLine: ["*"] },
+        "",
+        body,
+        null,
+      );
+      expect(traced.outcome).toBe(outcome);
+    },
+  );
+
+  it("is still not_applicable when the profile's requireLine is not met", () => {
+    const traced = parseReceiptTraced(
+      { version: 2, discard: "delete", requireLine: ["Never here"] },
+      "",
+      body,
+      null,
+    );
+    expect(traced.outcome).toBe("not_applicable");
+  });
+});

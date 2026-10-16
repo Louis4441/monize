@@ -27,6 +27,7 @@ import {
   MAX_SKIP_LINES,
   MAX_STEP_ALTERNATIVES,
   MIN_LABEL_WITHIN,
+  RECEIPT_DISCARD_MODES,
   RECEIPT_LINES_SOURCES,
   RECEIPT_MATCH_STRATEGIES,
   RECEIPT_MATCH_TEXT_FIELDS,
@@ -34,6 +35,7 @@ import {
   ReceiptBlockItemsDefinition,
   ReceiptCategoryRule,
   ReceiptCategoryRuleField,
+  ReceiptDiscardMode,
   ReceiptFieldEntry,
   ReceiptItemsDefinition,
   ReceiptLabelledPattern,
@@ -74,7 +76,7 @@ export interface ReceiptParserValidationError {
    * (`within`), `items_patterns_and_record`, `items_shape_missing`,
    * `items_single_conflict`, `skip_lines_need_record`,
    * `join_wrapped_needs_patterns`, `record_name_missing`, `invalid_value` (a
-   * category rule `field`, the top-level `source`, a `match` strategy, field or
+   * category rule `field`, the top-level `source` or `discard`, a `match` strategy, field or
    * tolerance), `duplicate_entry` (a repeated `match` strategy or field),
    * `reference_field_missing` (`match.by` names `reference` and the profile reads
    * none), `too_many_lines` (a multi-line pattern over `MAX_PATTERN_LINES`
@@ -156,6 +158,7 @@ const TOP_LEVEL_KEYS: readonly string[] = [
   "requireLine",
   "skipIfLine",
   "waitIfLine",
+  "discard",
 ];
 const TRADE_KEYS: readonly string[] = [
   "action",
@@ -186,6 +189,7 @@ const TRADE_COMPATIBLE_KEYS: readonly string[] = [
   "requireLine",
   "skipIfLine",
   "waitIfLine",
+  "discard",
 ];
 const ITEMS_KEYS: readonly string[] = ["startAfter", "stopAt", "patterns"];
 /** The keys of the multi-line item shape. */
@@ -1176,6 +1180,14 @@ export function validateReceiptParserDefinition(
     if (input[field] === undefined) continue;
     const patterns = checkPatternList(input[field], field, captures, errors, 0);
     if (patterns !== null) out[field] = patterns;
+  }
+  if (input.discard !== undefined) {
+    // Anything that is not one of the two modes is the same refusal, whatever its type.
+    if (RECEIPT_DISCARD_MODES.includes(input.discard as ReceiptDiscardMode)) {
+      out.discard = input.discard;
+    } else {
+      errors.add("discard", "invalid_value");
+    }
   }
   if (input.match !== undefined) {
     const match = checkMatch(

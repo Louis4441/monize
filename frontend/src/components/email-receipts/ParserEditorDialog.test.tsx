@@ -181,6 +181,29 @@ describe('ParserEditorDialog', () => {
       expect(api.create.mock.calls[0][0].definition).toEqual({ version: 2, source: 'html', total: ['Total {amount}'] });
     });
 
+    it('reads matching emails by default, and a profile that deletes them hides the reading fields and writes discard', async () => {
+      api.create.mockResolvedValue(makeParser());
+      await renderEditor();
+      const select = screen.getByLabelText('Matching emails') as HTMLSelectElement;
+      expect(select.value).toBe('');
+      expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual([
+        'Read them',
+        'Ignore them',
+        'Delete them',
+      ]);
+      expect(screen.getByLabelText('Total patterns')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.change(select, { target: { value: 'delete' } });
+      });
+      expect(screen.queryByLabelText('Total patterns')).not.toBeInTheDocument();
+      expect(screen.getByRole('note')).toHaveTextContent('This profile reads nothing');
+      await type('Name', 'Newsletters');
+      await type('Sender domains', 'news.example.com');
+      await save();
+      expect(api.create.mock.calls[0][0].definition).toEqual({ version: 2, discard: 'delete' });
+    });
+
     it('starts from the prefill it was given, such as the sender domain of an email', async () => {
       await renderEditor({ prefill: { name: 'shop.example', fromDomains: 'shop.example' }, initialReceiptId: 'r-1' });
       expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('shop.example');

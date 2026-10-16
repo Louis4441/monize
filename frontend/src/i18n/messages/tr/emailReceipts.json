@@ -150,9 +150,7 @@
     "payeeUnavailable": "Alıcı listesi kullanılamıyor",
     "actions": {
       "approve": "Onayla",
-      "viewJson": "JSON'u görüntüle",
-      "ignoreEmails": "Eşleşen e-postaları yok say",
-      "deleteEmails": "Eşleşen e-postaları sil"
+      "viewJson": "JSON'u görüntüle"
     },
     "toasts": {
       "approved": "Ayrıştırıcı onaylandı",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "E-postaları yok say",
       "deleteTitle": "Bu ayrıştırıcının e-postaları silinsin mi?",
       "deleteMessage": "{name} tarafından okunan {count, plural, one {# e-posta} other {# e-posta}} açık önerileriyle birlikte silinecek. Bu işlem geri alınamaz.{kept, plural, =0 {} one { Önerisi zaten uygulanmış # e-posta kalır.} other { Önerisi zaten uygulanmış # e-posta kalır.}}",
-      "deleteConfirm": "E-postaları sil",
-      "noneToIgnore": "Bu ayrıştırıcı yok sayılabilecek hiçbir e-postayı okumuyor.",
-      "noneToDelete": "Bu ayrıştırıcı silinebilecek hiçbir e-postayı okumuyor."
+      "deleteConfirm": "E-postaları sil"
     },
     "deleteDialog": {
       "title": "Ayrıştırıcı silinsin mi?",
@@ -193,7 +189,9 @@
       "later": "Şimdi değil"
     },
     "reparse": "E-postaları yeniden ayrıştır ({count})",
-    "kindTrade": "Aracı kurum işlemleri"
+    "kindTrade": "Aracı kurum işlemleri",
+    "discardIgnore": "E-postalarını yok sayar",
+    "discardDelete": "E-postalarını siler"
   },
   "editor": {
     "createTitle": "Yeni ayrıştırıcı",
@@ -374,6 +372,16 @@
       "markerRemove": "{marker}. işareti kaldır",
       "markerAdd": "Para birimi işareti ekle",
       "markersMax": "En fazla {max} işaret."
+    },
+    "discard": {
+      "label": "Eşleşen e-postalar",
+      "read": "Oku",
+      "ignore": "Yok say",
+      "delete": "Sil",
+      "readHelp": "Ayrıştırıcı, eşleşen her e-postayı aşağıdaki desenlerle okur.",
+      "ignoreHelp": "Bu ayrıştırıcıyla eşleşen her e-posta geldiğinde yok sayılır: hiçbir şey önermez. E-postalarıyla hiç uğraşmak istemediğiniz gönderenler için.",
+      "deleteHelp": "Bu ayrıştırıcıyla eşleşen her e-posta geldiğinde Monize'dan silinir (posta kutunuzda kalır). Silinen bir e-posta geri getirilemez.",
+      "noReading": "Bu ayrıştırıcı hiçbir şey okumaz, bu yüzden desene, kategoriye veya eşleştirmeye ihtiyaç duymaz. Hangi e-postaları alacağına yukarıdaki gönderen alan adları ve konu kelimeleri karar verir."
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "Bu ayrıştırıcı bu e-postayı okumaz: zorunlu satırlarından hiçbiri e-postada yok, bu yüzden gönderen için sıradaki ayrıştırıcı denenir.",
       "skip_line": "Bu ayrıştırıcı bu e-postayı kenara ayırır: e-postada atlamasını gerektiren bir satır var.",
       "wait_line": "Bu ayrıştırıcı bu e-postayı bekletir: bir satır siparişin henüz kesinleşmediğini söylüyor, bu yüzden e-posta daha sonra yeniden okunur.",
+      "discard_ignore": "Bu ayrıştırıcı bu e-postayı yok sayardı: eşleşen her e-postayı yok sayar.",
+      "discard_delete": "Bu ayrıştırıcı bu e-postayı silerdi: eşleşen her e-postayı siler.",
       "no_html": "Bu ayrıştırıcı e-postanın HTML kısmını okur ve bu e-postada HTML yok, bu yüzden okunamaz olarak işaretlenir (HTML yok)."
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "Öneri reddedildi, bu yüzden hiçbir şey önerilmedi.",
       "skip_line": "Bu ayrıştırıcının atladığı bir satır bulundu, bu yüzden e-posta yok sayıldı.",
       "wait_line": "Bir satır siparişin henüz kesinleşmediğini söylüyor, bu yüzden e-posta daha sonra yeniden okunacak.",
+      "profile_ignore": "Bu e-postanın ayrıştırıcısı eşleşen her e-postayı yok sayar.",
       "no_html": "Bu ayrıştırıcı e-postanın HTML kısmını okur ve bu e-postada HTML yok.",
       "schema_org": "Ayrıştırıcıya gerek kalmadı: sipariş, e-postadaki yapılandırılmış verilerden (schema.org) okundu.",
       "item_amount_missing": "Bir kalemin tutarı yok ve e-postada ona verilecek tek bir toplam yok.",
@@ -941,6 +952,7 @@
     "failed": "Bir istek başarısız olduğu için işleme durduruldu.",
     "failedWithReason": "İşleme durduruldu: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} silindi",
     "close": "Kapat"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "Bu profil tarafından okunmadı",
         "skip_line": "Atlandı (atlama satırı bulundu)",
         "wait_line": "Beklemede (sipariş kesin değil)",
+        "discard_ignore": "Bu ayrıştırıcı tarafından yok sayıldı",
+        "discard_delete": "Bu ayrıştırıcı tarafından silindi",
         "no_html": "HTML bölümü yok",
         "trade": "Bir işlem önerir",
         "trade_exists": "Defterinizde zaten var"

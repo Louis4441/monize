@@ -23,6 +23,7 @@ import {
   ParsedReceipt,
   ParsedReceiptItem,
   ParsedReceiptReason,
+  ReceiptDiscardMode,
   ReceiptFieldEntry,
   ReceiptLabelledPattern,
   ReceiptParserDefinition,
@@ -341,15 +342,30 @@ export function readLineGuards(
 
 /**
  * What the pipeline would do with an email under a parser: `read` it, or pass
- * over / set aside / hold it by a guard, or fail it because the parser reads the
- * HTML part (`source: "html"`) and the email has none (`no_html`).
+ * over / set aside / hold it by a guard, ignore or delete it because the
+ * profile discards its emails (`discard_ignore`, `discard_delete`), or fail it
+ * because the parser reads the HTML part (`source: "html"`) and the email has
+ * none (`no_html`).
  */
 export type ReceiptOutcome =
-  "read" | "not_applicable" | "skip_line" | "wait_line" | "no_html";
+  | "read"
+  | "not_applicable"
+  | "skip_line"
+  | "wait_line"
+  | "discard_ignore"
+  | "discard_delete"
+  | "no_html";
 
-/** `requireLine` unmet: another parser would be tried; else `skipIfLine`, then `waitIfLine`, else the email is read. */
-export function receiptOutcome(guards: ReceiptLineGuards): ReceiptOutcome {
+/**
+ * `requireLine` unmet: another parser would be tried; else the profile's
+ * `discard`, then `skipIfLine`, then `waitIfLine`, else the email is read.
+ */
+export function receiptOutcome(
+  guards: ReceiptLineGuards,
+  discard?: ReceiptDiscardMode,
+): ReceiptOutcome {
   if (!guards.applies) return "not_applicable";
+  if (discard !== undefined) return `discard_${discard}`;
   if (guards.skipIfLine !== null) return "skip_line";
   if (guards.waitIfLine !== null) return "wait_line";
   return "read";
@@ -577,7 +593,8 @@ export function parseReceiptLinesTraced(
   return {
     parsed: { ...parsed, complete: reason === null, reason },
     trace,
-    outcome: sourceLines === null ? "no_html" : receiptOutcome(guards),
+    outcome:
+      sourceLines === null ? "no_html" : receiptOutcome(guards, def.discard),
   };
 }
 

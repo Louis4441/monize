@@ -10,6 +10,7 @@ import { ParserJsonDialog } from '@/components/email-receipts/ParserJsonDialog';
 import { ProcessStatus } from '@/components/email-receipts/ProcessStatus';
 import { ProfileWizard } from '@/components/email-receipts/ProfileWizard';
 import { UncoveredDomainsSection } from '@/components/email-receipts/UncoveredDomainsSection';
+import { useProfileDiscardOffer } from '@/components/email-receipts/useProfileDiscardOffer';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -20,12 +21,9 @@ import { RowActions, type RowAction } from '@/components/ui/row-actions';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Td, Th } from '@/components/ui/Table';
 import { useProcessStoredEmails } from '@/hooks/useProcessStoredEmails';
 import { useReceiptParserLookups } from '@/hooks/useReceiptParserLookups';
-import { notifyAiAction } from '@/lib/aiActionSignal';
-import { clearAllCache } from '@/lib/apiCache';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
-import { profileActionCounts, sweepProfileEmails } from '@/lib/email-receipts-profile-batch';
 import { processableForDomains } from '@/lib/email-receipts-format';
-import { isTradeDefinition } from '@/lib/receipt-parser-form';
+import { discardModeOf, isTradeDefinition } from '@/lib/receipt-parser-form';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
@@ -35,16 +33,6 @@ const logger = createLogger('EmailReceiptParsers');
 
 /** The editor is closed, writing a new parser, or editing one. */
 type EditorTarget = { kind: 'closed' } | { kind: 'new' } | { kind: 'edit'; parser: EmailReceiptParser };
-
-/** A bulk action on a profile's emails, counted and waiting for the person to confirm it. */
-interface BulkOffer {
-  parser: EmailReceiptParser;
-  action: 'ignore' | 'delete';
-  /** Emails the action would ignore or delete. */
-  acts: number;
-  /** Matched emails it keeps as they are (applied, or unreadable for ignore). */
-  kept: number;
-}
 
 const isConflict = (error: unknown): boolean => error instanceof AxiosError && error.response?.status === 409;
 
@@ -72,10 +60,11 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
   const [jsonTarget, setJsonTarget] = useState<EmailReceiptParser | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EmailReceiptParser | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [bulkOffer, setBulkOffer] = useState<BulkOffer | null>(null);
   // The approved profile and how many stored emails of its senders could be processed now.
   const [processOffer, setProcessOffer] = useState<{ parser: EmailReceiptParser; count: number } | null>(null);
   const { state: processState, run: runProcess, cancel: cancelProcess, dismiss: dismissProcess } = useProcessStoredEmails();
+  // A profile that ignores or deletes its emails offers to do so to the stored ones it matches.
+  const discardOffer = useProfileDiscardOffer(() => void load());
   // Only the newest load may write the list (a reload after a 409 must not be
   // overwritten by a slower answer to an earlier request).
   const latestLoad = useRef(0);
@@ -127,7 +116,9 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
       const approved = await emailReceiptsApi.parsers.approve(parser.id, parser.revision);
       setParsers((prev) => prev && prev.map((p) => (p.id === approved.id ? approved : p)));
       toast.success(t('toasts.approved'));
-      void offerProcessing(approved);
+      // A profile that discards its emails offers that instead of reading the stored ones.
+      if (discardModeOf(approved.definition) !== null) void discardOffer.offer(approved);
+      else void offerProcessing(approved);
     } catch (error) {
       if (isConflict(error)) {
         toast.error(t('toasts.changedElsewhere'));
@@ -156,51 +147,16 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
     }
   };
 
-  /**
-   * Ignore or delete every stored email the profile matches (as the pipeline
-   * chooses the profile): count them first, and ask with the numbers.
-   */
-  const handleBulkStart = async (parser: EmailReceiptParser, action: BulkOffer['action']) => {
-    setBusyId(parser.id);
-    try {
-      const { acts, kept } = profileActionCounts(await sweepProfileEmails(parser.id, 'count'), action);
-      if (acts === 0) toast(t(action === 'ignore' ? 'bulk.noneToIgnore' : 'bulk.noneToDelete'));
-      else setBulkOffer({ parser, action, acts, kept });
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('toasts.bulkFailed')));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleBulkConfirm = async () => {
-    const offer = bulkOffer;
-    setBulkOffer(null);
-    if (!offer) return;
-    setBusyId(offer.parser.id);
-    try {
-      const { done } = await sweepProfileEmails(offer.parser.id, offer.action);
-      toast.success(t(offer.action === 'ignore' ? 'toasts.emailsIgnored' : 'toasts.emailsDeleted', { count: done }));
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('toasts.bulkFailed')));
-    } finally {
-      // Emails and their review requests changed (closed requests leave the queue), even after a failure part-way.
-      clearAllCache();
-      notifyAiAction();
-      setBusyId(null);
-      void load();
-    }
-  };
-
   /** Run the profile's domains through the pipeline again; the row's count is read again afterwards. */
   const handleReparse = async (parser: EmailReceiptParser) => {
     await runProcess(parser.fromDomains);
     void load();
   };
 
-  const handleSaved = () => {
+  const handleSaved = (saved: EmailReceiptParser) => {
     setEditor({ kind: 'closed' });
     void load();
+    void discardOffer.offer(saved);
   };
 
   const handleConflict = () => {
@@ -240,24 +196,6 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
       tone: 'delete',
       destructive: true,
       onClick: () => setDeleteTarget(parser),
-      disabled: busyId === parser.id,
-    },
-    // What to do with the emails the profile reads: in the overflow menu, after the profile's own actions.
-    {
-      key: 'ignoreEmails',
-      label: t('actions.ignoreEmails'),
-      icon: 'skip',
-      tone: 'warning',
-      onClick: () => void handleBulkStart(parser, 'ignore'),
-      disabled: busyId === parser.id,
-    },
-    {
-      key: 'deleteEmails',
-      label: t('actions.deleteEmails'),
-      icon: 'delete',
-      tone: 'delete',
-      destructive: true,
-      onClick: () => void handleBulkStart(parser, 'delete'),
       disabled: busyId === parser.id,
     },
   ];
@@ -327,6 +265,9 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
                     <Badge variant={parser.source === 'ai' ? 'purple' : 'gray'}>{t(`source.${parser.source}`)}</Badge>
                     {/* A trade profile books investment transactions, not bank-transaction splits. */}
                     {isTradeDefinition(parser.definition) && <Badge variant="blue">{t('kindTrade')}</Badge>}
+                    {/* A profile for mail that is never wanted: it ignores or deletes what it matches. */}
+                    {discardModeOf(parser.definition) === 'ignore' && <Badge variant="gray">{t('discardIgnore')}</Badge>}
+                    {discardModeOf(parser.definition) === 'delete' && <Badge variant="red">{t('discardDelete')}</Badge>}
                     {!parser.definitionValid && <Badge variant="red">{t('invalid')}</Badge>}
                   </div>
                 </Td>
@@ -418,19 +359,7 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
         onCancel={() => setProcessOffer(null)}
       />
 
-      <ConfirmDialog
-        isOpen={bulkOffer !== null}
-        title={t(bulkOffer?.action === 'delete' ? 'bulk.deleteTitle' : 'bulk.ignoreTitle')}
-        message={t(bulkOffer?.action === 'delete' ? 'bulk.deleteMessage' : 'bulk.ignoreMessage', {
-          count: bulkOffer?.acts ?? 0,
-          kept: bulkOffer?.kept ?? 0,
-          name: bulkOffer?.parser.name ?? '',
-        })}
-        confirmLabel={t(bulkOffer?.action === 'delete' ? 'bulk.deleteConfirm' : 'bulk.ignoreConfirm')}
-        variant={bulkOffer?.action === 'delete' ? 'danger' : 'warning'}
-        onConfirm={() => void handleBulkConfirm()}
-        onCancel={() => setBulkOffer(null)}
-      />
+      {discardOffer.dialog}
 
       <ConfirmDialog
         isOpen={deleteTarget !== null}

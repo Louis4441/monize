@@ -213,6 +213,7 @@ function setup(over: Partial<World> = {}) {
   const receiptRepo = {
     findOne: jest.fn(async () => world.receipt),
     update: jest.fn().mockResolvedValue({ affected: 1 }),
+    delete: jest.fn().mockResolvedValue({ affected: 1 }),
   };
   const mailboxRepo = { findOne: jest.fn(async () => world.mailbox) };
   const parserRepo = { find: jest.fn(async () => world.parsers) };
@@ -651,6 +652,71 @@ describe("EmailReceiptPipelineService.process", () => {
       const result = await run(h, { link: { transactionId: TX } });
       expect(result.statusReason).not.toBe("wait_line");
       expect(result.status).toBe("review");
+    });
+  });
+
+  describe("a profile that discards its emails (discard)", () => {
+    const discarding = (discard: "ignore" | "delete", extra = {}) =>
+      parserRow({ definition: { ...DEFINITION, discard, ...extra } });
+
+    it("ignore: the email is ignored with profile_ignore, before any guard, and nothing is read or asked", async () => {
+      const h = setup({
+        parsers: [discarding("ignore", { skipIfLine: ["*Widget*"] })],
+      });
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "ignored",
+        statusReason: "profile_ignore",
+        deleted: false,
+      });
+      expect(h.lastUpdate()?.[1]).toMatchObject({
+        status: "ignored",
+        statusReason: "profile_ignore",
+        parserId: "parser-1",
+        parsed: null,
+        transactionId: null,
+      });
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+      expect(h.manager.query).not.toHaveBeenCalledWith(
+        expect.stringContaining("JOIN accounts a"),
+        expect.anything(),
+      );
+    });
+
+    it("delete: the email row is removed with its open requests, and nothing else is written", async () => {
+      const h = setup({ parsers: [discarding("delete")] });
+      const result = await run(h);
+      expect(result).toMatchObject({ deleted: true, unchanged: false });
+      expect(h.receiptRepo.delete).toHaveBeenCalledWith({
+        id: RECEIPT,
+        userId: USER,
+      });
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      expect(
+        h.manager.query.mock.calls.some((c) =>
+          String(c[0]).includes("SET status = 'rejected'"),
+        ),
+      ).toBe(true);
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+    });
+
+    it("a person's own link is a command: the profile does not discard the email", async () => {
+      const h = setup({
+        parsers: [discarding("delete")],
+        linkRow: {
+          id: TX,
+          amount: "-15.0000",
+          description: null,
+          payee_id: null,
+          reference_number: null,
+          is_transfer: false,
+          status: "UNRECONCILED",
+          plain: true,
+        },
+      });
+      const result = await run(h, { link: { transactionId: TX } });
+      expect(result).toMatchObject({ status: "review", deleted: false });
+      expect(h.receiptRepo.delete).not.toHaveBeenCalled();
     });
   });
 

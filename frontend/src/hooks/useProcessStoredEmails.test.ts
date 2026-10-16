@@ -56,14 +56,26 @@ describe('useProcessStoredEmails', () => {
     });
     expect(api.processBatch).toHaveBeenNthCalledWith(1, {});
     expect(api.processBatch).toHaveBeenNthCalledWith(2, { since: 'T1' });
-    expect(totals).toEqual({ processed: 5, failed: 1, byOutcome: { review: 3, unmatched: 2 } });
+    expect(totals).toEqual({ processed: 5, failed: 1, byOutcome: { review: 3, unmatched: 2 }, deleted: 0 });
     expect(result.current.state).toEqual({
       status: 'done',
       cancelled: false,
-      totals: { processed: 5, failed: 1, byOutcome: { review: 3, unmatched: 2 } },
+      totals: { processed: 5, failed: 1, byOutcome: { review: 3, unmatched: 2 }, deleted: 0 },
     });
     expect(clearAllCache).toHaveBeenCalledTimes(1);
     expect(notifyAiAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('sums the emails a profile deleted, and reads an answer without the count as none', async () => {
+    api.processBatch
+      .mockResolvedValueOnce(answer({ deleted: 2, remaining: 3, since: 'T1' }))
+      .mockResolvedValueOnce(answer({ remaining: 0, since: 'T1' }));
+    const { result } = renderHook(() => useProcessStoredEmails());
+    let totals: Awaited<ReturnType<typeof result.current.run>> | undefined;
+    await act(async () => {
+      totals = await result.current.run([undefined]);
+    });
+    expect(totals).toMatchObject({ processed: 4, deleted: 2 });
   });
 
   it('stops when a call touched nothing, however many it says remain', async () => {

@@ -6,6 +6,7 @@ import {
   buildParserDefinition,
   buildParserPayload,
   definitionToFormFields,
+  discardModeOf,
   emptyParserForm,
   formCanRepresent,
   formatDefinitionJson,
@@ -124,6 +125,33 @@ describe('buildParserPayload', () => {
 
   it('carries the chosen payee', () => {
     expect(buildParserPayload(emptyParserForm({ name: 'x', payeeId: CATEGORY })).payeeId).toBe(CATEGORY);
+  });
+});
+
+describe('discard', () => {
+  it('writes the mode it holds, for a receipt or a trade profile, and leaves it out when it reads', () => {
+    expect(buildParserDefinition(emptyParserForm({ discard: 'ignore' }))).toEqual({ version: 2, discard: 'ignore' });
+    expect(buildParserDefinition(emptyParserForm({ kind: 'trade', discard: 'delete' })).discard).toBe('delete');
+    expect(buildParserDefinition(emptyParserForm())).not.toHaveProperty('discard');
+  });
+
+  it('reads it back, and the form can show a definition that holds one', () => {
+    for (const discard of ['ignore', 'delete'] as const) {
+      expect(definitionToFormFields({ version: 2, discard }).discard).toBe(discard);
+      expect(formCanRepresent({ version: 2, total: ['Total {amount}'], discard })).toBe(true);
+    }
+    expect(definitionToFormFields({ version: 2 }).discard).toBe('');
+  });
+
+  it('sends a definition with a mode the form has no option for to the JSON editor', () => {
+    expect(formCanRepresent({ version: 2, discard: 'archive' })).toBe(false);
+  });
+
+  it('names the mode of a stored definition, or none', () => {
+    expect(discardModeOf({ version: 2, discard: 'delete' })).toBe('delete');
+    expect(discardModeOf({ version: 2 })).toBeNull();
+    expect(discardModeOf({ version: 2, discard: 'archive' })).toBeNull();
+    expect(discardModeOf(null)).toBeNull();
   });
 });
 

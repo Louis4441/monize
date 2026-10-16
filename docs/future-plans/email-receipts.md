@@ -618,9 +618,23 @@ gives its one item the order total:
   once the line is gone. `skipIfLine` wins over `waitIfLine`; a person's own
   link is a command and no guard holds it back. `status_reason` is free text
   (40 characters, no CHECK), so no migration is needed.
+- **Discarding profiles.** `discard: "ignore" | "delete"` makes a profile for
+  mail that is never wanted: every email the pipeline gives the profile (its
+  sender domains, subject words and `requireLine`, ranked against the other
+  profiles as usual) is ignored with `status_reason` `profile_ignore`, or
+  deleted with its open requests (`deleteLockedReceipt`), before any other
+  guard or field is read. A person's own link is a command and still reads the
+  email. The test operation and the preview answer the outcome
+  `discard_ignore` / `discard_delete`; `process-batch` counts a deleted email
+  in `processed` and `deleted`, under no status; a person's Reprocess of an
+  email its profile deletes answers no detail. The editor sets it with one
+  select ("Matching emails": read, ignore, delete) and hides the reading
+  fields while it is set; saving or approving such a profile offers to do the
+  same to the stored emails it matches (`profile-batch` below), counted first.
 - **The test trace.** `POST /email-receipt-parsers/test` and the tool's `test`
   return, beside `parsed`, an `outcome` (`read`, or the guard that would stop
-  the read: `not_applicable`, `skip_line`, `wait_line`) and a `trace`: for
+  the read: `not_applicable`, `skip_line`, `wait_line`, `discard_ignore`,
+  `discard_delete`) and a `trace`: for
   `orderId`, `total`, `paid`, `shipping`, `discount`, `payee` and the three
   guards the entry index, the glob (a labelled entry: its `value`, its `label`
   and the label line) and the line (1-based number among the email's lines, 0
@@ -994,7 +1008,8 @@ section 3a.
   100 per call, and answers `{ matched, applied, unreadable, ignored, done, next }`; the
   client loops with `after = next` until `next` is null, so each email is looked at once
   whatever the action does to it. `count` writes nothing (the client confirms with the
-  totals first). Each email is ignored or deleted in its own transaction under its row
+  totals first). It backs the offer a profile with `discard` makes when it is saved or
+  approved: the stored emails it matches are ignored or deleted as new ones will be. Each email is ignored or deleted in its own transaction under its row
   lock, with the single action's steps (`backend/src/email-receipts/receipts/receipt-disposal.ts`) and its state read
   again there: an email whose proposal was applied is kept by both actions, one that could
   not be read (`skipped`) is kept by `ignore` (the single action refuses it) and deleted

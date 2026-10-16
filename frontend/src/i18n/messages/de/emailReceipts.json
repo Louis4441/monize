@@ -150,9 +150,7 @@
     "payeeUnavailable": "Zahlungsempfängerliste nicht verfügbar",
     "actions": {
       "approve": "Freigeben",
-      "viewJson": "JSON anzeigen",
-      "ignoreEmails": "Passende E-Mails ignorieren",
-      "deleteEmails": "Passende E-Mails löschen"
+      "viewJson": "JSON anzeigen"
     },
     "toasts": {
       "approved": "Profil freigegeben",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "E-Mails ignorieren",
       "deleteTitle": "E-Mails dieses Profils löschen?",
       "deleteMessage": "{count, plural, one {# E-Mail, die {name} ausliest, wird} other {# E-Mails, die {name} ausliest, werden}} samt ihren offenen Vorschlägen gelöscht. Das lässt sich nicht rückgängig machen.{kept, plural, =0 {} one { # E-Mail, deren Vorschlag bereits angewendet wurde, bleibt.} other { # E-Mails, deren Vorschläge bereits angewendet wurden, bleiben.}}",
-      "deleteConfirm": "E-Mails löschen",
-      "noneToIgnore": "Dieses Profil liest keine E-Mails, die ignoriert werden können.",
-      "noneToDelete": "Dieses Profil liest keine E-Mails, die gelöscht werden können."
+      "deleteConfirm": "E-Mails löschen"
     },
     "deleteDialog": {
       "title": "Profil löschen?",
@@ -193,7 +189,9 @@
       "later": "Nicht jetzt"
     },
     "reparse": "E-Mails erneut auslesen ({count})",
-    "kindTrade": "Wertpapierhandel"
+    "kindTrade": "Wertpapierhandel",
+    "discardIgnore": "Ignoriert seine E-Mails",
+    "discardDelete": "Löscht seine E-Mails"
   },
   "editor": {
     "createTitle": "Neues Profil",
@@ -374,6 +372,16 @@
       "markerRemove": "Markierung {marker} entfernen",
       "markerAdd": "Währungsmarkierung hinzufügen",
       "markersMax": "Höchstens {max} Markierungen."
+    },
+    "discard": {
+      "label": "Passende E-Mails",
+      "read": "Auslesen",
+      "ignore": "Ignorieren",
+      "delete": "Löschen",
+      "readHelp": "Das Profil liest jede passende E-Mail mit den Mustern unten aus.",
+      "ignoreHelp": "Jede E-Mail, die zu diesem Profil passt, wird beim Eintreffen ignoriert: Sie schlägt nichts vor. Für Absender, mit deren E-Mails du nie etwas zu tun haben willst.",
+      "deleteHelp": "Jede E-Mail, die zu diesem Profil passt, wird beim Eintreffen aus Monize gelöscht (in deinem Postfach bleibt sie). Eine gelöschte E-Mail lässt sich nicht zurückholen.",
+      "noReading": "Dieses Profil liest nichts aus und braucht daher keine Muster, Kategorien oder Zuordnung. Die Absenderdomains und Betreffwörter oben bestimmen, welche E-Mails es übernimmt."
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "Dieses Profil würde diese E-Mail nicht lesen: Keine seiner erforderlichen Zeilen kommt darin vor, daher würde das nächste Profil für den Absender versucht.",
       "skip_line": "Dieses Profil würde diese E-Mail beiseitelegen: Sie enthält eine Zeile, bei der es überspringt.",
       "wait_line": "Dieses Profil würde diese E-Mail zurückhalten: Eine Zeile besagt, dass die Bestellung nicht endgültig ist, daher wird sie später erneut gelesen.",
+      "discard_ignore": "Dieses Profil würde diese E-Mail ignorieren: Es ignoriert jede passende E-Mail.",
+      "discard_delete": "Dieses Profil würde diese E-Mail löschen: Es löscht jede passende E-Mail.",
       "no_html": "Dieses Profil liest den HTML-Teil der E-Mail, und diese E-Mail hat keinen, daher würde sie als nicht lesbar (kein HTML) markiert."
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "Der Vorschlag wurde abgelehnt, daher wurde nichts vorgeschlagen.",
       "skip_line": "Es wurde eine Zeile gefunden, bei der dieses Profil überspringt, daher wurde die E-Mail ignoriert.",
       "wait_line": "Eine Zeile besagt, dass die Bestellung noch nicht endgültig ist, daher wird die E-Mail später erneut gelesen.",
+      "profile_ignore": "Das Profil dieser E-Mail ignoriert jede passende E-Mail.",
       "no_html": "Dieses Profil liest den HTML-Teil der E-Mail, und diese E-Mail hat keinen.",
       "schema_org": "Es wurde kein Profil benötigt: Die Bestellung wurde aus den strukturierten Daten (schema.org) der E-Mail gelesen.",
       "item_amount_missing": "Eine Position hat keinen Betrag, und die E-Mail enthält keine einzelne Summe, die ihr zugewiesen werden könnte.",
@@ -941,6 +952,7 @@
     "failed": "Die Verarbeitung wurde gestoppt, weil eine Anfrage fehlgeschlagen ist.",
     "failedWithReason": "Die Verarbeitung wurde gestoppt: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} gelöscht",
     "close": "Schließen"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "Von diesem Profil nicht gelesen",
         "skip_line": "Übersprungen (Überspringen-Zeile gefunden)",
         "wait_line": "Zurückgestellt (Bestellung nicht endgültig)",
+        "discard_ignore": "Von diesem Profil ignoriert",
+        "discard_delete": "Von diesem Profil gelöscht",
         "no_html": "Kein HTML-Teil",
         "trade": "Schlägt einen Handel vor",
         "trade_exists": "Bereits gebucht"

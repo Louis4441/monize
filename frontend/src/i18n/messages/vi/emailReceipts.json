@@ -150,9 +150,7 @@
     "payeeUnavailable": "Danh sách người nhận không khả dụng",
     "actions": {
       "approve": "Duyệt",
-      "viewJson": "Xem JSON",
-      "ignoreEmails": "Bỏ qua các email khớp",
-      "deleteEmails": "Xóa các email khớp"
+      "viewJson": "Xem JSON"
     },
     "toasts": {
       "approved": "Đã duyệt trình phân tích",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "Bỏ qua email",
       "deleteTitle": "Xóa email của trình phân tích này?",
       "deleteMessage": "{count, plural, other {# email}} mà {name} đọc sẽ bị xóa cùng với các đề xuất đang mở. Không thể hoàn tác thao tác này.{kept, plural, =0 {} other { # email có đề xuất đã được áp dụng sẽ được giữ lại.}}",
-      "deleteConfirm": "Xóa email",
-      "noneToIgnore": "Trình phân tích này không đọc email nào có thể bỏ qua.",
-      "noneToDelete": "Trình phân tích này không đọc email nào có thể xóa."
+      "deleteConfirm": "Xóa email"
     },
     "deleteDialog": {
       "title": "Xóa trình phân tích?",
@@ -193,7 +189,9 @@
       "later": "Để sau"
     },
     "reparse": "Phân tích lại email ({count})",
-    "kindTrade": "Giao dịch chứng khoán"
+    "kindTrade": "Giao dịch chứng khoán",
+    "discardIgnore": "Bỏ qua email của nó",
+    "discardDelete": "Xóa email của nó"
   },
   "editor": {
     "createTitle": "Trình phân tích mới",
@@ -374,6 +372,16 @@
       "markerRemove": "Xóa dấu hiệu {marker}",
       "markerAdd": "Thêm dấu hiệu tiền tệ",
       "markersMax": "Tối đa {max} dấu hiệu."
+    },
+    "discard": {
+      "label": "Email khớp",
+      "read": "Đọc",
+      "ignore": "Bỏ qua",
+      "delete": "Xóa",
+      "readHelp": "Trình phân tích đọc mỗi email khớp bằng các mẫu bên dưới.",
+      "ignoreHelp": "Mọi email khớp với trình phân tích này đều bị bỏ qua khi đến: chúng không đề xuất gì. Dành cho người gửi mà bạn không bao giờ muốn xử lý thư của họ.",
+      "deleteHelp": "Mọi email khớp với trình phân tích này đều bị xóa khỏi Monize khi đến (vẫn còn trong hộp thư của bạn). Email đã xóa không thể khôi phục.",
+      "noReading": "Trình phân tích này không đọc gì, nên không cần mẫu, danh mục hay khớp giao dịch. Các tên miền người gửi và từ trong tiêu đề ở trên quyết định nó nhận những email nào."
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "Trình phân tích này sẽ không đọc email này: không có dòng bắt buộc nào của nó nằm trong email, nên trình phân tích tiếp theo của người gửi sẽ được thử.",
       "skip_line": "Trình phân tích này sẽ gác email này sang một bên: trong email có một dòng mà nó bỏ qua.",
       "wait_line": "Trình phân tích này sẽ giữ lại email này: có một dòng cho biết đơn hàng chưa chốt, nên email sẽ được đọc lại sau.",
+      "discard_ignore": "Trình phân tích này sẽ bỏ qua email này: nó bỏ qua mọi email khớp.",
+      "discard_delete": "Trình phân tích này sẽ xóa email này: nó xóa mọi email khớp.",
       "no_html": "Trình phân tích này đọc phần HTML của email, mà email này không có HTML, nên sẽ bị đánh dấu là không đọc được (không có HTML)."
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "Đề xuất bị từ chối, nên không có gì được đề xuất.",
       "skip_line": "Đã tìm thấy một dòng mà trình phân tích này dùng để loại email, nên email đã bị bỏ qua.",
       "wait_line": "Một dòng cho biết đơn hàng chưa chốt, nên email sẽ được đọc lại sau.",
+      "profile_ignore": "Trình phân tích của email này bỏ qua mọi email khớp.",
       "no_html": "Trình phân tích này đọc phần HTML của email, mà email này không có HTML.",
       "schema_org": "Không cần trình phân tích: đơn hàng được đọc từ dữ liệu có cấu trúc (schema.org) trong email.",
       "item_amount_missing": "Một mục hàng không có số tiền, và email không có tổng duy nhất nào để gán cho nó.",
@@ -941,6 +952,7 @@
     "failed": "Quá trình xử lý đã dừng vì một yêu cầu thất bại.",
     "failedWithReason": "Quá trình xử lý đã dừng: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} đã xóa",
     "close": "Đóng"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "Hồ sơ này không đọc",
         "skip_line": "Đã bỏ qua (có dòng bỏ qua)",
         "wait_line": "Đang chờ (đơn hàng chưa chốt)",
+        "discard_ignore": "Bị trình phân tích này bỏ qua",
+        "discard_delete": "Bị trình phân tích này xóa",
         "no_html": "Không có phần HTML",
         "trade": "Đề xuất một giao dịch",
         "trade_exists": "Đã có trong sổ cái"

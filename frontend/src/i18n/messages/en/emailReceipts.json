@@ -150,9 +150,7 @@
     "payeeUnavailable": "Payee list unavailable",
     "actions": {
       "approve": "Approve",
-      "viewJson": "View JSON",
-      "ignoreEmails": "Ignore matching emails",
-      "deleteEmails": "Delete matching emails"
+      "viewJson": "View JSON"
     },
     "toasts": {
       "approved": "Profile approved",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "Ignore emails",
       "deleteTitle": "Delete this profile's emails?",
       "deleteMessage": "{count, plural, one {# email} other {# emails}} that {name} reads will be deleted, with their open proposals. This cannot be undone.{kept, plural, =0 {} one { # email whose proposal was already applied stays.} other { # emails whose proposals were already applied stay.}}",
-      "deleteConfirm": "Delete emails",
-      "noneToIgnore": "This profile reads no emails that can be ignored.",
-      "noneToDelete": "This profile reads no emails that can be deleted."
+      "deleteConfirm": "Delete emails"
     },
     "deleteDialog": {
       "title": "Delete the profile?",
@@ -193,7 +189,9 @@
       "later": "Not now"
     },
     "reparse": "Re-parse emails ({count})",
-    "kindTrade": "Brokerage trades"
+    "kindTrade": "Brokerage trades",
+    "discardIgnore": "Ignores its emails",
+    "discardDelete": "Deletes its emails"
   },
   "editor": {
     "createTitle": "New profile",
@@ -374,6 +372,16 @@
       "markerRemove": "Remove marker {marker}",
       "markerAdd": "Add a currency marker",
       "markersMax": "At most {max} markers."
+    },
+    "discard": {
+      "label": "Matching emails",
+      "read": "Read them",
+      "ignore": "Ignore them",
+      "delete": "Delete them",
+      "readHelp": "The profile reads each email it matches with the patterns below.",
+      "ignoreHelp": "Every email this profile matches is ignored as it arrives: it proposes nothing. For senders whose mail you never want to deal with.",
+      "deleteHelp": "Every email this profile matches is deleted from Monize as it arrives (it stays in your mailbox). A deleted email cannot be brought back.",
+      "noReading": "This profile reads nothing, so it needs no patterns, categories or matching. The sender domains and subject words above decide which emails it takes."
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "This profile would not read this email: none of its required lines is in it, so the next profile for the sender would be tried.",
       "skip_line": "This profile would set this email aside: a line it skips on is in it.",
       "wait_line": "This profile would hold this email: a line says the order is not final, so it is read again later.",
+      "discard_ignore": "This profile would ignore this email: it ignores every email it matches.",
+      "discard_delete": "This profile would delete this email: it deletes every email it matches.",
       "no_html": "This profile reads the HTML part of the email, and this email has none, so it would be marked as unreadable (no HTML)."
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "The proposal was refused, so nothing was proposed.",
       "skip_line": "A line this profile skips on was found, so the email was ignored.",
       "wait_line": "A line says the order is not final yet, so the email will be read again later.",
+      "profile_ignore": "This email's profile ignores every email it matches.",
       "no_html": "This profile reads the HTML part of the email, and this email has none.",
       "schema_org": "No profile was needed: the order was read from the structured data (schema.org) in the email.",
       "item_amount_missing": "An item has no amount, and the email has no single total to give it.",
@@ -941,6 +952,7 @@
     "failed": "Processing stopped because a request failed.",
     "failedWithReason": "Processing stopped: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} deleted",
     "close": "Close"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "Not read by this profile",
         "skip_line": "Skipped (skip line found)",
         "wait_line": "On hold (order not final)",
+        "discard_ignore": "Ignored by this profile",
+        "discard_delete": "Deleted by this profile",
         "no_html": "No HTML part",
         "trade": "Proposes a trade",
         "trade_exists": "Already in your ledger"

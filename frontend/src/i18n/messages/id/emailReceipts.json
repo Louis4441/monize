@@ -150,9 +150,7 @@
     "payeeUnavailable": "Daftar penerima tidak tersedia",
     "actions": {
       "approve": "Setujui",
-      "viewJson": "Lihat JSON",
-      "ignoreEmails": "Abaikan surel yang cocok",
-      "deleteEmails": "Hapus surel yang cocok"
+      "viewJson": "Lihat JSON"
     },
     "toasts": {
       "approved": "Profil disetujui",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "Abaikan surel",
       "deleteTitle": "Hapus surel profil ini?",
       "deleteMessage": "{count, plural, other {# surel}} yang dibaca {name} akan dihapus beserta usulan terbukanya. Tindakan ini tidak dapat dibatalkan.{kept, plural, =0 {} other { # surel yang usulannya sudah diterapkan tetap ada.}}",
-      "deleteConfirm": "Hapus surel",
-      "noneToIgnore": "Profil ini tidak membaca surel yang dapat diabaikan.",
-      "noneToDelete": "Profil ini tidak membaca surel yang dapat dihapus."
+      "deleteConfirm": "Hapus surel"
     },
     "deleteDialog": {
       "title": "Hapus profil?",
@@ -193,7 +189,9 @@
       "later": "Nanti saja"
     },
     "reparse": "Urai ulang surel ({count})",
-    "kindTrade": "Transaksi pialang"
+    "kindTrade": "Transaksi pialang",
+    "discardIgnore": "Mengabaikan surelnya",
+    "discardDelete": "Menghapus surelnya"
   },
   "editor": {
     "createTitle": "Profil baru",
@@ -374,6 +372,16 @@
       "markerRemove": "Hapus penanda {marker}",
       "markerAdd": "Tambah penanda mata uang",
       "markersMax": "Paling banyak {max} penanda."
+    },
+    "discard": {
+      "label": "Surel yang cocok",
+      "read": "Baca",
+      "ignore": "Abaikan",
+      "delete": "Hapus",
+      "readHelp": "Profil membaca setiap surel yang cocok dengan pola di bawah.",
+      "ignoreHelp": "Setiap surel yang cocok dengan profil ini diabaikan saat tiba: surel tersebut tidak mengusulkan apa pun. Untuk pengirim yang surelnya tidak pernah ingin Anda urus.",
+      "deleteHelp": "Setiap surel yang cocok dengan profil ini dihapus dari Monize saat tiba (tetap ada di kotak surel Anda). Surel yang dihapus tidak dapat dikembalikan.",
+      "noReading": "Profil ini tidak membaca apa pun, jadi tidak memerlukan pola, kategori, atau pencocokan. Domain pengirim dan kata subjek di atas menentukan surel mana yang diambilnya."
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "Profil ini tidak akan membaca surel ini: tidak ada baris wajibnya yang ada di dalamnya, sehingga profil berikutnya untuk pengirim akan dicoba.",
       "skip_line": "Profil ini akan menyisihkan surel ini: di dalamnya ada baris yang membuatnya dilewati.",
       "wait_line": "Profil ini akan menahan surel ini: sebuah baris menyatakan pesanan belum final, sehingga surel dibaca ulang nanti.",
+      "discard_ignore": "Profil ini akan mengabaikan surel ini: profil ini mengabaikan setiap surel yang cocok.",
+      "discard_delete": "Profil ini akan menghapus surel ini: profil ini menghapus setiap surel yang cocok.",
       "no_html": "Profil ini membaca bagian HTML surel, dan surel ini tidak memilikinya, sehingga akan ditandai tidak dapat dibaca (tanpa HTML)."
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "Usulan ditolak, jadi tidak ada yang diusulkan.",
       "skip_line": "Ditemukan baris yang membuat profil ini melewati surel, sehingga surel diabaikan.",
       "wait_line": "Sebuah baris menyatakan pesanan belum final, jadi surel akan dibaca lagi nanti.",
+      "profile_ignore": "Profil surel ini mengabaikan setiap surel yang cocok.",
       "no_html": "Profil ini membaca bagian HTML surel, dan surel ini tidak memilikinya.",
       "schema_org": "Tidak perlu profil: pesanan dibaca dari data terstruktur (schema.org) di surel.",
       "item_amount_missing": "Sebuah item tidak memiliki jumlah, dan surel tidak memiliki total tunggal untuk diberikan kepadanya.",
@@ -941,6 +952,7 @@
     "failed": "Pemrosesan berhenti karena sebuah permintaan gagal.",
     "failedWithReason": "Pemrosesan berhenti: {reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "{count} dihapus",
     "close": "Tutup"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "Tidak dibaca oleh profil ini",
         "skip_line": "Dilewati (baris lewati ditemukan)",
         "wait_line": "Ditahan (pesanan belum final)",
+        "discard_ignore": "Diabaikan oleh profil ini",
+        "discard_delete": "Dihapus oleh profil ini",
         "no_html": "Tidak ada bagian HTML",
         "trade": "Mengusulkan perdagangan",
         "trade_exists": "Sudah ada di buku besar"

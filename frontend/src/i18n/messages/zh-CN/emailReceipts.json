@@ -150,9 +150,7 @@
     "payeeUnavailable": "收款人列表不可用",
     "actions": {
       "approve": "批准",
-      "viewJson": "查看 JSON",
-      "ignoreEmails": "忽略匹配的邮件",
-      "deleteEmails": "删除匹配的邮件"
+      "viewJson": "查看 JSON"
     },
     "toasts": {
       "approved": "解析器已批准",
@@ -170,9 +168,7 @@
       "ignoreConfirm": "忽略邮件",
       "deleteTitle": "删除此解析器的邮件？",
       "deleteMessage": "{name} 读取的 {count, plural, other {# 封邮件}}将连同未完成的提议一起删除。此操作无法撤销。{kept, plural, =0 {} other {提议已应用的 # 封邮件将保留。}}",
-      "deleteConfirm": "删除邮件",
-      "noneToIgnore": "此解析器读取的邮件中没有可忽略的邮件。",
-      "noneToDelete": "此解析器读取的邮件中没有可删除的邮件。"
+      "deleteConfirm": "删除邮件"
     },
     "deleteDialog": {
       "title": "删除解析器？",
@@ -193,7 +189,9 @@
       "later": "暂不处理"
     },
     "reparse": "重新解析邮件（{count}）",
-    "kindTrade": "证券交易"
+    "kindTrade": "证券交易",
+    "discardIgnore": "忽略其邮件",
+    "discardDelete": "删除其邮件"
   },
   "editor": {
     "createTitle": "新建解析器",
@@ -374,6 +372,16 @@
       "markerRemove": "删除标记 {marker}",
       "markerAdd": "添加货币标记",
       "markersMax": "最多 {max} 个标记。"
+    },
+    "discard": {
+      "label": "匹配的邮件",
+      "read": "读取",
+      "ignore": "忽略",
+      "delete": "删除",
+      "readHelp": "解析器使用下面的模式读取每封匹配的邮件。",
+      "ignoreHelp": "与此解析器匹配的每封邮件到达时都会被忽略：它不会提出任何提议。适用于你永远不想处理其邮件的发件人。",
+      "deleteHelp": "与此解析器匹配的每封邮件到达时都会从 Monize 中删除（仍保留在你的邮箱中）。删除的邮件无法恢复。",
+      "noReading": "此解析器不读取任何内容，因此不需要模式、类别或匹配。上方的发件人域名和主题词决定它接收哪些邮件。"
     }
   },
   "problems": {
@@ -516,6 +524,8 @@
       "not_applicable": "此解析器不会读取这封邮件：邮件中没有任何必需的行，因此将尝试该发件人的下一个解析器。",
       "skip_line": "此解析器会将这封邮件排除在外：邮件中含有它要跳过的行。",
       "wait_line": "此解析器会暂缓处理这封邮件：有一行表明订单尚未最终确定，因此稍后会再次读取。",
+      "discard_ignore": "此解析器会忽略这封邮件：它会忽略每封匹配的邮件。",
+      "discard_delete": "此解析器会删除这封邮件：它会删除每封匹配的邮件。",
       "no_html": "此解析器读取邮件的 HTML 部分，而这封邮件没有 HTML，因此会被标记为无法读取（无 HTML）。"
     },
     "matchedBy": {
@@ -766,6 +776,7 @@
       "proposal_refused": "提议被拒绝，因此没有提出任何提议。",
       "skip_line": "发现了此解析器要跳过的行，因此该邮件已被忽略。",
       "wait_line": "有一行表明订单尚未最终确定，因此稍后会再次读取该邮件。",
+      "profile_ignore": "这封邮件的解析器会忽略每封匹配的邮件。",
       "no_html": "此解析器读取邮件的 HTML 部分，而这封邮件没有 HTML。",
       "schema_org": "无需解析器：订单是从邮件中的结构化数据（schema.org）读取的。",
       "item_amount_missing": "某个明细没有金额，而邮件中也没有可分配给它的单一合计。",
@@ -941,6 +952,7 @@
     "failed": "处理已停止，因为有请求失败。",
     "failedWithReason": "处理已停止：{reason}",
     "outcome": "{count} {state}",
+    "deletedOutcome": "已删除 {count} 封",
     "close": "关闭"
   },
   "overview": {
@@ -1146,6 +1158,8 @@
         "not_applicable": "此配置文件未读取",
         "skip_line": "已跳过（发现跳过行）",
         "wait_line": "已搁置（订单未最终确定）",
+        "discard_ignore": "已被此解析器忽略",
+        "discard_delete": "已被此解析器删除",
         "no_html": "没有 HTML 部分",
         "trade": "提出一笔交易",
         "trade_exists": "已在账本中"

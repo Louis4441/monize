@@ -1412,8 +1412,10 @@ describe("email receipts pipeline (integration)", () => {
       });
       // a second reprocess changes nothing about who forwarded it
       const again = await asAlice(() => receipts.reprocess(aliceId, legacy.id));
-      expect(again.forwardedBy).toBe("alice.example@gmail.example.com");
-      expect(again.fromAddress).toBe("orders@shop.example.com");
+      expect(again).toMatchObject({
+        forwardedBy: "alice.example@gmail.example.com",
+        fromAddress: "orders@shop.example.com",
+      });
     });
   });
 
@@ -1611,7 +1613,7 @@ describe("email receipts pipeline (integration)", () => {
 
       // a draft reads nothing: reprocessing still finds no parser
       const stillNone = await asAlice(() => receipts.reprocess(aliceId, r1));
-      expect(stillNone.status).toBe("no_parser");
+      expect(stillNone).toMatchObject({ status: "no_parser" });
       // and nothing touched the ledger
       expect(await splitCount()).toBe(0);
 
@@ -1642,8 +1644,10 @@ describe("email receipts pipeline (integration)", () => {
 
       // 7. and now the parser reads the email
       const read = await asAlice(() => receipts.reprocess(aliceId, r1));
-      expect(read.status).toBe("review");
-      expect(read.parserName).toBe("Example Shop");
+      expect(read).toMatchObject({
+        status: "review",
+        parserName: "Example Shop",
+      });
     });
 
     it("deleting the draft dismisses the request that proposed it", async () => {

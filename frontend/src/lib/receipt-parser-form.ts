@@ -2,12 +2,14 @@ import {
   DEFAULT_MATCH_BY,
   DEFAULT_MATCH_DAYS_AFTER,
   DEFAULT_MATCH_DAYS_BEFORE,
+  RECEIPT_DISCARD_MODES,
   RECEIPT_LINES_SOURCES,
   RECEIPT_MATCH_STRATEGIES,
   RECEIPT_MATCH_TEXT_FIELDS,
   RECEIPT_PARSER_LIMITS,
   type CreateEmailReceiptParserPayload,
   type EmailReceiptParser,
+  type ReceiptDiscardMode,
   type ReceiptLinesSource,
   type ReceiptMatchDefinition,
   type ReceiptMatchStrategy,
@@ -109,6 +111,8 @@ export interface ParserFormState {
   tagName: string;
   /** Ask the user's AI for the category of an item no rule matched. */
   aiCategories: boolean;
+  /** What the profile does with the emails it matches instead of reading them; `''` reads them. */
+  discard: ReceiptDiscardMode | '';
   /** The line guards (trade profile): one pattern per line. */
   requireLine: string;
   skipIfLine: string;
@@ -167,6 +171,7 @@ export const emptyParserForm = (overrides: Partial<ParserFormState> = {}): Parse
   tagEnabled: false,
   tagName: '',
   aiCategories: false,
+  discard: '',
   requireLine: '',
   skipIfLine: '',
   waitIfLine: '',
@@ -352,6 +357,7 @@ export function buildParserDefinition(form: ParserFormState): ReceiptParserDefin
   const tag = form.tagName.trim() !== '' ? form.tagName.trim() : form.name.trim();
   if (form.tagEnabled && tag !== '') definition.tag = tag;
   if (form.aiCategories) definition.aiCategories = true;
+  if (form.discard !== '') definition.discard = form.discard;
   return definition;
 }
 
@@ -397,7 +403,14 @@ function buildTradeDefinition(form: ParserFormState): ReceiptParserDefinition {
     const patterns = splitLines(form[field]);
     if (patterns.length > 0) definition[field] = patterns;
   }
+  if (form.discard !== '') definition.discard = form.discard;
   return definition;
+}
+
+/** What a stored definition does with the emails it matches instead of reading them (`discard`); null when it reads them. */
+export function discardModeOf(value: unknown): ReceiptDiscardMode | null {
+  if (!isRecord(value)) return null;
+  return RECEIPT_DISCARD_MODES.includes(value.discard as ReceiptDiscardMode) ? (value.discard as ReceiptDiscardMode) : null;
 }
 
 /** Does this stored definition read brokerage trade confirmations (it has a `trade` section)? */
@@ -455,6 +468,7 @@ type DefinitionFields = Pick<
   | 'tagEnabled'
   | 'tagName'
   | 'aiCategories'
+  | 'discard'
   | (typeof GUARD_FIELDS)[number]
   | TradePatternFormField
   | 'tradeAccountRules'
@@ -507,6 +521,9 @@ export function definitionToFormFields(value: unknown): DefinitionFields {
     tagEnabled: text(definition.tag).trim() !== '',
     tagName: text(definition.tag).trim(),
     aiCategories: definition.aiCategories === true,
+    discard: RECEIPT_DISCARD_MODES.includes(definition.discard as ReceiptDiscardMode)
+      ? (definition.discard as ReceiptDiscardMode)
+      : '',
     requireLine: stringList(definition.requireLine).join('\n'),
     skipIfLine: stringList(definition.skipIfLine).join('\n'),
     waitIfLine: stringList(definition.waitIfLine).join('\n'),
@@ -560,9 +577,14 @@ const FORM_TOP_LEVEL_KEYS = [
   'match',
   'tag',
   'aiCategories',
+  'discard',
 ];
 const FORM_ITEMS_KEYS = ['startAfter', 'stopAt', 'patterns'];
-const FORM_TRADE_TOP_LEVEL_KEYS = ['version', 'source', 'trade', ...GUARD_FIELDS];
+const FORM_TRADE_TOP_LEVEL_KEYS = ['version', 'source', 'trade', 'discard', ...GUARD_FIELDS];
+
+/** The discard mode the form's select can show: one of the two, or none. */
+const discardFits = (value: unknown): boolean =>
+  value === undefined || RECEIPT_DISCARD_MODES.includes(value as ReceiptDiscardMode);
 const FORM_TRADE_KEYS = [...TRADE_PATTERN_FIELDS.map(([key]) => key), 'accountRules', 'defaultAccountId', 'currencyMarkers'];
 const FORM_TRADE_RULE_KEYS = ['match', 'accountId', 'currency'];
 const FORM_TRADE_MARKER_KEYS = ['match', 'currency'];
@@ -616,6 +638,7 @@ export function formCanRepresent(value: unknown): boolean {
   if (!isRecord(value)) return false;
   if (value.trade !== undefined) return formCanRepresentTrade(value);
   if (!onlyKeys(value, FORM_TOP_LEVEL_KEYS)) return false;
+  if (!discardFits(value.discard)) return false;
   if (value.source !== undefined && !RECEIPT_LINES_SOURCES.includes(value.source as ReceiptLinesSource)) return false;
   for (const field of ['orderId', 'total', 'shipping', 'discount', 'fees', 'reference']) {
     if (!onlyStrings(value[field])) return false;
@@ -658,6 +681,7 @@ const rowsOf = (value: unknown, keys: readonly string[], required: readonly stri
  */
 function formCanRepresentTrade(value: Record<string, unknown>): boolean {
   if (!onlyKeys(value, FORM_TRADE_TOP_LEVEL_KEYS)) return false;
+  if (!discardFits(value.discard)) return false;
   if (value.source !== undefined && !RECEIPT_LINES_SOURCES.includes(value.source as ReceiptLinesSource)) return false;
   if (!GUARD_FIELDS.every((field) => onlyStrings(value[field]))) return false;
   const trade = value.trade;

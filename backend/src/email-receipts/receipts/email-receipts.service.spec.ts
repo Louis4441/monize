@@ -769,12 +769,38 @@ describe("EmailReceiptsService.get", () => {
 describe("EmailReceiptsService.reprocess and link", () => {
   it("reprocess runs the pipeline under the JWT user and returns the fresh detail", async () => {
     const { service, manager, pipeline } = setup();
+    pipeline.process.mockResolvedValue({
+      status: "review",
+      statusReason: null,
+      transactionId: null,
+      matchKind: null,
+      requestId: null,
+      autoApplied: false,
+      unchanged: false,
+      deleted: false,
+    });
     manager.query.mockResolvedValueOnce([
       { ...row(), body_text: "", parsed: null, candidate_transaction_ids: [] },
     ]);
     const detail = await service.reprocess(USER, ID);
     expect(pipeline.process).toHaveBeenCalledWith(USER, ID);
-    expect(detail.id).toBe(ID);
+    expect(detail?.id).toBe(ID);
+  });
+
+  it("reprocess answers null, and reads nothing more, when the email's profile deleted it", async () => {
+    const { service, manager, pipeline } = setup();
+    pipeline.process.mockResolvedValue({
+      status: "review",
+      statusReason: null,
+      transactionId: null,
+      matchKind: null,
+      requestId: null,
+      autoApplied: false,
+      unchanged: false,
+      deleted: true,
+    });
+    await expect(service.reprocess(USER, ID)).resolves.toBeNull();
+    expect(manager.query).not.toHaveBeenCalled();
   });
 
   it("link hands the pipeline the transaction, which checks it in the writing transaction", async () => {
@@ -1125,6 +1151,7 @@ describe("EmailReceiptsService.processBatch", () => {
     requestId: null,
     autoApplied: false,
     unchanged: false,
+    deleted: false,
     ...over,
   });
 
@@ -1145,6 +1172,7 @@ describe("EmailReceiptsService.processBatch", () => {
     expect(out).toEqual({
       processed: 3,
       byOutcome: { review: 2, unmatched: 1 },
+      deleted: 0,
       failed: 0,
       remaining: 4,
       since: SINCE,
@@ -1176,6 +1204,19 @@ describe("EmailReceiptsService.processBatch", () => {
     expect(first[2]?.aiCategoryBudget?.remaining).toBe(
       EMAIL_RECEIPTS_BATCH_AI_CATEGORY_CALLS,
     );
+  });
+
+  it("counts an email its profile deleted as processed and deleted, under no status", async () => {
+    const h = batch(["a", "b"]);
+    h.pipeline.process
+      .mockResolvedValueOnce(result("pending", { deleted: true }) as never)
+      .mockResolvedValueOnce(result("review") as never);
+    const out = await h.service.processBatch(USER, {});
+    expect(out).toMatchObject({
+      processed: 2,
+      deleted: 1,
+      byOutcome: { review: 1 },
+    });
   });
 
   it("does not count an email the pipeline left as it was", async () => {
@@ -1315,6 +1356,7 @@ describe("EmailReceiptsService.processBatch", () => {
     expect(out).toEqual({
       processed: 0,
       byOutcome: {},
+      deleted: 0,
       failed: 0,
       remaining: 0,
       since: SINCE,
