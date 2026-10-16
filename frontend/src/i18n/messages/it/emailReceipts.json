@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Acquisto} other {Vendita}} di {quantity} {symbol} per {total} il {date}.",
     "noTradeTransaction": "Ancora nessuna: l'operazione viene registrata quando approvi la proposta, oppure collegata a una già presente nel registro.",
     "candidateShares": "{quantity} quote",
-    "tradeNoCandidates": "Nessuna transazione di investimento di questo conto, direzione e simbolo entro una settimana dal giorno dell'operazione è libera da collegare. Se hai inserito tu l'operazione, controllane conto e data; altrimenti approva la proposta nella casella di revisione."
+    "tradeNoCandidates": "Nessuna transazione di investimento di questo conto, direzione e simbolo entro una settimana dal giorno dell'operazione è libera da collegare. Se hai inserito tu l'operazione, controllane conto e data; altrimenti approva la proposta nella casella di revisione.",
+    "aiTradeHeading": "Operazione proposta dall'agente IA",
+    "aiTradeReader": "Nessuno: l'agente IA la legge come operazione",
+    "noAiTradeTransaction": "Nessuna per ora: l'operazione viene registrata quando approvi la proposta dell'agente IA."
   },
   "picker": {
     "heading": "Scegli la transazione",
@@ -1039,6 +1042,15 @@
     "incomplete": "Il profilo non è riuscito a leggere un'operazione completa da questa email.",
     "totalFromPrice": "il totale ricavato dal prezzo",
     "dateUnknown": "il giorno in cui è arrivata l'email",
-    "price": "Prezzo medio nell'email: {price} per quota"
+    "price": "Prezzo medio nell'email: {price} per quota",
+    "proposalSecurity": "Titolo: {name}",
+    "proposalAccount": "Conto: {account}",
+    "proposalPrice": "Prezzo: {price} per azione",
+    "proposalCommission": "Commissione: {commission}",
+    "proposalReview": "Nulla viene registrato finché non approvi.",
+    "proposalReviewLink": "Controllala nella posta in arrivo",
+    "aiWaiting": "L'agente IA non ha ancora proposto l'operazione. La sua proposta comparirà qui e nella casella delle revisioni.",
+    "aiBooked": "Registrata dalla proposta dell'agente IA: vedi la transazione sopra.",
+    "aiNoProposal": "Nessuna proposta dell'agente IA è in attesa per questa email."
   }
 }

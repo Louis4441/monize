@@ -198,6 +198,23 @@ export interface EmailReceiptInvestmentSummary {
   currencyCode: string;
 }
 
+/** The investment transaction an email's open `email_trade` request proposes: the review card's own preview. */
+export interface EmailReceiptTradeProposal {
+  accountName: string;
+  /** YYYY-MM-DD. */
+  date: string;
+  action: 'BUY' | 'SELL';
+  symbol: string;
+  securityName: string | null;
+  quantity: number;
+  /** Per share, in the security's currency. */
+  price: number;
+  commission: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
+}
+
 /** One stored email in the list: never its text. */
 export interface EmailReceiptListItem {
   id: string;
@@ -223,8 +240,14 @@ export interface EmailReceiptListItem {
   parserId: string | null;
   parserName: string | null;
   aiReviewRequestId: string | null;
-  /** Read by a trade profile: it proposes an investment transaction to create, so the bank-transaction actions do not apply. */
+  /** A brokerage trade confirmation (`tradeSource` says who reads it): it proposes an investment transaction to create, so the bank-transaction actions do not apply. */
   isTrade: boolean;
+  /**
+   * Who reads the trade: `profile` (its reading is the detail's `trade`), `ai`
+   * (handed to the AI as a trade, with no profile reading), null for no trade.
+   * Absent from a server that predates it.
+   */
+  tradeSource?: 'profile' | 'ai' | null;
   displayState: EmailReceiptDisplayState | null;
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
@@ -351,6 +374,8 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
   parsed: Record<string, unknown> | null;
   /** What a profile with a `trade` section read (`ParsedTrade`); read it through `readParsedTrade`. Null for every other email. */
   trade: Record<string, unknown> | null;
+  /** What the email's `email_trade` request proposes while it waits for approval; null otherwise. Absent from a server that predates it. */
+  tradeProposal?: EmailReceiptTradeProposal | null;
   candidates: EmailReceiptCandidateSummary[];
 }
 

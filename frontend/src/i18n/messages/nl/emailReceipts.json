@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Gekocht} other {Verkocht}}: {quantity} {symbol} voor {total} op {date}.",
     "noTradeTransaction": "Nog geen: de transactie wordt geboekt wanneer je het voorstel goedkeurt, of gekoppeld aan een transactie die al in je administratie staat.",
     "candidateShares": "{quantity} aandelen",
-    "tradeNoCandidates": "Geen beleggingstransactie van deze rekening, richting en ticker binnen een week van de transactiedag is vrij om te koppelen. Heb je de transactie zelf ingevoerd, controleer dan de rekening en de datum; keur anders het voorstel goed in de beoordelingsinbox."
+    "tradeNoCandidates": "Geen beleggingstransactie van deze rekening, richting en ticker binnen een week van de transactiedag is vrij om te koppelen. Heb je de transactie zelf ingevoerd, controleer dan de rekening en de datum; keur anders het voorstel goed in de beoordelingsinbox.",
+    "aiTradeHeading": "Transactie die de AI-agent voorstelt",
+    "aiTradeReader": "Geen: de AI-agent leest het als een transactie",
+    "noAiTradeTransaction": "Nog geen: de transactie wordt geboekt zodra je het voorstel van de AI-agent goedkeurt."
   },
   "picker": {
     "heading": "Kies de transactie",
@@ -1039,6 +1042,15 @@
     "incomplete": "Het profiel kon uit deze e-mail geen volledige transactie lezen.",
     "totalFromPrice": "het uit de prijs afgeleide totaal",
     "dateUnknown": "de dag waarop de e-mail binnenkwam",
-    "price": "Gemiddelde prijs in de e-mail: {price} per aandeel"
+    "price": "Gemiddelde prijs in de e-mail: {price} per aandeel",
+    "proposalSecurity": "Effect: {name}",
+    "proposalAccount": "Rekening: {account}",
+    "proposalPrice": "Koers: {price} per aandeel",
+    "proposalCommission": "Provisie: {commission}",
+    "proposalReview": "Er wordt niets geboekt tot je het goedkeurt.",
+    "proposalReviewLink": "Bekijk het in de inbox",
+    "aiWaiting": "De AI-agent heeft de transactie nog niet voorgesteld. Het voorstel verschijnt hier en in de beoordelingsinbox.",
+    "aiBooked": "Geboekt op basis van het voorstel van de AI-agent: zie de transactie hierboven.",
+    "aiNoProposal": "Er wacht geen voorstel van de AI-agent voor deze e-mail."
   }
 }

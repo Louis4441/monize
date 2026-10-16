@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{date} に {symbol} を {quantity} 株、{total} で{action, select, BUY {購入} other {売却}}。",
     "noTradeTransaction": "まだありません。提案を承認すると記帳されるか、台帳にある既存の取引に紐付けられます。",
     "candidateShares": "{quantity} 株",
-    "tradeNoCandidates": "取引日の前後1週間以内に、この口座・売買区分・銘柄コードで紐付けられる投資取引はありません。自分で入力した場合は口座と日付を確認してください。そうでなければ、レビュー受信箱で提案を承認してください。"
+    "tradeNoCandidates": "取引日の前後1週間以内に、この口座・売買区分・銘柄コードで紐付けられる投資取引はありません。自分で入力した場合は口座と日付を確認してください。そうでなければ、レビュー受信箱で提案を承認してください。",
+    "aiTradeHeading": "AIエージェントが提案する取引",
+    "aiTradeReader": "なし: AIエージェントが取引として読み取ります",
+    "noAiTradeTransaction": "まだありません。AIエージェントの提案を承認すると記帳されます。"
   },
   "picker": {
     "heading": "取引を選択",
@@ -1039,6 +1042,15 @@
     "incomplete": "プロフィールはこのメールから完全な取引を読み取れませんでした。",
     "totalFromPrice": "価格から求めた合計",
     "dateUnknown": "メールが届いた日",
-    "price": "メールの平均価格: 1株あたり {price}"
+    "price": "メールの平均価格: 1株あたり {price}",
+    "proposalSecurity": "銘柄: {name}",
+    "proposalAccount": "口座: {account}",
+    "proposalPrice": "価格: 1株あたり {price}",
+    "proposalCommission": "手数料: {commission}",
+    "proposalReview": "承認するまで何も記帳されません。",
+    "proposalReviewLink": "受信箱で確認",
+    "aiWaiting": "AIエージェントはまだ取引を提案していません。提案はここと確認用の受信箱に表示されます。",
+    "aiBooked": "AIエージェントの提案から記帳しました。上の取引を確認してください。",
+    "aiNoProposal": "このメールについて承認待ちのAIエージェントの提案はありません。"
   }
 }

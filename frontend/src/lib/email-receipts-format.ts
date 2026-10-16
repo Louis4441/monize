@@ -111,12 +111,14 @@ export const RECEIPT_TRADE_LINKED_REASON = 'trade_linked';
  * proposal waits or was refused (`review`, `review_conflict`), or the trade was
  * already in the ledger (`ignored` as `trade_exists`, which may be pointed at
  * the right row). Never once it accounts for a row it was linked to or booked,
- * nor once its proposal was applied.
+ * nor once its proposal was applied, nor for an email the AI reads as a trade.
  */
 export function canLinkTradeEmail(
-  receipt: Pick<EmailReceiptListItem, 'isTrade' | 'status' | 'statusReason' | 'displayState' | 'investmentTransaction'>,
+  receipt: Pick<EmailReceiptListItem, 'isTrade' | 'tradeSource' | 'status' | 'statusReason' | 'displayState' | 'investmentTransaction'>,
 ): boolean {
   if (!receipt.isTrade || receipt.displayState === 'applied') return false;
+  // The candidates come from a profile's reading; an email the AI reads has none.
+  if (receipt.tradeSource === 'ai') return false;
   if (receipt.statusReason === RECEIPT_TRADE_LINKED_REASON) return false;
   if (receipt.investmentTransaction && receipt.statusReason !== RECEIPT_TRADE_EXISTS_REASON) return false;
   if (receipt.status === 'ignored') return receipt.statusReason === RECEIPT_TRADE_EXISTS_REASON;

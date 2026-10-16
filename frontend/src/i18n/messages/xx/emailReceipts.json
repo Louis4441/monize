@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "[XX-{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.-XX]",
     "noTradeTransaction": "[XX-None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.-XX]",
     "candidateShares": "[XX-{quantity} shares-XX]",
-    "tradeNoCandidates": "[XX-No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox.-XX]"
+    "tradeNoCandidates": "[XX-No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox.-XX]",
+    "aiTradeHeading": "[XX-Trade the AI agent proposes-XX]",
+    "aiTradeReader": "[XX-None: the AI agent reads it as a trade-XX]",
+    "noAiTradeTransaction": "[XX-None yet: the trade is booked when you approve the AI agent's proposal.-XX]"
   },
   "picker": {
     "heading": "[XX-Choose the transaction-XX]",
@@ -1039,6 +1042,15 @@
     "incomplete": "[XX-The profile could not read a complete trade from this email.-XX]",
     "totalFromPrice": "[XX-the total implied by the price-XX]",
     "dateUnknown": "[XX-the day the email arrived-XX]",
-    "price": "[XX-Average price in the email: {price} a share-XX]"
+    "price": "[XX-Average price in the email: {price} a share-XX]",
+    "proposalSecurity": "[XX-Security: {name}-XX]",
+    "proposalAccount": "[XX-Account: {account}-XX]",
+    "proposalPrice": "[XX-Price: {price} a share-XX]",
+    "proposalCommission": "[XX-Commission: {commission}-XX]",
+    "proposalReview": "[XX-Nothing is booked until you approve it.-XX]",
+    "proposalReviewLink": "[XX-Review it in the inbox-XX]",
+    "aiWaiting": "[XX-The AI agent has not proposed the trade yet. Its proposal appears here and in the review inbox.-XX]",
+    "aiBooked": "[XX-Booked from the AI agent's proposal: see the transaction above.-XX]",
+    "aiNoProposal": "[XX-No proposal from the AI agent is waiting for this email.-XX]"
   }
 }

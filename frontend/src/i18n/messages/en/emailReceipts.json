@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.",
     "noTradeTransaction": "None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.",
     "candidateShares": "{quantity} shares",
-    "tradeNoCandidates": "No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox."
+    "tradeNoCandidates": "No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox.",
+    "aiTradeHeading": "Trade the AI agent proposes",
+    "aiTradeReader": "None: the AI agent reads it as a trade",
+    "noAiTradeTransaction": "None yet: the trade is booked when you approve the AI agent's proposal."
   },
   "picker": {
     "heading": "Choose the transaction",
@@ -1039,6 +1042,15 @@
     "incomplete": "The profile could not read a complete trade from this email.",
     "totalFromPrice": "the total implied by the price",
     "dateUnknown": "the day the email arrived",
-    "price": "Average price in the email: {price} a share"
+    "price": "Average price in the email: {price} a share",
+    "proposalSecurity": "Security: {name}",
+    "proposalAccount": "Account: {account}",
+    "proposalPrice": "Price: {price} a share",
+    "proposalCommission": "Commission: {commission}",
+    "proposalReview": "Nothing is booked until you approve it.",
+    "proposalReviewLink": "Review it in the inbox",
+    "aiWaiting": "The AI agent has not proposed the trade yet. Its proposal appears here and in the review inbox.",
+    "aiBooked": "Booked from the AI agent's proposal: see the transaction above.",
+    "aiNoProposal": "No proposal from the AI agent is waiting for this email."
   }
 }

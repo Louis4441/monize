@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {买入} other {卖出}} {quantity} 股 {symbol}。",
     "noTradeTransaction": "暂无：批准提议后会记账这笔交易，或将其关联到账本中已有的交易。",
     "candidateShares": "{quantity} 股",
-    "tradeNoCandidates": "在交易日前后一周内，没有此账户、方向和代码的可关联投资交易。如果您自己录入过这笔交易，请检查其账户和日期；否则请在审核收件箱中批准提议。"
+    "tradeNoCandidates": "在交易日前后一周内，没有此账户、方向和代码的可关联投资交易。如果您自己录入过这笔交易，请检查其账户和日期；否则请在审核收件箱中批准提议。",
+    "aiTradeHeading": "AI 代理提议的交易",
+    "aiTradeReader": "无：AI 代理将其作为交易读取",
+    "noAiTradeTransaction": "暂无：批准 AI 代理的提议后会记账这笔交易。"
   },
   "picker": {
     "heading": "选择交易",
@@ -1039,6 +1042,15 @@
     "incomplete": "解析器无法从这封邮件中读取完整的交易。",
     "totalFromPrice": "由价格推算出的合计",
     "dateUnknown": "邮件到达的当天",
-    "price": "邮件中的平均价格：每股 {price}"
+    "price": "邮件中的平均价格：每股 {price}",
+    "proposalSecurity": "证券：{name}",
+    "proposalAccount": "账户：{account}",
+    "proposalPrice": "价格：每股 {price}",
+    "proposalCommission": "佣金：{commission}",
+    "proposalReview": "在你批准之前不会记账。",
+    "proposalReviewLink": "在收件箱中审阅",
+    "aiWaiting": "AI 代理尚未提议这笔交易。提议会显示在这里和审阅收件箱中。",
+    "aiBooked": "已根据 AI 代理的提议记账：请查看上方的交易。",
+    "aiNoProposal": "此邮件没有等待处理的 AI 代理提议。"
   }
 }

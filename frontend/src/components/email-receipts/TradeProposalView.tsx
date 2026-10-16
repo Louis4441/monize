@@ -1,0 +1,59 @@
+'use client';
+
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
+import type { EmailReceiptDisplayState, EmailReceiptTradeProposal } from '@/types/email-receipts';
+
+/** Where a trade's proposal is approved: its card in the review inbox. */
+const REVIEW_INBOX_HREF = '/ai-reviews?kind=email_receipt';
+
+interface TradeProposalViewProps {
+  /** The open proposal's trade, or null when none waits for approval. */
+  proposal: EmailReceiptTradeProposal | null;
+  /** The email already accounts for an investment transaction (the approval booked it). */
+  booked: boolean;
+  displayState: EmailReceiptDisplayState | null;
+}
+
+/**
+ * What the AI agent made of an email handed to it as a trade (no profile read
+ * it): the trade its proposal would book, with the figures of the review card,
+ * or why there is none to show. The total and the price are in the security's
+ * currency, as the card states them.
+ */
+export function TradeProposalView({ proposal, booked, displayState }: TradeProposalViewProps) {
+  const t = useTranslations('emailReceipts.trade');
+  const { formatCurrency, formatCurrencyPrecise, formatShareQuantity } = useNumberFormat();
+  const { formatDate } = useDateFormat();
+
+  if (proposal === null) {
+    const key = booked ? 'aiBooked' : displayState === 'pending_ai' ? 'aiWaiting' : 'aiNoProposal';
+    return <p className="text-sm text-gray-500 dark:text-gray-400">{t(key)}</p>;
+  }
+
+  return (
+    <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+      <p className="font-medium text-gray-900 dark:text-gray-100">
+        {t('summary', {
+          action: proposal.action,
+          quantity: formatShareQuantity(proposal.quantity),
+          symbol: proposal.symbol,
+          total: formatCurrency(proposal.totalAmount, proposal.currencyCode),
+          date: formatDate(proposal.date),
+        })}
+      </p>
+      {proposal.securityName && <p>{t('proposalSecurity', { name: proposal.securityName })}</p>}
+      <p>{t('proposalAccount', { account: proposal.accountName })}</p>
+      <p>{t('proposalPrice', { price: formatCurrencyPrecise(proposal.price, proposal.currencyCode, 4) })}</p>
+      <p>{t('proposalCommission', { commission: formatCurrency(proposal.commission, proposal.currencyCode) })}</p>
+      <p>
+        {t('proposalReview')}{' '}
+        <Link href={REVIEW_INBOX_HREF} className="text-blue-600 hover:underline dark:text-blue-400">
+          {t('proposalReviewLink')}
+        </Link>
+      </p>
+    </div>
+  );
+}

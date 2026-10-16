@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{date}에 {symbol} {quantity}주를 {total}에 {action, select, BUY {매수} other {매도}}.",
     "noTradeTransaction": "아직 없음: 제안을 승인하면 거래가 기록되거나, 원장에 이미 있는 거래에 연결됩니다.",
     "candidateShares": "{quantity}주",
-    "tradeNoCandidates": "거래일 전후 일주일 안에 이 계좌, 방향, 종목 코드로 연결할 수 있는 투자 거래가 없습니다. 직접 입력했다면 계좌와 날짜를 확인하고, 그렇지 않다면 검토함에서 제안을 승인하세요."
+    "tradeNoCandidates": "거래일 전후 일주일 안에 이 계좌, 방향, 종목 코드로 연결할 수 있는 투자 거래가 없습니다. 직접 입력했다면 계좌와 날짜를 확인하고, 그렇지 않다면 검토함에서 제안을 승인하세요.",
+    "aiTradeHeading": "AI 에이전트가 제안하는 거래",
+    "aiTradeReader": "없음: AI 에이전트가 거래로 읽습니다",
+    "noAiTradeTransaction": "아직 없음: AI 에이전트의 제안을 승인하면 거래가 기록됩니다."
   },
   "picker": {
     "heading": "거래 선택",
@@ -1039,6 +1042,15 @@
     "incomplete": "프로필이 이 메일에서 완전한 거래를 읽지 못했습니다.",
     "totalFromPrice": "가격으로 계산한 합계",
     "dateUnknown": "메일이 도착한 날",
-    "price": "이메일의 평균 가격: 주당 {price}"
+    "price": "이메일의 평균 가격: 주당 {price}",
+    "proposalSecurity": "종목: {name}",
+    "proposalAccount": "계좌: {account}",
+    "proposalPrice": "가격: 주당 {price}",
+    "proposalCommission": "수수료: {commission}",
+    "proposalReview": "승인하기 전에는 아무것도 기록되지 않습니다.",
+    "proposalReviewLink": "받은편지함에서 검토",
+    "aiWaiting": "AI 에이전트가 아직 거래를 제안하지 않았습니다. 제안은 여기와 검토 받은편지함에 표시됩니다.",
+    "aiBooked": "AI 에이전트의 제안으로 기록됨: 위의 거래를 확인하세요.",
+    "aiNoProposal": "이 이메일에 대해 대기 중인 AI 에이전트 제안이 없습니다."
   }
 }

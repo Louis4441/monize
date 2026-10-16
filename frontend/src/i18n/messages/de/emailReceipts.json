@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Gekauft} other {Verkauft}}: {quantity} {symbol} für {total} am {date}.",
     "noTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag freigibst, oder mit einer bereits erfassten Transaktion verknüpft.",
     "candidateShares": "{quantity} Anteile",
-    "tradeNoCandidates": "Keine Investmenttransaktion dieses Kontos, dieser Richtung und dieses Kürzels innerhalb einer Woche um den Handelstag ist frei zum Verknüpfen. Wenn du den Trade selbst erfasst hast, prüfe Konto und Datum; andernfalls gib den Vorschlag im Prüfeingang frei."
+    "tradeNoCandidates": "Keine Investmenttransaktion dieses Kontos, dieser Richtung und dieses Kürzels innerhalb einer Woche um den Handelstag ist frei zum Verknüpfen. Wenn du den Trade selbst erfasst hast, prüfe Konto und Datum; andernfalls gib den Vorschlag im Prüfeingang frei.",
+    "aiTradeHeading": "Vom KI-Agenten vorgeschlagener Handel",
+    "aiTradeReader": "Keins: Der KI-Agent liest sie als Handel",
+    "noAiTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag des KI-Agenten freigibst."
   },
   "picker": {
     "heading": "Buchung auswählen",
@@ -1039,6 +1042,15 @@
     "incomplete": "Das Profil konnte aus dieser E-Mail keinen vollständigen Handel lesen.",
     "totalFromPrice": "die aus dem Preis abgeleitete Summe",
     "dateUnknown": "der Tag, an dem die E-Mail eintraf",
-    "price": "Durchschnittspreis in der E-Mail: {price} je Anteil"
+    "price": "Durchschnittspreis in der E-Mail: {price} je Anteil",
+    "proposalSecurity": "Wertpapier: {name}",
+    "proposalAccount": "Konto: {account}",
+    "proposalPrice": "Preis: {price} je Anteil",
+    "proposalCommission": "Provision: {commission}",
+    "proposalReview": "Gebucht wird erst, wenn du freigibst.",
+    "proposalReviewLink": "Im Posteingang prüfen",
+    "aiWaiting": "Der KI-Agent hat den Trade noch nicht vorgeschlagen. Sein Vorschlag erscheint hier und im Prüfungs-Posteingang.",
+    "aiBooked": "Aus dem Vorschlag des KI-Agenten gebucht: siehe die Transaktion oben.",
+    "aiNoProposal": "Für diese E-Mail wartet kein Vorschlag des KI-Agenten."
   }
 }

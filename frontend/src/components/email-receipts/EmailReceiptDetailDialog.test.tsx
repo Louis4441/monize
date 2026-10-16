@@ -440,6 +440,95 @@ describe('EmailReceiptDetailDialog', () => {
     });
   });
 
+  describe('an email the AI reads as a trade (no profile)', () => {
+    const proposal = {
+      accountName: 'CA RRSP - Brokerage',
+      date: '2026-10-15',
+      action: 'BUY' as const,
+      symbol: 'XCNS',
+      securityName: 'iShares Core Conservative Balanced ETF Portfolio',
+      quantity: 75.9878,
+      price: 26.3200145286,
+      commission: 0,
+      totalAmount: 2000,
+      currencyCode: 'CAD',
+    };
+    const aiTrade = (over = {}) =>
+      makeDetail({
+        fromAddress: 'notifications@o.wealthsimple.com',
+        status: 'review',
+        displayState: 'proposed',
+        aiReviewRequestId: 'rq-1',
+        isTrade: true,
+        tradeSource: 'ai',
+        trade: null,
+        tradeProposal: proposal,
+        ...over,
+      });
+
+    it('shows the trade the AI proposes, not a receipt, and where to approve it', async () => {
+      api.get.mockResolvedValue(aiTrade());
+      await renderDialog();
+      expect(screen.getByRole('heading', { name: 'Trade the AI agent proposes' })).toBeInTheDocument();
+      expect(screen.getByText(/Buy 75\.9878 shares of XCNS for/)).toBeInTheDocument();
+      expect(screen.getByText('Account: CA RRSP - Brokerage')).toBeInTheDocument();
+      expect(screen.getByText('Security: iShares Core Conservative Balanced ETF Portfolio')).toBeInTheDocument();
+      expect(screen.getByText(/^Price: /)).toBeInTheDocument();
+      // A zero commission is a known zero, shown as a figure.
+      expect(screen.getByText(/^Commission: /)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Review it in the inbox' })).toHaveAttribute('href', '/ai-reviews?kind=email_receipt');
+      expect(screen.getByText('None: the AI agent reads it as a trade')).toBeInTheDocument();
+      expect(screen.getByText("None yet: the trade is booked when you approve the AI agent's proposal.")).toBeInTheDocument();
+      // None of the receipt sections apply to it.
+      expect(screen.queryByText('What the profile read')).not.toBeInTheDocument();
+      expect(screen.queryByText('Nothing has been read from this email yet.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Structured data (schema.org)')).not.toBeInTheDocument();
+      expect(screen.queryByText('No transaction found')).not.toBeInTheDocument();
+    });
+
+    it('says the AI has not proposed it yet while the request waits', async () => {
+      api.get.mockResolvedValue(aiTrade({ displayState: 'pending_ai', tradeProposal: null }));
+      await renderDialog();
+      expect(screen.getByText(/The AI agent has not proposed the trade yet/)).toBeInTheDocument();
+      expect(screen.queryByText(/^Account: /)).not.toBeInTheDocument();
+    });
+
+    it('says no proposal waits once it was dismissed', async () => {
+      api.get.mockResolvedValue(aiTrade({ displayState: 'dismissed', tradeProposal: null }));
+      await renderDialog();
+      expect(screen.getByText('No proposal from the AI agent is waiting for this email.')).toBeInTheDocument();
+    });
+
+    it('shows the booked investment transaction once the proposal was approved', async () => {
+      api.get.mockResolvedValue(
+        aiTrade({
+          displayState: 'applied',
+          tradeProposal: null,
+          investmentTransaction: {
+            id: 'it-9',
+            date: '2026-10-15',
+            action: 'BUY',
+            symbol: 'XCNS',
+            quantity: 75.9878,
+            totalAmount: 2000,
+            currencyCode: 'CAD',
+          },
+        }),
+      );
+      await renderDialog();
+      expect(screen.getByText("Booked from the AI agent's proposal: see the transaction above.")).toBeInTheDocument();
+      expect(screen.getByText(/Bought 75\.9878 XCNS for/)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'View transaction' })).toHaveAttribute('href', '/investments?edit=it-9');
+    });
+
+    it('offers no bank transaction to pick, whatever its status', async () => {
+      api.get.mockResolvedValue(aiTrade({ status: 'unmatched', displayState: null, tradeProposal: null }));
+      await renderDialog();
+      expect(txApi.getAll).not.toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: 'Link to this transaction' })).not.toBeInTheDocument();
+    });
+  });
+
   it('says nothing has been read, rather than showing an empty result, when there is no parse', async () => {
     await renderDialog();
     expect(screen.getByText('Nothing has been read from this email yet.')).toBeInTheDocument();

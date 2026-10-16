@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venta}} de {quantity} {symbol} por {total} el {date}.",
     "noTradeTransaction": "Ninguna todavía: la operación se registra al aprobar su propuesta, o se vincula a una que ya esté en tu registro.",
     "candidateShares": "{quantity} acciones",
-    "tradeNoCandidates": "Ninguna transacción de inversión de esta cuenta, sentido y símbolo dentro de una semana del día de la operación está libre para vincular. Si registraste la operación tú mismo, revisa su cuenta y fecha; si no, aprueba la propuesta en la bandeja de revisión."
+    "tradeNoCandidates": "Ninguna transacción de inversión de esta cuenta, sentido y símbolo dentro de una semana del día de la operación está libre para vincular. Si registraste la operación tú mismo, revisa su cuenta y fecha; si no, aprueba la propuesta en la bandeja de revisión.",
+    "aiTradeHeading": "Operación que propone el agente de IA",
+    "aiTradeReader": "Ninguno: el agente de IA lo lee como una operación",
+    "noAiTradeTransaction": "Ninguna todavía: la operación se registra al aprobar la propuesta del agente de IA."
   },
   "picker": {
     "heading": "Elige la transacción",
@@ -1039,6 +1042,15 @@
     "incomplete": "El perfil no pudo leer una operación completa en este correo.",
     "totalFromPrice": "el total que implica el precio",
     "dateUnknown": "el día en que llegó el correo",
-    "price": "Precio medio en el correo: {price} por acción"
+    "price": "Precio medio en el correo: {price} por acción",
+    "proposalSecurity": "Valor: {name}",
+    "proposalAccount": "Cuenta: {account}",
+    "proposalPrice": "Precio: {price} por acción",
+    "proposalCommission": "Comisión: {commission}",
+    "proposalReview": "No se registra nada hasta que lo apruebes.",
+    "proposalReviewLink": "Revisarla en la bandeja",
+    "aiWaiting": "El agente de IA aún no ha propuesto la operación. Su propuesta aparecerá aquí y en la bandeja de revisión.",
+    "aiBooked": "Registrada a partir de la propuesta del agente de IA: consulta la transacción de arriba.",
+    "aiNoProposal": "No hay ninguna propuesta del agente de IA pendiente para este correo."
   }
 }

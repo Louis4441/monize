@@ -48,6 +48,27 @@ export interface EmailReceiptInvestmentSummary {
   currencyCode: string;
 }
 
+/**
+ * The investment transaction an email's open `email_trade` request proposes:
+ * the review card's own preview (the total the commit stores and the price it
+ * derives from it, INV-TRADE-001), never a figure recomputed here.
+ */
+export interface EmailReceiptTradeProposal {
+  accountName: string;
+  /** `YYYY-MM-DD`. */
+  date: string;
+  action: "BUY" | "SELL";
+  symbol: string;
+  securityName: string | null;
+  quantity: number;
+  /** Per share, in the security's currency. */
+  price: number;
+  commission: number;
+  /** In the security's currency. */
+  totalAmount: number;
+  currencyCode: string;
+}
+
 /** One stored email in the list: never its text. */
 export interface EmailReceiptListItem {
   id: string;
@@ -74,8 +95,18 @@ export interface EmailReceiptListItem {
   parserId: string | null;
   parserName: string | null;
   aiReviewRequestId: string | null;
-  /** The email was read by a trade profile: it proposes an investment transaction to create, so bank-transaction actions do not apply. */
+  /**
+   * The email is a brokerage trade confirmation (`tradeSource` says who reads
+   * it): it proposes an investment transaction to create, so bank-transaction
+   * actions do not apply.
+   */
   isTrade: boolean;
+  /**
+   * Who reads the trade: `profile` (a trade profile's reading is in `trade`),
+   * `ai` (the email stands behind an `email_trade` request with no profile
+   * reading: "Recognize as a trade"), or null for an email that is no trade.
+   */
+  tradeSource: "profile" | "ai" | null;
   displayState: EmailReceiptDisplayState | null;
   /** Why the request was closed without being applied, when it says. */
   requestNote: string | null;
@@ -114,6 +145,11 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
    * transaction, so `parsed` and `candidates` are empty for it.
    */
   trade: Record<string, unknown> | null;
+  /**
+   * What the email's `email_trade` request proposes while that proposal waits
+   * for approval (not expired); null otherwise, and for every other email.
+   */
+  tradeProposal: EmailReceiptTradeProposal | null;
   candidates: EmailReceiptCandidateSummary[];
 }
 

@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Achat} other {Vente}} de {quantity} {symbol} pour {total} le {date}.",
     "noTradeTransaction": "Aucune pour l'instant : l'opération est enregistrée quand vous approuvez sa proposition, ou liée à une opération déjà présente dans votre registre.",
     "candidateShares": "{quantity} actions",
-    "tradeNoCandidates": "Aucune opération de placement de ce compte, de ce sens et de ce symbole à moins d'une semaine du jour de l'opération n'est libre à lier. Si vous avez saisi l'opération vous-même, vérifiez son compte et sa date ; sinon, approuvez la proposition dans la boîte de révision."
+    "tradeNoCandidates": "Aucune opération de placement de ce compte, de ce sens et de ce symbole à moins d'une semaine du jour de l'opération n'est libre à lier. Si vous avez saisi l'opération vous-même, vérifiez son compte et sa date ; sinon, approuvez la proposition dans la boîte de révision.",
+    "aiTradeHeading": "Opération proposée par l'agent IA",
+    "aiTradeReader": "Aucun : l'agent IA la lit comme une opération",
+    "noAiTradeTransaction": "Aucune pour l'instant : l'opération est enregistrée quand vous approuvez la proposition de l'agent IA."
   },
   "picker": {
     "heading": "Choisir la transaction",
@@ -1039,6 +1042,15 @@
     "incomplete": "Le profil n'a pas pu lire une opération complète dans cet e-mail.",
     "totalFromPrice": "le total déduit du prix",
     "dateUnknown": "jour de réception de l'e-mail",
-    "price": "Prix moyen dans le courriel : {price} par action"
+    "price": "Prix moyen dans le courriel : {price} par action",
+    "proposalSecurity": "Titre : {name}",
+    "proposalAccount": "Compte : {account}",
+    "proposalPrice": "Prix : {price} par action",
+    "proposalCommission": "Commission : {commission}",
+    "proposalReview": "Rien n'est enregistré avant votre approbation.",
+    "proposalReviewLink": "La vérifier dans la boîte de réception",
+    "aiWaiting": "L'agent IA n'a pas encore proposé l'opération. Sa proposition apparaîtra ici et dans la boîte de réception des vérifications.",
+    "aiBooked": "Enregistrée à partir de la proposition de l'agent IA : voir l'opération ci-dessus.",
+    "aiNoProposal": "Aucune proposition de l'agent IA n'attend pour ce courriel."
   }
 }

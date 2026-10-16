@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Đã mua} other {Đã bán}} {quantity} {symbol} với giá {total} vào {date}.",
     "noTradeTransaction": "Chưa có: giao dịch được ghi khi bạn duyệt đề xuất, hoặc được liên kết với giao dịch đã có trong sổ cái.",
     "candidateShares": "{quantity} cổ phiếu",
-    "tradeNoCandidates": "Không có giao dịch đầu tư nào của tài khoản, chiều và mã này trong vòng một tuần quanh ngày giao dịch còn trống để liên kết. Nếu bạn tự nhập giao dịch, hãy kiểm tra tài khoản và ngày; nếu không, hãy duyệt đề xuất trong hộp thư xem xét."
+    "tradeNoCandidates": "Không có giao dịch đầu tư nào của tài khoản, chiều và mã này trong vòng một tuần quanh ngày giao dịch còn trống để liên kết. Nếu bạn tự nhập giao dịch, hãy kiểm tra tài khoản và ngày; nếu không, hãy duyệt đề xuất trong hộp thư xem xét.",
+    "aiTradeHeading": "Giao dịch do tác tử AI đề xuất",
+    "aiTradeReader": "Không có: tác tử AI đọc email này như một giao dịch",
+    "noAiTradeTransaction": "Chưa có: giao dịch được ghi sổ khi bạn duyệt đề xuất của tác tử AI."
   },
   "picker": {
     "heading": "Chọn giao dịch",
@@ -1039,6 +1042,15 @@
     "incomplete": "Trình phân tích không đọc được một giao dịch đầy đủ từ email này.",
     "totalFromPrice": "tổng suy ra từ giá",
     "dateUnknown": "ngày email đến",
-    "price": "Giá trung bình trong email: {price} mỗi cổ phiếu"
+    "price": "Giá trung bình trong email: {price} mỗi cổ phiếu",
+    "proposalSecurity": "Chứng khoán: {name}",
+    "proposalAccount": "Tài khoản: {account}",
+    "proposalPrice": "Giá: {price} mỗi cổ phiếu",
+    "proposalCommission": "Phí: {commission}",
+    "proposalReview": "Chưa có gì được ghi sổ cho đến khi bạn duyệt.",
+    "proposalReviewLink": "Xem lại trong hộp thư",
+    "aiWaiting": "Tác tử AI chưa đề xuất giao dịch. Đề xuất sẽ hiện ở đây và trong hộp thư xét duyệt.",
+    "aiBooked": "Đã ghi sổ từ đề xuất của tác tử AI: xem giao dịch ở trên.",
+    "aiNoProposal": "Không có đề xuất nào của tác tử AI đang chờ cho email này."
   }
 }

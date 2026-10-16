@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venda}} de {quantity} {symbol} por {total} em {date}.",
     "noTradeTransaction": "Nenhuma ainda: a operação é lançada quando você aprovar a proposta, ou vinculada a uma que já esteja no seu registro.",
     "candidateShares": "{quantity} ações",
-    "tradeNoCandidates": "Nenhuma transação de investimento desta conta, sentido e código dentro de uma semana do dia da operação está livre para vincular. Se você lançou a operação, confira a conta e a data; caso contrário, aprove a proposta na caixa de revisão."
+    "tradeNoCandidates": "Nenhuma transação de investimento desta conta, sentido e código dentro de uma semana do dia da operação está livre para vincular. Se você lançou a operação, confira a conta e a data; caso contrário, aprove a proposta na caixa de revisão.",
+    "aiTradeHeading": "Operação proposta pelo agente de IA",
+    "aiTradeReader": "Nenhum: o agente de IA lê como uma operação",
+    "noAiTradeTransaction": "Nenhuma ainda: a operação é registrada quando você aprova a proposta do agente de IA."
   },
   "picker": {
     "heading": "Escolha a transação",
@@ -1039,6 +1042,15 @@
     "incomplete": "O analisador não conseguiu ler uma negociação completa neste e-mail.",
     "totalFromPrice": "o total implícito no preço",
     "dateUnknown": "o dia em que o e-mail chegou",
-    "price": "Preço médio no e-mail: {price} por ação"
+    "price": "Preço médio no e-mail: {price} por ação",
+    "proposalSecurity": "Ativo: {name}",
+    "proposalAccount": "Conta: {account}",
+    "proposalPrice": "Preço: {price} por ação",
+    "proposalCommission": "Corretagem: {commission}",
+    "proposalReview": "Nada é registrado até você aprovar.",
+    "proposalReviewLink": "Revisar na caixa de entrada",
+    "aiWaiting": "O agente de IA ainda não propôs a operação. A proposta aparece aqui e na caixa de revisão.",
+    "aiBooked": "Registrada a partir da proposta do agente de IA: veja a transação acima.",
+    "aiNoProposal": "Nenhuma proposta do agente de IA está aguardando este e-mail."
   }
 }

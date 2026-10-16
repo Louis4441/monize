@@ -28,6 +28,7 @@ import {
   EMAIL_RECEIPTS_MAX_LIST_LIMIT,
 } from "./dto/email-receipts.dto";
 import { describeFailure } from "../pipeline/receipt-failure";
+import { readTradeProposal } from "./email-receipt-trade-proposal";
 import type {
   EmailReceiptCandidateSummary,
   EmailReceiptDetail,
@@ -127,6 +128,7 @@ interface ItemRow {
   parser_name: string | null;
   ai_review_request_id: string | null;
   is_trade?: boolean;
+  trade_source?: "profile" | "ai" | null;
   request_status: string | null;
   request_expired: boolean | null;
   request_note: string | null;
@@ -149,13 +151,18 @@ interface DetailRow extends ItemRow {
   body_html: string | null;
   parsed: Record<string, unknown> | null;
   trade: Record<string, unknown> | null;
+  trade_proposal: unknown;
   candidate_transaction_ids: string[];
 }
 
 const ITEM_COLUMNS = `r.id, r.from_address, r.from_domain, r.subject, r.received_at,
        r.forwarded_by, r.original_sent_at, r.created_at, r.status, r.status_reason, r.match_kind, r.parser_id,
        p.name AS parser_name, r.ai_review_request_id,
-       (r.trade IS NOT NULL) AS is_trade,
+       -- A trade is read by a trade profile (its reading in r.trade) or, with
+       -- none, by the AI the email's email_trade request hands it to.
+       (r.trade IS NOT NULL OR rq.kind = 'email_trade') AS is_trade,
+       CASE WHEN r.trade IS NOT NULL THEN 'profile'
+            WHEN rq.kind = 'email_trade' THEN 'ai' END AS trade_source,
        rq.status AS request_status,
        (rq.expires_at <= CURRENT_TIMESTAMP) AS request_expired,
        rq.proposal #>> '{agentNote,reason}' AS request_note,
@@ -201,6 +208,7 @@ function toListItem(row: ItemRow): EmailReceiptListItem {
     parserName: row.parser_name,
     aiReviewRequestId: row.ai_review_request_id,
     isTrade: row.is_trade === true,
+    tradeSource: row.trade_source ?? null,
     displayState: deriveDisplayState(
       row.status,
       row.request_status === null
@@ -831,7 +839,11 @@ export class EmailReceiptsService {
     const rows = returnedRows<DetailRow>(
       await m.query(
         `SELECT ${ITEM_COLUMNS},
-                r.body_text, r.body_html, r.parsed, r.trade, r.candidate_transaction_ids
+                r.body_text, r.body_html, r.parsed, r.trade, r.candidate_transaction_ids,
+                CASE WHEN rq.kind = 'email_trade'
+                      AND rq.status = 'proposed'
+                      AND rq.expires_at > CURRENT_TIMESTAMP
+                     THEN rq.proposal END AS trade_proposal
            ${ITEM_JOINS}
           WHERE r.user_id = $1
             AND r.id = $2`,
@@ -854,6 +866,7 @@ export class EmailReceiptsService {
         structured === null ? null : orderFromStructuredData(structured),
       parsed: row.parsed,
       trade: row.trade ?? null,
+      tradeProposal: readTradeProposal(row.trade_proposal),
       candidates: row.trade
         ? await this.tradeLinks.candidates(
             m,

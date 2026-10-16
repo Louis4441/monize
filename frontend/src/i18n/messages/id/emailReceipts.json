@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Membeli} other {Menjual}} {quantity} {symbol} seharga {total} pada {date}.",
     "noTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulannya, atau ditautkan ke transaksi yang sudah ada di buku besar Anda.",
     "candidateShares": "{quantity} saham",
-    "tradeNoCandidates": "Tidak ada transaksi investasi dengan akun, arah, dan kode ini dalam seminggu dari hari transaksi yang bebas untuk ditautkan. Jika Anda mencatatnya sendiri, periksa akun dan tanggalnya; jika tidak, setujui usulannya di kotak tinjauan."
+    "tradeNoCandidates": "Tidak ada transaksi investasi dengan akun, arah, dan kode ini dalam seminggu dari hari transaksi yang bebas untuk ditautkan. Jika Anda mencatatnya sendiri, periksa akun dan tanggalnya; jika tidak, setujui usulannya di kotak tinjauan.",
+    "aiTradeHeading": "Transaksi yang diusulkan agen AI",
+    "aiTradeReader": "Tidak ada: agen AI membacanya sebagai transaksi",
+    "noAiTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulan agen AI."
   },
   "picker": {
     "heading": "Pilih transaksi",
@@ -1039,6 +1042,15 @@
     "incomplete": "Profil tidak dapat membaca perdagangan yang lengkap dari surel ini.",
     "totalFromPrice": "total yang tersirat dari harga",
     "dateUnknown": "hari surel diterima",
-    "price": "Harga rata-rata di email: {price} per saham"
+    "price": "Harga rata-rata di email: {price} per saham",
+    "proposalSecurity": "Efek: {name}",
+    "proposalAccount": "Akun: {account}",
+    "proposalPrice": "Harga: {price} per saham",
+    "proposalCommission": "Komisi: {commission}",
+    "proposalReview": "Tidak ada yang dicatat sebelum Anda menyetujuinya.",
+    "proposalReviewLink": "Tinjau di kotak masuk",
+    "aiWaiting": "Agen AI belum mengusulkan transaksi ini. Usulannya akan muncul di sini dan di kotak masuk tinjauan.",
+    "aiBooked": "Dicatat dari usulan agen AI: lihat transaksi di atas.",
+    "aiNoProposal": "Tidak ada usulan agen AI yang menunggu untuk email ini."
   }
 }

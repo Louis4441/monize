@@ -146,6 +146,21 @@ describe("EmailReceiptsService.list", () => {
     });
   });
 
+  it("marks an email the AI reads as a trade, with no profile reading, as a trade", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([
+      row({ is_trade: true, trade_source: "ai", parser_id: null }),
+    ]);
+    const [item] = await service.list(USER, {});
+    const [sql] = manager.query.mock.calls[0];
+    // The request kind, not only a profile's reading, makes it a trade.
+    expect(sql).toContain(
+      "(r.trade IS NOT NULL OR rq.kind = 'email_trade') AS is_trade",
+    );
+    expect(sql).toContain("WHEN rq.kind = 'email_trade' THEN 'ai'");
+    expect(item).toMatchObject({ isTrade: true, tradeSource: "ai" });
+  });
+
   it("lists newest first without the text, deriving the state and the transaction", async () => {
     const { service, manager } = setup();
     manager.query.mockResolvedValue([
@@ -189,6 +204,7 @@ describe("EmailReceiptsService.list", () => {
       parserName: "Shop",
       aiReviewRequestId: "rq1",
       isTrade: false,
+      tradeSource: null,
       displayState: "proposed",
       requestNote: null,
       transaction: {
@@ -539,6 +555,70 @@ describe("EmailReceiptsService.get", () => {
     expect(detail.trade).toEqual({ symbol: "XCNS", quantity: 75.9878 });
     expect(detail.parsed).toBeNull();
     expect(detail.candidates).toEqual([]);
+  });
+
+  it("returns the trade an open email_trade proposal holds, from the card's preview", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValueOnce([
+      {
+        ...row({ status: "review", is_trade: true, trade_source: "ai" }),
+        body_text: "Symbol: XCNS",
+        body_html: null,
+        parsed: null,
+        trade: null,
+        trade_proposal: {
+          trade: { symbol: "XCNS" },
+          action: {
+            preview: {
+              accountName: "CA RRSP - Brokerage",
+              transactionDate: "2026-10-15",
+              investmentAction: "BUY",
+              symbol: "XCNS",
+              securityName: "iShares Core Conservative Balanced ETF Portfolio",
+              securityCurrency: "CAD",
+              quantity: 75.9878,
+              price: 26.3200145286,
+              commission: 0,
+              totalAmount: 2000,
+            },
+          },
+          proposedAt: "2026-10-16T02:00:00.000Z",
+        },
+        candidate_transaction_ids: [],
+      },
+    ]);
+    const detail = await service.get(USER, ID);
+    const [sql] = manager.query.mock.calls[0];
+    // Only a proposal still waiting for approval is shown as the email's trade.
+    expect(sql).toContain("AND rq.status = 'proposed'");
+    expect(sql).toContain("AND rq.expires_at > CURRENT_TIMESTAMP");
+    expect(detail.tradeProposal).toEqual({
+      accountName: "CA RRSP - Brokerage",
+      date: "2026-10-15",
+      action: "BUY",
+      symbol: "XCNS",
+      securityName: "iShares Core Conservative Balanced ETF Portfolio",
+      quantity: 75.9878,
+      price: 26.3200145286,
+      commission: 0,
+      totalAmount: 2000,
+      currencyCode: "CAD",
+    });
+  });
+
+  it("has no tradeProposal when the email's request holds none", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValueOnce([
+      {
+        ...row(),
+        body_text: "x",
+        body_html: null,
+        parsed: null,
+        trade_proposal: null,
+        candidate_transaction_ids: [],
+      },
+    ]);
+    expect((await service.get(USER, ID)).tradeProposal).toBeNull();
   });
 
   it("has no bodyHtml for an email with no HTML part", async () => {

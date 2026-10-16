@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{date} tarihinde {total} karşılığında {quantity} {symbol} {action, select, BUY {alındı} other {satıldı}}.",
     "noTradeTransaction": "Henüz yok: işlem, önerisini onayladığınızda kaydedilir ya da defterinizde zaten olan bir işleme bağlanır.",
     "candidateShares": "{quantity} pay",
-    "tradeNoCandidates": "İşlem gününden bir hafta içinde bu hesap, yön ve sembole ait bağlanabilecek bir yatırım işlemi yok. İşlemi kendiniz girdiyseniz hesabını ve tarihini kontrol edin; aksi halde öneriyi inceleme kutusunda onaylayın."
+    "tradeNoCandidates": "İşlem gününden bir hafta içinde bu hesap, yön ve sembole ait bağlanabilecek bir yatırım işlemi yok. İşlemi kendiniz girdiyseniz hesabını ve tarihini kontrol edin; aksi halde öneriyi inceleme kutusunda onaylayın.",
+    "aiTradeHeading": "Yapay zekâ ajanının önerdiği işlem",
+    "aiTradeReader": "Yok: yapay zekâ ajanı bunu bir işlem olarak okuyor",
+    "noAiTradeTransaction": "Henüz yok: yapay zekâ ajanının önerisini onayladığınızda işlem kaydedilir."
   },
   "picker": {
     "heading": "İşlemi seçin",
@@ -1039,6 +1042,15 @@
     "incomplete": "Ayrıştırıcı bu e-postadan tam bir işlem okuyamadı.",
     "totalFromPrice": "fiyattan çıkan toplam",
     "dateUnknown": "e-postanın geldiği gün",
-    "price": "E-postadaki ortalama fiyat: pay başına {price}"
+    "price": "E-postadaki ortalama fiyat: pay başına {price}",
+    "proposalSecurity": "Menkul kıymet: {name}",
+    "proposalAccount": "Hesap: {account}",
+    "proposalPrice": "Fiyat: hisse başına {price}",
+    "proposalCommission": "Komisyon: {commission}",
+    "proposalReview": "Siz onaylayana kadar hiçbir şey kaydedilmez.",
+    "proposalReviewLink": "Gelen kutusunda inceleyin",
+    "aiWaiting": "Yapay zekâ ajanı işlemi henüz önermedi. Önerisi burada ve inceleme gelen kutusunda görünür.",
+    "aiBooked": "Yapay zekâ ajanının önerisinden kaydedildi: yukarıdaki işleme bakın.",
+    "aiNoProposal": "Bu e-posta için bekleyen bir yapay zekâ ajanı önerisi yok."
   }
 }

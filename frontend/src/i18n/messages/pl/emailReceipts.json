@@ -711,7 +711,10 @@
     "tradeTransactionSummary": "{action, select, BUY {Kupiono} other {Sprzedano}} {quantity} {symbol} za {total} dnia {date}.",
     "noTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji albo połączona z już istniejącą w księdze.",
     "candidateShares": "{quantity} akcji",
-    "tradeNoCandidates": "Żadna transakcja inwestycyjna z tego konta, w tym kierunku i z tym symbolem, w ciągu tygodnia od dnia transakcji, nie jest wolna do połączenia. Jeśli wprowadziłeś ją sam, sprawdź konto i datę; w przeciwnym razie zatwierdź propozycję w skrzynce przeglądu."
+    "tradeNoCandidates": "Żadna transakcja inwestycyjna z tego konta, w tym kierunku i z tym symbolem, w ciągu tygodnia od dnia transakcji, nie jest wolna do połączenia. Jeśli wprowadziłeś ją sam, sprawdź konto i datę; w przeciwnym razie zatwierdź propozycję w skrzynce przeglądu.",
+    "aiTradeHeading": "Transakcja proponowana przez agenta AI",
+    "aiTradeReader": "Brak: agent AI odczytuje ją jako transakcję",
+    "noAiTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji agenta AI."
   },
   "picker": {
     "heading": "Wybierz transakcję",
@@ -1039,6 +1042,15 @@
     "incomplete": "Parser nie odczytał z tej wiadomości kompletnej transakcji.",
     "totalFromPrice": "suma wynikająca z ceny",
     "dateUnknown": "dzień otrzymania wiadomości",
-    "price": "Średnia cena w e-mailu: {price} za akcję"
+    "price": "Średnia cena w e-mailu: {price} za akcję",
+    "proposalSecurity": "Papier wartościowy: {name}",
+    "proposalAccount": "Konto: {account}",
+    "proposalPrice": "Cena: {price} za akcję",
+    "proposalCommission": "Prowizja: {commission}",
+    "proposalReview": "Nic nie zostanie zaksięgowane, dopóki tego nie zatwierdzisz.",
+    "proposalReviewLink": "Sprawdź w skrzynce",
+    "aiWaiting": "Agent AI nie zaproponował jeszcze transakcji. Propozycja pojawi się tutaj i w skrzynce do przeglądu.",
+    "aiBooked": "Zaksięgowano na podstawie propozycji agenta AI: zobacz transakcję powyżej.",
+    "aiNoProposal": "Dla tej wiadomości nie czeka żadna propozycja agenta AI."
   }
 }

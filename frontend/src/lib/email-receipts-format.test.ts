@@ -286,4 +286,9 @@ describe('canLinkTradeEmail', () => {
     // A reading with no account has no candidates to offer.
     expect(canLinkTradeEmail(trade({ status: 'parse_failed', statusReason: 'trade_no_account', displayState: null }))).toBe(false);
   });
+
+  it('is false for an email the AI reads as a trade: its candidates come from a profile\'s reading', () => {
+    expect(canLinkTradeEmail(trade({ tradeSource: 'ai' }))).toBe(false);
+    expect(canLinkTradeEmail(trade({ tradeSource: 'profile' }))).toBe(true);
+  });
 });

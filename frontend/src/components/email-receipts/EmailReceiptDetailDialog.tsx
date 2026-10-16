@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { EmailBodyView } from '@/components/email-receipts/EmailBodyView';
+import { TradeProposalView } from '@/components/email-receipts/TradeProposalView';
 import { TradeReadingView } from '@/components/email-receipts/TradeReadingView';
 import { ParsedReceiptView } from '@/components/email-receipts/ParsedReceiptView';
 import { ReceiptTransactionPicker } from '@/components/email-receipts/ReceiptTransactionPicker';
@@ -124,14 +125,18 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     const { detail } = state;
     const parsed = readParsedReceipt(detail.parsed);
     const trade = readParsedTrade(detail.trade);
+    // A trade email: a trade profile read it (`trade`), or it was handed to the AI
+    // as a trade. Either way it books an investment transaction, never a bank one.
+    const isTradeEmail = detail.isTrade || trade !== null;
+    const readByAi = isTradeEmail && trade === null;
     // A trade email is linked to the investment transaction it reports, even once it was
     // closed as already booked (that is when linking marks its scheduled bill paid), but
     // only once: an email linked or booked already accounts for its row.
-    const tradeLinkable = trade !== null && canLinkTradeEmail(detail);
-    const canLink = detail.candidates.length > 0 && (trade !== null ? tradeLinkable : isReceiptActionable(detail));
+    const tradeLinkable = isTradeEmail && canLinkTradeEmail(detail);
+    const canLink = detail.candidates.length > 0 && (isTradeEmail ? tradeLinkable : isReceiptActionable(detail));
     const booked = detail.investmentTransaction ?? null;
     // An email the matcher could not tie to a transaction can be tied by hand.
-    const canPick = trade === null && PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);
+    const canPick = !isTradeEmail && PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);
     const reasonKey = detail.statusReason ? `reasons.${detail.statusReason}` : null;
 
     body = (
@@ -170,7 +175,8 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
           <div>
             <dt className="text-gray-500 dark:text-gray-400">{t('parser')}</dt>
             <dd className="text-gray-900 dark:text-gray-100">
-              {detail.parserName ?? (parsed?.source === 'schema_org' ? t('structuredSource') : t('noParser'))}
+              {detail.parserName ??
+                (readByAi ? t('aiTradeReader') : parsed?.source === 'schema_org' ? t('structuredSource') : t('noParser'))}
             </dd>
           </div>
           {detail.matchKind && (
@@ -182,7 +188,7 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
           <div className="min-w-0">
             <dt className="text-gray-500 dark:text-gray-400">{t('transaction')}</dt>
             <dd className="text-gray-900 dark:text-gray-100">
-              {trade !== null ? (
+              {isTradeEmail ? (
                 booked ? (
                   <>
                     {t('tradeTransactionSummary', {
@@ -200,7 +206,9 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
                     </Link>
                   </>
                 ) : (
-                  <span className="text-gray-500 dark:text-gray-400">{t('noTradeTransaction')}</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {readByAi ? t('noAiTradeTransaction') : t('noTradeTransaction')}
+                  </span>
                 )
               ) : detail.transaction ? (
                 <>
@@ -238,12 +246,20 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
           </div>
         )}
 
-        {trade ? (
+        {isTradeEmail ? (
           <section aria-labelledby="receipt-trade-heading" className="space-y-2">
             <h3 id="receipt-trade-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {t('tradeHeading')}
+              {trade ? t('tradeHeading') : t('aiTradeHeading')}
             </h3>
-            <TradeReadingView trade={trade} fallbackDate={detail.effectiveDate} />
+            {trade ? (
+              <TradeReadingView trade={trade} fallbackDate={detail.effectiveDate} />
+            ) : (
+              <TradeProposalView
+                proposal={detail.tradeProposal ?? null}
+                booked={booked !== null}
+                displayState={detail.displayState}
+              />
+            )}
           </section>
         ) : (
           <>
@@ -271,9 +287,11 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
         {detail.candidates.length > 0 && (
           <section aria-labelledby="receipt-candidates-heading" className="space-y-2">
             <h3 id="receipt-candidates-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {trade ? t('tradeCandidatesHeading') : t('candidatesHeading')}
+              {isTradeEmail ? t('tradeCandidatesHeading') : t('candidatesHeading')}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{trade ? t('tradeCandidatesHelp') : t('candidatesHelp')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {isTradeEmail ? t('tradeCandidatesHelp') : t('candidatesHelp')}
+            </p>
             <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
               {detail.candidates.map((candidate) => (
                 <li key={candidate.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
