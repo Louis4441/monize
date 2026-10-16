@@ -322,6 +322,9 @@ export const manageSecuritiesOutput = manageToolOutput({
   exchange: strNull.optional(),
   currencyCode: str.optional(),
   isFavourite: bool.optional(),
+  // list: the account queried and the securities held in it.
+  account: str.optional(),
+  securities: rows().optional(),
 });
 
 /**

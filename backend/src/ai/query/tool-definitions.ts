@@ -729,14 +729,19 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "manage_securities",
     description:
-      "Create, edit, or delete the user's securities (stocks, ETFs, mutual funds). This does NOT change anything immediately: it shows the user one or more confirmation cards they must explicitly approve before anything is saved. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). create: { query, exchange?, securityType?, isFavourite?, currencyCode? } -- the security is looked up and validated by ticker/name against the user's configured price provider, which fills the official symbol/name/exchange/type/currency (do not invent them); pass exchange only to disambiguate a dual-listed ticker. update: { symbol, securityType?, exchange?, isFavourite?, currencyCode?, countryWeightings?, assetWeightings? } -- symbol identifies an existing security (ticker or name); provide the classification/display fields to change. countryWeightings sets a manual country (geographic) allocation for an ETF/fund as an array of { name, weight } where weight is a PERCENTAGE (0-100); the entries need not add to 100 -- the remainder is treated as 'Other'. Prefer the canonical country names listed in the countryWeightings schema below and map pasted variants to them (e.g. 'USA' -> 'United States'). assetWeightings sets a manual asset-class allocation the same way, but its names are free text (e.g. 'Equity', 'Fixed Income', 'Cash') -- reuse the spelling the user already uses on their other securities where one fits. delete: { symbol } -- fails if the security still has holdings or investment transactions. Only ever pass exchange/securityType values from the enumerated lists below. approvalMode = 'bulk' (default) one card for all; 'individual' one card per item. After calling, briefly tell the user to review and approve the card(s); never claim the change was made.",
+      "List, create, edit, or delete the user's securities (stocks, ETFs, mutual funds). operation = 'list' is read-only and takes { accountName } (name or id; a base name like 'RRSP' resolves to its brokerage) instead of items: it returns the securities currently held in that account. The other operations do NOT change anything immediately: they show the user one or more confirmation cards they must explicitly approve before anything is saved. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). create: { query, exchange?, securityType?, isFavourite?, currencyCode? } -- the security is looked up and validated by ticker/name against the user's configured price provider, which fills the official symbol/name/exchange/type/currency (do not invent them); pass exchange only to disambiguate a dual-listed ticker. update: { symbol, securityType?, exchange?, isFavourite?, currencyCode?, countryWeightings?, assetWeightings? } -- symbol identifies an existing security (ticker or name); provide the classification/display fields to change. countryWeightings sets a manual country (geographic) allocation for an ETF/fund as an array of { name, weight } where weight is a PERCENTAGE (0-100); the entries need not add to 100 -- the remainder is treated as 'Other'. Prefer the canonical country names listed in the countryWeightings schema below and map pasted variants to them (e.g. 'USA' -> 'United States'). assetWeightings sets a manual asset-class allocation the same way, but its names are free text (e.g. 'Equity', 'Fixed Income', 'Cash') -- reuse the spelling the user already uses on their other securities where one fits. delete: { symbol } -- fails if the security still has holdings or investment transactions. Only ever pass exchange/securityType values from the enumerated lists below. approvalMode = 'bulk' (default) one card for all; 'individual' one card per item. After calling, briefly tell the user to review and approve the card(s); never claim the change was made.",
     inputSchema: {
       type: "object",
       properties: {
         operation: {
           type: "string",
-          enum: ["create", "update", "delete"],
-          description: "The operation to perform on every item.",
+          enum: ["list", "create", "update", "delete"],
+          description:
+            "list: the securities held in accountName. create/update/delete: applied to every item.",
+        },
+        accountName: {
+          type: "string",
+          description: "list only: the account, by name or id.",
         },
         items: {
           type: "array",
@@ -827,7 +832,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
             "How multi-item batches are approved: 'bulk' (default) one card for all; 'individual' one card per item. Ignored for a single item.",
         },
       },
-      required: ["operation", "items"],
+      required: ["operation"],
     },
   },
   {

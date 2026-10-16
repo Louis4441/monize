@@ -50,6 +50,7 @@ describe("McpInvestmentsTools", () => {
     securitiesService = {
       previewCreateSecurity: jest.fn(),
       lookupSecuritiesForLlm: jest.fn(),
+      listSecuritiesInAccount: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       remove: jest.fn().mockResolvedValue(undefined),
@@ -66,6 +67,7 @@ describe("McpInvestmentsTools", () => {
 
     accountsService = {
       resolveByName: jest.fn(),
+      resolveBrokerageByNameOrId: jest.fn(),
       // Default: no name filter resolves to "all accounts"; tests that pass
       // accountNames override this with resolved ids or an error.
       resolveAccountFilter: jest
@@ -565,6 +567,126 @@ describe("McpInvestmentsTools", () => {
         symbol: "AAPL",
         name: "Apple Inc.",
       });
+    });
+
+    describe("list", () => {
+      const held = {
+        symbol: "XCNS",
+        name: "iShares Core Conservative Balanced ETF Portfolio",
+        securityType: "ETF",
+        exchange: "TSX",
+        currencyCode: "CAD",
+        isFavourite: false,
+        quantity: 3728.63344325,
+        averageCost: 25.5808,
+      };
+
+      it("lists the securities held in the account with only the read scope", async () => {
+        ctx.setUser({ userId: "u1", scopes: "read" });
+        accountsService.resolveBrokerageByNameOrId.mockResolvedValue({
+          match: {
+            id: "acc-1",
+            name: "CA RRSP - Brokerage",
+            currencyCode: "CAD",
+          },
+          candidates: [],
+        });
+        securitiesService.listSecuritiesInAccount.mockResolvedValue([held]);
+
+        const result = await handlers["manage_securities"](
+          { operation: "list", accountName: "CA RRSP" },
+          ctx,
+        );
+
+        expect(accountsService.resolveBrokerageByNameOrId).toHaveBeenCalledWith(
+          "u1",
+          "CA RRSP",
+        );
+        expect(securitiesService.listSecuritiesInAccount).toHaveBeenCalledWith(
+          "u1",
+          "acc-1",
+        );
+        expect(result.structuredContent).toMatchObject({
+          operation: "list",
+          account: "CA RRSP - Brokerage",
+          count: 1,
+          securities: [held],
+        });
+      });
+
+      it("accepts the schema with an empty items array", () => {
+        expect(
+          configs["manage_securities"].inputSchema.safeParse({
+            operation: "list",
+            accountName: "CA RRSP",
+            items: [],
+          }).success,
+        ).toBe(true);
+      });
+
+      it("accepts blank optional fields a form client sends", () => {
+        expect(
+          configs["manage_securities"].inputSchema.safeParse({
+            operation: "list",
+            accountName: "CA RRSP",
+            items: [],
+            approvalMode: "",
+          }).success,
+        ).toBe(true);
+      });
+
+      it("errors without an accountName", async () => {
+        ctx.setUser({ userId: "u1", scopes: "read" });
+        const result = await handlers["manage_securities"](
+          { operation: "list" },
+          ctx,
+        );
+        expect(result.isError).toBe(true);
+        expect(
+          securitiesService.listSecuritiesInAccount,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("errors on an unknown account", async () => {
+        ctx.setUser({ userId: "u1", scopes: "read" });
+        accountsService.resolveBrokerageByNameOrId.mockResolvedValue({
+          match: undefined,
+          candidates: [],
+        });
+        const result = await handlers["manage_securities"](
+          { operation: "list", accountName: "Nope" },
+          ctx,
+        );
+        expect(result.isError).toBe(true);
+        expect(
+          securitiesService.listSecuritiesInAccount,
+        ).not.toHaveBeenCalled();
+      });
+
+      it("errors on an ambiguous account naming the candidates", async () => {
+        ctx.setUser({ userId: "u1", scopes: "read" });
+        accountsService.resolveBrokerageByNameOrId.mockResolvedValue({
+          match: undefined,
+          candidates: [
+            { id: "a", name: "RRSP - Brokerage" },
+            { id: "b", name: "RRSP - Brokerage" },
+          ],
+        });
+        const result = await handlers["manage_securities"](
+          { operation: "list", accountName: "RRSP" },
+          ctx,
+        );
+        expect(result.isError).toBe(true);
+      });
+    });
+
+    it("requires items for a write operation", async () => {
+      ctx.setUser({ userId: "u1", scopes: "write" });
+      const result = await handlers["manage_securities"](
+        { operation: "create" },
+        ctx,
+      );
+      expect(result.isError).toBe(true);
     });
 
     it("returns error when no user context", async () => {

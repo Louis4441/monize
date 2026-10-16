@@ -454,7 +454,9 @@ export const lookupSecuritiesSchema = z.object({
 });
 
 export const manageSecuritiesSchema = z.object({
-  operation: z.enum(["create", "update", "delete"]),
+  operation: z.enum(["list", "create", "update", "delete"]),
+  // list only: the account whose held securities to list.
+  accountName: z.string().max(100).optional(),
   items: z
     .array(
       z.object({
@@ -494,8 +496,8 @@ export const manageSecuritiesSchema = z.object({
           .optional(),
       }),
     )
-    .min(1)
-    .max(MAX_BULK_ACTION_ROWS),
+    .max(MAX_BULK_ACTION_ROWS)
+    .optional(),
   approvalMode: z.enum(["bulk", "individual"]).optional(),
 });
 

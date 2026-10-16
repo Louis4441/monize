@@ -4764,6 +4764,63 @@ describe("AccountsService", () => {
     });
   });
 
+  describe("resolveBrokerageByNameOrId", () => {
+    const id = "6b82a102-fe13-44b9-b5d8-5f2158d808c4";
+    const accounts = [
+      {
+        id,
+        name: "CA RRSP - Cash",
+        currencyCode: "CAD",
+        accountType: AccountType.INVESTMENT,
+        accountSubType: AccountSubType.INVESTMENT_CASH,
+      },
+      {
+        id: "d87d2a5d-92e4-409f-a8ee-8b6d138068df",
+        name: "CA RRSP - Brokerage",
+        currencyCode: "CAD",
+        accountType: AccountType.INVESTMENT,
+        accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+      },
+    ];
+
+    it("resolves a UUID to the user's open account, case-insensitively", async () => {
+      jest.spyOn(service, "findAll").mockResolvedValue(accounts as never);
+
+      const result = await service.resolveBrokerageByNameOrId(
+        "user-1",
+        ` ${id.toUpperCase()} `,
+      );
+
+      expect(result.match).toEqual({
+        id,
+        name: "CA RRSP - Cash",
+        currencyCode: "CAD",
+      });
+    });
+
+    it("does not resolve a UUID that is not one of the user's open accounts", async () => {
+      jest.spyOn(service, "findAll").mockResolvedValue(accounts as never);
+
+      const result = await service.resolveBrokerageByNameOrId(
+        "user-1",
+        "11111111-1111-4111-8111-111111111111",
+      );
+
+      expect(result.match).toBeUndefined();
+    });
+
+    it("resolves a base name to its brokerage like resolveBrokerageByName", async () => {
+      jest.spyOn(service, "findAll").mockResolvedValue(accounts as never);
+
+      const result = await service.resolveBrokerageByNameOrId(
+        "user-1",
+        "CA RRSP",
+      );
+
+      expect(result.match?.name).toBe("CA RRSP - Brokerage");
+    });
+  });
+
   describe("resolveBrokerageByName", () => {
     const rrspBrokerage = {
       id: "b1",

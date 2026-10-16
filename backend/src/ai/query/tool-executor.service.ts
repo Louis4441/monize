@@ -1114,8 +1114,18 @@ export class ToolExecutorService {
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const operation = input.operation as "create" | "update" | "delete";
+    const operation = input.operation as
+      "list" | "create" | "update" | "delete";
+    if (operation === "list") {
+      return this.listSecuritiesInAccount(
+        userId,
+        input.accountName as string | undefined,
+      );
+    }
     const items = (input.items as Array<Record<string, unknown>>) ?? [];
+    if (items.length === 0) {
+      return this.toolError(`${operation} needs 1-25 items.`);
+    }
     const approvalMode =
       (input.approvalMode as "bulk" | "individual" | undefined) ?? "bulk";
     const single = items.length === 1;
@@ -1650,8 +1660,18 @@ export class ToolExecutorService {
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const operation = input.operation as "create" | "update" | "delete";
+    const operation = input.operation as
+      "list" | "create" | "update" | "delete";
+    if (operation === "list") {
+      return this.listSecuritiesInAccount(
+        userId,
+        input.accountName as string | undefined,
+      );
+    }
     const items = (input.items as Array<Record<string, unknown>>) ?? [];
+    if (items.length === 0) {
+      return this.toolError(`${operation} needs 1-25 items.`);
+    }
     const approvalMode =
       (input.approvalMode as "bulk" | "individual" | undefined) ?? "bulk";
     const single = items.length === 1;
@@ -1663,6 +1683,50 @@ export class ToolExecutorService {
       return this.manageSecurityUpdate(userId, items, single, approvalMode);
     }
     return this.manageSecurityDelete(userId, items, single, approvalMode);
+  }
+
+  private async listSecuritiesInAccount(
+    userId: string,
+    accountName: string | undefined,
+  ): Promise<ToolResult> {
+    if (!accountName?.trim()) {
+      return this.toolError("list needs accountName.");
+    }
+    try {
+      const { match, candidates } =
+        await this.accountsService.resolveBrokerageByNameOrId(
+          userId,
+          accountName,
+        );
+      if (!match) {
+        return this.toolError(
+          candidates.length > 0
+            ? `"${accountName}" is ambiguous: ${candidates.map((c) => c.name).join(", ")}.`
+            : `Unknown account: ${accountName}. Call list_accounts to look up valid names.`,
+        );
+      }
+      const securities = await this.securitiesService.listSecuritiesInAccount(
+        userId,
+        match.id,
+      );
+      return {
+        data: {
+          operation: "list",
+          account: match.name,
+          count: securities.length,
+          securities,
+        },
+        summary: `${match.name} holds ${securities.length} security${securities.length === 1 ? "" : "s"}.`,
+        sources: [
+          {
+            type: "account_securities",
+            description: `Securities held in ${match.name}`,
+          },
+        ],
+      };
+    } catch (err) {
+      return this.toolErrorFromException(err, "Could not list securities.");
+    }
   }
 
   private toSecurityCreateRow(

@@ -2076,6 +2076,93 @@ describe("SecuritiesService", () => {
     });
   });
 
+  describe("listSecuritiesInAccount", () => {
+    it("returns the non-zero holdings of the account as numbers, filtered by account and user", async () => {
+      const where = jest.fn().mockReturnThis();
+      const andWhere = jest.fn().mockReturnThis();
+      const orderBy = jest.fn().mockReturnThis();
+      holdingsRepository.createQueryBuilder.mockReturnValue({
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where,
+        andWhere,
+        orderBy,
+        getMany: jest.fn().mockResolvedValue([
+          {
+            quantity: "12.5",
+            averageCost: "10.25",
+            security: {
+              symbol: "AAPL",
+              name: "Apple Inc.",
+              securityType: "STOCK",
+              exchange: "NASDAQ",
+              currencyCode: "USD",
+              isFavourite: true,
+            },
+          },
+          {
+            quantity: "3",
+            averageCost: null,
+            security: {
+              symbol: "XYZ",
+              name: "Xyz",
+              securityType: undefined,
+              exchange: undefined,
+              currencyCode: "CAD",
+              isFavourite: false,
+            },
+          },
+        ]),
+      });
+
+      const result = await service.listSecuritiesInAccount("user-1", "acc-1");
+
+      expect(where).toHaveBeenCalledWith("h.accountId = :accountId", {
+        accountId: "acc-1",
+      });
+      expect(andWhere).toHaveBeenCalledWith("s.userId = :userId", {
+        userId: "user-1",
+      });
+      expect(andWhere).toHaveBeenCalledWith("h.quantity <> 0");
+      expect(orderBy).toHaveBeenCalledWith("s.symbol", "ASC");
+      expect(result).toEqual([
+        {
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          securityType: "STOCK",
+          exchange: "NASDAQ",
+          currencyCode: "USD",
+          isFavourite: true,
+          quantity: 12.5,
+          averageCost: 10.25,
+        },
+        {
+          symbol: "XYZ",
+          name: "Xyz",
+          securityType: null,
+          exchange: null,
+          currencyCode: "CAD",
+          isFavourite: false,
+          quantity: 3,
+          averageCost: null,
+        },
+      ]);
+    });
+
+    it("returns an empty list when the account holds nothing", async () => {
+      holdingsRepository.createQueryBuilder.mockReturnValue({
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      });
+
+      expect(await service.listSecuritiesInAccount("user-1", "acc-1")).toEqual(
+        [],
+      );
+    });
+  });
+
   describe("search", () => {
     it("searches by symbol and name using query builder", async () => {
       const getMany = jest.fn().mockResolvedValue([mockSecurity]);

@@ -165,6 +165,18 @@ export interface LlmSecurityLookup {
   candidates: LlmSecurityLookupCandidate[];
 }
 
+/** One security held in an account, as listed by `manage_securities`. */
+export interface LlmAccountSecurity {
+  symbol: string;
+  name: string;
+  securityType: string | null;
+  exchange: string | null;
+  currencyCode: string;
+  isFavourite: boolean;
+  quantity: number;
+  averageCost: number | null;
+}
+
 @Injectable()
 export class SecuritiesService {
   private readonly logger = new Logger(SecuritiesService.name);
@@ -1355,6 +1367,40 @@ export class SecuritiesService {
     );
 
     return results.map((r) => r.securityId);
+  }
+
+  /**
+   * The securities with a non-zero holding in one account, ordered by symbol.
+   * Backs the `list` operation of `manage_securities` on both tool surfaces.
+   * The caller resolves the account (and so its ownership); the user filter on
+   * the security keeps the query tenant-safe regardless.
+   */
+  async listSecuritiesInAccount(
+    userId: string,
+    accountId: string,
+  ): Promise<LlmAccountSecurity[]> {
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Holding)
+        .createQueryBuilder("h")
+        .innerJoinAndSelect("h.security", "s")
+        .where("h.accountId = :accountId", { accountId })
+        .andWhere("s.userId = :userId", { userId })
+        .andWhere("h.quantity <> 0")
+        .orderBy("s.symbol", "ASC")
+        .getMany(),
+    );
+
+    return holdings.map((h) => ({
+      symbol: h.security.symbol,
+      name: h.security.name,
+      securityType: h.security.securityType ?? null,
+      exchange: h.security.exchange ?? null,
+      currencyCode: h.security.currencyCode,
+      isFavourite: h.security.isFavourite,
+      quantity: Number(h.quantity),
+      averageCost: h.averageCost == null ? null : Number(h.averageCost),
+    }));
   }
 
   async search(userId: string, query: string): Promise<Security[]> {
