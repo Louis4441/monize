@@ -154,6 +154,15 @@ describe("isPlainReceiptAmount", () => {
     ["kr 5"],
     ["5 Kč"],
     ["USD5"],
+    // A dollar sign's country prefix is a currency mark, as for a trade.
+    ["CA$158.20"],
+    ["ca$158.20"],
+    ["C$ 26.32"],
+    ["US$2,000.00"],
+    ["CDN$5"],
+    ["AU$9.99"],
+    ["NZ$1.00"],
+    ["HK$10"],
   ])("accepts %j", (text) => {
     expect(isPlainReceiptAmount(text)).toBe(true);
   });
@@ -164,6 +173,10 @@ describe("isPlainReceiptAmount", () => {
     ["case 1 234,56"],
     ["USB 5.00"],
     ["12.99 each"],
+    // A prefix only counts against a dollar sign, and only as a whole word.
+    ["CA 158.20"],
+    ["XCA$158.20"],
+    ["ZZ$158.20"],
     ["-5.00"],
     ["abc"],
     [""],

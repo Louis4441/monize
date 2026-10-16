@@ -1,3 +1,5 @@
+import { DOLLAR_PREFIXES } from "./trade-number";
+
 /**
  * The amount grammar of the email-receipt parser (spec section 2). Pure,
  * integer arithmetic only: the result is a count of 1/10000 units, never a
@@ -67,16 +69,22 @@ export function parseReceiptAmount(text: string): number | null {
 const CURRENCY_WORDS =
   /(?<!\p{L})(?:pln|eur|usd|gbp|chf|czk|sek|nok|dkk|huf|ron|bgn|jpy|cad|aud|nzd|uah|rub|cny|try|z\u{142}|zl|kr|k\u{10d}|ft|lei)(?!\p{L})/giu;
 
+/** A dollar sign's country prefix ("CA" of "CA$158.20"), a currency mark like the codes above. */
+const DOLLAR_PREFIX = new RegExp(
+  `(?<!\\p{L})(?:${DOLLAR_PREFIXES.join("|")})(?=\\s?\\$)`,
+  "giu",
+);
+
 /**
  * True when the text parses as an amount AND holds no words besides a currency
- * symbol or code. `parseReceiptAmount` drops every letter, so "cable 19.98"
+ * symbol or code (a dollar sign's country prefix included: "CA$", "US$"). `parseReceiptAmount` drops every letter, so "cable 19.98"
  * parses; a caller choosing between two readings of a line uses this to tell an
  * amount from a name that happens to end in digits.
  */
 export function isPlainReceiptAmount(text: string): boolean {
   return (
     parseReceiptAmount(text) !== null &&
-    !/\p{L}/u.test(text.replace(CURRENCY_WORDS, ""))
+    !/\p{L}/u.test(text.replace(CURRENCY_WORDS, "").replace(DOLLAR_PREFIX, ""))
   );
 }
 

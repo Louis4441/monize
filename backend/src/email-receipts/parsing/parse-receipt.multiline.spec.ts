@@ -128,6 +128,14 @@ describe("fields read with a multi-line pattern", () => {
     });
   });
 
+  it("reads an amount with a country-prefixed dollar sign under its caption", () => {
+    const d: ReceiptParserDefinition = {
+      version: 2,
+      total: ["Amount paid\\n{amount}"],
+    };
+    expect(parse(d, ["Amount paid", "CA$158.20"]).parsed.total).toBe(1_582_000);
+  });
+
   it("does not read the amount when the line after it is not there", () => {
     const lines = ANTHROPIC.map((line) =>
       line === "Paid" ? "Refunded" : line,

@@ -563,7 +563,11 @@ gives its one item the order total:
 - **Accepted values.** An amount is a plain amount (the spec's amount grammar)
   that holds no operator character (`×`, `÷`, `+`, `*`, `/`, `=`, `%`, `<`,
   `>`, `@`, `#`, `\`, `|`), so a quantity line such as `3 × 1,47 zł` is never
-  an amount. An order id is a non-empty first token. A zero amount is a value.
+  an amount. The only letters it may hold are a currency code or mark (`zł`,
+  `EUR`, `kr`) or a dollar sign's country prefix (`US$`, `C$`, `CA$`, `CDN$`,
+  `A$`, `AU$`, `NZ$`, `HK$`: the trade reader's `DOLLAR_PREFIXES`), so a name
+  ending in digits is not an amount. An order id is a non-empty first token.
+  A zero amount is a value.
 - **Items** hold exactly one of `patterns` (one item per line), `record` (an
   item over several lines) and `single` (one item for the whole email);
   `startAfter` / `stopAt` are plain case-insensitive substrings bounding the
