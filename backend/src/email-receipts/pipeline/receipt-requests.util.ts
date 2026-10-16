@@ -71,3 +71,24 @@ export async function closeReceiptRequests(
     [userId, receiptId],
   );
 }
+
+/**
+ * `closeReceiptRequests` for many receipts in one statement (a bulk delete or
+ * ignore). Keep the status list and the `rejected` target identical to the
+ * single-receipt statement above. The caller holds the receipts' row locks.
+ */
+export async function closeRequestsOfReceipts(
+  m: EntityManager,
+  userId: string,
+  receiptIds: readonly string[],
+): Promise<void> {
+  if (receiptIds.length === 0) return;
+  await m.query(
+    `UPDATE ai_review_requests
+        SET status = 'rejected'
+      WHERE user_id = $1
+        AND email_receipt_id = ANY($2::uuid[])
+        AND status IN ('pending', 'claimed', 'proposed')`,
+    [userId, [...receiptIds]],
+  );
+}

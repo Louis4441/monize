@@ -114,6 +114,73 @@
       },
       "deleted": "Đã xóa hộp thư",
       "deleteFailed": "Không thể xóa hộp thư"
+    },
+    "import": {
+      "title": "Nhập email đã lưu trữ",
+      "description": "Tệp giữ lại người gửi và ngày mua hàng của cửa hàng, khác với email được chuyển tiếp. Tải lên các email đã xuất để đọc các xác nhận đơn hàng cũ.",
+      "fileLabel": "Tệp email (.eml, .mbox, .msg hoặc .zip)",
+      "chooseFiles": "Chọn tệp",
+      "noFileChosen": "Chưa chọn tệp nào",
+      "selected": "Đã chọn: {count}",
+      "button": "Nhập",
+      "preparing": "Đang chuẩn bị tệp...",
+      "sending": "Đang gửi phần {current} trên {total}",
+      "processing": "Đang xử lý email: {done}/{total}",
+      "cancel": "Hủy",
+      "tooLargeTotal": "Các tệp đã chọn cộng lại lớn hơn {max}. Hãy nhập theo từng nhóm nhỏ hơn.",
+      "failed": "Nhập không thành công",
+      "result": {
+        "heading": "Kết quả nhập",
+        "file": "{name}: đã lưu {stored}, trùng lặp {duplicates}, bỏ qua {skipped}",
+        "summary": "{processed, plural, other {Đã xử lý # email đang chờ.}}",
+        "pendingLeft": "{count, plural, other {# email vẫn đang chờ xử lý. Monize sẽ xử lý chúng ở lần đọc hộp thư tiếp theo.}}",
+        "processFailed": "{count, plural, other {Không thể xử lý # email.}}",
+        "processingStopped": "Việc xử lý các email đã nhập đã dừng. Các email vẫn được giữ lại. Monize sẽ xử lý chúng ở lần đọc hộp thư tiếp theo.",
+        "truncated": "{count} thư chưa được đọc vì mỗi lần nhập có một giới hạn. Hãy nhập lại chúng trong lần chạy thứ hai.",
+        "oversized": "{name}: {count} thư lớn hơn {max} đã không được gửi.",
+        "stopped": "Quá trình nhập đã dừng sau {done} trên {total} phần. Các email đã nhập vẫn được giữ lại. Hãy nhập lại cùng các tệp để tiếp tục. Email đã nhập sẽ không bị lưu hai lần.",
+        "cancelled": "Quá trình nhập đã bị hủy sau {done} trên {total} phần. Các email đã nhập vẫn được giữ lại.",
+        "errors": {
+          "unsupported_format": "{name}: định dạng này không được hỗ trợ. Các định dạng được hỗ trợ là .eml, .mbox, .msg và .zip.",
+          "invalid_archive": "{name}: tệp ZIP bị hỏng hoặc không đọc được.",
+          "archive_too_large": "{name}: tệp ZIP sau khi giải nén vượt quá giới hạn nhập. Hãy giải nén và tải lên tệp .mbox bên trong.",
+          "empty": "{name}: tệp không có email."
+        },
+        "ignored": "{name}: đã bỏ qua {count} tệp khác trong kho lưu trữ."
+      },
+      "guide": {
+        "toggle": "Cách xuất email từ nhà cung cấp của bạn",
+        "gmailLabel": {
+          "title": "Gmail: tất cả email có nhãn",
+          "step1": "Mở takeout.google.com và chọn \"Deselect all\".",
+          "step2": "Chọn \"Mail\" và chọn \"All Mail data included\".",
+          "step3": "Chỉ chọn nhãn của bạn và tạo bản xuất.",
+          "step4": "Hãy tải lên nguyên tệp .zip đã tải xuống, dù lớn đến đâu. Bạn không cần giải nén tệp."
+        },
+        "gmailOne": {
+          "title": "Gmail: một email",
+          "step1": "Mở email.",
+          "step2": "Chọn \"Khác\", rồi chọn \"Tải thư xuống\".",
+          "step3": "Tải lên tệp .eml."
+        },
+        "imap": {
+          "title": "Nhà cung cấp khác: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Thêm hộp thư vào Thunderbird qua IMAP và cài tiện ích ImportExportTools NG.",
+          "step2": "Chọn các email hoặc một thư mục rồi nhấp chuột phải.",
+          "step3": "Chọn ImportExportTools NG, rồi xuất dưới dạng EML hoặc mbox.",
+          "step4": "Tải lên các tệp."
+        },
+        "outlook": {
+          "title": "Outlook trên máy tính",
+          "body": "Chọn các email và kéo chúng vào một thư mục trên ổ đĩa. Outlook ghi các tệp .msg. Tải chúng lên, nhiều tệp cùng lúc hoặc gói trong một tệp .zip."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Chọn \"Mailbox\", rồi \"Export Mailbox\". Apple Mail ghi ra một thư mục.",
+          "step2": "Tải lên tệp có tên mbox trong thư mục, hoặc kéo email vào Finder để có các tệp .eml."
+        },
+        "tip": "Mẹo: chuyển tiếp email bằng tập lệnh làm mất người gửi và ngày của cửa hàng. Nhập tệp giữ lại cả hai."
+      }
     }
   },
   "parsers": {
@@ -682,11 +749,27 @@
     "selection": {
       "label": "Email đã chọn",
       "select": "Chọn {subject}",
-      "selectAll": "Chọn tất cả email trong danh sách này (tối đa {max})",
-      "count": "{count, plural, one {Đã chọn # email} other {Đã chọn # email}} (tối đa {max})",
+      "selectAll": "Chọn tất cả email trong danh sách này",
+      "count": "{count, plural, one {Đã chọn # email} other {Đã chọn # email}}",
       "draftButton": "Nhờ AI soạn trình phân tích ({count})",
       "clear": "Bỏ chọn",
-      "differentSenders": "Các email đã chọn đến từ những người gửi khác nhau ({domains}). Một trình phân tích đọc email của một người gửi, vì vậy hãy chọn email từ cùng một người gửi."
+      "deleteButton": "Xóa ({count})",
+      "ignoreButton": "Phớt lờ ({count})",
+      "pageSelected": "Tất cả {count} email trên trang này đã được chọn.",
+      "selectAllMatching": "Chọn tất cả {total} email khớp với bộ lọc này.",
+      "allMatchingSelected": "Tất cả {total} email khớp với bộ lọc này đã được chọn.",
+      "draftBlocked": {
+        "tooMany": "Trình phân tích chỉ có thể được soạn từ tối đa {max} email. Hãy chọn {max} email trở xuống.",
+        "differentSenders": "Các email đã chọn đến từ những người gửi khác nhau ({domains}). Một trình phân tích đọc email của một người gửi, vì vậy hãy chọn email từ cùng một người gửi.",
+        "skipped": "Email không đọc được thì không có văn bản để soạn trình phân tích. Hãy bỏ nó khỏi lựa chọn.",
+        "allMatching": "Trình phân tích được soạn từ các email bạn tự chọn, tối đa {max}. Hãy bỏ lựa chọn này rồi chọn tối đa {max} email.",
+        "mixedKinds": "Các email đã chọn trộn lẫn xác nhận giao dịch và email đơn hàng. Một hồ sơ chỉ đọc một loại, vì vậy hãy chỉ chọn xác nhận giao dịch hoặc chỉ chọn email đơn hàng."
+      }
+    },
+    "pager": {
+      "itemName": "email",
+      "total": "{count, plural, other {# email}}",
+      "page": "Trang {page}"
     },
     "draft": {
       "failed": "Không thể bắt đầu soạn trình phân tích",
@@ -698,7 +781,31 @@
       "mixedKinds": "Các email đã chọn trộn lẫn xác nhận giao dịch và email đơn hàng. Một hồ sơ chỉ đọc một loại, vì vậy hãy chỉ chọn xác nhận giao dịch hoặc chỉ chọn email đơn hàng.",
       "chatPromptTrade": "Hãy tạo một hồ sơ giao dịch cho {count, plural, one {email xác nhận giao dịch này} other {# email xác nhận giao dịch này}} từ {domain}. Hãy nhận yêu cầu xem xét AI {requestId}, thử hồ sơ của bạn trên mọi email đính kèm bằng công cụ email_receipt_parsers, sửa cho đến khi từ mỗi email đọc được một giao dịch đầy đủ, rồi lưu nó dưới dạng bản nháp cho yêu cầu {requestId}."
     },
-    "tradeBadge": "Giao dịch"
+    "tradeBadge": "Giao dịch",
+    "bulkDialog": {
+      "delete": {
+        "title": "Xóa email?",
+        "message": "Xóa {count, plural, one {# email} other {# email}}{scope, select, both { từ {domain} ở trạng thái {status}} domain { từ {domain}} status { ở trạng thái {status}} other {}}? Không thể hoàn tác thao tác này. Để giữ lại email và không cho chúng đề xuất gì, hãy chọn “Phớt lờ”. Email liên kết với giao dịch sẽ được giữ lại."
+      },
+      "ignore": {
+        "title": "Phớt lờ email?",
+        "message": "Phớt lờ {count, plural, one {# email} other {# email}}{scope, select, both { từ {domain} ở trạng thái {status}} domain { từ {domain}} status { ở trạng thái {status}} other {}}? Chúng sẽ không đề xuất gì và các yêu cầu xem xét đang mở sẽ bị đóng. Email liên kết với giao dịch được giữ nguyên.",
+        "confirm": "Phớt lờ"
+      },
+      "countChanged": "Số email khớp bây giờ là {count}. Chưa có gì bị thay đổi. Hãy kiểm tra số lượng và xác nhận lại."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {Đã xóa # email.} other {Đã xóa # email.}}",
+        "ignored": "{count, plural, one {Đã phớt lờ # email.} other {Đã phớt lờ # email.}}",
+        "unchanged": "{count, plural, one {# email đã được phớt lờ từ trước.} other {# email đã được phớt lờ từ trước.}}",
+        "notIgnorable": "{count, plural, one {Không thể phớt lờ # email: không đọc được, hoặc đề xuất của email đã được áp dụng.} other {Không thể phớt lờ # email: không đọc được, hoặc đề xuất của chúng đã được áp dụng.}}",
+        "skippedLinked": "{count, plural, one {Đã giữ lại # email liên kết với giao dịch.} other {Đã giữ lại # email liên kết với giao dịch.}}"
+      },
+      "deleteFailed": "Không thể xóa email",
+      "ignoreFailed": "Không thể phớt lờ email",
+      "noneLeft": "Không còn email nào khớp. Chưa có gì bị thay đổi."
+    }
   },
   "detail": {
     "title": "Hóa đơn qua email",

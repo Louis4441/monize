@@ -114,6 +114,73 @@
       },
       "deleted": "Mailbox verwijderd",
       "deleteFailed": "De mailbox kon niet worden verwijderd"
+    },
+    "import": {
+      "title": "Gearchiveerde e-mails importeren",
+      "description": "Een bestand behoudt de afzender en de aankoopdatum van de winkel, anders dan een doorgestuurde e-mail. Upload geëxporteerde e-mails om oude orderbevestigingen te lezen.",
+      "fileLabel": "E-mailbestanden (.eml, .mbox, .msg of .zip)",
+      "chooseFiles": "Bestanden kiezen",
+      "noFileChosen": "Geen bestanden gekozen",
+      "selected": "Geselecteerd: {count}",
+      "button": "Importeren",
+      "preparing": "Bestanden voorbereiden...",
+      "sending": "Deel {current} van {total} verzenden",
+      "processing": "E-mails verwerken: {done} van {total}",
+      "cancel": "Annuleren",
+      "tooLargeTotal": "De geselecteerde bestanden samen zijn groter dan {max}. Importeer ze in kleinere groepen.",
+      "failed": "De import is mislukt",
+      "result": {
+        "heading": "Importresultaat",
+        "file": "{name}: {stored} opgeslagen, {duplicates} dubbele, {skipped} overgeslagen",
+        "summary": "{processed, plural, one {# wachtende e-mail verwerkt.} other {# wachtende e-mails verwerkt.}}",
+        "pendingLeft": "{count, plural, one {# e-mail wacht nog op verwerking. Monize verwerkt die bij het volgende lezen van de mailbox.} other {# e-mails wachten nog op verwerking. Monize verwerkt ze bij het volgende lezen van de mailbox.}}",
+        "processFailed": "{count, plural, one {# e-mail kon niet worden verwerkt.} other {# e-mails konden niet worden verwerkt.}}",
+        "processingStopped": "Het verwerken van de geïmporteerde e-mails is gestopt. De e-mails blijven bewaard. Monize verwerkt ze bij het volgende lezen van de mailbox.",
+        "truncated": "{count} berichten zijn niet gelezen omdat een import een limiet heeft. Importeer ze opnieuw in een tweede ronde.",
+        "oversized": "{name}: {count} berichten groter dan {max} zijn niet verzonden.",
+        "stopped": "De import is gestopt na {done} van {total} delen. De e-mails die al zijn geïmporteerd, blijven bewaard. Importeer dezelfde bestanden opnieuw om verder te gaan. E-mails die al zijn geïmporteerd, worden niet dubbel opgeslagen.",
+        "cancelled": "De import is geannuleerd na {done} van {total} delen. De e-mails die al zijn geïmporteerd, blijven bewaard.",
+        "errors": {
+          "unsupported_format": "{name}: dit formaat wordt niet ondersteund. Ondersteunde formaten zijn .eml, .mbox, .msg en .zip.",
+          "invalid_archive": "{name}: het ZIP-bestand is beschadigd of kan niet worden gelezen.",
+          "archive_too_large": "{name}: het uitgepakte ZIP-bestand is groter dan de importlimiet. Pak het uit en upload het .mbox-bestand dat erin zit.",
+          "empty": "{name}: het bestand bevat geen e-mails."
+        },
+        "ignored": "{name}: {count} andere bestanden in het archief zijn overgeslagen."
+      },
+      "guide": {
+        "toggle": "E-mails exporteren bij uw provider",
+        "gmailLabel": {
+          "title": "Gmail: alle e-mails met een label",
+          "step1": "Open takeout.google.com en kies \"Deselect all\".",
+          "step2": "Selecteer \"Mail\" en kies \"All Mail data included\".",
+          "step3": "Kies alleen uw label en maak de export.",
+          "step4": "Upload het gedownloade .zip-bestand zoals het is, hoe groot het ook is. U hoeft het niet uit te pakken."
+        },
+        "gmailOne": {
+          "title": "Gmail: één e-mail",
+          "step1": "Open de e-mail.",
+          "step2": "Kies \"Meer\" en dan \"Bericht downloaden\".",
+          "step3": "Upload het .eml-bestand."
+        },
+        "imap": {
+          "title": "Andere providers: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Voeg het postvak via IMAP toe aan Thunderbird en installeer de add-on ImportExportTools NG.",
+          "step2": "Selecteer de e-mails of een map en klik met de rechtermuisknop.",
+          "step3": "Kies ImportExportTools NG en exporteer dan als EML of als mbox.",
+          "step4": "Upload de bestanden."
+        },
+        "outlook": {
+          "title": "Outlook voor desktop",
+          "body": "Selecteer de e-mails en sleep ze naar een map op uw schijf. Outlook schrijft .msg-bestanden. Upload ze, meerdere tegelijk of verpakt in één .zip-bestand."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Kies \"Postvak\" en dan \"Exporteer postvak\". Apple Mail schrijft een map.",
+          "step2": "Upload het bestand met de naam mbox in de map, of sleep e-mails naar de Finder om .eml-bestanden te krijgen."
+        },
+        "tip": "Tip: e-mails doorsturen met een script verliest de afzender en de datum van de winkel. Bestanden importeren behoudt ze."
+      }
     }
   },
   "parsers": {
@@ -682,11 +749,27 @@
     "selection": {
       "label": "Geselecteerde e-mails",
       "select": "{subject} selecteren",
-      "selectAll": "Alle e-mails in deze lijst selecteren (maximaal {max})",
-      "count": "{count, plural, one {# e-mail geselecteerd} other {# e-mails geselecteerd}} (maximaal {max})",
+      "selectAll": "Alle e-mails in deze lijst selecteren",
+      "count": "{count, plural, one {# e-mail geselecteerd} other {# e-mails geselecteerd}}",
       "draftButton": "Profiel laten opstellen door AI ({count})",
       "clear": "Selectie wissen",
-      "differentSenders": "De geselecteerde e-mails komen van verschillende afzenders ({domains}). Een profiel leest de e-mails van één afzender, dus selecteer e-mails van één afzender."
+      "deleteButton": "Verwijderen ({count})",
+      "ignoreButton": "Negeren ({count})",
+      "pageSelected": "Alle {count} e-mails op deze pagina zijn geselecteerd.",
+      "selectAllMatching": "Selecteer alle {total} e-mails die bij dit filter passen.",
+      "allMatchingSelected": "Alle {total} e-mails die bij dit filter passen, zijn geselecteerd.",
+      "draftBlocked": {
+        "tooMany": "Een profiel wordt voorbereid met maximaal {max} e-mails. Selecteer {max} e-mails of minder.",
+        "differentSenders": "De geselecteerde e-mails komen van verschillende afzenders ({domains}). Een profiel leest de e-mails van één afzender, dus selecteer e-mails van één afzender.",
+        "skipped": "Een e-mail die niet gelezen kon worden, heeft geen tekst voor een profiel. Haal hem uit de selectie.",
+        "allMatching": "Een profiel wordt voorbereid met e-mails die je zelf selecteert, maximaal {max}. Wis deze selectie en selecteer maximaal {max} e-mails.",
+        "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails."
+      }
+    },
+    "pager": {
+      "itemName": "e-mails",
+      "total": "{count, plural, one {# e-mail} other {# e-mails}}",
+      "page": "Pagina {page}"
     },
     "draft": {
       "failed": "Het opstellen van een profiel kon niet worden gestart",
@@ -698,7 +781,31 @@
       "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails.",
       "chatPromptTrade": "Maak een transactieprofiel voor {count, plural, one {deze transactiebevestiging} other {deze # transactiebevestigingen}} van {domain}. Claim AI-beoordelingsverzoek {requestId}, test je profiel op elke bijgevoegde e-mail met de tool email_receipt_parsers, verbeter het totdat uit elke e-mail een volledige transactie wordt gelezen en sla het daarna op als concept voor verzoek {requestId}."
     },
-    "tradeBadge": "Transactie"
+    "tradeBadge": "Transactie",
+    "bulkDialog": {
+      "delete": {
+        "title": "E-mails verwijderen?",
+        "message": "{count, plural, one {# e-mail verwijderen} other {# e-mails verwijderen}}{scope, select, both { van {domain} met de status {status}} domain { van {domain}} status { met de status {status}} other {}}? Dit kan niet ongedaan worden gemaakt. Kies in plaats daarvan “Negeren” om de e-mails te bewaren en te voorkomen dat ze iets voorstellen. E-mails die aan een transactie zijn gekoppeld, blijven bewaard."
+      },
+      "ignore": {
+        "title": "E-mails negeren?",
+        "message": "{count, plural, one {# e-mail negeren} other {# e-mails negeren}}{scope, select, both { van {domain} met de status {status}} domain { van {domain}} status { met de status {status}} other {}}? Ze stellen dan niets meer voor en hun openstaande beoordelingsverzoeken worden afgewezen. E-mails die aan een transactie zijn gekoppeld, blijven ongewijzigd.",
+        "confirm": "Negeren"
+      },
+      "countChanged": "Het aantal passende e-mails is nu {count}. Er is niets gewijzigd. Controleer het aantal en bevestig opnieuw."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# e-mail verwijderd.} other {# e-mails verwijderd.}}",
+        "ignored": "{count, plural, one {# e-mail genegeerd.} other {# e-mails genegeerd.}}",
+        "unchanged": "{count, plural, one {# e-mail was al genegeerd.} other {# e-mails waren al genegeerd.}}",
+        "notIgnorable": "{count, plural, one {# e-mail kon niet worden genegeerd: hij kon niet worden gelezen, of zijn voorstel is al toegepast.} other {# e-mails konden niet worden genegeerd: ze konden niet worden gelezen, of hun voorstellen zijn al toegepast.}}",
+        "skippedLinked": "{count, plural, one {# e-mail die aan een transactie is gekoppeld, is bewaard.} other {# e-mails die aan een transactie zijn gekoppeld, zijn bewaard.}}"
+      },
+      "deleteFailed": "De e-mails konden niet worden verwijderd",
+      "ignoreFailed": "De e-mails konden niet worden genegeerd",
+      "noneLeft": "Er zijn geen passende e-mails meer. Er is niets gewijzigd."
+    }
   },
   "detail": {
     "title": "E-mailbon",

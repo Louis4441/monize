@@ -25,6 +25,11 @@ export interface HttpErrorBody {
    * client can point at the offending field.
    */
   errors?: unknown[];
+  /**
+   * The number a refused bulk command found instead of the one it was told
+   * (`POST /email-receipts/bulk`, 409), so the client can ask again with it.
+   */
+  currentCount?: number;
 }
 
 /**
@@ -85,6 +90,9 @@ export function httpErrorBody(
           ? { errorCode: resp.errorCode }
           : {}),
         ...(Array.isArray(resp.errors) ? { errors: resp.errors } : {}),
+        ...(typeof resp.currentCount === "number"
+          ? { currentCount: resp.currentCount }
+          : {}),
       };
     }
     return { statusCode, message: exception.message };

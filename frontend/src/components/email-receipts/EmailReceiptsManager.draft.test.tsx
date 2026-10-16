@@ -92,44 +92,59 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
       await click(checkbox('Order 1'));
       await click(checkbox('Order 3'));
 
-      expect(bar()).toHaveTextContent('2 emails selected (at most 5)');
+      expect(bar()).toHaveTextContent('2 emails selected');
       expect(draftButton(2)).toBeEnabled();
     });
 
     it('says one email when one is ticked', async () => {
       await renderManager();
       await click(checkbox('Order 1'));
-      expect(bar()).toHaveTextContent('1 email selected (at most 5)');
+      expect(bar()).toHaveTextContent('1 email selected');
     });
 
-    it('stops at five: the others are disabled, the ticked ones stay free to untick', async () => {
+    it('does not stop at five: every email can be selected, the draft button is the one that is limited', async () => {
       await renderManager();
-      for (const n of [1, 2, 3, 4, 5]) await click(checkbox(`Order ${n}`));
+      for (const n of [1, 2, 3, 4, 5, 6]) await click(checkbox(`Order ${n}`));
 
-      expect(checkbox('Order 6')).toBeDisabled();
-      expect(checkbox('Order 5')).toBeEnabled();
-      await click(checkbox('Order 5'));
       expect(checkbox('Order 6')).toBeEnabled();
-      expect(bar()).toHaveTextContent('4 emails selected');
+      expect(bar()).toHaveTextContent('6 emails selected');
+      const button = draftButton(6);
+      expect(button).toBeDisabled();
+      expect(within(bar() as HTMLElement).getByText(/at most 5 emails/)).toBeInTheDocument();
+      await click(checkbox('Order 6'));
+      expect(draftButton(5)).toBeEnabled();
     });
 
-    it('does not let a skipped email be selected: it has no text to write a profile from', async () => {
+    it('points the disabled draft button at the sentence that says why', async () => {
+      await renderManager();
+      for (const n of [1, 2, 3, 4, 5, 6]) await click(checkbox(`Order ${n}`));
+
+      const reason = within(bar() as HTMLElement).getByText(/A profile can be prepared from at most 5 emails/);
+      expect(draftButton(6)).toHaveAccessibleDescription(reason.textContent as string);
+    });
+
+    it('lets a skipped email be selected but keeps it out of a draft, saying why', async () => {
       api.list.mockResolvedValue([shop(1), shop(2, { status: 'skipped' })]);
       await renderManager();
-      expect(checkbox('Order 2')).toBeDisabled();
+      expect(checkbox('Order 2')).toBeEnabled();
+      await click(checkbox('Order 2'));
+      expect(draftButton(1)).toBeDisabled();
+      expect(within(bar() as HTMLElement).getByText(/could not be read has no text/)).toBeInTheDocument();
     });
 
-    it('warns, without blocking, when the selected emails come from different senders', async () => {
+    it('turns the draft button off, with the reason, when the selected emails come from different senders', async () => {
       api.list.mockResolvedValue([shop(1), shop(2, { fromAddress: 'news@other.example.org', fromDomain: 'other.example.org' })]);
       await renderManager();
       await click(checkbox('Order 1'));
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(draftButton(1)).toBeEnabled();
+      expect(screen.queryByText(/different senders/)).not.toBeInTheDocument();
       await click(checkbox('Order 2'));
 
-      expect(within(bar() as HTMLElement).getByRole('alert')).toHaveTextContent(
-        'different senders (shop.example.com, other.example.org)',
-      );
-      expect(draftButton(2)).toBeEnabled();
+      expect(draftButton(2)).toBeDisabled();
+      expect(within(bar() as HTMLElement).getByText(/different senders \(shop.example.com, other.example.org\)/)).toBeInTheDocument();
+      // Delete and Ignore do not care about the sender.
+      expect(screen.getByRole('button', { name: 'Delete (2)' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Ignore (2)' })).toBeEnabled();
     });
 
     it('says nothing about senders when they are the same', async () => {
@@ -281,7 +296,7 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
         fireEvent.click(draftButton(1));
       });
       expect(draftButton(1)).toBeDisabled();
-      expect(checkbox('Order 2')).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Delete (1)' })).toBeDisabled();
       await act(async () => {
         resolve({ ok: true, requestId: 'req-1' });
       });
@@ -329,8 +344,7 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
       await click(checkbox('Order 3'));
 
       expect(draftButton(2)).toBeDisabled();
-      const why = within(bar()!).getByRole('alert');
-      expect(why).toHaveTextContent('The selected emails mix trade confirmations and order emails');
+      const why = within(bar()!).getByText(/The selected emails mix trade confirmations and order emails/);
       expect(draftButton(2)).toHaveAttribute('aria-describedby', why.id);
       expect(api.draftWithAi).not.toHaveBeenCalled();
     });

@@ -4,6 +4,7 @@ import {
   canLinkTradeEmail,
   canReprocessReceipt,
   distinctSenderDomains,
+  draftBlock,
   dominantSenderDomain,
   fromReceiptUnits,
   looksLikeHtml,
@@ -329,5 +330,41 @@ describe('parserDraftKind', () => {
     expect(parserDraftKind([{ isTrade: true }, { isTrade: true }])).toBe('trade');
     expect(parserDraftKind([{ isTrade: false }])).toBe('receipt');
     expect(parserDraftKind([{ isTrade: true }, { isTrade: false }])).toBe('mixed');
+  });
+});
+
+describe('draftBlock', () => {
+  const mail = (domain: string, status: 'no_parser' | 'skipped' = 'no_parser', isTrade = false) => ({
+    status,
+    fromDomain: domain,
+    fromAddress: `a@${domain}`,
+    isTrade,
+  });
+
+  it('is off for a mix of trade confirmations and order emails', () => {
+    expect(draftBlock([mail('a.com'), mail('a.com', 'no_parser', true)], 5, false)).toBe('mixedKinds');
+    expect(draftBlock([mail('a.com', 'no_parser', true)], 5, false)).toBeNull();
+  });
+
+  it('is on for one to five emails of one sender', () => {
+    expect(draftBlock([mail('a.com')], 5, false)).toBeNull();
+    expect(draftBlock([1, 2, 3, 4, 5].map(() => mail('a.com')), 5, false)).toBeNull();
+  });
+
+  it('is off above the limit', () => {
+    expect(draftBlock([1, 2, 3, 4, 5, 6].map(() => mail('a.com')), 5, false)).toBe('tooMany');
+  });
+
+  it('is off for several senders and for an unreadable email', () => {
+    expect(draftBlock([mail('a.com'), mail('b.com')], 5, false)).toBe('differentSenders');
+    expect(draftBlock([mail('a.com'), mail('a.com', 'skipped')], 5, false)).toBe('skipped');
+  });
+
+  it('is off for a selection by filter, whatever its size', () => {
+    expect(draftBlock([mail('a.com')], 5, true)).toBe('allMatching');
+  });
+
+  it('names the limit before the sender when both apply', () => {
+    expect(draftBlock([1, 2, 3, 4, 5, 6].map((n) => mail(`d${n}.com`)), 5, false)).toBe('tooMany');
   });
 });

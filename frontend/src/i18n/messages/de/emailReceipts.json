@@ -114,6 +114,73 @@
       },
       "deleted": "Postfach gelöscht",
       "deleteFailed": "Das Postfach konnte nicht gelöscht werden"
+    },
+    "import": {
+      "title": "Archivierte E-Mails importieren",
+      "description": "Eine Datei behält den Absender und das Kaufdatum des Shops, anders als eine weitergeleitete E-Mail. Laden Sie exportierte E-Mails hoch, um alte Bestellbestätigungen zu lesen.",
+      "fileLabel": "E-Mail-Dateien (.eml, .mbox, .msg oder .zip)",
+      "chooseFiles": "Dateien auswählen",
+      "noFileChosen": "Keine Dateien ausgewählt",
+      "selected": "Ausgewählt: {count}",
+      "button": "Importieren",
+      "preparing": "Dateien werden vorbereitet...",
+      "sending": "Teil {current} von {total} wird gesendet",
+      "processing": "E-Mails werden verarbeitet: {done} von {total}",
+      "cancel": "Abbrechen",
+      "tooLargeTotal": "Die ausgewählten Dateien zusammen sind größer als {max}. Importieren Sie sie in kleineren Gruppen.",
+      "failed": "Der Import ist fehlgeschlagen",
+      "result": {
+        "heading": "Importergebnis",
+        "file": "{name}: {stored} gespeichert, {duplicates} Duplikate, {skipped} übersprungen",
+        "summary": "{processed, plural, one {# wartende E-Mail verarbeitet.} other {# wartende E-Mails verarbeitet.}}",
+        "pendingLeft": "{count, plural, one {# E-Mail wartet noch auf die Verarbeitung. Monize verarbeitet sie beim nächsten Lesen des Postfachs.} other {# E-Mails warten noch auf die Verarbeitung. Monize verarbeitet sie beim nächsten Lesen des Postfachs.}}",
+        "processFailed": "{count, plural, one {# E-Mail konnte nicht verarbeitet werden.} other {# E-Mails konnten nicht verarbeitet werden.}}",
+        "processingStopped": "Die Verarbeitung der importierten E-Mails wurde beendet. Die E-Mails bleiben gespeichert. Monize verarbeitet sie beim nächsten Lesen des Postfachs.",
+        "truncated": "{count} Nachrichten wurden nicht gelesen, weil ein Import ein Limit hat. Importieren Sie sie in einem zweiten Durchgang erneut.",
+        "oversized": "{name}: {count} Nachrichten, die größer als {max} sind, wurden nicht gesendet.",
+        "stopped": "Der Import wurde nach {done} von {total} Teilen beendet. Bereits importierte E-Mails bleiben erhalten. Importieren Sie dieselben Dateien erneut, um fortzufahren. Bereits importierte E-Mails werden nicht doppelt gespeichert.",
+        "cancelled": "Der Import wurde nach {done} von {total} Teilen abgebrochen. Bereits importierte E-Mails bleiben erhalten.",
+        "errors": {
+          "unsupported_format": "{name}: Dieses Format wird nicht unterstützt. Unterstützte Formate sind .eml, .mbox, .msg und .zip.",
+          "invalid_archive": "{name}: Die ZIP-Datei ist beschädigt oder kann nicht gelesen werden.",
+          "archive_too_large": "{name}: Die ZIP-Datei ist entpackt größer als das Importlimit. Entpacken Sie sie und laden Sie die enthaltene .mbox-Datei hoch.",
+          "empty": "{name}: Die Datei enthält keine E-Mails."
+        },
+        "ignored": "{name}: {count} andere Dateien im Archiv wurden übersprungen."
+      },
+      "guide": {
+        "toggle": "So exportieren Sie E-Mails bei Ihrem Anbieter",
+        "gmailLabel": {
+          "title": "Gmail: alle E-Mails mit einem Label",
+          "step1": "Öffnen Sie takeout.google.com und wählen Sie „Alle Auswahlen aufheben“.",
+          "step2": "Wählen Sie „E-Mail“ und dann „Alle E-Mail-Daten enthalten“.",
+          "step3": "Wählen Sie nur Ihr Label und erstellen Sie den Export.",
+          "step4": "Laden Sie die heruntergeladene .zip-Datei unverändert hoch, egal wie groß sie ist. Sie müssen sie nicht entpacken."
+        },
+        "gmailOne": {
+          "title": "Gmail: eine E-Mail",
+          "step1": "Öffnen Sie die E-Mail.",
+          "step2": "Wählen Sie „Mehr“ und dann „Nachricht herunterladen“.",
+          "step3": "Laden Sie die .eml-Datei hoch."
+        },
+        "imap": {
+          "title": "Andere Anbieter: Outlook.com, Yahoo, Onet, WP, Interia, o2, iCloud, Zoho",
+          "step1": "Fügen Sie das Postfach in Thunderbird über IMAP hinzu und installieren Sie das Add-on ImportExportTools NG.",
+          "step2": "Wählen Sie die E-Mails oder einen Ordner aus und klicken Sie mit der rechten Maustaste.",
+          "step3": "Wählen Sie ImportExportTools NG und exportieren Sie dann als EML oder als mbox.",
+          "step4": "Laden Sie die Dateien hoch."
+        },
+        "outlook": {
+          "title": "Outlook für den Desktop",
+          "body": "Wählen Sie die E-Mails aus und ziehen Sie sie in einen Ordner auf Ihrer Festplatte. Outlook schreibt .msg-Dateien. Laden Sie sie hoch, mehrere auf einmal oder in einer .zip-Datei gepackt."
+        },
+        "apple": {
+          "title": "Apple Mail",
+          "step1": "Wählen Sie „Postfach“ und dann „Postfach exportieren“. Apple Mail schreibt einen Ordner.",
+          "step2": "Laden Sie die Datei mit dem Namen mbox aus dem Ordner hoch oder ziehen Sie E-Mails in den Finder, um .eml-Dateien zu erhalten."
+        },
+        "tip": "Tipp: Das Weiterleiten von E-Mails mit einem Skript verliert den Absender und das Datum des Shops. Der Import von Dateien behält sie."
+      }
     }
   },
   "parsers": {
@@ -682,11 +749,27 @@
     "selection": {
       "label": "Ausgewählte E-Mails",
       "select": "{subject} auswählen",
-      "selectAll": "Alle E-Mails dieser Liste auswählen (höchstens {max})",
-      "count": "{count, plural, one {# E-Mail ausgewählt} other {# E-Mails ausgewählt}} (höchstens {max})",
+      "selectAll": "Alle E-Mails dieser Liste auswählen",
+      "count": "{count, plural, one {# E-Mail ausgewählt} other {# E-Mails ausgewählt}}",
       "draftButton": "Profil mit KI entwerfen ({count})",
       "clear": "Auswahl aufheben",
-      "differentSenders": "Die ausgewählten E-Mails stammen von verschiedenen Absendern ({domains}). Ein Profil liest die E-Mails eines Absenders, wähle also E-Mails von einem Absender."
+      "deleteButton": "Löschen ({count})",
+      "ignoreButton": "Ignorieren ({count})",
+      "pageSelected": "Alle {count} E-Mails auf dieser Seite sind ausgewählt.",
+      "selectAllMatching": "Alle {total} E-Mails auswählen, die zu diesem Filter passen.",
+      "allMatchingSelected": "Alle {total} E-Mails, die zu diesem Filter passen, sind ausgewählt.",
+      "draftBlocked": {
+        "tooMany": "Ein Profil kann aus höchstens {max} E-Mails erstellt werden. Wähle {max} oder weniger E-Mails aus.",
+        "differentSenders": "Die ausgewählten E-Mails stammen von verschiedenen Absendern ({domains}). Ein Profil liest die E-Mails eines Absenders, wähle also E-Mails von einem Absender.",
+        "skipped": "Eine E-Mail, die nicht gelesen werden konnte, hat keinen Text für ein Profil. Entferne sie aus der Auswahl.",
+        "allMatching": "Ein Profil wird aus E-Mails erstellt, die du selbst auswählst, höchstens {max}. Hebe diese Auswahl auf und wähle bis zu {max} E-Mails aus.",
+        "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails."
+      }
+    },
+    "pager": {
+      "itemName": "E-Mails",
+      "total": "{count, plural, one {# E-Mail} other {# E-Mails}}",
+      "page": "Seite {page}"
     },
     "draft": {
       "failed": "Das Entwerfen eines Profils konnte nicht gestartet werden",
@@ -698,7 +781,31 @@
       "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails.",
       "chatPromptTrade": "Erstelle ein Handelsprofil für {count, plural, one {diese Handelsbestätigung} other {diese # Handelsbestätigungen}} von {domain}. Übernimm die KI-Prüfanfrage {requestId}, teste dein Profil mit dem Tool email_receipt_parsers an jeder angehängten E-Mail, korrigiere es, bis jede einen vollständigen Handel ergibt, und speichere es dann als Entwurf für die Anfrage {requestId}."
     },
-    "tradeBadge": "Handel"
+    "tradeBadge": "Handel",
+    "bulkDialog": {
+      "delete": {
+        "title": "E-Mails löschen?",
+        "message": "{count, plural, one {# E-Mail löschen} other {# E-Mails löschen}}{scope, select, both { von {domain} im Status {status}} domain { von {domain}} status { im Status {status}} other {}}? Das kann nicht rückgängig gemacht werden. Wähle stattdessen „Ignorieren“, um die E-Mails zu behalten und zu verhindern, dass sie etwas vorschlagen. E-Mails, die mit einer Transaktion verknüpft sind, bleiben erhalten."
+      },
+      "ignore": {
+        "title": "E-Mails ignorieren?",
+        "message": "{count, plural, one {# E-Mail ignorieren} other {# E-Mails ignorieren}}{scope, select, both { von {domain} im Status {status}} domain { von {domain}} status { im Status {status}} other {}}? Sie schlagen dann nichts mehr vor, und ihre offenen Prüfanfragen werden verworfen. E-Mails, die mit einer Transaktion verknüpft sind, bleiben unverändert.",
+        "confirm": "Ignorieren"
+      },
+      "countChanged": "Die Anzahl der passenden E-Mails ist jetzt {count}. Es wurde nichts geändert. Prüfe die Zahl und bestätige erneut."
+    },
+    "bulk": {
+      "result": {
+        "deleted": "{count, plural, one {# E-Mail gelöscht.} other {# E-Mails gelöscht.}}",
+        "ignored": "{count, plural, one {# E-Mail ignoriert.} other {# E-Mails ignoriert.}}",
+        "unchanged": "{count, plural, one {# E-Mail war bereits ignoriert.} other {# E-Mails waren bereits ignoriert.}}",
+        "notIgnorable": "{count, plural, one {# E-Mail konnte nicht ignoriert werden: Sie konnte nicht gelesen werden, oder ihr Vorschlag wurde bereits angewendet.} other {# E-Mails konnten nicht ignoriert werden: Sie konnten nicht gelesen werden, oder ihre Vorschläge wurden bereits angewendet.}}",
+        "skippedLinked": "{count, plural, one {# E-Mail, die mit einer Transaktion verknüpft ist, wurde behalten.} other {# E-Mails, die mit einer Transaktion verknüpft sind, wurden behalten.}}"
+      },
+      "deleteFailed": "E-Mails konnten nicht gelöscht werden",
+      "ignoreFailed": "E-Mails konnten nicht ignoriert werden",
+      "noneLeft": "Keine E-Mails passen mehr. Es wurde nichts geändert."
+    }
   },
   "detail": {
     "title": "E-Mail-Beleg",

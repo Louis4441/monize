@@ -13,14 +13,12 @@ import {
 } from "../../common/jobs/job-claim.service";
 import { tr } from "../../i18n/translate";
 import { EmailReceiptAiService } from "../ai/email-receipt-ai.service";
+import type { EmailReceiptAiMode } from "../entities/email-receipt-mailbox.entity";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
 import {
   ImapMailboxClient,
-  type FetchedMessage,
   type FetchSinceResult,
 } from "../imap/imap-mailbox-client";
-import { resolveForwardedIdentity } from "../imap/forwarded-receipt";
-import { extractMailText } from "../imap/mail-text.util";
 import { EmailReceiptMailboxService } from "../mailbox/email-receipt-mailbox.service";
 import {
   describeFailure,
@@ -31,6 +29,14 @@ import {
   resolveEmailReceiptPollLimits,
   type EmailReceiptPollLimits,
 } from "./email-receipt-poll-limits";
+import {
+  buildReceiptRow,
+  insertReceiptRows,
+  skippedRow,
+  type ReceiptRow,
+} from "./receipt-rows";
+
+export { pickReceivedAt } from "./receipt-rows";
 
 /** One poll of one mailbox holds its lease this long at most (design INV-RECEIPT-006). */
 export const POLL_LEASE_MS = 10 * 60_000;
@@ -71,21 +77,6 @@ export type EmailReceiptPollNowResult = Omit<
 > & {
   busy?: boolean;
 };
-
-interface ReceiptRow {
-  messageId: string | null;
-  fromAddress: string;
-  fromDomain: string;
-  subject: string;
-  receivedAt: Date;
-  bodyText: string;
-  bodyHtml: string | null;
-  forwardedBy: string | null;
-  originalSentAt: Date | null;
-  uid: string;
-  status: "pending" | "skipped";
-  statusReason: "too_large" | "undecodable" | null;
-}
 
 const EMPTY: EmailReceiptPollOutcome = {
   ok: true,
@@ -200,6 +191,43 @@ export class EmailReceiptPollService {
   }
 
   /**
+   * The stored-email part of a poll, for the archive import: pending emails, the
+   * re-match and (mode `automatic`) the bounded AI step, under the same mailbox
+   * lease as a poll (INV-RECEIPT-006). It never connects to the mail server and
+   * does not need the mailbox to be enabled. A held lease is `busy` and nothing
+   * is processed; the rows wait for the next poll. No mailbox is a 404.
+   */
+  async processStoredNow(
+    userId: string,
+  ): Promise<{ processed: number; busy: boolean }> {
+    const view = await this.mailbox.getView(userId);
+    if (!view) {
+      throw new NotFoundException(
+        tr(
+          "errors.emailReceipts.mailboxNotFound",
+          "No mailbox is set up for this account.",
+        ),
+      );
+    }
+    const leaseToken = await this.jobClaims.claimLease(
+      JobClaimType.EmailReceiptPoll,
+      userId,
+      view.id,
+      POLL_LEASE_MS,
+    );
+    if (leaseToken === null) return { processed: 0, busy: true };
+    const deadline = Date.now() + LEASE_WORK_BUDGET_MS;
+    try {
+      const outcome: EmailReceiptPollOutcome = { ...EMPTY };
+      await this.processStored(userId, view.id, view.aiMode, outcome, deadline);
+      await this.attention.evaluate(userId);
+      return { processed: outcome.processed, busy: false };
+    } finally {
+      await this.releaseLease(userId, view.id, leaseToken);
+    }
+  }
+
+  /**
    * One mailbox under its lease. The caller has seeded the identity (the cron's
    * `withUserContext`, or the request's own), so the lease claim and its
    * release, like everything inside, find one.
@@ -230,19 +258,27 @@ export class EmailReceiptPollService {
       await this.attention.evaluate(userId);
       return outcome;
     } finally {
-      try {
-        await this.jobClaims.releaseLease(
-          JobClaimType.EmailReceiptPoll,
-          userId,
-          mailboxId,
-          leaseToken,
-        );
-      } catch (error) {
-        // The lease expires on its own; a failed release costs one quiet tick.
-        this.logger.warn(
-          `Could not release the receipt poll lease user=${userId} (${describeFailure(error)})`,
-        );
-      }
+      await this.releaseLease(userId, mailboxId, leaseToken);
+    }
+  }
+
+  private async releaseLease(
+    userId: string,
+    mailboxId: string,
+    leaseToken: string,
+  ): Promise<void> {
+    try {
+      await this.jobClaims.releaseLease(
+        JobClaimType.EmailReceiptPoll,
+        userId,
+        mailboxId,
+        leaseToken,
+      );
+    } catch (error) {
+      // The lease expires on its own; a failed release costs one quiet tick.
+      this.logger.warn(
+        `Could not release the receipt poll lease user=${userId} (${describeFailure(error)})`,
+      );
     }
   }
 
@@ -298,6 +334,24 @@ export class EmailReceiptPollService {
     }
 
     // What is stored can be processed whether or not the mailbox answered.
+    await this.processStored(
+      userId,
+      mailboxId,
+      loaded.aiMode,
+      outcome,
+      deadline,
+    );
+    return outcome;
+  }
+
+  /** Pending emails, the re-match and the automatic AI step; `outcome.processed` counts. */
+  private async processStored(
+    userId: string,
+    mailboxId: string,
+    aiMode: EmailReceiptAiMode,
+    outcome: EmailReceiptPollOutcome,
+    deadline: number,
+  ): Promise<void> {
     const budget = { remaining: AI_CATEGORY_CALLS_PER_POLL };
     const seen = new Set<string>();
     for (const id of await this.selectPending(userId, mailboxId)) {
@@ -317,7 +371,7 @@ export class EmailReceiptPollService {
       );
     }
 
-    if (loaded.aiMode === "automatic" && Date.now() <= deadline) {
+    if (aiMode === "automatic" && Date.now() <= deadline) {
       try {
         await this.ai.runAutomaticStep(userId);
       } catch (error) {
@@ -326,7 +380,6 @@ export class EmailReceiptPollService {
         );
       }
     }
-    return outcome;
   }
 
   /**
@@ -343,97 +396,32 @@ export class EmailReceiptPollService {
     const now = new Date();
     const rows: ReceiptRow[] = [];
     for (const message of fetched.messages) {
-      rows.push(await this.toRow(message, now));
+      rows.push(
+        await buildReceiptRow(
+          message.source,
+          message.uid,
+          message.internalDate,
+          now,
+        ),
+      );
     }
     for (const skipped of fetched.skipped) {
       rows.push(skippedRow(skipped.uid, skipped.reason, now));
     }
     return withScopedDb(this.dataSource, async (m) => {
-      let stored = 0;
-      let skipped = 0;
-      for (const row of rows) {
-        const inserted = returnedRows<{ id: string }>(
-          await m.query(
-            `INSERT INTO email_receipts
-               (user_id, mailbox_id, uid_validity, uid, message_id, from_address,
-                from_domain, subject, received_at, body_text, body_html,
-                forwarded_by, original_sent_at, status, status_reason)
-             VALUES ($1, $2, $3::bigint, $4::bigint, $5, $6, $7, $8, $9, $10, $11,
-                     $12, $13, $14, $15)
-             ON CONFLICT (mailbox_id, uid_validity, uid) DO NOTHING
-             RETURNING id`,
-            [
-              userId,
-              mailboxId,
-              fetched.uidValidity,
-              row.uid,
-              row.messageId,
-              row.fromAddress,
-              row.fromDomain,
-              row.subject,
-              row.receivedAt,
-              row.bodyText,
-              row.bodyHtml,
-              row.forwardedBy,
-              row.originalSentAt,
-              row.status,
-              row.statusReason,
-            ],
-          ),
-        );
-        if (inserted.length === 0) continue;
-        if (row.status === "skipped") skipped++;
-        else stored++;
-      }
+      const { stored, skipped } = await insertReceiptRows(
+        m,
+        userId,
+        mailboxId,
+        fetched.uidValidity,
+        rows,
+      );
       await this.mailbox.advanceCursor(userId, mailboxId, {
         uidValidity: fetched.uidValidity,
         lastUid: fetched.highestUid,
       });
       return { stored, skipped };
     });
-  }
-
-  private async toRow(message: FetchedMessage, now: Date): Promise<ReceiptRow> {
-    try {
-      const mail = await extractMailText(message.source);
-      const receivedAt = pickReceivedAt(mail.date, message.internalDate, now);
-      // A forward from the user's own address: the shop, the subject and the day
-      // it wrote come from the forwarded header block in the text, so the parser
-      // is chosen by the shop and the match window is centred on the purchase.
-      const identity = resolveForwardedIdentity(
-        {
-          fromAddress: mail.fromAddress,
-          fromDomain: mail.fromDomain,
-          subject: mail.subject,
-          forwardedBy: null,
-          originalSentAt: null,
-        },
-        mail.text,
-        receivedAt,
-      ) ?? {
-        fromAddress: mail.fromAddress,
-        fromDomain: mail.fromDomain,
-        subject: mail.subject,
-        forwardedBy: null,
-        originalSentAt: null,
-      };
-      return {
-        messageId: mail.messageId,
-        fromAddress: identity.fromAddress,
-        fromDomain: identity.fromDomain,
-        subject: identity.subject,
-        receivedAt,
-        bodyText: mail.text,
-        bodyHtml: mail.html,
-        forwardedBy: identity.forwardedBy,
-        originalSentAt: identity.originalSentAt,
-        uid: message.uid,
-        status: "pending",
-        statusReason: null,
-      };
-    } catch {
-      return skippedRow(message.uid, "undecodable", message.internalDate);
-    }
   }
 
   private async processOne(
@@ -524,41 +512,4 @@ export class EmailReceiptPollService {
     );
     return rows.map((row) => row.id);
   }
-}
-
-/**
- * When the email was written: its Date header when that is a real date no later
- * than a day from now (a forwarded order keeps the shop's date, which is what
- * the match window is about), else the server's own arrival time.
- */
-export function pickReceivedAt(
-  header: Date | null,
-  internalDate: Date,
-  now: Date,
-): Date {
-  if (header !== null && header.getTime() <= now.getTime() + DAY_MS) {
-    return header;
-  }
-  return Number.isNaN(internalDate.getTime()) ? now : internalDate;
-}
-
-function skippedRow(
-  uid: string,
-  reason: "too_large" | "undecodable",
-  receivedAt: Date,
-): ReceiptRow {
-  return {
-    messageId: null,
-    fromAddress: "",
-    fromDomain: "",
-    subject: "",
-    receivedAt: Number.isNaN(receivedAt.getTime()) ? new Date() : receivedAt,
-    bodyText: "",
-    bodyHtml: null,
-    forwardedBy: null,
-    originalSentAt: null,
-    uid,
-    status: "skipped",
-    statusReason: reason,
-  };
 }
