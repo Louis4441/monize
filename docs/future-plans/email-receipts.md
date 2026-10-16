@@ -505,6 +505,25 @@ gives its one item the order total:
   whitespace folded, invisible characters such as zero-width spaces, bidi
   marks and soft hyphens removed). A line pattern of `orderId` is tried on the
   subject first, then on each line.
+- **Multi-line patterns.** The two characters `\n` in a pattern split it into
+  parts, each a whole-line glob as above, matched against consecutive lines (the
+  non-empty normalised lines, so blank lines between them do not count):
+  `Receipt from *\n{amount}\nPaid` reads a total printed between two lines, and
+  a part of only `*` is any one line. Each part is read lazily, then greedily,
+  and the first combination of the parts' readings the field accepts wins
+  (merged captures; a capture name is in one part only). Wherever lines are
+  read a pattern may span them: every field entry (and a labelled entry's
+  `label` and `value`, its `within` counted from the label's last line), the
+  line guards, `line` category rules, trade currency markers, item `patterns`
+  (the next item starts after the last line taken; tried without held
+  `joinWrapped` lines), record steps, `skipLines` (every line matched is
+  dropped) and `single.name`. Where one text is matched (the subject, an item
+  name or the payee of a category rule, a trade account rule) a multi-line
+  pattern never matches; the validator refuses one in a category rule over an
+  item or the payee and in a trade account rule (`line_break_not_allowed`). A
+  fee is counted once per line its `{amount}` part read. A line holds no line
+  break, so the escape takes nothing a line could contain; a stored pattern
+  that meant a literal backslash and `n` no longer matches.
 - **Literal asterisk and trimming.** `{*}` and `\*` in a pattern are a literal
   `*` (the receipt matcher swaps each literal `*` of the pattern and of the line
   for a private-use character, matches, and swaps it back in the captures; the
@@ -601,7 +620,8 @@ gives its one item the order total:
   `orderId`, `total`, `paid`, `shipping`, `discount`, `payee` and the three
   guards the entry index, the glob (a labelled entry: its `value`, its `label`
   and the label line) and the line (1-based number among the email's lines, 0
-  for the subject, and its text cut to 200 characters) that produced the value,
+  for the subject, and its text cut to 200 characters) that produced the value
+  (a multi-line pattern: its first line, and `lines`, every line it matched),
   and for each item (at most 20 in the tool's answer) the globs and lines that
   read it. The editor's test panel lists them under "Matched by".
 - A line item's category is the first `categoryRules` entry whose glob matches
@@ -614,7 +634,7 @@ At most 10 entries per field, 200 characters per pattern (and per `label` and
 `value`), 5 captures per pattern (the glob's own limit), 50 category rules, 100
 characters per section marker, 10 `skipLines`, 6 record steps, 5 alternatives
 per step, 10 globs in each line guard, 3 held lines for `joinWrapped`, `within`
-1 to 10;
+1 to 10, 5 lines per multi-line pattern (no part empty);
 unknown keys refused; every category id owned by the user (checked in the
 write's transaction). Parsing reads at most 2,000 lines and 100 items. A
 labelled entry matches each line against its `value` once however many label
@@ -628,7 +648,9 @@ The validator's codes, each at the path of the problem: `not_object`,
 `capture_conflict`, `invalid_uuid`, `out_of_range` (`within`),
 `items_patterns_and_record`, `items_single_conflict`, `items_shape_missing`,
 `skip_lines_need_record`, `join_wrapped_needs_patterns`, `record_name_missing`,
-`invalid_value` (a category rule `field`, or the top-level `source`).
+`invalid_value` (a category rule `field`, or the top-level `source`),
+`too_many_lines` (a multi-line pattern over 5 parts), `line_break_not_allowed`
+(a multi-line pattern where one text is matched).
 
 ### 5.3 Output (`ParsedReceipt`)
 

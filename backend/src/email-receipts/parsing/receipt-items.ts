@@ -4,8 +4,8 @@ import {
   parseReceiptAmount,
   parseReceiptQty,
 } from "./receipt-amount";
-import { matchReceiptPattern } from "./receipt-glob";
-import { itemSectionRange, traceLine } from "./receipt-lines";
+import { matchReceiptLines, matchReceiptPattern } from "./receipt-glob";
+import { itemSectionRange, traceLines } from "./receipt-lines";
 import {
   MAX_ITEMS,
   MAX_JOINED_LINES,
@@ -52,20 +52,38 @@ export interface RawItem extends ItemFields {
   trace: ReceiptTraceItem;
 }
 
-/** One item line read by one pattern, or null when neither reading of the line is usable. */
-function readLineItem(line: string, pattern: string): ItemFields | null {
-  const captures = matchReceiptPattern(pattern, line, (c) => {
-    const read = readItemFields(c);
-    return read !== null && read.amount !== null;
-  });
+/** An item pattern's reading is usable only when it reads an item with an amount. */
+const acceptItem = (captures: GlobCaptures): boolean => {
+  const read = readItemFields(captures);
+  return read !== null && read.amount !== null;
+};
+
+/** A joined text read by one one-line pattern, or null when neither reading of it is usable. */
+function readTextItem(text: string, pattern: string): ItemFields | null {
+  const captures = matchReceiptPattern(pattern, text, acceptItem);
   return captures === null ? null : readItemFields(captures);
+}
+
+/** The item one pattern reads at line `at` (a multi-line pattern over the lines from `at`, before `end`), with the lines it took. */
+function readItemAt(
+  pattern: string,
+  lines: readonly string[],
+  at: number,
+  end: number,
+): { item: ItemFields; span: number } | null {
+  const found = matchReceiptLines(pattern, lines, at, acceptItem, end);
+  if (found === null) return null;
+  const item = readItemFields(found.captures);
+  return item === null ? null : { item, span: found.span };
 }
 
 /**
  * One item per line: each line of the section is read by the first pattern
- * that reads it. With `joinWrapped`, a line no pattern reads is held (the last
- * three) and put in front of the next line, joined by a space, before the
- * patterns are tried on that; an emitted item clears what was held.
+ * that reads it; a multi-line pattern reads the lines from there on and the
+ * next item starts after the last of them. With `joinWrapped`, a line no
+ * pattern reads is held (the last three) and put in front of the next line,
+ * joined by a space, before the patterns are tried on that; an emitted item
+ * clears what was held.
  */
 function readPatternItems(
   items: ReceiptItemsDefinition,
@@ -80,16 +98,20 @@ function readPatternItems(
   const out: RawItem[] = [];
   let held: number[] = [];
   for (let at = start; at < end; at++) {
-    const read = readJoinedLine(items.patterns, lines, held, at);
+    const read = readJoinedLine(items.patterns, lines, held, at, end);
     if (read !== null) {
       out.push({
         ...read.item,
         trace: {
           mode: "patterns",
           patterns: [read.pattern],
-          lines: [...read.used, at].map((index) => traceLine(lines, index)),
+          lines: [
+            ...read.used.flatMap((index) => traceLines(lines, index, 1)),
+            ...traceLines(lines, at, read.span),
+          ],
         },
       });
+      at += read.span - 1;
       held = [];
       if (out.length >= MAX_ITEMS) break;
     } else if (join) {
@@ -104,23 +126,33 @@ function readPatternItems(
  * One line read by the first pattern that reads it. With held lines the whole
  * buffer is put in front of the line first; when that does not read, a shorter
  * buffer is tried (the last `n - 1` held lines, down to none), so a stray
- * unread line before a one-line item does not hide the item.
+ * unread line before a one-line item does not hide the item. A multi-line
+ * pattern is tried only without held lines (its parts are lines of their own),
+ * and `span` is the lines it took from `at` on (1 for a one-line pattern).
  */
 function readJoinedLine(
   patterns: readonly string[],
   lines: readonly string[],
   held: readonly number[],
   at: number,
-): { item: ItemFields; pattern: string; used: number[] } | null {
-  for (let keep = held.length; keep >= 0; keep--) {
+  end: number,
+): {
+  item: ItemFields;
+  pattern: string;
+  used: number[];
+  span: number;
+} | null {
+  for (let keep = held.length; keep > 0; keep--) {
     const used = held.slice(held.length - keep);
-    const text = keep
-      ? `${used.map((index) => lines[index]).join(" ")} ${lines[at]}`
-      : lines[at];
+    const text = `${used.map((index) => lines[index]).join(" ")} ${lines[at]}`;
     for (const pattern of patterns) {
-      const item = readLineItem(text, pattern);
-      if (item !== null) return { item, pattern, used };
+      const item = readTextItem(text, pattern);
+      if (item !== null) return { item, pattern, used, span: 1 };
     }
+  }
+  for (const pattern of patterns) {
+    const read = readItemAt(pattern, lines, at, end);
+    if (read !== null) return { ...read, pattern, used: [] };
   }
   return null;
 }
@@ -140,14 +172,16 @@ const stepGlobs = (step: ReceiptRecordStep): readonly string[] =>
 
 /**
  * Read one record at `start` of the section's lines: each step consumes the
- * line under the cursor when one of its globs matches and the values read (the
- * alternatives in order, the first that reads wins); an optional step that does
- * not match consumes nothing, a required one fails the record. The captures of
- * all the steps are one item (a capture name belongs to one step).
+ * line under the cursor (a multi-line glob: the lines from the cursor on) when
+ * one of its globs matches and the values read (the alternatives in order, the
+ * first that reads wins); an optional step that does not match consumes
+ * nothing, a required one fails the record. The captures of all the steps are
+ * one item (a capture name belongs to one step).
  */
 function readRecord(
   record: readonly ReceiptRecordStep[],
   section: readonly number[],
+  sectionLines: readonly string[],
   lines: readonly string[],
   start: number,
 ): { item: RawItem; next: number } | null {
@@ -156,18 +190,13 @@ function readRecord(
   const patterns: string[] = [];
   let at = start;
   for (const step of record) {
-    let taken: { glob: string; captures: GlobCaptures } | null = null;
-    if (at < section.length) {
-      for (const glob of stepGlobs(step)) {
-        const captures = matchReceiptPattern(
-          glob,
-          lines[section[at]],
-          acceptStep,
-        );
-        if (captures !== null) {
-          taken = { glob, captures };
-          break;
-        }
+    let taken: { glob: string; captures: GlobCaptures; span: number } | null =
+      null;
+    for (const glob of stepGlobs(step)) {
+      const found = matchReceiptLines(glob, sectionLines, at, acceptStep);
+      if (found !== null) {
+        taken = { glob, ...found };
+        break;
       }
     }
     if (taken === null) {
@@ -177,9 +206,11 @@ function readRecord(
     for (const [name, value] of Object.entries(taken.captures)) {
       if (!(name in merged)) merged[name] = value;
     }
-    patterns.push(taken.glob);
-    used.push(section[at]);
-    at++;
+    for (let k = 0; k < taken.span; k++) {
+      patterns.push(taken.glob);
+      used.push(section[at + k]);
+    }
+    at += taken.span;
   }
   const fields = readItemFields(merged);
   if (fields === null) return null;
@@ -189,14 +220,17 @@ function readRecord(
       trace: {
         mode: "record",
         patterns,
-        lines: used.map((index) => traceLine(lines, index)),
+        lines: used.flatMap((index) => traceLines(lines, index, 1)),
       },
     },
     next: at,
   };
 }
 
-/** Block items: the section minus its `skipLines`, then a record read from a cursor. */
+/**
+ * Block items: the section minus its `skipLines` (a multi-line skip glob drops
+ * every line it matched), then a record read from a cursor.
+ */
 function readBlockItems(
   items: ReceiptBlockItemsDefinition,
   lines: readonly string[],
@@ -208,16 +242,24 @@ function readBlockItems(
     items.stopAt,
   );
   const section: number[] = [];
-  for (let at = start; at < end; at++) {
-    const dropped = skip.some(
-      (glob) => matchReceiptPattern(glob, lines[at], () => true) !== null,
-    );
-    if (!dropped) section.push(at);
+  let at = start;
+  while (at < end) {
+    let dropped = 0;
+    for (const glob of skip) {
+      const found = matchReceiptLines(glob, lines, at, () => true, end);
+      if (found !== null) {
+        dropped = found.span;
+        break;
+      }
+    }
+    if (dropped === 0) section.push(at);
+    at += Math.max(dropped, 1);
   }
+  const sectionLines = section.map((index) => lines[index]);
   const out: RawItem[] = [];
   let cursor = 0;
   while (cursor < section.length && out.length < MAX_ITEMS) {
-    const read = readRecord(items.record, section, lines, cursor);
+    const read = readRecord(items.record, section, sectionLines, lines, cursor);
     if (read === null) {
       // A failed record moves the cursor one line, so the next product is found.
       cursor += 1;
@@ -229,7 +271,7 @@ function readBlockItems(
   return out;
 }
 
-/** One item for the whole email: its name from the first section line the glob reads; its amount comes later. */
+/** One item for the whole email: its name from the first section line (or run of lines, multi-line) the glob reads; its amount comes later. */
 function readSingleItem(
   items: ReceiptSingleItemsDefinition,
   lines: readonly string[],
@@ -242,21 +284,23 @@ function readSingleItem(
   const glob = items.single?.name;
   if (typeof glob !== "string") return [];
   for (let at = start; at < end; at++) {
-    const captures = matchReceiptPattern(
+    const found = matchReceiptLines(
       glob,
-      lines[at],
+      lines,
+      at,
       (c) => (c.name ?? "") !== "",
+      end,
     );
-    if (captures !== null) {
+    if (found !== null) {
       return [
         {
-          name: captures.name,
+          name: found.captures.name,
           qty: 1,
           amount: null,
           trace: {
             mode: "single",
             patterns: [glob],
-            lines: [traceLine(lines, at)],
+            lines: traceLines(lines, at, found.span),
           },
         },
       ];

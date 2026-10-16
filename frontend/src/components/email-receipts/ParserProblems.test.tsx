@@ -107,6 +107,19 @@ describe('ParserProblems', () => {
     expect(screen.getByText('Lines source: has a value this field does not accept')).toBeInTheDocument();
   });
 
+  it('bounds a multi-line pattern by the line limit, and says where a pattern cannot span lines', () => {
+    render(
+      <ParserProblems
+        problems={[
+          { path: 'total[0]', code: 'too_many_lines' },
+          { path: 'categoryRules[0].match', code: 'line_break_not_allowed' },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/spans too many lines \(at most 5\)/)).toBeInTheDocument();
+    expect(screen.getByText(/so it cannot span several lines/)).toBeInTheDocument();
+  });
+
   it('bounds the number of category rules by the rule limit, not the pattern limit', () => {
     render(<ParserProblems problems={[{ path: 'categoryRules', code: 'too_many' }]} />);
     expect(screen.getByText('Category rules: has too many entries (at most 50)')).toBeInTheDocument();

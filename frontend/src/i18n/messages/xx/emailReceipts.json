@@ -212,7 +212,7 @@
         "text": "[XX-Text-XX]",
         "html": "[XX-HTML-XX]"
       },
-      "globHelp": "[XX-Each pattern is matched against one whole line of the email, ignoring case. Use {star} for any text and a name in braces, such as {capture}, to capture a value. Each field takes up to {max} patterns, one per line.-XX]",
+      "globHelp": "[XX-Each pattern is matched against one whole line of the email, ignoring case. Use {star} for any text and a name in braces, such as {capture}, to capture a value. Each field takes up to {max} patterns, one per line. To match consecutive lines, join one pattern per line with {lineBreak}, for example {example}.-XX]",
       "orderIdLabel": "[XX-Order number patterns-XX]",
       "orderIdHint": "[XX-Must capture {capture}. Example: Order number: {capture}-XX]",
       "totalLabel": "[XX-Total patterns-XX]",
@@ -468,6 +468,8 @@
       "trade_amount_missing": "[XX-needs total or price patterns (at least one of the two)-XX]",
       "trade_account_missing": "[XX-needs a default account, or account rules-XX]",
       "invalid_currency": "[XX-is not a 3-letter currency code, such as USD-XX]",
+      "too_many_lines": "[XX-spans too many lines (at most {max})-XX]",
+      "line_break_not_allowed": "[XX-is matched against one text (an item name, the merchant or an account), so it cannot span several lines-XX]",
       "invalid_uuid_account": "[XX-is not a valid account-XX]"
     }
   },
@@ -526,6 +528,8 @@
       },
       "entryLine": "[XX-entry {entry} ({pattern}), line {line}: {text}-XX]",
       "entrySubject": "[XX-entry {entry} ({pattern}), the subject: {text}-XX]",
+      "entryLines": "[XX-entry {entry} ({pattern}), lines {first} to {last}:-XX]",
+      "blockLine": "[XX-line {line}: {text}-XX]",
       "labelled": "[XX-entry {entry}, label {label} on line {labelLine} ({labelText}), value {pattern} on line {line}: {text}-XX]",
       "item": "[XX-Item {number}-XX]",
       "itemLine": "[XX-{pattern}, line {line}: {text}-XX]"

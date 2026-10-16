@@ -1,7 +1,7 @@
 import type { GlobCaptures } from "../../transaction-rules/rule-glob-capture";
 import { findField } from "./parse-receipt";
-import { normalizeLine, traceLine } from "./receipt-lines";
-import { matchReceiptPattern } from "./receipt-glob";
+import { normalizeLine, traceMatch } from "./receipt-lines";
+import { matchReceiptLines, matchReceiptPattern } from "./receipt-glob";
 import {
   MAX_TRADE_QUANTITY_DECIMALS,
   type ParsedTrade,
@@ -321,18 +321,23 @@ export function resolveTradeAccount(
   };
 }
 
-/** The first currency marker that matches a line, with what matched it. */
+/** The first currency marker that matches a line (or, multi-line, a run of lines), with what matched it. */
 function readCurrencyMarker(
   definition: Pick<ReceiptTradeDefinition, "currencyMarkers">,
   lines: readonly string[],
 ): { currency: string; hit: ReceiptTraceHit } | null {
   const markers = definition.currencyMarkers ?? [];
   for (const [entry, marker] of markers.entries()) {
-    for (const [index, text] of lines.entries()) {
-      if (matchReceiptPattern(marker.match, text, () => true) !== null) {
+    for (let index = 0; index < lines.length; index++) {
+      const found = matchReceiptLines(marker.match, lines, index, () => true);
+      if (found !== null) {
         return {
           currency: marker.currency.toUpperCase(),
-          hit: { entry, pattern: marker.match, line: traceLine(lines, index) },
+          hit: {
+            entry,
+            pattern: marker.match,
+            ...traceMatch(lines, index, found.span),
+          },
         };
       }
     }

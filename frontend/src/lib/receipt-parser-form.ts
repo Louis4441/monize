@@ -727,6 +727,8 @@ export const PARSER_VALIDATION_CODES = [
   'trade_amount_missing',
   'trade_account_missing',
   'invalid_currency',
+  'too_many_lines',
+  'line_break_not_allowed',
 ] as const;
 
 const PROBLEM = new RegExp(

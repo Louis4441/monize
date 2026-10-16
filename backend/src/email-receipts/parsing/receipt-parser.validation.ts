@@ -3,6 +3,7 @@ import {
   MAX_CAPTURES_PER_PATTERN,
   parseGlob,
 } from "../../transaction-rules/rule-glob-capture";
+import { patternParts } from "./receipt-glob";
 import {
   MAX_DAYS_AFTER,
   MAX_DAYS_BEFORE,
@@ -19,6 +20,7 @@ import {
   MAX_LABEL_WITHIN,
   MAX_LINE_GUARDS,
   MAX_PATTERN_LENGTH,
+  MAX_PATTERN_LINES,
   MAX_PATTERNS_PER_FIELD,
   MAX_RECORD_STEPS,
   MAX_SECTION_MARKER_LENGTH,
@@ -75,7 +77,9 @@ export interface ReceiptParserValidationError {
    * category rule `field`, the top-level `source`, a `match` strategy, field or
    * tolerance), `duplicate_entry` (a repeated `match` strategy or field),
    * `reference_field_missing` (`match.by` names `reference` and the profile reads
-   * none).
+   * none), `too_many_lines` (a multi-line pattern over `MAX_PATTERN_LINES`
+   * parts), `line_break_not_allowed` (a multi-line pattern where one text is
+   * matched: a category rule's item name or payee, a trade account rule).
    */
   code: string;
 }
@@ -254,12 +258,19 @@ function hasControlCharacter(text: string): boolean {
   return false;
 }
 
-/** A glob pattern for one field: bounded, well formed, with only the allowed captures. */
+/**
+ * A glob pattern for one field: bounded, well formed, with only the allowed
+ * captures. A multi-line pattern (parts joined by `\n`) has up to
+ * `MAX_PATTERN_LINES` parts, none empty, and its captures are counted over
+ * all of them; `lineBreaks` false refuses one, where the pattern is matched
+ * against one text rather than the email's lines.
+ */
 function checkPattern(
   value: unknown,
   path: string,
   captures: FieldCaptures,
   errors: Errors,
+  lineBreaks = true,
 ): boolean {
   if (typeof value !== "string") {
     errors.add(path, "invalid_type");
@@ -278,14 +289,31 @@ function checkPattern(
     errors.add(path, "control_character");
     return false;
   }
-  const glob = parseGlob(value);
+  const parts = patternParts(value);
+  if (parts.length > 1 && !lineBreaks) {
+    errors.add(path, "line_break_not_allowed");
+    return false;
+  }
+  if (parts.length > MAX_PATTERN_LINES) {
+    errors.add(path, "too_many_lines");
+    return false;
+  }
+  // An empty part would match only an empty line, and no line is empty.
+  if (parts.some((part) => part.trim() === "")) {
+    errors.add(path, "empty");
+    return false;
+  }
+  const globs = parts.map((part) => parseGlob(part));
+  const names = globs.flatMap((glob) => glob.captureNames);
   const before = errors.list.length;
-  if (glob.malformed.length > 0) errors.add(path, "malformed_capture");
-  if (glob.captureNames.length > MAX_CAPTURES_PER_PATTERN) {
+  if (globs.some((glob) => glob.malformed.length > 0)) {
+    errors.add(path, "malformed_capture");
+  }
+  if (names.length > MAX_CAPTURES_PER_PATTERN) {
     errors.add(path, "too_many_captures");
   }
   const seen = new Set<string>();
-  for (const name of glob.captureNames) {
+  for (const name of names) {
     if (seen.has(name)) errors.add(path, "duplicate_capture");
     seen.add(name);
     if (!captures.allowed.includes(name)) {
@@ -674,13 +702,15 @@ function checkCategoryRules(
       return;
     }
     checkKeys(entry, CATEGORY_RULE_KEYS, `${path}.`, errors);
-    // A category rule is a capture-less glob over an item name, the payee or a line.
+    // A category rule is a capture-less glob over an item name, the payee or a
+    // line; only a `line` rule reads the email's lines, so only it may span them.
     const noCaptures: FieldCaptures = { allowed: [], required: [] };
     const matchOk = checkPattern(
       entry.match,
       `${path}.match`,
       noCaptures,
       errors,
+      entry.field === "line",
     );
     const categoryId = checkUuid(
       entry.categoryId,
@@ -936,11 +966,13 @@ function checkTradeAccountRules(
       return;
     }
     checkKeys(entry, TRADE_ACCOUNT_RULE_KEYS, `${entryPath}.`, errors);
+    // An account rule matches the account text the email printed, one text.
     const matchOk = checkPattern(
       entry.match,
       `${entryPath}.match`,
       NO_CAPTURES,
       errors,
+      false,
     );
     const accountId = checkUuid(
       entry.accountId,

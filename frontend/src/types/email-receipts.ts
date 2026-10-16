@@ -508,6 +508,8 @@ export const PARSER_DRAFT_MAX_RECEIPTS = 5;
 export const RECEIPT_PARSER_LIMITS = {
   maxPatternsPerField: 10,
   maxPatternLength: 200,
+  /** Consecutive lines one multi-line pattern (parts joined by `\n`) may span. */
+  maxPatternLines: 5,
   maxCategoryRules: 50,
   maxSectionMarkerLength: 100,
   maxSkipLines: 10,
@@ -816,7 +818,10 @@ export interface ReceiptTraceHit {
   /** A labelled entry's label glob and the line it matched. */
   label?: string;
   labelLine?: ReceiptTraceLine;
+  /** The line the value was read from; for a multi-line pattern, the first line it matched. */
   line: ReceiptTraceLine;
+  /** A multi-line pattern: every line it matched, first to last (absent for a one-line match). */
+  lines?: ReceiptTraceLine[];
 }
 
 export interface ReceiptTraceItem {

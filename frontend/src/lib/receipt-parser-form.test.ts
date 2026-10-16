@@ -53,6 +53,13 @@ describe('buildParserDefinition', () => {
     expect(buildParserDefinition(emptyParserForm())).toEqual({ version: 2 });
   });
 
+  it('keeps a multi-line pattern (parts joined by \\n) as one pattern, and shows it in the form again', () => {
+    const multiLine = 'Receipt from *\\n{amount}\\nPaid';
+    const definition = buildParserDefinition(emptyParserForm({ total: `${multiLine}\nTotal {amount}` }));
+    expect(definition.total).toEqual([multiLine, 'Total {amount}']);
+    expect(formCanRepresent(definition)).toBe(true);
+  });
+
   it('builds every part of the definition', () => {
     const definition = buildParserDefinition(
       emptyParserForm({
@@ -179,6 +186,15 @@ describe('parseValidationProblems', () => {
       { path: 'items.patterns[1]', code: 'capture_conflict' },
       { path: 'categoryRules[2].categoryId', code: 'invalid_uuid' },
       { path: '', code: 'not_object' },
+    ]);
+  });
+
+  it('reads the multi-line codes, not the shorter code they start with', () => {
+    expect(
+      parseValidationProblems('x: total[0]: too_many_lines; categoryRules[1].match: line_break_not_allowed'),
+    ).toEqual([
+      { path: 'total[0]', code: 'too_many_lines' },
+      { path: 'categoryRules[1].match', code: 'line_break_not_allowed' },
     ]);
   });
 
