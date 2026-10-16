@@ -1,3 +1,4 @@
+import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { MAX_PARSE_LINES } from "../parsing/receipt-parser.types";
@@ -606,6 +607,27 @@ describe("EmailReceiptsService.get", () => {
     });
   });
 
+  it("says whose trade request is open: the profile's, or the AI's from Recognize as a trade", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValueOnce([
+      {
+        ...row({ status: "review", is_trade: true, trade_source: "profile" }),
+        body_text: "Symbol: XCNS",
+        body_html: null,
+        parsed: null,
+        trade: { symbol: "XCNS", complete: false },
+        trade_proposal: null,
+        trade_request_source: "ai",
+        candidate_transaction_ids: [],
+      },
+    ]);
+    const detail = await service.get(USER, ID);
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(sql).toContain("rq.instruction = $3");
+    expect(params).toEqual([USER, ID, RECEIPT_TRADE_CHAT_INSTRUCTION]);
+    expect(detail.tradeRequestSource).toBe("ai");
+  });
+
   it("has no tradeProposal when the email's request holds none", async () => {
     const { service, manager } = setup();
     manager.query.mockResolvedValueOnce([
@@ -618,7 +640,9 @@ describe("EmailReceiptsService.get", () => {
         candidate_transaction_ids: [],
       },
     ]);
-    expect((await service.get(USER, ID)).tradeProposal).toBeNull();
+    const detail = await service.get(USER, ID);
+    expect(detail.tradeProposal).toBeNull();
+    expect(detail.tradeRequestSource).toBeNull();
   });
 
   it("has no bodyHtml for an email with no HTML part", async () => {

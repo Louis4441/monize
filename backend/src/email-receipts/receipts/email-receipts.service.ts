@@ -28,6 +28,7 @@ import {
   EMAIL_RECEIPTS_MAX_LIST_LIMIT,
 } from "./dto/email-receipts.dto";
 import { describeFailure } from "../pipeline/receipt-failure";
+import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
 import { readTradeProposal } from "./email-receipt-trade-proposal";
 import type {
   EmailReceiptCandidateSummary,
@@ -152,6 +153,7 @@ interface DetailRow extends ItemRow {
   parsed: Record<string, unknown> | null;
   trade: Record<string, unknown> | null;
   trade_proposal: unknown;
+  trade_request_source: "profile" | "ai" | null;
   candidate_transaction_ids: string[];
 }
 
@@ -843,11 +845,17 @@ export class EmailReceiptsService {
                 CASE WHEN rq.kind = 'email_trade'
                       AND rq.status = 'proposed'
                       AND rq.expires_at > CURRENT_TIMESTAMP
-                     THEN rq.proposal END AS trade_proposal
+                     THEN rq.proposal END AS trade_proposal,
+                -- Who reads the trade the request asks about: the profile's
+                -- own request, or the one "Recognize as a trade" queued for
+                -- the AI (told apart by its fixed instruction).
+                CASE WHEN rq.kind = 'email_trade'
+                     THEN CASE WHEN rq.instruction = $3 THEN 'ai' ELSE 'profile' END
+                END AS trade_request_source
            ${ITEM_JOINS}
           WHERE r.user_id = $1
             AND r.id = $2`,
-        [userId, id],
+        [userId, id, RECEIPT_TRADE_CHAT_INSTRUCTION],
       ),
     );
     const row = rows[0];
@@ -867,6 +875,7 @@ export class EmailReceiptsService {
       parsed: row.parsed,
       trade: row.trade ?? null,
       tradeProposal: readTradeProposal(row.trade_proposal),
+      tradeRequestSource: row.trade_request_source ?? null,
       candidates: row.trade
         ? await this.tradeLinks.candidates(
             m,

@@ -150,6 +150,12 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
    * for approval (not expired); null otherwise, and for every other email.
    */
   tradeProposal: EmailReceiptTradeProposal | null;
+  /**
+   * Who answers the email's `email_trade` request: `profile` for the one a
+   * trade profile queued, `ai` for the one "Recognize as a trade" handed to
+   * the assistant; null when the email's request is not a trade request.
+   */
+  tradeRequestSource: "profile" | "ai" | null;
   candidates: EmailReceiptCandidateSummary[];
 }
 
