@@ -143,7 +143,12 @@ describe("EmailReceiptProfileBatchService", () => {
     expect(idsOf(receiptRepo.update)).toEqual(["a"]);
     expect(receiptRepo.update).toHaveBeenCalledWith(
       { id: "a", userId: USER },
-      { status: "ignored", statusReason: null, aiReviewRequestId: null },
+      {
+        status: "ignored",
+        statusReason: null,
+        aiReviewRequestId: null,
+        linkKey: null,
+      },
     );
     // Its open request is closed with it.
     expect(

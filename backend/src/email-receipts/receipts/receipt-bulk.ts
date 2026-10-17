@@ -122,6 +122,15 @@ export async function bulkActOnReceipts(
   if (targets.length === 0) return result;
 
   await closeRequestsOfReceipts(m, userId, targets);
+  if (action === "ignore") {
+    // An ignored settlement takes nothing from a component (linked receipts
+    // spec 5); a delete cascades to the rows by itself.
+    await m.query(
+      `DELETE FROM email_receipt_links
+        WHERE settlement_receipt_id = ANY($1::uuid[]) AND user_id = $2`,
+      [targets, userId],
+    );
+  }
   const written =
     action === "delete"
       ? returnedRows<{ id: string }>(
@@ -138,7 +147,7 @@ export async function bulkActOnReceipts(
           await m.query(
             `UPDATE email_receipts
                 SET status = 'ignored', status_reason = NULL,
-                    ai_review_request_id = NULL
+                    ai_review_request_id = NULL, link_key = NULL
               WHERE id = ANY($1::uuid[])
                 AND user_id = $2
                 AND transaction_id IS NULL

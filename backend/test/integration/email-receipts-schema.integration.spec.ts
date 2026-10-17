@@ -35,6 +35,7 @@ describe("email receipts schema (schema.sql and migrations)", () => {
     "ai_review_requests_parser_draft",
     "email_receipts_match_kind_profile",
     "email_receipt_mailbox_profile_ai_limit",
+    "email_receipt_links",
   ];
 
   let admin: DataSource;
@@ -419,6 +420,148 @@ describe("email receipts schema (schema.sql and migrations)", () => {
     });
   });
 
+  describe("email_receipt_links", () => {
+    const OUTCOMES = [
+      "no_link",
+      "not_found",
+      "component_incomplete",
+      "component_used",
+      "joined",
+      "scaled",
+      "amount_exceeds",
+    ];
+
+    const link = (settlementId: string, over: Record<string, unknown> = {}) => {
+      const row: Record<string, unknown> = {
+        user_id: userId,
+        settlement_receipt_id: settlementId,
+        part_index: 0,
+        part_amount: "10.0000",
+        outcome: "no_link",
+        ...over,
+      };
+      const cols = Object.keys(row);
+      return db.query(
+        `INSERT INTO email_receipt_links (${cols.join(", ")})
+         VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING id`,
+        cols.map((c) => row[c]),
+      );
+    };
+
+    let settlementId: string;
+    let componentId: string;
+
+    beforeEach(async () => {
+      [{ id: settlementId }] = await receipt({ uid: 1 });
+      [{ id: componentId }] = await receipt({
+        uid: 2,
+        status: "component",
+        link_key: "k1",
+      });
+    });
+
+    it("bounds the part index to 0..99 and holds one row per part of a settlement", async () => {
+      await link(settlementId, { part_index: 0 });
+      await link(settlementId, { part_index: 99 });
+      await expect(link(settlementId, { part_index: 100 })).rejects.toThrow(
+        /ck_email_receipt_links_part_index/,
+      );
+      await expect(link(settlementId, { part_index: -1 })).rejects.toThrow(
+        /ck_email_receipt_links_part_index/,
+      );
+      await expect(link(settlementId, { part_index: 0 })).rejects.toThrow(
+        /uq_email_receipt_links_part/,
+      );
+    });
+
+    it("admits only the seven outcomes of a part", async () => {
+      for (const [i, outcome] of OUTCOMES.entries()) {
+        await link(settlementId, { part_index: i, outcome });
+      }
+      await expect(
+        link(settlementId, { part_index: 50, outcome: "guess" }),
+      ).rejects.toThrow(/ck_email_receipt_links_outcome/);
+    });
+
+    it("refuses a negative part amount and holds four decimals", async () => {
+      await expect(
+        link(settlementId, { part_amount: "-0.0001" }),
+      ).rejects.toThrow(/ck_email_receipt_links_part_amount/);
+      await link(settlementId, { part_index: 1, part_amount: "0" });
+      await link(settlementId, { part_index: 2, part_amount: "109.8900" });
+      const rows = await db.query(
+        `SELECT part_amount FROM email_receipt_links WHERE part_index = 2`,
+      );
+      expect(rows[0].part_amount).toBe("109.8900");
+    });
+
+    it("leaves a part with no link value or component as it is, and defaults to the safe outcome", async () => {
+      await db.query(
+        `INSERT INTO email_receipt_links (user_id, settlement_receipt_id, part_amount)
+         VALUES ($1, $2, 1)`,
+        [userId, settlementId],
+      );
+      const [row] = await db.query(
+        `SELECT part_index, link_value, component_receipt_id, outcome
+           FROM email_receipt_links`,
+      );
+      expect(row).toEqual({
+        part_index: 0,
+        link_value: null,
+        component_receipt_id: null,
+        outcome: "no_link",
+      });
+    });
+
+    it("is deleted with its settlement, and only loses its component when the component is deleted", async () => {
+      await link(settlementId, {
+        part_index: 0,
+        link_value: "k1",
+        component_receipt_id: componentId,
+        outcome: "joined",
+      });
+
+      await db.query(`DELETE FROM email_receipts WHERE id = $1`, [componentId]);
+      const [kept] = await db.query(
+        `SELECT component_receipt_id, outcome FROM email_receipt_links`,
+      );
+      expect(kept).toEqual({ component_receipt_id: null, outcome: "joined" });
+
+      await db.query(`DELETE FROM email_receipts WHERE id = $1`, [
+        settlementId,
+      ]);
+      expect(await db.query(`SELECT 1 FROM email_receipt_links`)).toHaveLength(
+        0,
+      );
+    });
+
+    it("is deleted with its user", async () => {
+      const gone = (await createTestUserDirect(db, { firstName: "G" })).id;
+      const [{ id: mb }] = await db.query(
+        `INSERT INTO email_receipt_mailboxes (user_id, host, username, password_enc)
+         VALUES ($1, 'h', 'u', 'p') RETURNING id`,
+        [gone],
+      );
+      const [{ id: rid }] = await receipt({
+        uid: 7,
+        user_id: gone,
+        mailbox_id: mb,
+      });
+      await link(rid, { user_id: gone });
+      await db.query(`DELETE FROM users WHERE id = $1`, [gone]);
+      expect(await db.query(`SELECT 1 FROM email_receipt_links`)).toHaveLength(
+        0,
+      );
+    });
+
+    it("keeps the link value of a component in its own column, and admits it only as text up to 100", async () => {
+      await receipt({ uid: 3, status: "component", link_key: "x".repeat(100) });
+      await expect(
+        receipt({ uid: 4, status: "component", link_key: "x".repeat(101) }),
+      ).rejects.toThrow(/value too long/);
+    });
+  });
+
   describe("email_receipts", () => {
     it("accepts every state of the pipeline and refuses any other", async () => {
       const states = [
@@ -431,6 +574,7 @@ describe("email receipts schema (schema.sql and migrations)", () => {
         "review_conflict",
         "review",
         "ignored",
+        "component",
       ];
       for (const [i, status] of states.entries()) {
         await receipt({ uid: i + 1, status });
@@ -798,7 +942,7 @@ describe("email receipts schema (schema.sql and migrations)", () => {
            FROM pg_constraint
           WHERE conrelid::regclass::text IN
                 ('email_receipt_mailboxes', 'email_receipt_parsers',
-                 'email_receipts', 'ai_review_requests')
+                 'email_receipts', 'ai_review_requests', 'email_receipt_links')
           ORDER BY 1, 2`,
       );
 
@@ -819,6 +963,8 @@ describe("email receipts schema (schema.sql and migrations)", () => {
       // the two of the profile work come last
       expect(positions[5]).toBeGreaterThan(positions[4]);
       expect(positions[6]).toBeGreaterThan(positions[5]);
+      // the linked receipts come after the profile work
+      expect(positions[7]).toBeGreaterThan(positions[6]);
     });
 
     it("has the new columns, with the same types, after the replays", async () => {
@@ -827,7 +973,7 @@ describe("email receipts schema (schema.sql and migrations)", () => {
           `SELECT table_name, column_name, data_type, is_nullable
              FROM information_schema.columns
             WHERE (table_name = 'email_receipts'
-                   AND column_name IN ('body_html', 'forwarded_by', 'original_sent_at'))
+                   AND column_name IN ('body_html', 'forwarded_by', 'original_sent_at', 'link_key'))
                OR (table_name = 'ai_review_requests'
                    AND column_name IN ('transaction_id', 'email_receipt_ids', 'parser_domain'))
                OR (table_name = 'email_receipt_mailboxes'
@@ -835,7 +981,7 @@ describe("email receipts schema (schema.sql and migrations)", () => {
             ORDER BY 1, 2`,
         );
       const expected = await columns(db);
-      expect(expected).toHaveLength(7);
+      expect(expected).toHaveLength(8);
       expect(await columns(upgraded)).toEqual(expected);
     });
   });

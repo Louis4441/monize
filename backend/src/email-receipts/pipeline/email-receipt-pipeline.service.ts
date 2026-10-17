@@ -46,7 +46,19 @@ import {
   type ParsedReceipt,
   type ParsedTrade,
 } from "../parsing/receipt-parser.types";
-import { hasJoinedPart } from "../linking/join-settlement";
+import { componentReason } from "../linking/component-reason";
+import { loadLinkedComponents } from "../linking/component-lookup";
+import {
+  componentNet,
+  hasJoinedPart,
+  joinSettlement,
+  type JoinedSettlement,
+} from "../linking/join-settlement";
+import {
+  linkRowsOf,
+  replaceLinkRows,
+  type LinkRowInput,
+} from "../linking/link-rows";
 import {
   applyCategoryHistory,
   loadItemCategoryHistory,
@@ -104,6 +116,12 @@ export const RECEIPT_NO_HTML_REASON = "no_html";
  * `items_uncategorized`, ...), which `parsed.source` records either way.
  */
 export const RECEIPT_SCHEMA_ORG_REASON = "schema_org";
+/** The `parse_failed` reason of a component email that holds no link value (linked receipts spec 2.1). */
+export const RECEIPT_NO_LINK_KEY_REASON = "no_link_key";
+/** The reason of a settlement some linked part of which stayed one line (spec 4.4 and 12). */
+export const RECEIPT_PARTIALLY_LINKED_REASON = "partially_linked";
+/** The `review_conflict` reason of a settlement whose transaction another email enriched (spec 6). */
+export const RECEIPT_ENRICHED_BY_OTHER_REASON = "enriched_by_other";
 
 /** What `process` does and refuses, by who asked. */
 export interface ProcessReceiptOptions {
@@ -171,6 +189,12 @@ interface Stored {
   candidateIds: string[];
   matchKind: EmailReceiptMatchKind | null;
   requestId: string | null;
+  /** A `component` receipt's link value; every other outcome stores null. */
+  linkKey?: string | null;
+  /** The link rows of a settlement after the join; absent leaves it with none. */
+  links?: LinkRowInput[];
+  /** What the joined components now hold; written with the settlement, never on a pass that writes nothing. */
+  componentReasons?: JoinedSettlement["componentReasons"];
 }
 
 interface TransactionFacts extends ReceiptProposalTransaction {
@@ -486,6 +510,37 @@ export class EmailReceiptPipelineService {
         sources.forSource(definition.source),
         payee?.defaultCategoryId ?? null,
       );
+      // A component never looks for a bank transaction and never opens a
+      // request (linked receipts spec 2.1); a person's own link is a command
+      // and reads the email as a standalone one, like the guards above.
+      if (!link && definition.role === "component") {
+        const base = {
+          parserId: choice.parser.id,
+          parsed,
+          requestId: null,
+          transactionId: null,
+          candidateIds: [],
+          matchKind: null,
+        };
+        if (!parsed.linkKey) {
+          return this.finish(m, userId, receipt, {
+            ...base,
+            status: "parse_failed",
+            reason: RECEIPT_NO_LINK_KEY_REASON,
+          });
+        }
+        return this.finish(m, userId, receipt, {
+          ...base,
+          status: "component",
+          reason: await componentReason(
+            m,
+            userId,
+            receipt.id,
+            componentNet(parsed),
+          ),
+          linkKey: parsed.linkKey,
+        });
+      }
       if (parsed.total === null && parsed.paid === null) {
         structured = await this.readStructured(userId, sources);
         if (structured) parsed = structured;
@@ -504,15 +559,30 @@ export class EmailReceiptPipelineService {
       }
       parsed = structured;
     }
-    // The reason slot a schema.org reading fills when the outcome has none of its own.
+    // Some linked part of a settlement stayed one line (set by the join below).
+    let partiallyLinked = false;
+    // The reason slot a schema.org reading, or a partly linked settlement,
+    // fills when the outcome has none of its own.
     const reasonOf = (reason: string | null): string | null =>
-      reason ?? (structured ? RECEIPT_SCHEMA_ORG_REASON : null);
+      reason ??
+      (partiallyLinked ? RECEIPT_PARTIALLY_LINKED_REASON : null) ??
+      (structured ? RECEIPT_SCHEMA_ORG_REASON : null);
     // What the profile says about matching (spec 3a); the defaults when no
     // parser read the email (schema.org, no parser).
     const matchConfig = resolveMatchConfig(
       choice.kind === "chosen" ? choice.definition.match : undefined,
     );
-    let stored = { parserId: parser?.id ?? null, parsed };
+    let stored: {
+      parserId: string | null;
+      parsed: ParsedReceipt;
+      links?: LinkRowInput[];
+      componentReasons?: JoinedSettlement["componentReasons"];
+    } = { parserId: parser?.id ?? null, parsed };
+    // The day the shop sent the order when a forward carried it, else the day
+    // the email arrived (spec "Matching" section 3).
+    const purchaseDate = effectiveReceiptDate(receipt)
+      .toISOString()
+      .slice(0, 10);
 
     if (
       !link &&
@@ -530,23 +600,65 @@ export class EmailReceiptPipelineService {
       });
     }
 
+    // A settlement (linked receipts spec 4): each part is replaced by the lines
+    // of the purchase email it pays for. A reading that came from schema.org
+    // does not join. The component rows are locked here, after the receipt's
+    // own row and before the advisory lock on the matched transaction (spec 11).
+    const isSettlement =
+      structured === null &&
+      choice.kind === "chosen" &&
+      choice.definition.role === "settlement";
+    let joinedTagNames: string[] = [];
+    const joinedComponentIds = new Set<string>();
+    if (isSettlement && choice.kind === "chosen") {
+      const parts = await loadLinkedComponents(
+        m,
+        userId,
+        { id: receipt.id, effectiveDate: purchaseDate },
+        parsed.items.map((item) => item.link ?? null),
+        choice.definition.link ?? {},
+        true,
+      );
+      const joined = joinSettlement(parsed, parts);
+      parsed = joined.parsed;
+      joinedTagNames = joined.tagNames;
+      for (const report of joined.reports) {
+        if (
+          (report.outcome === "joined" || report.outcome === "scaled") &&
+          report.componentReceiptId !== null
+        ) {
+          joinedComponentIds.add(report.componentReceiptId);
+        }
+      }
+      partiallyLinked = joined.reports.some(
+        (report) =>
+          report.link !== null &&
+          report.outcome !== "joined" &&
+          report.outcome !== "scaled",
+      );
+      stored = {
+        ...stored,
+        parsed,
+        links: linkRowsOf(joined.reports),
+        componentReasons: joined.componentReasons,
+      };
+    }
+
     let transaction: TransactionFacts;
     let matchKind: EmailReceiptMatchKind;
     if (link) {
       transaction = link;
       matchKind = "manual";
     } else {
-      // The window is centred on the day the shop sent the order when a forward
-      // carried it, else on the day the email arrived (spec section 3).
-      const purchaseDate = effectiveReceiptDate(receipt)
-        .toISOString()
-        .slice(0, 10);
+      // The window is centred on `purchaseDate` (spec section 3). A settlement
+      // also sees the transactions another email enriched (linked receipts 6).
       const candidates = await loadReceiptCandidates(
         m,
         userId,
         purchaseDate,
         receipt.id,
         matchConfig,
+        isSettlement,
       );
       const match = matchReceipt(
         parsed,
@@ -579,6 +691,24 @@ export class EmailReceiptPipelineService {
       }
       const hit = candidates.find((c) => c.id === match.transactionId);
       if (!hit) throw new Error("A matched candidate is not in the candidates");
+      // The transaction was enriched by an email this settlement does not join:
+      // a person decides (the Link action proposes over it). One enriched by a
+      // component this settlement joins is replaced by the new card.
+      if (
+        isSettlement &&
+        hit.enrichedByReceiptId &&
+        !joinedComponentIds.has(hit.enrichedByReceiptId)
+      ) {
+        return this.finish(m, userId, receipt, {
+          status: "review_conflict",
+          reason: RECEIPT_ENRICHED_BY_OTHER_REASON,
+          transactionId: null,
+          candidateIds: [hit.id],
+          matchKind: null,
+          requestId: null,
+          ...stored,
+        });
+      }
       transaction = {
         id: hit.id,
         amount: hit.amount,
@@ -666,6 +796,8 @@ export class EmailReceiptPipelineService {
         structured === null && choice.kind === "chosen"
           ? (choice.definition.tag ?? null)
           : null,
+      // The tags of the profiles of the joined components (spec 7).
+      ...(isSettlement ? { extraTagNames: joinedTagNames } : {}),
     };
     const proposal = buildReceiptProposal(parsed, transaction, context);
     const askAi = aiMode === "automatic" && !parsed.complete;
@@ -988,12 +1120,23 @@ export class EmailReceiptPipelineService {
         trade: (stored.trade ??
           null) as unknown as QueryDeepPartialEntity<EmailReceipt>["trade"],
         investmentTransactionId: stored.investmentTransactionId ?? null,
+        linkKey: stored.linkKey ?? null,
         transactionId: stored.transactionId,
         candidateTransactionIds: stored.candidateIds,
         matchKind: stored.matchKind,
         aiReviewRequestId: stored.requestId,
       },
     );
+    // The settlement's link rows are replaced every time it is stored (spec 5).
+    await replaceLinkRows(m, userId, receipt.id, stored.links);
+    // The component rows are locked since the join (spec 11).
+    for (const { receiptId, reason } of stored.componentReasons ?? []) {
+      await m.query(
+        `UPDATE email_receipts SET status_reason = $1
+          WHERE id = $2 AND user_id = $3`,
+        [reason, receiptId, userId],
+      );
+    }
     return {
       result: {
         status: stored.status,

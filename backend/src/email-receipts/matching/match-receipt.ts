@@ -43,6 +43,11 @@ export interface ReceiptMatchCandidate {
   payeeName: string | null;
   description: string | null;
   referenceNumber: string | null;
+  /**
+   * The receipt whose applied request enriched this transaction (a settlement
+   * receipt's candidates only, linked receipts spec 6); `matchReceipt` ignores it.
+   */
+  enrichedByReceiptId?: string | null;
 }
 
 /** The match kind a strategy stores (spec 3a): `orderId` is stored as `order_id`. */

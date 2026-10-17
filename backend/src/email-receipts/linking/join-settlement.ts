@@ -96,6 +96,11 @@ function componentLines(component: ParsedReceipt): ParsedReceiptItem[] {
 const signed = (line: ParsedReceiptItem): number =>
   line.kind === "discount" ? -line.amount : line.amount;
 
+/** A component's net `N` (spec 4.1): the signed sum of its lines, in 1/10000 units. */
+export function componentNet(component: ParsedReceipt): number {
+  return componentLines(component).reduce((sum, line) => sum + signed(line), 0);
+}
+
 /** Round half away from zero of `numerator / denominator` (denominator > 0). */
 function roundDivide(numerator: bigint, denominator: bigint): bigint {
   const negative = numerator < 0n;

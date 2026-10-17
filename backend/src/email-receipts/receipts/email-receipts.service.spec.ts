@@ -914,8 +914,16 @@ describe("EmailReceiptsService.ignore", () => {
     expect(close).toBeGreaterThan(advisory);
     expect(receiptRepo.update).toHaveBeenCalledWith(
       { id: ID, userId: USER },
-      { status: "ignored", statusReason: null, aiReviewRequestId: null },
+      {
+        status: "ignored",
+        statusReason: null,
+        aiReviewRequestId: null,
+        linkKey: null,
+      },
     );
+    expect(
+      sqls.some((s) => s.includes("DELETE FROM email_receipt_links")),
+    ).toBe(true);
     expect(detail.status).toBe("ignored");
   });
 
@@ -1637,6 +1645,11 @@ describe("EmailReceiptsService.bulk", () => {
       String(sql).includes("UPDATE ai_review_requests"),
     );
     expect(close?.[1]).toEqual([USER, [A]]);
+    // An ignored settlement keeps no link rows (linked receipts spec 5).
+    const links = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("DELETE FROM email_receipt_links"),
+    );
+    expect(links?.[1]).toEqual([[A], USER]);
   });
 
   it("an ignore that has nothing to ignore closes and writes nothing", async () => {

@@ -24,7 +24,8 @@ export type EmailReceiptStatus =
   | "ambiguous"
   | "review_conflict"
   | "review"
-  | "ignored";
+  | "ignored"
+  | "component";
 
 export const EMAIL_RECEIPT_STATUSES: readonly EmailReceiptStatus[] = [
   "pending",
@@ -36,6 +37,7 @@ export const EMAIL_RECEIPT_STATUSES: readonly EmailReceiptStatus[] = [
   "review_conflict",
   "review",
   "ignored",
+  "component",
 ];
 
 /**
@@ -213,6 +215,10 @@ export class EmailReceipt {
 
   @Column({ type: "uuid", name: "ai_review_request_id", nullable: true })
   aiReviewRequestId: string | null;
+
+  /** A `component` receipt's link value (linked receipts spec section 5); null for every other receipt. */
+  @Column({ type: "varchar", length: 100, name: "link_key", nullable: true })
+  linkKey: string | null;
 
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;

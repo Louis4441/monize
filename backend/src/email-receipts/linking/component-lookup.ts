@@ -1,0 +1,206 @@
+import type { EntityManager } from "typeorm";
+import { addDaysYMD } from "../../common/date-utils";
+import {
+  DEFAULT_LINK_DAYS_BEFORE,
+  LINK_DAYS_AFTER,
+  type ParsedReceipt,
+  type ParsedReceiptItem,
+} from "../parsing/receipt-parser.types";
+import type { JoinPart } from "./join-settlement";
+
+const UNITS_PER_MONEY = 10000;
+
+/** The `link` section of a settlement profile that narrows the component search. */
+export interface ComponentSearch {
+  fromDomains?: readonly string[];
+  daysBefore?: number;
+}
+
+/** A stored `component` receipt a link value found. */
+export interface ComponentRow {
+  id: string;
+  linkKey: string;
+  subject: string;
+  /** `YYYY-MM-DD` (UTC): `original_sent_at ?? received_at`. */
+  effectiveDate: string;
+  parsed: ParsedReceipt;
+  parserId: string | null;
+}
+
+/** The component chosen for a link value and how many were found (spec 3). */
+export interface ChosenComponent {
+  row: ComponentRow;
+  several: number;
+}
+
+interface FoundRow {
+  id: string;
+  link_key: string;
+  subject: string;
+  effective_date: string;
+  parsed: ParsedReceipt;
+  parser_id: string | null;
+}
+
+/** A SUM(numeric) read from SQL as 1/10000 units, rounded once. */
+export const unitsOf = (amount: string | number | null | undefined): number =>
+  Math.round(Number(amount ?? 0) * UNITS_PER_MONEY);
+
+/**
+ * Spec 3, pure: for each link value the newest component first (ties by id),
+ * with the number found. A link value no row carries is absent from the map.
+ */
+export function chooseComponents(
+  links: readonly string[],
+  rows: readonly ComponentRow[],
+): Map<string, ChosenComponent> {
+  const chosen = new Map<string, ChosenComponent>();
+  for (const link of new Set(links)) {
+    const found = rows
+      .filter((row) => row.linkKey === link)
+      .sort((a, b) =>
+        a.effectiveDate !== b.effectiveDate
+          ? a.effectiveDate < b.effectiveDate
+            ? 1
+            : -1
+          : a.id < b.id
+            ? -1
+            : a.id > b.id
+              ? 1
+              : 0,
+      );
+    if (found.length > 0)
+      chosen.set(link, { row: found[0], several: found.length });
+  }
+  return chosen;
+}
+
+/**
+ * Spec 4 input, pure: one `JoinPart` per settlement item, in item order. A part
+ * with no link, or a link no component carries, has no component.
+ */
+export function toJoinParts(
+  items: readonly Pick<ParsedReceiptItem, "link">[],
+  chosen: ReadonlyMap<string, ChosenComponent>,
+  takenUnits: ReadonlyMap<string, number>,
+  tagByParser: ReadonlyMap<string, string | null>,
+): JoinPart[] {
+  return items.map((item) => {
+    const found = item.link ? chosen.get(item.link) : undefined;
+    if (!found) return { component: null, several: 0, taken: 0 };
+    return {
+      component: {
+        receiptId: found.row.id,
+        parsed: found.row.parsed,
+        tagName: found.row.parserId
+          ? (tagByParser.get(found.row.parserId) ?? null)
+          : null,
+      },
+      several: found.several,
+      taken: takenUnits.get(found.row.id) ?? 0,
+    };
+  });
+}
+
+/**
+ * The components the parts of a settlement point at (linked receipts spec 3 and
+ * 11), in ONE query over the user's stored receipts, then the units other
+ * settlements already took from each chosen one and its profile's tag. `links`
+ * is one entry per settlement item (null: the part captured none).
+ *
+ * `lock` takes `FOR UPDATE OF r`, rows in ascending id: the second step of the
+ * lock order (the settlement's own row, then these, then the advisory lock on
+ * the matched transaction), so two settlements of one component read `taken`
+ * one after the other. A read-only preview passes false.
+ *
+ * A DATE is read with `TO_CHAR` and a numeric with `Number` (backend/CLAUDE.md).
+ */
+export async function loadLinkedComponents(
+  m: EntityManager,
+  userId: string,
+  settlement: { id: string; effectiveDate: string },
+  links: readonly (string | null)[],
+  search: ComponentSearch,
+  lock: boolean,
+): Promise<JoinPart[]> {
+  const wanted = [...new Set(links.filter((l): l is string => l !== null))];
+  const items = links.map((link) => ({ link: link ?? undefined }));
+  if (wanted.length === 0) {
+    return toJoinParts(items, new Map(), new Map(), new Map());
+  }
+  const from = addDaysYMD(
+    settlement.effectiveDate,
+    -(search.daysBefore ?? DEFAULT_LINK_DAYS_BEFORE),
+  );
+  const to = addDaysYMD(settlement.effectiveDate, LINK_DAYS_AFTER);
+  const domains =
+    search.fromDomains && search.fromDomains.length > 0
+      ? [...search.fromDomains]
+      : null;
+  const rows: FoundRow[] = await m.query(
+    `SELECT r.id, r.link_key, r.subject,
+            TO_CHAR((COALESCE(r.original_sent_at, r.received_at) AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS effective_date,
+            r.parsed, r.parser_id
+       FROM email_receipts r
+      WHERE r.user_id = $1
+        AND r.status = 'component'
+        AND r.link_key = ANY($2::text[])
+        AND r.id <> $3
+        AND r.parsed IS NOT NULL
+        AND ($4::text[] IS NULL OR EXISTS (
+              SELECT 1 FROM unnest($4::text[]) AS d(domain)
+               WHERE r.from_domain = d.domain
+                  OR right(r.from_domain, length(d.domain) + 1) = '.' || d.domain))
+        AND (COALESCE(r.original_sent_at, r.received_at) AT TIME ZONE 'UTC')::date
+              BETWEEN $5::date AND $6::date
+      ORDER BY r.id
+      ${lock ? "FOR UPDATE OF r" : ""}`,
+    [userId, wanted, settlement.id, domains, from, to],
+  );
+  const chosen = chooseComponents(
+    wanted,
+    rows.map((row) => ({
+      id: row.id,
+      linkKey: row.link_key,
+      subject: row.subject,
+      effectiveDate: row.effective_date,
+      parsed: row.parsed,
+      parserId: row.parser_id,
+    })),
+  );
+  const ids = [...chosen.values()].map((c) => c.row.id);
+  const taken = new Map<string, number>();
+  const tags = new Map<string, string | null>();
+  if (ids.length > 0) {
+    const takenRows: { component_receipt_id: string; taken: string }[] =
+      await m.query(
+        `SELECT component_receipt_id, SUM(part_amount) AS taken
+           FROM email_receipt_links
+          WHERE user_id = $1
+            AND component_receipt_id = ANY($2::uuid[])
+            AND settlement_receipt_id <> $3
+          GROUP BY component_receipt_id`,
+        [userId, ids, settlement.id],
+      );
+    for (const row of takenRows) {
+      taken.set(row.component_receipt_id, unitsOf(row.taken));
+    }
+    const parserIds = [
+      ...new Set(
+        [...chosen.values()]
+          .map((c) => c.row.parserId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    if (parserIds.length > 0) {
+      const tagRows: { id: string; tag: string | null }[] = await m.query(
+        `SELECT id, definition->>'tag' AS tag
+           FROM email_receipt_parsers
+          WHERE user_id = $1 AND id = ANY($2::uuid[])`,
+        [userId, parserIds],
+      );
+      for (const row of tagRows) tags.set(row.id, row.tag);
+    }
+  }
+  return toJoinParts(items, chosen, taken, tags);
+}
