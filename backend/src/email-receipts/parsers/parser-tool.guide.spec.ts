@@ -347,3 +347,25 @@ describe("the language guide the categories operation returns", () => {
     expect(guide).toMatch(/trace numbers the lines of that source/);
   });
 });
+
+describe("the language guide: linked receipts", () => {
+  it("names the role, the link key, the link section and both captures", () => {
+    for (const word of [
+      "role",
+      "settlement",
+      "component",
+      "linkKey",
+      "link",
+      "{link}",
+      "{instalment}",
+      "fromDomains",
+      "daysBefore",
+    ]) {
+      expect(EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE).toContain(word);
+    }
+  });
+
+  it("does not grow the tool description", () => {
+    expect(EMAIL_RECEIPT_PARSER_TOOL_DESCRIPTION).not.toContain("linkKey");
+  });
+});

@@ -92,6 +92,8 @@ export interface LlmParsedReceipt {
   orderId: string | null;
   /** What the profile's `reference` field read; null when none. */
   reference: string | null;
+  /** A component's link value; present only on a component's reading. */
+  linkKey?: string | null;
   total: number | null;
   paid: number | null;
   payee: string | null;
@@ -102,6 +104,9 @@ export interface LlmParsedReceipt {
     qty: number;
     amount: number;
     category: string | null;
+    /** A settlement part's link value and instalment text; present only when read. */
+    link?: string;
+    instalment?: string;
   }>;
   complete: boolean;
   reason: ParsedReceipt["reason"];
@@ -291,6 +296,7 @@ function toLlmParsed(
   return {
     orderId: parsed.orderId,
     reference: parsed.reference ?? null,
+    ...(parsed.linkKey === undefined ? {} : { linkKey: parsed.linkKey }),
     total: units(parsed.total),
     paid: units(parsed.paid ?? null),
     payee: parsed.payee ?? null,
@@ -304,6 +310,8 @@ function toLlmParsed(
         item.categoryId === null
           ? null
           : (categoryNames.get(item.categoryId) ?? null),
+      ...(item.link === undefined ? {} : { link: item.link }),
+      ...(item.instalment === undefined ? {} : { instalment: item.instalment }),
     })),
     complete: parsed.complete,
     reason: parsed.reason,

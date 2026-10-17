@@ -406,6 +406,11 @@ completeness table of section 4. What version 2 adds is HOW a value is found.
   `status_reason` `skip_line`), `waitIfLine` (`unmatched`, `status_reason`
   `wait_line`, read again whole by the poll's 30-day rematch). Skip wins over
   wait; a manual link is not held back.
+- **Roles and links.** `role` (`standalone`, `component`, `settlement`), the
+  `linkKey` of a component, the `{link}` and `{instalment}` captures and the
+  `link` section of a settlement tie several emails to one transaction; the
+  rules and validation codes are in
+  [`email-receipt-linked-receipts.md`](./email-receipt-linked-receipts.md).
 
 Worked example (Allegro, three products, shipping 0,00): the items are
 `3 × 1,47 = 4,41`, `3 × 2,50 = 7,50` and `26 × 1,94 = 50,44`; shipping is 0,00;
