@@ -524,7 +524,12 @@
       "currencyMarkers": "Dấu hiệu tiền tệ",
       "defaultAccount": "Tài khoản mặc định",
       "ruleAccount": "tài khoản",
-      "ruleCurrency": "tiền tệ"
+      "ruleCurrency": "tiền tệ",
+      "role": "Vai trò của hồ sơ",
+      "link": "Phần link",
+      "linkDaysBefore": "Số ngày trước khoản thanh toán",
+      "linkFromDomains": "Tên miền người gửi của các email mua hàng",
+      "linkKey": "Mẫu khóa liên kết"
     },
     "codes": {
       "not_object": "không phải là một định nghĩa hợp lệ",
@@ -560,7 +565,15 @@
       "invalid_currency": "không phải mã tiền tệ 3 chữ cái, như USD",
       "too_many_lines": "trải qua quá nhiều dòng (tối đa {max})",
       "line_break_not_allowed": "được so khớp với một văn bản duy nhất (tên mặt hàng, người bán hoặc một tài khoản), nên không thể trải qua nhiều dòng",
-      "invalid_uuid_account": "không phải tài khoản hợp lệ"
+      "invalid_uuid_account": "không phải tài khoản hợp lệ",
+      "role_invalid": "phải là standalone, component hoặc settlement",
+      "link_key_requires_component": "chỉ dùng được khi vai trò là component",
+      "link_key_missing": "cần có khi vai trò là component",
+      "link_capture_requires_settlement": "dùng phần bắt link hoặc instalment, mà chỉ hồ sơ settlement mới chấp nhận",
+      "link_requires_settlement": "chỉ dùng được khi vai trò là settlement",
+      "link_domain_invalid": "không phải tên miền người gửi hợp lệ (tối đa {max} tên miền)",
+      "link_days_invalid": "phải là số nguyên từ 0 đến {max}",
+      "role_trade_conflict": "không thể là component hoặc settlement trong hồ sơ giao dịch chứng khoán, vì hồ sơ này chỉ đọc giao dịch"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# giao dịch} other {# giao dịch}} đều khớp như nhau, nên sẽ không liên kết giao dịch nào cho đến khi bạn chọn.",
     "unmatched": "Không có giao dịch nào khớp, trong số {count, plural, one {# ứng viên} other {# ứng viên}}.",
     "jsonInvalid": "JSON không hợp lệ nên chưa có gì để kiểm thử.",
+    "component": {
+      "heading": "Email mua hàng (component): khóa liên kết {linkKey}",
+      "noLinkKey": "Email mua hàng (component): không đọc được khóa liên kết nào, nên không email thanh toán nào tìm thấy nó.",
+      "noneWaiting": "Không có email thanh toán nào đang chờ khóa liên kết này.",
+      "waiting": "{count, plural, one {# email thanh toán đang chờ} other {# email thanh toán đang chờ}} khóa liên kết này:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Trình phân tích này sẽ không đọc email này: không có dòng bắt buộc nào của nó nằm trong email, nên trình phân tích tiếp theo của người gửi sẽ được thử.",
       "skip_line": "Trình phân tích này sẽ gác email này sang một bên: trong email có một dòng mà nó bỏ qua.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Dòng bỏ qua",
         "waitIfLine": "Dòng chờ",
         "reference": "Tham chiếu",
+        "linkKey": "Khóa liên kết",
         "action": "Mua hoặc bán",
         "symbol": "Mã",
         "quantity": "Cổ phiếu",
@@ -674,7 +695,33 @@
     "paid": "Đã trả",
     "payee": "Người bán",
     "reference": "Tham chiếu",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "Khóa liên kết",
+    "kinds": {
+      "shipping": "Vận chuyển",
+      "fee": "Phí",
+      "discount": "Giảm giá"
+    },
+    "parts": {
+      "heading": "Các phần",
+      "part": "Phần",
+      "link": "Liên kết",
+      "outcome": "Kết quả",
+      "noLink": "Không có liên kết",
+      "component": "Email mua hàng: {subject} ({date}).",
+      "componentProfile": "Hồ sơ: {name}.",
+      "componentNet": "Tổng tiền mua hàng: {amount}.",
+      "taken": "Đã dùng: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "Phần này không có liên kết, nên vẫn là một dòng.",
+      "not_found": "Không tìm thấy email mua hàng nào cho liên kết này, nên phần này vẫn là một dòng.",
+      "component_incomplete": "Email mua hàng chưa được đọc đầy đủ, nên phần này vẫn là một dòng.",
+      "component_used": "Các khoản thanh toán khác đã dùng hết toàn bộ đơn mua, nên phần này vẫn là một dòng.",
+      "joined": "Được thay bằng các dòng của email mua hàng.",
+      "scaled": "Được thay bằng các dòng của email mua hàng, điều chỉnh theo phần này.",
+      "amount_exceeds": "Phần này lớn hơn số còn lại của đơn mua, nên vẫn là một dòng."
+    }
   },
   "state": {
     "pending": "Đang chờ đọc",
@@ -690,7 +737,8 @@
     "dismissed": "Đã bỏ qua yêu cầu",
     "expired": "Đã hết hạn",
     "pending_ai": "Đang chờ AI",
-    "request_missing": "Thiếu yêu cầu"
+    "request_missing": "Thiếu yêu cầu",
+    "component": "Đang chờ khoản thanh toán của nó"
   },
   "receipts": {
     "loading": "Đang tải các email",
@@ -710,7 +758,8 @@
       "ambiguous": "Nhiều giao dịch phù hợp",
       "review_conflict": "Đang có yêu cầu khác mở",
       "review": "Đang xem xét",
-      "ignored": "Đã phớt lờ"
+      "ignored": "Đã phớt lờ",
+      "component": "Đang chờ thanh toán"
     },
     "domainFilter": {
       "label": "Tên miền người gửi",
@@ -939,7 +988,13 @@
       "trade_no_account": "Trình phân tích không xác định được giao dịch này thuộc tài khoản nào.",
       "trade_exists": "Các tài khoản của bạn đã có giao dịch này, nên không có gì được đề xuất.",
       "trade_linked": "Đã liên kết với giao dịch mà nó báo cáo, nên không có gì được đề xuất.",
-      "trade_no_currency": "Hồ sơ không xác định được loại tiền của giao dịch này nên không chọn được tài khoản."
+      "trade_no_currency": "Hồ sơ không xác định được loại tiền của giao dịch này nên không chọn được tài khoản.",
+      "awaiting_settlement": "Đã lưu email mua hàng. Email này chờ email thanh toán chi trả cho nó.",
+      "settled": "Đã lưu email mua hàng. Các email thanh toán được gộp với nó chi trả toàn bộ số tiền.",
+      "instalment": "Đã lưu email mua hàng. Các khoản thanh toán đã chi trả một phần; phần còn lại vẫn cần thanh toán.",
+      "partially_linked": "Một số phần của khoản thanh toán này chưa có email mua hàng. Mỗi phần được hiển thị là một dòng.",
+      "enriched_by_other": "Giao dịch khớp đã được một email khác bổ sung. Hãy mở giao dịch và dùng Liên kết để thay phần bổ sung đó, hoặc bỏ qua email này.",
+      "no_link_key": "Email mua hàng này không có khóa liên kết, nên không khoản thanh toán nào tìm thấy nó."
     },
     "reasonUnknown": "Lý do: {reason}",
     "requestNote": "Yêu cầu xem xét ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "Chỉ đọc {max} dòng đầu tiên.",
       "empty": "Không có dòng nào.",
       "listLabel": "Các dòng được đánh số của email"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Các email mua hàng đã liên kết",
+      "component": "Phần {part}: {subject} ({date})",
+      "settlementsHeading": "Được thanh toán bởi",
+      "settlement": "{subject} ({date}), phần {amount}",
+      "enrichedBy": "Đã được bổ sung bởi: {subject}",
+      "openButton": "Mở",
+      "open": "Mở email {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Đã mua} other {Đã bán}} {quantity} {symbol} với giá {total} vào {date}.",
     "noTradeTransaction": "Chưa có: giao dịch được ghi khi bạn duyệt đề xuất, hoặc được liên kết với giao dịch đã có trong sổ cái.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "Bị trình phân tích này xóa",
         "no_html": "Không có phần HTML",
         "trade": "Đề xuất một giao dịch",
-        "trade_exists": "Đã có trong sổ cái"
+        "trade_exists": "Đã có trong sổ cái",
+        "component": "Email mua hàng (chờ thanh toán)"
       },
       "parsedTradeAccount": "Tài khoản: {account}",
       "accountWithCurrency": "{name} ({currency})",

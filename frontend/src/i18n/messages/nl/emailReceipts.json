@@ -524,7 +524,12 @@
       "currencyMarkers": "Valutamarkeringen",
       "defaultAccount": "Standaardrekening",
       "ruleAccount": "rekening",
-      "ruleCurrency": "valuta"
+      "ruleCurrency": "valuta",
+      "role": "Profielrol",
+      "link": "Het onderdeel „link”",
+      "linkDaysBefore": "Dagen vóór de terugbetaling",
+      "linkFromDomains": "Afzenderdomeinen van de aankoopmails",
+      "linkKey": "Patronen voor de koppelsleutel"
     },
     "codes": {
       "not_object": "is geen geldige definitie",
@@ -560,7 +565,15 @@
       "invalid_currency": "is geen valutacode van 3 letters, zoals USD",
       "too_many_lines": "beslaat te veel regels (maximaal {max})",
       "line_break_not_allowed": "wordt vergeleken met één tekst (een artikelnaam, de verkoper of een rekening) en kan dus niet meerdere regels beslaan",
-      "invalid_uuid_account": "is geen geldige rekening"
+      "invalid_uuid_account": "is geen geldige rekening",
+      "role_invalid": "moet standalone, component of settlement zijn",
+      "link_key_requires_component": "kan alleen worden gebruikt als de rol component is",
+      "link_key_missing": "is nodig als de rol component is",
+      "link_capture_requires_settlement": "gebruikt een link- of instalment-capture, die alleen een settlement-profiel accepteert",
+      "link_requires_settlement": "kan alleen worden gebruikt als de rol settlement is",
+      "link_domain_invalid": "is geen geldig afzenderdomein (maximaal {max} domeinen)",
+      "link_days_invalid": "moet een geheel getal van 0 tot {max} zijn",
+      "role_trade_conflict": "mag in een profiel voor effectentransacties, dat alleen de transactie leest, niet component of settlement zijn"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transactie past} other {# transacties passen}} even goed, dus er zou er geen worden gekoppeld totdat je er een kiest.",
     "unmatched": "Er komt geen transactie overeen, uit {count, plural, one {# kandidaat} other {# kandidaten}}.",
     "jsonInvalid": "De JSON is niet geldig, dus er is nog niets te testen.",
+    "component": {
+      "heading": "Aankoopmail (component): koppelsleutel {linkKey}",
+      "noLinkKey": "Aankoopmail (component): er is geen koppelsleutel gelezen, dus geen terugbetalingsmail kan hem vinden.",
+      "noneWaiting": "Er wacht geen terugbetalingsmail op deze koppelsleutel.",
+      "waiting": "{count, plural, one {# terugbetalingsmail wacht} other {# terugbetalingsmails wachten}} op deze koppelsleutel:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Dit profiel zou deze e-mail niet lezen: geen van de vereiste regels komt erin voor, dus het volgende profiel voor de afzender zou worden geprobeerd.",
       "skip_line": "Dit profiel zou deze e-mail terzijde leggen: er staat een regel in waarop het overslaat.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Overslaanregel",
         "waitIfLine": "Wachtregel",
         "reference": "Referentie",
+        "linkKey": "Koppelsleutel",
         "action": "Koop of verkoop",
         "symbol": "Ticker",
         "quantity": "Aandelen",
@@ -674,7 +695,33 @@
     "paid": "Betaald",
     "payee": "Verkoper",
     "reference": "Referentie",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "Koppelsleutel",
+    "kinds": {
+      "shipping": "Verzending",
+      "fee": "Kosten",
+      "discount": "Korting"
+    },
+    "parts": {
+      "heading": "Delen",
+      "part": "Deel",
+      "link": "Koppeling",
+      "outcome": "Resultaat",
+      "noLink": "Geen koppeling",
+      "component": "Aankoopmail: {subject} ({date}).",
+      "componentProfile": "Profiel: {name}.",
+      "componentNet": "Totaal van de aankoop: {amount}.",
+      "taken": "Al gebruikt: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "Het deel heeft geen koppeling, dus het blijft één regel.",
+      "not_found": "Voor deze koppeling is geen aankoopmail gevonden, dus het deel blijft één regel.",
+      "component_incomplete": "De aankoopmail is niet volledig gelezen, dus het deel blijft één regel.",
+      "component_used": "Andere terugbetalingen hebben de hele aankoop al gebruikt, dus het deel blijft één regel.",
+      "joined": "Vervangen door de regels van de aankoopmail.",
+      "scaled": "Vervangen door de regels van de aankoopmail, geschaald naar dit deel.",
+      "amount_exceeds": "Het deel is meer dan wat er van de aankoop over is, dus het blijft één regel."
+    }
   },
   "state": {
     "pending": "Wacht om gelezen te worden",
@@ -690,7 +737,8 @@
     "dismissed": "Verworpen",
     "expired": "Verlopen",
     "pending_ai": "Wacht op de AI",
-    "request_missing": "Verzoek ontbreekt"
+    "request_missing": "Verzoek ontbreekt",
+    "component": "Wacht op de terugbetaling"
   },
   "receipts": {
     "loading": "E-mails laden",
@@ -710,7 +758,8 @@
       "ambiguous": "Meerdere transacties passen",
       "review_conflict": "Er staat een ander verzoek open",
       "review": "In controle",
-      "ignored": "Genegeerd"
+      "ignored": "Genegeerd",
+      "component": "Wacht op terugbetaling"
     },
     "domainFilter": {
       "label": "Afzenderdomein",
@@ -939,7 +988,13 @@
       "trade_no_account": "Het profiel kon niet bepalen voor welke rekening deze transactie is.",
       "trade_exists": "Je rekeningen bevatten deze transactie al, dus er is niets voorgesteld.",
       "trade_linked": "Gekoppeld aan de transactie die het meldt, dus er is niets voorgesteld.",
-      "trade_no_currency": "Het profiel kon niet bepalen in welke valuta deze transactie is, dus het kon de rekening niet kiezen."
+      "trade_no_currency": "Het profiel kon niet bepalen in welke valuta deze transactie is, dus het kon de rekening niet kiezen.",
+      "awaiting_settlement": "Aankoopmail opgeslagen. Hij wacht op de terugbetalingsmail die hem betaalt.",
+      "settled": "Aankoopmail opgeslagen. De terugbetalingsmails die eraan zijn gekoppeld, betalen het hele bedrag.",
+      "instalment": "Aankoopmail opgeslagen. Terugbetalingen hebben een deel betaald; de rest moet nog worden betaald.",
+      "partially_linked": "Voor sommige delen van deze terugbetaling is nog geen aankoopmail. Ze worden als één regel per deel getoond.",
+      "enriched_by_other": "De gevonden transactie is al aangevuld door een andere e-mail. Open haar en gebruik Koppelen om die aanvulling te vervangen, of negeer deze e-mail.",
+      "no_link_key": "Deze aankoopmail bevat geen koppelsleutel, dus geen terugbetaling kan hem vinden."
     },
     "reasonUnknown": "Reden: {reason}",
     "requestNote": "Controleverzoek ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "Alleen de eerste {max} regels worden gelezen.",
       "empty": "Geen regels.",
       "listLabel": "Genummerde regels van de e-mail"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Gekoppelde aankoopmails",
+      "component": "Deel {part}: {subject} ({date})",
+      "settlementsHeading": "Betaald door",
+      "settlement": "{subject} ({date}), deel {amount}",
+      "enrichedBy": "Al aangevuld door: {subject}",
+      "openButton": "Openen",
+      "open": "De e-mail {subject} openen"
     },
     "tradeTransactionSummary": "{action, select, BUY {Gekocht} other {Verkocht}}: {quantity} {symbol} voor {total} op {date}.",
     "noTradeTransaction": "Nog geen: de transactie wordt geboekt wanneer je het voorstel goedkeurt, of gekoppeld aan een transactie die al in je administratie staat.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "Verwijderd door dit profiel",
         "no_html": "Geen HTML-deel",
         "trade": "Stelt een transactie voor",
-        "trade_exists": "Staat al in je administratie"
+        "trade_exists": "Staat al in je administratie",
+        "component": "Aankoopmail (wacht op terugbetaling)"
       },
       "parsedTradeAccount": "Rekening: {account}",
       "accountWithCurrency": "{name} ({currency})",

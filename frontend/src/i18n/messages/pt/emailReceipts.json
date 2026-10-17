@@ -524,7 +524,12 @@
       "currencyMarkers": "Marcadores de moeda",
       "defaultAccount": "Conta predefinida",
       "ruleAccount": "conta",
-      "ruleCurrency": "moeda"
+      "ruleCurrency": "moeda",
+      "role": "Função do perfil",
+      "link": "A secção «link»",
+      "linkDaysBefore": "Dias antes do pagamento",
+      "linkFromDomains": "Domínios do remetente dos e-mails de compra",
+      "linkKey": "Padrões da chave de ligação"
     },
     "codes": {
       "not_object": "não é uma definição válida",
@@ -560,7 +565,15 @@
       "invalid_currency": "não é um código de moeda de 3 letras, como USD",
       "too_many_lines": "abrange demasiadas linhas (no máximo {max})",
       "line_break_not_allowed": "é comparado com um único texto (o nome de um artigo, o comerciante ou uma conta), por isso não pode abranger várias linhas",
-      "invalid_uuid_account": "não é uma conta válida"
+      "invalid_uuid_account": "não é uma conta válida",
+      "role_invalid": "tem de ser standalone, component ou settlement",
+      "link_key_requires_component": "só pode ser usado quando a função é component",
+      "link_key_missing": "é necessário quando a função é component",
+      "link_capture_requires_settlement": "usa uma captura de link ou instalment, que só um perfil settlement aceita",
+      "link_requires_settlement": "só pode ser usado quando a função é settlement",
+      "link_domain_invalid": "não é um domínio de remetente válido (no máximo {max} domínios)",
+      "link_days_invalid": "tem de ser um número inteiro de 0 a {max}",
+      "role_trade_conflict": "não pode ser component nem settlement num perfil de negociação em bolsa, que lê apenas a negociação"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transação corresponde} other {# transações correspondem}} igualmente bem, por isso nenhuma seria ligada até escolher.",
     "unmatched": "Nenhuma transação corresponde, entre {count, plural, one {# candidata} other {# candidatas}}.",
     "jsonInvalid": "O JSON não é válido, por isso ainda não há nada para testar.",
+    "component": {
+      "heading": "E-mail de compra (component): chave de ligação {linkKey}",
+      "noLinkKey": "E-mail de compra (component): não foi lida nenhuma chave de ligação, por isso nenhum e-mail de pagamento o consegue encontrar.",
+      "noneWaiting": "Nenhum e-mail de pagamento está à espera desta chave de ligação.",
+      "waiting": "{count, plural, one {# e-mail de pagamento está} other {# e-mails de pagamento estão}} à espera desta chave de ligação:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Este analisador não leria este e-mail: nenhuma das suas linhas obrigatórias consta nele, por isso seria tentado o analisador seguinte para o remetente.",
       "skip_line": "Este analisador poria este e-mail de parte: contém uma linha que o leva a ignorá-lo.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Linha de exclusão",
         "waitIfLine": "Linha de espera",
         "reference": "Referência",
+        "linkKey": "Chave de ligação",
         "action": "Compra ou venda",
         "symbol": "Símbolo",
         "quantity": "Ações",
@@ -674,7 +695,33 @@
     "paid": "Pago",
     "payee": "Comerciante",
     "reference": "Referência",
-    "categoryByAi": "IA"
+    "categoryByAi": "IA",
+    "linkKey": "Chave de ligação",
+    "kinds": {
+      "shipping": "Envio",
+      "fee": "Taxa",
+      "discount": "Desconto"
+    },
+    "parts": {
+      "heading": "Partes",
+      "part": "Parte",
+      "link": "Ligação",
+      "outcome": "Resultado",
+      "noLink": "Sem ligação",
+      "component": "E-mail de compra: {subject} ({date}).",
+      "componentProfile": "Perfil: {name}.",
+      "componentNet": "Total da compra: {amount}.",
+      "taken": "Já utilizado: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "A parte não tem ligação, por isso continua a ser uma linha.",
+      "not_found": "Não foi encontrado nenhum e-mail de compra para esta ligação, por isso a parte continua a ser uma linha.",
+      "component_incomplete": "O e-mail de compra não foi lido por completo, por isso a parte continua a ser uma linha.",
+      "component_used": "Outros pagamentos já usaram toda a compra, por isso a parte continua a ser uma linha.",
+      "joined": "Substituída pelas linhas do e-mail de compra.",
+      "scaled": "Substituída pelas linhas do e-mail de compra, ajustadas a esta parte.",
+      "amount_exceeds": "A parte excede o que resta da compra, por isso continua a ser uma linha."
+    }
   },
   "state": {
     "pending": "A aguardar leitura",
@@ -690,7 +737,8 @@
     "dismissed": "Dispensado",
     "expired": "Expirado",
     "pending_ai": "A aguardar a IA",
-    "request_missing": "Pedido em falta"
+    "request_missing": "Pedido em falta",
+    "component": "À espera do seu pagamento"
   },
   "receipts": {
     "loading": "A carregar os e-mails",
@@ -710,7 +758,8 @@
       "ambiguous": "Várias transações correspondem",
       "review_conflict": "Há outro pedido aberto",
       "review": "Em revisão",
-      "ignored": "Ignorado"
+      "ignored": "Ignorado",
+      "component": "À espera de pagamento"
     },
     "domainFilter": {
       "label": "Domínio do remetente",
@@ -939,7 +988,13 @@
       "trade_no_account": "O analisador não conseguiu perceber a que conta esta negociação diz respeito.",
       "trade_exists": "As suas contas já contêm esta negociação, por isso nada foi proposto.",
       "trade_linked": "Associado à transação que reporta, por isso nada foi proposto.",
-      "trade_no_currency": "O perfil não conseguiu saber em que moeda está esta negociação, por isso não pôde escolher a conta."
+      "trade_no_currency": "O perfil não conseguiu saber em que moeda está esta negociação, por isso não pôde escolher a conta.",
+      "awaiting_settlement": "E-mail de compra guardado. Aguarda o e-mail de pagamento que o liquida.",
+      "settled": "E-mail de compra guardado. Os e-mails de pagamento associados liquidam o seu valor total.",
+      "instalment": "E-mail de compra guardado. Os pagamentos liquidaram uma parte; o resto ainda está por pagar.",
+      "partially_linked": "Algumas partes deste pagamento ainda não têm e-mail de compra. São mostradas como uma linha cada.",
+      "enriched_by_other": "A transação correspondente já foi complementada por outro e-mail. Abra-a e use Ligar para substituir esse complemento, ou ignore este e-mail.",
+      "no_link_key": "Este e-mail de compra não contém nenhuma chave de ligação, por isso nenhum pagamento o consegue encontrar."
     },
     "reasonUnknown": "Motivo: {reason}",
     "requestNote": "Pedido de revisão ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "Só são lidas as primeiras {max} linhas.",
       "empty": "Sem linhas.",
       "listLabel": "Linhas numeradas do e-mail"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "E-mails de compra ligados",
+      "component": "Parte {part}: {subject} ({date})",
+      "settlementsHeading": "Pago por",
+      "settlement": "{subject} ({date}), parte {amount}",
+      "enrichedBy": "Já complementada por: {subject}",
+      "openButton": "Abrir",
+      "open": "Abrir o e-mail {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venda}} de {quantity} {symbol} por {total} em {date}.",
     "noTradeTransaction": "Nenhuma ainda: a operação é registada quando aprovar a proposta, ou associada a uma que já esteja no seu registo.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "Eliminado por este analisador",
         "no_html": "Sem parte HTML",
         "trade": "Propõe uma negociação",
-        "trade_exists": "Já está no seu registo"
+        "trade_exists": "Já está no seu registo",
+        "component": "E-mail de compra (aguarda pagamento)"
       },
       "parsedTradeAccount": "Conta: {account}",
       "accountWithCurrency": "{name} ({currency})",

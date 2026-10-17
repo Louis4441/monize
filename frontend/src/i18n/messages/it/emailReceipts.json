@@ -524,7 +524,12 @@
       "currencyMarkers": "Indicatori di valuta",
       "defaultAccount": "Conto predefinito",
       "ruleAccount": "conto",
-      "ruleCurrency": "valuta"
+      "ruleCurrency": "valuta",
+      "role": "Ruolo del profilo",
+      "link": "La sezione «link»",
+      "linkDaysBefore": "Giorni prima del rimborso",
+      "linkFromDomains": "Domini mittente delle email di acquisto",
+      "linkKey": "Modelli della chiave di collegamento"
     },
     "codes": {
       "not_object": "non è una definizione valida",
@@ -560,7 +565,15 @@
       "invalid_currency": "non è un codice di valuta di 3 lettere, come USD",
       "too_many_lines": "si estende su troppe righe (al massimo {max})",
       "line_break_not_allowed": "viene confrontato con un solo testo (il nome di un articolo, il commerciante o un conto), quindi non può estendersi su più righe",
-      "invalid_uuid_account": "non è un conto valido"
+      "invalid_uuid_account": "non è un conto valido",
+      "role_invalid": "deve essere standalone, component o settlement",
+      "link_key_requires_component": "può essere usato solo quando il ruolo è component",
+      "link_key_missing": "è necessario quando il ruolo è component",
+      "link_capture_requires_settlement": "usa un'acquisizione link o instalment, che solo un profilo settlement accetta",
+      "link_requires_settlement": "può essere usato solo quando il ruolo è settlement",
+      "link_domain_invalid": "non è un dominio mittente valido (al massimo {max} domini)",
+      "link_days_invalid": "deve essere un numero intero da 0 a {max}",
+      "role_trade_conflict": "non può essere component né settlement in un profilo di operazione di borsa, che legge solo l'operazione"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transazione corrisponde} other {# transazioni corrispondono}} ugualmente bene, quindi nessuna verrebbe collegata finché non ne scegli una.",
     "unmatched": "Nessuna transazione corrisponde, su {count, plural, one {# candidata} other {# candidate}}.",
     "jsonInvalid": "Il JSON non è valido, quindi non c'è ancora nulla da testare.",
+    "component": {
+      "heading": "Email di acquisto (component): chiave di collegamento {linkKey}",
+      "noLinkKey": "Email di acquisto (component): non è stata letta alcuna chiave di collegamento, quindi nessuna email di rimborso può trovarla.",
+      "noneWaiting": "Nessuna email di rimborso è in attesa di questa chiave di collegamento.",
+      "waiting": "{count, plural, one {# email di rimborso è in attesa} other {# email di rimborso sono in attesa}} di questa chiave di collegamento:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Questo profilo non leggerebbe questa email: nessuna delle sue righe obbligatorie è presente, quindi si proverebbe il profilo successivo del mittente.",
       "skip_line": "Questo profilo metterebbe da parte questa email: contiene una riga che il profilo salta.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Riga da saltare",
         "waitIfLine": "Riga di attesa",
         "reference": "Riferimento",
+        "linkKey": "Chiave di collegamento",
         "action": "Acquisto o vendita",
         "symbol": "Simbolo",
         "quantity": "Quote",
@@ -674,7 +695,33 @@
     "paid": "Pagato",
     "payee": "Esercente",
     "reference": "Riferimento",
-    "categoryByAi": "IA"
+    "categoryByAi": "IA",
+    "linkKey": "Chiave di collegamento",
+    "kinds": {
+      "shipping": "Spedizione",
+      "fee": "Commissione",
+      "discount": "Sconto"
+    },
+    "parts": {
+      "heading": "Parti",
+      "part": "Parte",
+      "link": "Collegamento",
+      "outcome": "Risultato",
+      "noLink": "Nessun collegamento",
+      "component": "Email di acquisto: {subject} ({date}).",
+      "componentProfile": "Profilo: {name}.",
+      "componentNet": "Totale dell'acquisto: {amount}.",
+      "taken": "Già usato: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "La parte non ha collegamento, quindi resta una sola riga.",
+      "not_found": "Per questo collegamento non è stata trovata alcuna email di acquisto, quindi la parte resta una sola riga.",
+      "component_incomplete": "L'email di acquisto non è stata letta per intero, quindi la parte resta una sola riga.",
+      "component_used": "Altri rimborsi hanno già usato l'intero acquisto, quindi la parte resta una sola riga.",
+      "joined": "Sostituita dalle righe dell'email di acquisto.",
+      "scaled": "Sostituita dalle righe dell'email di acquisto, adattate a questa parte.",
+      "amount_exceeds": "La parte supera ciò che resta dell'acquisto, quindi resta una sola riga."
+    }
   },
   "state": {
     "pending": "In attesa di lettura",
@@ -690,7 +737,8 @@
     "dismissed": "Scartata",
     "expired": "Scaduta",
     "pending_ai": "In attesa dell'IA",
-    "request_missing": "Richiesta mancante"
+    "request_missing": "Richiesta mancante",
+    "component": "In attesa del suo rimborso"
   },
   "receipts": {
     "loading": "Caricamento delle email",
@@ -710,7 +758,8 @@
       "ambiguous": "Corrispondono più transazioni",
       "review_conflict": "Un'altra richiesta è aperta",
       "review": "In revisione",
-      "ignored": "Ignorata"
+      "ignored": "Ignorata",
+      "component": "In attesa di rimborso"
     },
     "domainFilter": {
       "label": "Dominio del mittente",
@@ -939,7 +988,13 @@
       "trade_no_account": "Il profilo non ha saputo stabilire a quale conto appartiene questa operazione.",
       "trade_exists": "I tuoi conti contengono già questa operazione, quindi non è stato proposto nulla.",
       "trade_linked": "Collegata alla transazione che riporta, quindi non è stato proposto nulla.",
-      "trade_no_currency": "Il profilo non ha potuto capire in quale valuta è questa operazione, quindi non ha potuto sceglierne il conto."
+      "trade_no_currency": "Il profilo non ha potuto capire in quale valuta è questa operazione, quindi non ha potuto sceglierne il conto.",
+      "awaiting_settlement": "Email di acquisto salvata. Attende l'email di rimborso che la salda.",
+      "settled": "Email di acquisto salvata. Le email di rimborso collegate ad essa saldano l'intero importo.",
+      "instalment": "Email di acquisto salvata. I rimborsi ne hanno saldato una parte; il resto è ancora da pagare.",
+      "partially_linked": "Alcune parti di questo rimborso non hanno ancora un'email di acquisto. Sono mostrate come una riga ciascuna.",
+      "enriched_by_other": "La transazione corrispondente è già stata completata da un'altra email. Aprila e usa Collega per sostituire quel completamento, oppure ignora questa email.",
+      "no_link_key": "Questa email di acquisto non contiene alcuna chiave di collegamento, quindi nessun rimborso può trovarla."
     },
     "reasonUnknown": "Motivo: {reason}",
     "requestNote": "Richiesta di revisione ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "Vengono lette solo le prime {max} righe.",
       "empty": "Nessuna riga.",
       "listLabel": "Righe numerate dell'email"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Email di acquisto collegate",
+      "component": "Parte {part}: {subject} ({date})",
+      "settlementsHeading": "Saldato da",
+      "settlement": "{subject} ({date}), parte {amount}",
+      "enrichedBy": "Già completata da: {subject}",
+      "openButton": "Apri",
+      "open": "Apri l'email {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Acquisto} other {Vendita}} di {quantity} {symbol} per {total} il {date}.",
     "noTradeTransaction": "Ancora nessuna: l'operazione viene registrata quando approvi la proposta, oppure collegata a una già presente nel registro.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "Eliminata da questo profilo",
         "no_html": "Nessuna parte HTML",
         "trade": "Propone un'operazione",
-        "trade_exists": "Già nel registro"
+        "trade_exists": "Già nel registro",
+        "component": "Email di acquisto (attende il rimborso)"
       },
       "parsedTradeAccount": "Conto: {account}",
       "accountWithCurrency": "{name} ({currency})",

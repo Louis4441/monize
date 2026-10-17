@@ -524,7 +524,12 @@
       "currencyMarkers": "通貨マーカー",
       "defaultAccount": "既定の口座",
       "ruleAccount": "口座",
-      "ruleCurrency": "通貨"
+      "ruleCurrency": "通貨",
+      "role": "プロフィールの役割",
+      "link": "link セクション",
+      "linkDaysBefore": "返済日より前の日数",
+      "linkFromDomains": "購入メールの送信元ドメイン",
+      "linkKey": "リンクキーのパターン"
     },
     "codes": {
       "not_object": "は有効な定義ではありません",
@@ -560,7 +565,15 @@
       "invalid_currency": "は USD のような 3 文字の通貨コードではありません",
       "too_many_lines": "の行数が多すぎます (最大 {max} 行)",
       "line_break_not_allowed": "は 1 つのテキスト (商品名、販売者、口座) と照合されるため、複数の行にまたがることはできません",
-      "invalid_uuid_account": "は有効な口座ではありません"
+      "invalid_uuid_account": "は有効な口座ではありません",
+      "role_invalid": "standalone、component、settlement のいずれかである必要があります",
+      "link_key_requires_component": "役割が component の場合にのみ使用できます",
+      "link_key_missing": "役割が component の場合に必要です",
+      "link_capture_requires_settlement": "link または instalment のキャプチャを使っていますが、これは settlement プロフィールだけが受け付けます",
+      "link_requires_settlement": "役割が settlement の場合にのみ使用できます",
+      "link_domain_invalid": "有効な送信元ドメインではありません(最大 {max} ドメイン)",
+      "link_days_invalid": "0 から {max} までの整数である必要があります",
+      "role_trade_conflict": "取引のみを読み取る証券取引プロフィールでは、component や settlement にできません"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# 件の取引が} other {# 件の取引が}}同じ程度に一致するため、あなたが選ぶまでどれにも紐づけられません。",
     "unmatched": "{count, plural, one {# 件の候補} other {# 件の候補}}のうち、一致する取引はありません。",
     "jsonInvalid": "JSONが有効ではないため、まだテストするものがありません。",
+    "component": {
+      "heading": "購入メール(component): リンクキー {linkKey}",
+      "noLinkKey": "購入メール(component): リンクキーが読み取られなかったため、どの返済メールもこのメールを見つけられません。",
+      "noneWaiting": "このリンクキーを待っている返済メールはありません。",
+      "waiting": "このリンクキーを待っている返済メール: {count, plural, one {#件} other {#件}}",
+      "settlement": "{subject}({date})"
+    },
     "outcome": {
       "not_applicable": "このプロフィールはこのメールを読み取りません。必須の行がどれも含まれていないため、その送信者の次のプロフィールが試されます。",
       "skip_line": "このプロフィールはこのメールを脇に置きます。スキップ対象の行が含まれています。",
@@ -609,6 +629,7 @@
         "skipIfLine": "スキップする行",
         "waitIfLine": "保留にする行",
         "reference": "参照",
+        "linkKey": "リンクキー",
         "action": "売買区分",
         "symbol": "銘柄コード",
         "quantity": "株数",
@@ -674,7 +695,33 @@
     "paid": "支払額",
     "payee": "販売元",
     "reference": "参照",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "リンクキー",
+    "kinds": {
+      "shipping": "送料",
+      "fee": "手数料",
+      "discount": "割引"
+    },
+    "parts": {
+      "heading": "パート",
+      "part": "パート",
+      "link": "リンク",
+      "outcome": "結果",
+      "noLink": "リンクなし",
+      "component": "購入メール: {subject}({date})。",
+      "componentProfile": "プロフィール: {name}。",
+      "componentNet": "購入合計: {amount}。",
+      "taken": "使用済み: {amount}。"
+    },
+    "linkOutcomes": {
+      "no_link": "このパートにはリンクがないため、1 行のままです。",
+      "not_found": "このリンクに対応する購入メールが見つからなかったため、パートは 1 行のままです。",
+      "component_incomplete": "購入メールを最後まで読み取れなかったため、パートは 1 行のままです。",
+      "component_used": "ほかの返済がすでに購入全体を使用したため、パートは 1 行のままです。",
+      "joined": "購入メールの行に置き換えました。",
+      "scaled": "購入メールの行に置き換え、このパートに合わせて按分しました。",
+      "amount_exceeds": "このパートは購入の残りを超えているため、1 行のままです。"
+    }
   },
   "state": {
     "pending": "読み取り待ち",
@@ -690,7 +737,8 @@
     "dismissed": "却下済み",
     "expired": "期限切れ",
     "pending_ai": "AIの回答待ち",
-    "request_missing": "依頼が見つかりません"
+    "request_missing": "依頼が見つかりません",
+    "component": "返済待ち"
   },
   "receipts": {
     "loading": "メールを読み込み中",
@@ -710,7 +758,8 @@
       "ambiguous": "複数の取引が一致",
       "review_conflict": "別の依頼が未処理",
       "review": "レビュー中",
-      "ignored": "無視済み"
+      "ignored": "無視済み",
+      "component": "返済待ち"
     },
     "domainFilter": {
       "label": "送信元ドメイン",
@@ -939,7 +988,13 @@
       "trade_no_account": "プロフィールは、この取引がどの口座のものか判断できませんでした。",
       "trade_exists": "この取引はすでに口座に記録されているため、何も提案されませんでした。",
       "trade_linked": "報告されている取引に紐づけたため、何も提案されませんでした。",
-      "trade_no_currency": "この取引の通貨をプロフィールが判別できなかったため、口座を選べませんでした。"
+      "trade_no_currency": "この取引の通貨をプロフィールが判別できなかったため、口座を選べませんでした。",
+      "awaiting_settlement": "購入メールを保存しました。支払いに充てる返済メールを待っています。",
+      "settled": "購入メールを保存しました。紐づけられた返済メールが全額を支払います。",
+      "instalment": "購入メールを保存しました。返済で一部が支払われ、残りはまだ支払われていません。",
+      "partially_linked": "この返済の一部のパートには、まだ購入メールがありません。それぞれ 1 行で表示されます。",
+      "enriched_by_other": "一致した取引はすでに別のメールで補完されています。取引を開き、「紐づける」でその補完を置き換えるか、このメールを無視してください。",
+      "no_link_key": "この購入メールにはリンクキーがないため、どの返済もこのメールを見つけられません。"
     },
     "reasonUnknown": "理由: {reason}",
     "requestNote": "レビュー依頼 ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "最初の {max} 行のみが読み取られます。",
       "empty": "行がありません。",
       "listLabel": "メールの番号付き行"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "紐づけられた購入メール",
+      "component": "パート {part}: {subject}({date})",
+      "settlementsHeading": "支払元",
+      "settlement": "{subject}({date})、パート {amount}",
+      "enrichedBy": "すでに補完したメール: {subject}",
+      "openButton": "開く",
+      "open": "メール {subject} を開く"
     },
     "tradeTransactionSummary": "{date} に {symbol} を {quantity} 株、{total} で{action, select, BUY {購入} other {売却}}。",
     "noTradeTransaction": "まだありません。提案を承認すると記帳されるか、台帳にある既存の取引に紐付けられます。",
@@ -1314,7 +1378,8 @@
         "discard_delete": "このプロフィールで削除",
         "no_html": "HTML部分なし",
         "trade": "取引を提案",
-        "trade_exists": "台帳に記帳済み"
+        "trade_exists": "台帳に記帳済み",
+        "component": "購入メール(返済待ち)"
       },
       "parsedTradeAccount": "口座: {account}",
       "accountWithCurrency": "{name} ({currency})",

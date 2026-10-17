@@ -524,7 +524,12 @@
       "currencyMarkers": "Znaczniki waluty",
       "defaultAccount": "Konto domyślne",
       "ruleAccount": "konto",
-      "ruleCurrency": "waluta"
+      "ruleCurrency": "waluta",
+      "role": "Rola profilu",
+      "link": "Sekcja „link”",
+      "linkDaysBefore": "Dni przed spłatą",
+      "linkFromDomains": "Domeny nadawców e-maili zakupu",
+      "linkKey": "Wzorce klucza powiązania"
     },
     "codes": {
       "not_object": "nie jest prawidłową definicją",
@@ -560,7 +565,15 @@
       "invalid_currency": "nie jest 3-literowym kodem waluty, takim jak USD",
       "too_many_lines": "obejmuje zbyt wiele wierszy (najwyżej {max})",
       "line_break_not_allowed": "jest porównywany z jednym tekstem (nazwą pozycji, sprzedawcą lub kontem), więc nie może obejmować kilku wierszy",
-      "invalid_uuid_account": "nie jest prawidłowym kontem"
+      "invalid_uuid_account": "nie jest prawidłowym kontem",
+      "role_invalid": "musi mieć wartość standalone, component lub settlement",
+      "link_key_requires_component": "można użyć tylko wtedy, gdy rola to component",
+      "link_key_missing": "są wymagane, gdy rola to component",
+      "link_capture_requires_settlement": "używa przechwycenia link lub instalment, które akceptuje tylko profil settlement",
+      "link_requires_settlement": "można użyć tylko wtedy, gdy rola to settlement",
+      "link_domain_invalid": "nie jest prawidłową domeną nadawcy (najwyżej {max} domen)",
+      "link_days_invalid": "musi być liczbą całkowitą od 0 do {max}",
+      "role_trade_conflict": "nie może mieć roli component ani settlement w profilu transakcji giełdowej, który odczytuje tylko transakcję"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {Pasuje # transakcja} few {Pasują # transakcje} many {Pasuje # transakcji} other {Pasuje # transakcji}} jednakowo dobrze, więc żadna nie zostanie powiązana, dopóki jednej nie wybierzesz.",
     "unmatched": "Żadna transakcja nie pasuje (sprawdzono {count, plural, one {# kandydata} few {# kandydatów} many {# kandydatów} other {# kandydatów}}).",
     "jsonInvalid": "JSON jest nieprawidłowy, więc nie ma jeszcze czego testować.",
+    "component": {
+      "heading": "E-mail zakupu (component): klucz powiązania {linkKey}",
+      "noLinkKey": "E-mail zakupu (component): nie odczytano klucza powiązania, więc żaden e-mail spłaty nie może go znaleźć.",
+      "noneWaiting": "Żaden e-mail spłaty nie czeka na ten klucz powiązania.",
+      "waiting": "{count, plural, one {# e-mail spłaty czeka} few {# e-maile spłaty czekają} many {# e-maili spłaty czeka} other {# e-maila spłaty czeka}} na ten klucz powiązania:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Ten parser nie odczytałby tej wiadomości: nie ma w niej żadnego z jego wymaganych wierszy, więc zostałby wypróbowany kolejny parser dla tego nadawcy.",
       "skip_line": "Ten parser odłożyłby tę wiadomość na bok: znajduje się w niej wiersz, po którym ją pomija.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Wiersz pomijający",
         "waitIfLine": "Wiersz wstrzymujący",
         "reference": "Referencja",
+        "linkKey": "Klucz powiązania",
         "action": "Kupno lub sprzedaż",
         "symbol": "Symbol",
         "quantity": "Akcje",
@@ -674,7 +695,33 @@
     "paid": "Zapłacono",
     "payee": "Sprzedawca",
     "reference": "Referencja",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "Klucz powiązania",
+    "kinds": {
+      "shipping": "Dostawa",
+      "fee": "Opłata",
+      "discount": "Rabat"
+    },
+    "parts": {
+      "heading": "Części",
+      "part": "Część",
+      "link": "Powiązanie",
+      "outcome": "Wynik",
+      "noLink": "Brak powiązania",
+      "component": "E-mail zakupu: {subject} ({date}).",
+      "componentProfile": "Profil: {name}.",
+      "componentNet": "Suma zakupu: {amount}.",
+      "taken": "Już wykorzystano: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "Część nie ma powiązania, więc pozostaje jednym wierszem.",
+      "not_found": "Dla tego powiązania nie znaleziono e-maila zakupu, więc część pozostaje jednym wierszem.",
+      "component_incomplete": "E-mail zakupu nie został odczytany w całości, więc część pozostaje jednym wierszem.",
+      "component_used": "Inne spłaty wykorzystały już cały zakup, więc część pozostaje jednym wierszem.",
+      "joined": "Zastąpiono wierszami z e-maila zakupu.",
+      "scaled": "Zastąpiono wierszami z e-maila zakupu, przeskalowanymi do tej części.",
+      "amount_exceeds": "Część jest większa niż reszta zakupu, więc pozostaje jednym wierszem."
+    }
   },
   "state": {
     "pending": "Czeka na odczyt",
@@ -690,7 +737,8 @@
     "dismissed": "Odrzucona",
     "expired": "Wygasła",
     "pending_ai": "Czeka na AI",
-    "request_missing": "Brak prośby"
+    "request_missing": "Brak prośby",
+    "component": "Czeka na swoją spłatę"
   },
   "receipts": {
     "loading": "Wczytywanie wiadomości",
@@ -710,7 +758,8 @@
       "ambiguous": "Pasuje kilka transakcji",
       "review_conflict": "Otwarta jest inna prośba",
       "review": "W trakcie przeglądu",
-      "ignored": "Zignorowana"
+      "ignored": "Zignorowana",
+      "component": "Czeka na spłatę"
     },
     "domainFilter": {
       "label": "Domena nadawcy",
@@ -939,7 +988,13 @@
       "trade_no_account": "Parser nie ustalił, którego konta dotyczy ta transakcja.",
       "trade_exists": "Twoje konta zawierają już tę transakcję, więc nic nie zaproponowano.",
       "trade_linked": "Powiązano z transakcją, którą zgłasza, więc nic nie zaproponowano.",
-      "trade_no_currency": "Profil nie rozpoznał waluty tej transakcji, więc nie mógł wybrać jej konta."
+      "trade_no_currency": "Profil nie rozpoznał waluty tej transakcji, więc nie mógł wybrać jej konta.",
+      "awaiting_settlement": "E-mail zakupu zapisano. Czeka na e-mail spłaty, który go opłaca.",
+      "settled": "E-mail zakupu zapisano. Połączone z nim e-maile spłaty opłacają całą jego kwotę.",
+      "instalment": "E-mail zakupu zapisano. Spłaty opłaciły jego część; reszta czeka na opłacenie.",
+      "partially_linked": "Niektóre części tej spłaty nie mają jeszcze e-maila zakupu. Każda z nich jest pokazana jako jeden wiersz.",
+      "enriched_by_other": "Dopasowana transakcja została już uzupełniona przez inny e-mail. Otwórz ją i użyj akcji Powiąż, aby zastąpić to uzupełnienie, albo zignoruj ten e-mail.",
+      "no_link_key": "Ten e-mail zakupu nie zawiera klucza powiązania, więc żadna spłata nie może go znaleźć."
     },
     "reasonUnknown": "Powód: {reason}",
     "requestNote": "Prośba o przegląd ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "Odczytywane jest tylko pierwszych {max} wierszy.",
       "empty": "Brak wierszy.",
       "listLabel": "Ponumerowane wiersze wiadomości"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Powiązane e-maile zakupu",
+      "component": "Część {part}: {subject} ({date})",
+      "settlementsHeading": "Opłacono przez",
+      "settlement": "{subject} ({date}), część {amount}",
+      "enrichedBy": "Już uzupełniono przez: {subject}",
+      "openButton": "Otwórz",
+      "open": "Otwórz e-mail {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Kupiono} other {Sprzedano}} {quantity} {symbol} za {total} dnia {date}.",
     "noTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji albo połączona z już istniejącą w księdze.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "Usunięta przez ten parser",
         "no_html": "Brak części HTML",
         "trade": "Proponuje transakcję",
-        "trade_exists": "Już jest w księdze"
+        "trade_exists": "Już jest w księdze",
+        "component": "E-mail zakupu (czeka na spłatę)"
       },
       "parsedTradeAccount": "Konto: {account}",
       "accountWithCurrency": "{name} ({currency})",

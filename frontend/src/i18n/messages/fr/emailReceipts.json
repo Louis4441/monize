@@ -524,7 +524,12 @@
       "currencyMarkers": "Marqueurs de devise",
       "defaultAccount": "Compte par défaut",
       "ruleAccount": "compte",
-      "ruleCurrency": "devise"
+      "ruleCurrency": "devise",
+      "role": "Rôle du profil",
+      "link": "La section « link »",
+      "linkDaysBefore": "Jours avant le remboursement",
+      "linkFromDomains": "Domaines d'expéditeur des e-mails d'achat",
+      "linkKey": "Modèles de clé de liaison"
     },
     "codes": {
       "not_object": "n'est pas une définition valide",
@@ -560,7 +565,15 @@
       "invalid_currency": "n'est pas un code de devise à 3 lettres, comme USD",
       "too_many_lines": "s'étend sur trop de lignes (au maximum {max})",
       "line_break_not_allowed": "est comparé à un seul texte (un nom d'article, le marchand ou un compte) et ne peut donc pas s'étendre sur plusieurs lignes",
-      "invalid_uuid_account": "n'est pas un compte valide"
+      "invalid_uuid_account": "n'est pas un compte valide",
+      "role_invalid": "doit être standalone, component ou settlement",
+      "link_key_requires_component": "ne peut être utilisé que lorsque le rôle est component",
+      "link_key_missing": "est nécessaire lorsque le rôle est component",
+      "link_capture_requires_settlement": "utilise une capture link ou instalment, qu'un profil settlement seul accepte",
+      "link_requires_settlement": "ne peut être utilisé que lorsque le rôle est settlement",
+      "link_domain_invalid": "n'est pas un domaine d'expéditeur valide (au plus {max} domaines)",
+      "link_days_invalid": "doit être un nombre entier de 0 à {max}",
+      "role_trade_conflict": "ne peut pas être component ni settlement dans un profil d'opération de bourse, qui ne lit que l'opération"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transaction convient} other {# transactions conviennent}} aussi bien, aucune ne serait donc associée avant que vous en choisissiez une.",
     "unmatched": "Aucune transaction ne correspond, sur {count, plural, one {# candidate} other {# candidates}}.",
     "jsonInvalid": "Le JSON n'est pas valide, il n'y a donc encore rien à tester.",
+    "component": {
+      "heading": "E-mail d'achat (component) : clé de liaison {linkKey}",
+      "noLinkKey": "E-mail d'achat (component) : aucune clé de liaison n'a été lue, donc aucun e-mail de remboursement ne peut le trouver.",
+      "noneWaiting": "Aucun e-mail de remboursement n'attend cette clé de liaison.",
+      "waiting": "{count, plural, one {# e-mail de remboursement attend} other {# e-mails de remboursement attendent}} cette clé de liaison :",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Ce profil ne lirait pas cet e-mail : aucune de ses lignes obligatoires n'y figure, donc le profil suivant de l'expéditeur serait essayé.",
       "skip_line": "Ce profil mettrait cet e-mail de côté : il contient une ligne qui le fait ignorer.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Ligne d'exclusion",
         "waitIfLine": "Ligne d'attente",
         "reference": "Référence",
+        "linkKey": "Clé de liaison",
         "action": "Achat ou vente",
         "symbol": "Symbole",
         "quantity": "Actions",
@@ -674,7 +695,33 @@
     "paid": "Payé",
     "payee": "Commerçant",
     "reference": "Référence",
-    "categoryByAi": "IA"
+    "categoryByAi": "IA",
+    "linkKey": "Clé de liaison",
+    "kinds": {
+      "shipping": "Livraison",
+      "fee": "Frais",
+      "discount": "Remise"
+    },
+    "parts": {
+      "heading": "Parties",
+      "part": "Partie",
+      "link": "Lien",
+      "outcome": "Résultat",
+      "noLink": "Aucun lien",
+      "component": "E-mail d'achat : {subject} ({date}).",
+      "componentProfile": "Profil : {name}.",
+      "componentNet": "Total de l'achat : {amount}.",
+      "taken": "Déjà utilisé : {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "La partie n'a pas de lien, elle reste donc une seule ligne.",
+      "not_found": "Aucun e-mail d'achat n'a été trouvé pour ce lien, la partie reste donc une seule ligne.",
+      "component_incomplete": "L'e-mail d'achat n'a pas été lu en entier, la partie reste donc une seule ligne.",
+      "component_used": "D'autres remboursements ont déjà utilisé tout l'achat, la partie reste donc une seule ligne.",
+      "joined": "Remplacée par les lignes de l'e-mail d'achat.",
+      "scaled": "Remplacée par les lignes de l'e-mail d'achat, ajustées à cette partie.",
+      "amount_exceeds": "La partie dépasse ce qui reste de l'achat, elle reste donc une seule ligne."
+    }
   },
   "state": {
     "pending": "En attente de lecture",
@@ -690,7 +737,8 @@
     "dismissed": "Écarté",
     "expired": "Expiré",
     "pending_ai": "En attente de l'IA",
-    "request_missing": "Demande manquante"
+    "request_missing": "Demande manquante",
+    "component": "En attente de son remboursement"
   },
   "receipts": {
     "loading": "Chargement des e-mails",
@@ -710,7 +758,8 @@
       "ambiguous": "Plusieurs transactions conviennent",
       "review_conflict": "Une autre demande est ouverte",
       "review": "En cours de révision",
-      "ignored": "Ignoré"
+      "ignored": "Ignoré",
+      "component": "En attente de remboursement"
     },
     "domainFilter": {
       "label": "Domaine de l'expéditeur",
@@ -939,7 +988,13 @@
       "trade_no_account": "Le profil n'a pas pu déterminer à quel compte cette opération correspond.",
       "trade_exists": "Vos comptes contiennent déjà cette opération, donc rien n'a été proposé.",
       "trade_linked": "Lié à la transaction qu'il indique, donc rien n'a été proposé.",
-      "trade_no_currency": "Le profil n'a pas pu déterminer la devise de cette opération, il n'a donc pas pu choisir son compte."
+      "trade_no_currency": "Le profil n'a pas pu déterminer la devise de cette opération, il n'a donc pas pu choisir son compte.",
+      "awaiting_settlement": "E-mail d'achat enregistré. Il attend l'e-mail de remboursement qui le règle.",
+      "settled": "E-mail d'achat enregistré. Les e-mails de remboursement qui lui sont joints règlent son montant entier.",
+      "instalment": "E-mail d'achat enregistré. Des remboursements en ont réglé une partie ; le reste reste à payer.",
+      "partially_linked": "Certaines parties de ce remboursement n'ont pas encore d'e-mail d'achat. Elles sont affichées sur une ligne chacune.",
+      "enriched_by_other": "La transaction correspondante a déjà été complétée par un autre e-mail. Ouvrez-la et utilisez Associer pour remplacer ce complément, ou ignorez cet e-mail.",
+      "no_link_key": "Cet e-mail d'achat ne contient aucune clé de liaison, donc aucun remboursement ne peut le trouver."
     },
     "reasonUnknown": "Motif : {reason}",
     "requestNote": "Demande de révision ({state}) : {note}",
@@ -986,6 +1041,15 @@
       "capped": "Seules les {max} premières lignes sont lues.",
       "empty": "Aucune ligne.",
       "listLabel": "Lignes numérotées de l'e-mail"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "E-mails d'achat associés",
+      "component": "Partie {part} : {subject} ({date})",
+      "settlementsHeading": "Réglé par",
+      "settlement": "{subject} ({date}), partie {amount}",
+      "enrichedBy": "Déjà complétée par : {subject}",
+      "openButton": "Ouvrir",
+      "open": "Ouvrir l'e-mail {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Achat} other {Vente}} de {quantity} {symbol} pour {total} le {date}.",
     "noTradeTransaction": "Aucune pour l'instant : l'opération est enregistrée quand vous approuvez sa proposition, ou liée à une opération déjà présente dans votre registre.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "Supprimé par ce profil",
         "no_html": "Aucune partie HTML",
         "trade": "Propose une opération",
-        "trade_exists": "Déjà dans votre registre"
+        "trade_exists": "Déjà dans votre registre",
+        "component": "E-mail d'achat (attend le remboursement)"
       },
       "parsedTradeAccount": "Compte : {account}",
       "accountWithCurrency": "{name} ({currency})",

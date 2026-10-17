@@ -524,7 +524,12 @@
       "currencyMarkers": "통화 표시",
       "defaultAccount": "기본 계좌",
       "ruleAccount": "계좌",
-      "ruleCurrency": "통화"
+      "ruleCurrency": "통화",
+      "role": "프로필 역할",
+      "link": "link 섹션",
+      "linkDaysBefore": "상환 전 일수",
+      "linkFromDomains": "구매 메일의 발신자 도메인",
+      "linkKey": "링크 키 패턴"
     },
     "codes": {
       "not_object": "은(는) 유효한 정의가 아닙니다",
@@ -560,7 +565,15 @@
       "invalid_currency": "은(는) USD 같은 3글자 통화 코드가 아닙니다",
       "too_many_lines": "이(가) 너무 많은 줄에 걸쳐 있습니다 (최대 {max}줄)",
       "line_break_not_allowed": "은(는) 하나의 텍스트(품목 이름, 판매자 또는 계좌)와 비교되므로 여러 줄에 걸칠 수 없습니다",
-      "invalid_uuid_account": "은(는) 올바른 계좌가 아닙니다"
+      "invalid_uuid_account": "은(는) 올바른 계좌가 아닙니다",
+      "role_invalid": "standalone, component 또는 settlement여야 합니다",
+      "link_key_requires_component": "역할이 component일 때만 사용할 수 있습니다",
+      "link_key_missing": "역할이 component일 때 필요합니다",
+      "link_capture_requires_settlement": "settlement 프로필만 허용하는 link 또는 instalment 캡처를 사용합니다",
+      "link_requires_settlement": "역할이 settlement일 때만 사용할 수 있습니다",
+      "link_domain_invalid": "유효한 발신자 도메인이 아닙니다(최대 {max}개 도메인)",
+      "link_days_invalid": "0에서 {max} 사이의 정수여야 합니다",
+      "role_trade_conflict": "거래만 읽는 증권 거래 프로필에서는 component 또는 settlement일 수 없습니다"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {거래 #건이} other {거래 #건이}} 똑같이 잘 맞으므로 직접 선택하기 전까지 연결되지 않습니다.",
     "unmatched": "{count, plural, one {후보 #건} other {후보 #건}} 중 일치하는 거래가 없습니다.",
     "jsonInvalid": "JSON이 올바르지 않아 아직 테스트할 내용이 없습니다.",
+    "component": {
+      "heading": "구매 메일(component): 링크 키 {linkKey}",
+      "noLinkKey": "구매 메일(component): 링크 키를 읽지 못했으므로 어떤 상환 메일도 이 메일을 찾을 수 없습니다.",
+      "noneWaiting": "이 링크 키를 기다리는 상환 메일이 없습니다.",
+      "waiting": "이 링크 키를 기다리는 상환 메일: {count, plural, one {#건} other {#건}}",
+      "settlement": "{subject}({date})"
+    },
     "outcome": {
       "not_applicable": "이 프로필은 이 메일을 읽지 않습니다. 필수 줄이 하나도 없으므로 해당 발신자의 다음 프로필을 시도합니다.",
       "skip_line": "이 프로필은 이 메일을 제외합니다. 건너뛰기 대상 줄이 포함되어 있습니다.",
@@ -609,6 +629,7 @@
         "skipIfLine": "건너뛰기 줄",
         "waitIfLine": "보류 줄",
         "reference": "참조",
+        "linkKey": "링크 키",
         "action": "매수 또는 매도",
         "symbol": "종목 코드",
         "quantity": "주식 수",
@@ -674,7 +695,33 @@
     "paid": "결제 금액",
     "payee": "판매처",
     "reference": "참조",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "링크 키",
+    "kinds": {
+      "shipping": "배송",
+      "fee": "수수료",
+      "discount": "할인"
+    },
+    "parts": {
+      "heading": "부분",
+      "part": "부분",
+      "link": "링크",
+      "outcome": "결과",
+      "noLink": "링크 없음",
+      "component": "구매 메일: {subject}({date}).",
+      "componentProfile": "프로필: {name}.",
+      "componentNet": "구매 합계: {amount}.",
+      "taken": "이미 사용됨: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "이 부분에는 링크가 없으므로 한 줄로 유지됩니다.",
+      "not_found": "이 링크에 해당하는 구매 메일을 찾지 못했으므로 이 부분은 한 줄로 유지됩니다.",
+      "component_incomplete": "구매 메일을 끝까지 읽지 못했으므로 이 부분은 한 줄로 유지됩니다.",
+      "component_used": "다른 상환이 이미 구매 전체를 사용했으므로 이 부분은 한 줄로 유지됩니다.",
+      "joined": "구매 메일의 줄로 대체되었습니다.",
+      "scaled": "구매 메일의 줄로 대체되었으며 이 부분에 맞게 비율이 조정되었습니다.",
+      "amount_exceeds": "이 부분이 구매의 남은 금액보다 크므로 한 줄로 유지됩니다."
+    }
   },
   "state": {
     "pending": "읽기 대기 중",
@@ -690,7 +737,8 @@
     "dismissed": "무시됨",
     "expired": "만료됨",
     "pending_ai": "AI 응답 대기 중",
-    "request_missing": "요청 없음"
+    "request_missing": "요청 없음",
+    "component": "상환 대기 중"
   },
   "receipts": {
     "loading": "이메일을 불러오는 중",
@@ -710,7 +758,8 @@
       "ambiguous": "여러 거래가 일치",
       "review_conflict": "다른 요청이 진행 중",
       "review": "검토 중",
-      "ignored": "제외됨"
+      "ignored": "제외됨",
+      "component": "상환 대기 중"
     },
     "domainFilter": {
       "label": "발신자 도메인",
@@ -939,7 +988,13 @@
       "trade_no_account": "프로필이 이 거래가 어느 계좌의 것인지 알아내지 못했습니다.",
       "trade_exists": "계좌에 이미 이 거래가 있어 아무것도 제안하지 않았습니다.",
       "trade_linked": "보고된 거래에 연결했으므로 아무것도 제안하지 않았습니다.",
-      "trade_no_currency": "프로필이 이 거래의 통화를 알아낼 수 없어 계좌를 고르지 못했습니다."
+      "trade_no_currency": "프로필이 이 거래의 통화를 알아낼 수 없어 계좌를 고르지 못했습니다.",
+      "awaiting_settlement": "구매 메일을 저장했습니다. 이 구매를 결제하는 상환 메일을 기다립니다.",
+      "settled": "구매 메일을 저장했습니다. 연결된 상환 메일이 전체 금액을 결제합니다.",
+      "instalment": "구매 메일을 저장했습니다. 상환으로 일부가 결제되었으며 나머지는 아직 결제되지 않았습니다.",
+      "partially_linked": "이 상환의 일부 부분에는 아직 구매 메일이 없습니다. 각각 한 줄로 표시됩니다.",
+      "enriched_by_other": "일치한 거래는 이미 다른 메일로 보완되었습니다. 거래를 열어 연결을 사용해 그 보완을 대체하거나 이 메일을 무시하세요.",
+      "no_link_key": "이 구매 메일에는 링크 키가 없으므로 어떤 상환도 이 메일을 찾을 수 없습니다."
     },
     "reasonUnknown": "사유: {reason}",
     "requestNote": "검토 요청 ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "처음 {max}줄만 읽습니다.",
       "empty": "줄이 없습니다.",
       "listLabel": "이메일의 번호가 매겨진 줄"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "연결된 구매 메일",
+      "component": "부분 {part}: {subject}({date})",
+      "settlementsHeading": "결제한 메일",
+      "settlement": "{subject}({date}), 부분 {amount}",
+      "enrichedBy": "이미 보완한 메일: {subject}",
+      "openButton": "열기",
+      "open": "메일 {subject} 열기"
     },
     "tradeTransactionSummary": "{date}에 {symbol} {quantity}주를 {total}에 {action, select, BUY {매수} other {매도}}.",
     "noTradeTransaction": "아직 없음: 제안을 승인하면 거래가 기록되거나, 원장에 이미 있는 거래에 연결됩니다.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "이 프로필이 삭제함",
         "no_html": "HTML 부분 없음",
         "trade": "거래를 제안함",
-        "trade_exists": "이미 원장에 있음"
+        "trade_exists": "이미 원장에 있음",
+        "component": "구매 메일(상환 대기)"
       },
       "parsedTradeAccount": "계좌: {account}",
       "accountWithCurrency": "{name} ({currency})",

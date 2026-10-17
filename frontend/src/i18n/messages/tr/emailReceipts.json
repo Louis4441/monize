@@ -524,7 +524,12 @@
       "currencyMarkers": "Para birimi işaretleri",
       "defaultAccount": "Varsayılan hesap",
       "ruleAccount": "hesap",
-      "ruleCurrency": "para birimi"
+      "ruleCurrency": "para birimi",
+      "role": "Profil rolü",
+      "link": "„link” bölümü",
+      "linkDaysBefore": "Geri ödemeden önceki gün sayısı",
+      "linkFromDomains": "Alışveriş e-postalarının gönderen alan adları",
+      "linkKey": "Bağlantı anahtarı kalıpları"
     },
     "codes": {
       "not_object": "geçerli bir tanım değil",
@@ -560,7 +565,15 @@
       "invalid_currency": "USD gibi 3 harfli bir para birimi kodu değil",
       "too_many_lines": "çok fazla satıra yayılıyor (en fazla {max})",
       "line_break_not_allowed": "tek bir metinle (bir kalem adı, satıcı veya bir hesap) eşleştirilir, bu yüzden birden fazla satıra yayılamaz",
-      "invalid_uuid_account": "geçerli bir hesap değil"
+      "invalid_uuid_account": "geçerli bir hesap değil",
+      "role_invalid": "standalone, component veya settlement olmalıdır",
+      "link_key_requires_component": "yalnızca rol component olduğunda kullanılabilir",
+      "link_key_missing": "rol component olduğunda gereklidir",
+      "link_capture_requires_settlement": "yalnızca bir settlement profilinin kabul ettiği link veya instalment yakalaması kullanıyor",
+      "link_requires_settlement": "yalnızca rol settlement olduğunda kullanılabilir",
+      "link_domain_invalid": "geçerli bir gönderen alan adı değil (en çok {max} alan adı)",
+      "link_days_invalid": "0 ile {max} arasında bir tam sayı olmalıdır",
+      "role_trade_conflict": "yalnızca işlemi okuyan bir borsa işlemi profilinde component veya settlement olamaz"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# işlem} other {# işlem}} eşit derecede uyuyor, bu yüzden siz seçene kadar hiçbiri bağlanmaz.",
     "unmatched": "{count, plural, one {# aday} other {# aday}} arasında eşleşen işlem yok.",
     "jsonInvalid": "JSON geçerli değil, bu yüzden henüz sınanacak bir şey yok.",
+    "component": {
+      "heading": "Alışveriş e-postası (component): bağlantı anahtarı {linkKey}",
+      "noLinkKey": "Alışveriş e-postası (component): bağlantı anahtarı okunmadı, bu yüzden hiçbir geri ödeme e-postası onu bulamaz.",
+      "noneWaiting": "Bu bağlantı anahtarını bekleyen geri ödeme e-postası yok.",
+      "waiting": "Bu bağlantı anahtarını {count, plural, one {# geri ödeme e-postası} other {# geri ödeme e-postası}} bekliyor:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Bu ayrıştırıcı bu e-postayı okumaz: zorunlu satırlarından hiçbiri e-postada yok, bu yüzden gönderen için sıradaki ayrıştırıcı denenir.",
       "skip_line": "Bu ayrıştırıcı bu e-postayı kenara ayırır: e-postada atlamasını gerektiren bir satır var.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Atlama satırı",
         "waitIfLine": "Bekleme satırı",
         "reference": "Referans",
+        "linkKey": "Bağlantı anahtarı",
         "action": "Alım veya satım",
         "symbol": "Sembol",
         "quantity": "Pay",
@@ -674,7 +695,33 @@
     "paid": "Ödenen",
     "payee": "Satıcı",
     "reference": "Referans",
-    "categoryByAi": "Yapay zekâ"
+    "categoryByAi": "Yapay zekâ",
+    "linkKey": "Bağlantı anahtarı",
+    "kinds": {
+      "shipping": "Kargo",
+      "fee": "Ücret",
+      "discount": "İndirim"
+    },
+    "parts": {
+      "heading": "Parçalar",
+      "part": "Parça",
+      "link": "Bağlantı",
+      "outcome": "Sonuç",
+      "noLink": "Bağlantı yok",
+      "component": "Alışveriş e-postası: {subject} ({date}).",
+      "componentProfile": "Profil: {name}.",
+      "componentNet": "Alışveriş toplamı: {amount}.",
+      "taken": "Zaten kullanılan: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "Parçanın bağlantısı yok, bu yüzden tek satır olarak kalır.",
+      "not_found": "Bu bağlantı için alışveriş e-postası bulunamadı, bu yüzden parça tek satır olarak kalır.",
+      "component_incomplete": "Alışveriş e-postası tamamen okunmadı, bu yüzden parça tek satır olarak kalır.",
+      "component_used": "Diğer geri ödemeler alışverişin tamamını zaten kullandı, bu yüzden parça tek satır olarak kalır.",
+      "joined": "Alışveriş e-postasının satırlarıyla değiştirildi.",
+      "scaled": "Alışveriş e-postasının bu parçaya göre ölçeklenmiş satırlarıyla değiştirildi.",
+      "amount_exceeds": "Parça, alışverişten kalan tutardan büyük, bu yüzden tek satır olarak kalır."
+    }
   },
   "state": {
     "pending": "Okunmayı bekliyor",
@@ -690,7 +737,8 @@
     "dismissed": "Yoksayıldı",
     "expired": "Süresi doldu",
     "pending_ai": "Yapay zekâyı bekliyor",
-    "request_missing": "İstek eksik"
+    "request_missing": "İstek eksik",
+    "component": "Geri ödemesini bekliyor"
   },
   "receipts": {
     "loading": "E-postalar yükleniyor",
@@ -710,7 +758,8 @@
       "ambiguous": "Birden çok işlem uyuyor",
       "review_conflict": "Başka bir istek açık",
       "review": "İncelemede",
-      "ignored": "Yoksayıldı"
+      "ignored": "Yoksayıldı",
+      "component": "Geri ödeme bekliyor"
     },
     "domainFilter": {
       "label": "Gönderen alan adı",
@@ -939,7 +988,13 @@
       "trade_no_account": "Ayrıştırıcı bu işlemin hangi hesaba ait olduğunu belirleyemedi.",
       "trade_exists": "Hesaplarınızda bu işlem zaten var, bu yüzden hiçbir şey önerilmedi.",
       "trade_linked": "Bildirdiği işleme bağlandı, bu yüzden hiçbir şey önerilmedi.",
-      "trade_no_currency": "Profil bu işlemin para birimini anlayamadı, bu yüzden hesabını seçemedi."
+      "trade_no_currency": "Profil bu işlemin para birimini anlayamadı, bu yüzden hesabını seçemedi.",
+      "awaiting_settlement": "Alışveriş e-postası kaydedildi. Onu ödeyen geri ödeme e-postasını bekliyor.",
+      "settled": "Alışveriş e-postası kaydedildi. Onunla birleştirilen geri ödeme e-postaları tutarının tamamını ödüyor.",
+      "instalment": "Alışveriş e-postası kaydedildi. Geri ödemeler bir kısmını ödedi; kalanı hâlâ ödenecek.",
+      "partially_linked": "Bu geri ödemenin bazı parçalarının henüz alışveriş e-postası yok. Her biri tek satır olarak gösteriliyor.",
+      "enriched_by_other": "Eşleşen işlem başka bir e-posta tarafından zaten tamamlandı. İşlemi açıp bu tamamlamayı değiştirmek için Bağla'yı kullanın ya da bu e-postayı yoksayın.",
+      "no_link_key": "Bu alışveriş e-postasında bağlantı anahtarı yok, bu yüzden hiçbir geri ödeme onu bulamaz."
     },
     "reasonUnknown": "Neden: {reason}",
     "requestNote": "İnceleme isteği ({state}): {note}",
@@ -986,6 +1041,15 @@
       "capped": "Yalnızca ilk {max} satır okunur.",
       "empty": "Satır yok.",
       "listLabel": "E-postanın numaralı satırları"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Bağlı alışveriş e-postaları",
+      "component": "Parça {part}: {subject} ({date})",
+      "settlementsHeading": "Ödeyen",
+      "settlement": "{subject} ({date}), parça {amount}",
+      "enrichedBy": "Zaten tamamlayan: {subject}",
+      "openButton": "Aç",
+      "open": "{subject} e-postasını aç"
     },
     "tradeTransactionSummary": "{date} tarihinde {total} karşılığında {quantity} {symbol} {action, select, BUY {alındı} other {satıldı}}.",
     "noTradeTransaction": "Henüz yok: işlem, önerisini onayladığınızda kaydedilir ya da defterinizde zaten olan bir işleme bağlanır.",
@@ -1314,7 +1378,8 @@
         "discard_delete": "Bu ayrıştırıcı tarafından silindi",
         "no_html": "HTML bölümü yok",
         "trade": "Bir işlem önerir",
-        "trade_exists": "Defterinizde zaten var"
+        "trade_exists": "Defterinizde zaten var",
+        "component": "Alışveriş e-postası (geri ödeme bekliyor)"
       },
       "parsedTradeAccount": "Hesap: {account}",
       "accountWithCurrency": "{name} ({currency})",
