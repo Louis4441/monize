@@ -1,6 +1,9 @@
 import type { EntityManager } from "typeorm";
 import { completeness } from "../parsing/parse-receipt";
-import type { ParsedReceipt } from "../parsing/receipt-parser.types";
+import {
+  isItemLine,
+  type ParsedReceipt,
+} from "../parsing/receipt-parser.types";
 
 /**
  * The first source of an item's category (spec 7, "Categories"): what the user
@@ -70,7 +73,10 @@ export function applyCategoryHistory(
 ): ParsedReceipt {
   let changed = false;
   const items = parsed.items.map((item) => {
-    const categoryId = history.get(itemHistoryKey(item.name));
+    // Only an item line is looked up: shipping, fee and discount lines keep their category.
+    const categoryId = isItemLine(item)
+      ? history.get(itemHistoryKey(item.name))
+      : undefined;
     if (
       categoryId === undefined ||
       !categories.has(categoryId) ||

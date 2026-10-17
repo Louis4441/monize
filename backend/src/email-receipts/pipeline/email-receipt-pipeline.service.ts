@@ -41,10 +41,12 @@ import {
 import { matchReceipt } from "../matching/match-receipt";
 import { completeness, parseReceiptLines } from "../parsing/parse-receipt";
 import { resolveMatchConfig } from "../parsing/receipt-match-config";
-import type {
-  ParsedReceipt,
-  ParsedTrade,
+import {
+  isItemLine,
+  type ParsedReceipt,
+  type ParsedTrade,
 } from "../parsing/receipt-parser.types";
+import { hasJoinedPart } from "../linking/join-settlement";
 import {
   applyCategoryHistory,
   loadItemCategoryHistory,
@@ -594,7 +596,7 @@ export class EmailReceiptPipelineService {
     const history = await loadItemCategoryHistory(
       m,
       userId,
-      parsed.items.map((item) => item.name),
+      parsed.items.filter(isItemLine).map((item) => item.name),
     );
     const withHistory = applyCategoryHistory(parsed, history, categoryNames);
     if (withHistory !== parsed) {
@@ -612,7 +614,7 @@ export class EmailReceiptPipelineService {
       choice.kind === "chosen" &&
       choice.definition.aiCategories === true &&
       parsed.reason === "items_uncategorized" &&
-      parsed.items.some((item) => item.categoryId === null)
+      parsed.items.some((item) => isItemLine(item) && item.categoryId === null)
     ) {
       const hints = options.categoryHints;
       if (hints === undefined) {
@@ -623,7 +625,7 @@ export class EmailReceiptPipelineService {
             aiMode,
             categories: categoryNames,
             items: parsed.items.flatMap((item, index) =>
-              item.categoryId === null
+              isItemLine(item) && item.categoryId === null
                 ? [
                     {
                       index,
@@ -781,6 +783,7 @@ export class EmailReceiptPipelineService {
       proposalKind: proposal.kind,
       usedFallback: submitted.usedFallback,
       cardBuilt: true,
+      linked: hasJoinedPart(parsed),
     };
     const committed = await this.finish(m, userId, receipt, {
       status: "review",

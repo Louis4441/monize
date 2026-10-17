@@ -374,6 +374,17 @@ export interface ReceiptParserDefinition {
 export const RECEIPT_DISCARD_MODES = ["ignore", "delete"] as const;
 export type ReceiptDiscardMode = (typeof RECEIPT_DISCARD_MODES)[number];
 
+/**
+ * What a split line is (linked receipts 4.1): an `item` (the default), the
+ * `shipping` or a `fee` of a joined component, or its `discount`. A `discount`
+ * line keeps a non-negative amount and counts against the total.
+ */
+export type ReceiptLineKind = "item" | "shipping" | "fee" | "discount";
+
+/** True for an item line: a line without `kind` is one (a receipt stored before `kind` existed). */
+export const isItemLine = (item: { kind?: ReceiptLineKind }): boolean =>
+  item.kind === undefined || item.kind === "item";
+
 /** One line item as read from the email. */
 export interface ParsedReceiptItem {
   name: string;
@@ -386,6 +397,8 @@ export interface ParsedReceiptItem {
    * rule, the default or the payee did. The card and the receipt page label it.
    */
   categorySource?: "ai" | "history";
+  /** What the line is; absent is `item`. Only a joined component's lines carry another kind. */
+  kind?: ReceiptLineKind;
   /** A settlement part's link value (capture `{link}`, normalized); absent otherwise. */
   link?: string;
   /** A settlement part's instalment text (capture `{instalment}`, at most 50 characters); absent otherwise. */
@@ -400,6 +413,44 @@ export type ParsedReceiptReason =
   | "items_unbalanced"
   | "items_uncategorized"
   | "shipping_uncategorized";
+
+/** What a settlement part became (linked receipts 4.2); `RECEIPT_LINK_OUTCOMES` is the list a CHECK constraint holds. */
+export type ReceiptLinkOutcome =
+  | "no_link"
+  | "not_found"
+  | "component_incomplete"
+  | "component_used"
+  | "joined"
+  | "scaled"
+  | "amount_exceeds";
+export const RECEIPT_LINK_OUTCOMES: readonly ReceiptLinkOutcome[] = [
+  "no_link",
+  "not_found",
+  "component_incomplete",
+  "component_used",
+  "joined",
+  "scaled",
+  "amount_exceeds",
+];
+
+/** The report of one settlement part, stored in the joined receipt's `links`. Amounts are 1/10000 units. */
+export interface ReceiptLinkReport {
+  partIndex: number;
+  /** The part's link value; null when it captured none. */
+  link: string | null;
+  partAmount: number;
+  outcome: ReceiptLinkOutcome;
+  /** The component found; null when none was. */
+  componentReceiptId: string | null;
+  /** The component's net (its lines, discount subtracted). */
+  componentNet?: number;
+  /** What other settlements already took from the component. */
+  taken?: number;
+  /** How many components the link found (more than one: a resend). */
+  several?: number;
+  /** Why an incomplete component is incomplete. */
+  componentReason?: ParsedReceiptReason | null;
+}
 
 /**
  * What a parser read from one email. Amounts are 1/10000 units. `total`,
@@ -439,6 +490,8 @@ export interface ParsedReceipt {
   /** 1/10000 units: what the lines may differ from the stated amounts by and still balance; absent is 0. */
   balanceTolerance?: number;
   discountCategoryId: string | null;
+  /** A joined settlement only: one report per part; absent on every other receipt. */
+  links?: ReceiptLinkReport[];
   complete: boolean;
   reason: ParsedReceiptReason | null;
   /**

@@ -1513,11 +1513,13 @@ describe("autoApplyAllowed", () => {
     proposalKind: "itemized",
     usedFallback: false,
     cardBuilt: true,
+    linked: false,
     ...over,
   });
 
   it("holds when every condition does", () => {
     expect(autoApplyAllowed(facts())).toBe(true);
+    expect(autoApplyAllowed(facts({ linked: true }))).toBe(false);
     expect(autoApplyAllowed(facts({ matchKind: "amount_payee" }))).toBe(true);
     // The profile's own identifier in the bank operation is as strong as an order number.
     expect(autoApplyAllowed(facts({ matchKind: "reference" }))).toBe(true);

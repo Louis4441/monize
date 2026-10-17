@@ -268,7 +268,7 @@ transaction of `-24.99` is description only, reason `amount_differs` (`paid` is
 
 Applies only when every one holds: mailbox `auto_apply`; parser `approved`;
 `complete`; `abs(T) = paid ?? total`; `match_kind` is `order_id`, `reference` or `amount_payee` (never `amount_date`, never a
-match made with a tolerance that an exact amount would not make); the card was built. Any refusal from `confirm` (write limit, reconciled lock, a
+match made with a tolerance that an exact amount would not make); the card was built; the receipt has no `joined` or `scaled` part (linked receipts spec section 7: a person approves every join). Any refusal from `confirm` (write limit, reconciled lock, a
 changed row) leaves the proposal waiting in the inbox.
 
 ## 7. (continued) Tag, categories by the AI, bulk work

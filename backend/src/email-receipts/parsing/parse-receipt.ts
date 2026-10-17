@@ -463,11 +463,19 @@ export function completeness(
   if (total === null && paid === null) return "no_total";
   if (itemsUnresolved) return "item_amount_missing";
   if (items.length === 0) return "no_items";
+  // A `discount`-kind line (a joined component's discount) is subtracted like `discount`.
+  const discountLines = items.reduce(
+    (sum, item) => sum + (item.kind === "discount" ? item.amount : 0),
+    0,
+  );
   const gross =
-    items.reduce((sum, item) => sum + item.amount, 0) +
+    items.reduce(
+      (sum, item) => sum + (item.kind === "discount" ? 0 : item.amount),
+      0,
+    ) +
     (shipping ?? 0) +
     fees.reduce((sum, fee) => sum + fee, 0);
-  const net = gross - (discount ?? 0);
+  const net = gross - (discount ?? 0) - discountLines;
   const within = (stated: number, computed: number): boolean =>
     Math.abs(stated - computed) <= tolerance;
   if (
