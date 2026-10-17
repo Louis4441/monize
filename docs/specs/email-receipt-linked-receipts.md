@@ -1,7 +1,7 @@
 # Spec: linked email receipts (many emails, one transaction)
 
 Status: **proposed**. The plan is
-[`../future-plans/email-receipts-linked.md`](../future-plans/email-receipts-linked.md);
+[`docs/future-plans/email-receipts-linked.md`](../future-plans/email-receipts-linked.md);
 the base rules are [`email-receipt-matching.md`](./email-receipt-matching.md)
 (units, amount grammar, matching, completeness, proposal). Everything in that
 spec holds unless this one says otherwise.

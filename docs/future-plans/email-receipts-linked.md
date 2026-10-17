@@ -1,7 +1,7 @@
 # Email receipts: linked receipts (many emails, one transaction)
 
 > Companion to [`email-receipts.md`](./email-receipts.md) (the design),
-> [`../specs/email-receipt-linked-receipts.md`](../specs/email-receipt-linked-receipts.md)
+> [`docs/specs/email-receipt-linked-receipts.md`](../specs/email-receipt-linked-receipts.md)
 > (the spec: truth tables, examples, missing-data policy, test matrix) and
 > [`email-receipts-linked-tasks.md`](./email-receipts-linked-tasks.md) (the task
 > list). The invariants of the parent design apply unchanged: the mailbox is

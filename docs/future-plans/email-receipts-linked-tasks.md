@@ -1,7 +1,7 @@
 # Email receipts: linked receipts, task list
 
 > Companion to [`email-receipts-linked.md`](./email-receipts-linked.md) and
-> [`../specs/email-receipt-linked-receipts.md`](../specs/email-receipt-linked-receipts.md).
+> [`docs/specs/email-receipt-linked-receipts.md`](../specs/email-receipt-linked-receipts.md).
 > Definition of done per task is the layer's "Required before you push" list in
 > `AGENTS.md`.
 
