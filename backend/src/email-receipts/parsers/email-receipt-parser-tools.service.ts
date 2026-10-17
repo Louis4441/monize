@@ -26,7 +26,12 @@ import { EmailReceipt } from "../entities/email-receipt.entity";
 import { EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE } from "./parser-tool.guide";
 import { effectiveMatchDefinition } from "../parsing/receipt-match-config";
 import { resolveParserCategoryNames } from "./parser-category-names.util";
-import type { ReceiptMatchStrategy } from "../parsing/receipt-parser.types";
+import type {
+  ReceiptLinkOutcome,
+  ReceiptLineKind,
+  ReceiptMatchStrategy,
+  ReceiptTraceHit,
+} from "../parsing/receipt-parser.types";
 import type { ReceiptOutcome } from "../parsing/parse-receipt";
 import {
   compareWithExpected,
@@ -107,6 +112,8 @@ export interface LlmParsedReceipt {
     /** A settlement part's link value and instalment text; present only when read. */
     link?: string;
     instalment?: string;
+    /** A joined component's line that is not an item (`shipping`, `fee`, `discount`); absent for an item. */
+    kind?: ReceiptLineKind;
   }>;
   complete: boolean;
   reason: ParsedReceipt["reason"];
@@ -141,7 +148,8 @@ export interface LlmParsedTrade {
  * strategy kept (spec 3a). Reads only.
  */
 export interface ParserToolMatch {
-  outcome: "matched" | "ambiguous" | "unmatched";
+  /** `component`: a component profile's email is stored, never matched to a transaction. */
+  outcome: "matched" | "ambiguous" | "unmatched" | "component";
   /** The strategy that matched or found several candidates; null when none did. */
   strategy: ReceiptMatchStrategy | null;
   transaction: {
@@ -155,6 +163,33 @@ export interface ParserToolMatch {
   attempts: Array<{ strategy: ReceiptMatchStrategy; count: number }>;
 }
 
+/**
+ * One part of a tested settlement email (linked receipts spec 10), in decimal
+ * units: the link it captured, the component that link found, and what the
+ * join did with the part.
+ */
+export interface ParserToolLink {
+  partIndex: number;
+  link: string | null;
+  /** The component found (the newest of several); null when none. */
+  component: {
+    receiptId: string;
+    subject: string;
+    /** `YYYY-MM-DD`. */
+    effectiveDate: string;
+    profileName: string | null;
+  } | null;
+  partAmount: number;
+  /** The component's net; null when it was not measured (no component, or an incomplete one). */
+  componentNet: number | null;
+  /** What other settlements already took from the component; null when not measured. */
+  taken: number | null;
+  /** What the join did with the part: `joined`, `scaled`, `not_found`, `component_incomplete`, `component_used`, `amount_exceeds` or `no_link`. */
+  outcome: ReceiptLinkOutcome;
+  /** How many components the link found. */
+  several: number;
+}
+
 export interface ParserToolTestEmail {
   receiptId: string;
   subject: string;
@@ -165,8 +200,19 @@ export interface ParserToolTestEmail {
   outcome: ReceiptOutcome;
   /** Which entry and which line read each value; at most 20 items are traced. */
   trace: ReceiptTrace;
-  /** What the definition's `match` section would do with this email (design 5.5). */
+  /** What the definition's `match` section would do with this email (design 5.5). A settlement is matched as its joined reading. */
   match: ParserToolMatch;
+  /** A component profile only: the link value it read and the trace hit that read it. */
+  linkKey?: { value: string | null; hit: ReceiptTraceHit | null };
+  /** A component profile only: settlement emails whose link rows wait for this key (newest first, at most 20); a settlement is re-read when the component is stored. */
+  waitingSettlements?: Array<{
+    receiptId: string;
+    subject: string;
+    /** `YYYY-MM-DD`. */
+    date: string;
+  }>;
+  /** A settlement profile only: one entry per part; `parsed.items` are then the joined lines. At most 20 are listed. */
+  links?: ParserToolLink[];
   /** For a trade profile: what it read and which line read each value. Such a profile has no bank match, and `parsed` is empty. */
   trade?: { parsed: LlmParsedTrade; trace: ReceiptTradeTrace };
   /**
@@ -312,6 +358,9 @@ function toLlmParsed(
           : (categoryNames.get(item.categoryId) ?? null),
       ...(item.link === undefined ? {} : { link: item.link }),
       ...(item.instalment === undefined ? {} : { instalment: item.instalment }),
+      ...(item.kind === undefined || item.kind === "item"
+        ? {}
+        : { kind: item.kind }),
     })),
     complete: parsed.complete,
     reason: parsed.reason,
@@ -557,11 +606,47 @@ export class EmailReceiptParserToolsService {
                 },
               }
             : {}),
+          ...(run.component
+            ? {
+                linkKey: {
+                  value: run.component.linkKey,
+                  hit: trace.linkKey ?? null,
+                },
+                waitingSettlements: run.component.waitingSettlements
+                  .slice(0, TRACE_MAX_ITEMS)
+                  .map((settlement) => ({
+                    receiptId: settlement.id,
+                    subject: settlement.subject,
+                    date: settlement.effectiveDate,
+                  })),
+              }
+            : {}),
+          ...(run.links
+            ? {
+                links: run.links.slice(0, TRACE_MAX_ITEMS).map((link) => ({
+                  partIndex: link.partIndex,
+                  link: link.link,
+                  component: link.component
+                    ? {
+                        receiptId: link.component.id,
+                        subject: link.component.subject,
+                        effectiveDate: link.component.effectiveDate,
+                        profileName: link.component.profileName,
+                      }
+                    : null,
+                  partAmount: units(link.partAmount) ?? 0,
+                  componentNet: units(link.componentNet),
+                  taken: units(link.taken),
+                  outcome: link.outcome,
+                  several: link.several,
+                })),
+              }
+            : {}),
           parsed: toLlmParsed(parsed, categoryNames),
           outcome,
           trace: { ...trace, items: trace.items.slice(0, TRACE_MAX_ITEMS) },
           match: {
-            outcome: matched.kind,
+            outcome: run.component ? "component" : matched.kind,
             strategy: matched.kind === "unmatched" ? null : matched.strategy,
             transaction: hit
               ? {

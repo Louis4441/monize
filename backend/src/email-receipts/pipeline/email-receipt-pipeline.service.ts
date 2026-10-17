@@ -52,6 +52,7 @@ import {
 } from "../parsing/receipt-parser.types";
 import { componentReason } from "../linking/component-reason";
 import { loadLinkedComponents } from "../linking/component-lookup";
+import { waitingSettlements } from "../linking/waiting-settlements";
 import {
   componentNet,
   hasJoinedPart,
@@ -672,12 +673,15 @@ export class EmailReceiptPipelineService {
         });
         return {
           ...stored,
-          rejoin: await waitingSettlements(
-            m,
-            userId,
-            receipt.id,
-            parsed.linkKey,
-          ),
+          rejoin: (
+            await waitingSettlements(
+              m,
+              userId,
+              receipt.id,
+              parsed.linkKey,
+              MAX_REJOINED_SETTLEMENTS,
+            )
+          ).map((settlement) => settlement.id),
         };
       }
       // A re-join leaves an email that read no amount alone.
@@ -1412,33 +1416,6 @@ function joinImproved(
     const was = before.get(report.partIndex);
     return was !== undefined && !isJoin(was) && isJoin(report.outcome);
   });
-}
-
-/** The settlements with a part waiting for this link value, newest first (spec 8). */
-async function waitingSettlements(
-  m: EntityManager,
-  userId: string,
-  componentId: string,
-  linkKey: string,
-): Promise<string[]> {
-  const rows = returnedRows<{ id: string }>(
-    await m.query(
-      `SELECT s.id
-         FROM email_receipts s
-        WHERE s.user_id = $1
-          AND s.id <> $2
-          AND EXISTS (SELECT 1
-                        FROM email_receipt_links l
-                       WHERE l.settlement_receipt_id = s.id
-                         AND l.user_id = $1
-                         AND l.link_value = $3
-                         AND l.component_receipt_id IS NULL)
-        ORDER BY COALESCE(s.original_sent_at, s.received_at) DESC, s.id DESC
-        LIMIT $4`,
-      [userId, componentId, linkKey, MAX_REJOINED_SETTLEMENTS],
-    ),
-  );
-  return rows.map((row) => row.id);
 }
 
 function unchanged(receipt: EmailReceipt): ProcessReceiptResult {

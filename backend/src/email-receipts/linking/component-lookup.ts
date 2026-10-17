@@ -84,6 +84,7 @@ export function toJoinParts(
   chosen: ReadonlyMap<string, ChosenComponent>,
   takenUnits: ReadonlyMap<string, number>,
   tagByParser: ReadonlyMap<string, string | null>,
+  nameByParser: ReadonlyMap<string, string | null> = new Map(),
 ): JoinPart[] {
   return items.map((item) => {
     const found = item.link ? chosen.get(item.link) : undefined;
@@ -94,6 +95,11 @@ export function toJoinParts(
         parsed: found.row.parsed,
         tagName: found.row.parserId
           ? (tagByParser.get(found.row.parserId) ?? null)
+          : null,
+        subject: found.row.subject,
+        effectiveDate: found.row.effectiveDate,
+        profileName: found.row.parserId
+          ? (nameByParser.get(found.row.parserId) ?? null)
           : null,
       },
       several: found.several,
@@ -171,6 +177,7 @@ export async function loadLinkedComponents(
   const ids = [...chosen.values()].map((c) => c.row.id);
   const taken = new Map<string, number>();
   const tags = new Map<string, string | null>();
+  const names = new Map<string, string | null>();
   if (ids.length > 0) {
     const takenRows: { component_receipt_id: string; taken: string }[] =
       await m.query(
@@ -193,14 +200,21 @@ export async function loadLinkedComponents(
       ),
     ];
     if (parserIds.length > 0) {
-      const tagRows: { id: string; tag: string | null }[] = await m.query(
-        `SELECT id, definition->>'tag' AS tag
+      const tagRows: {
+        id: string;
+        tag: string | null;
+        name: string | null;
+      }[] = await m.query(
+        `SELECT id, definition->>'tag' AS tag, name
            FROM email_receipt_parsers
           WHERE user_id = $1 AND id = ANY($2::uuid[])`,
         [userId, parserIds],
       );
-      for (const row of tagRows) tags.set(row.id, row.tag);
+      for (const row of tagRows) {
+        tags.set(row.id, row.tag);
+        names.set(row.id, row.name);
+      }
     }
   }
-  return toJoinParts(items, chosen, taken, tags);
+  return toJoinParts(items, chosen, taken, tags, names);
 }

@@ -24,6 +24,15 @@ export interface JoinComponent {
   receiptId: string;
   parsed: ParsedReceipt;
   tagName: string | null;
+  /**
+   * What a person needs to recognise the component (the dry run shows it);
+   * `joinSettlement` does not read them. Absent when the caller did not look.
+   */
+  subject?: string;
+  /** `YYYY-MM-DD` (UTC). */
+  effectiveDate?: string;
+  /** The name of the component's profile; null when it has none. */
+  profileName?: string | null;
 }
 
 /** What the caller found for one settlement item (one part), by index. */

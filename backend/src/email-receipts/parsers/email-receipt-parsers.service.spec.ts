@@ -9,6 +9,13 @@ import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
 import {
+  ALLEGRO_PAY_COMPONENT_DEFINITION,
+  ALLEGRO_PAY_CONTRACT_2,
+  ALLEGRO_PAY_PURCHASE_LINES,
+  ALLEGRO_PAY_REPAYMENT_LINES,
+  ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+} from "../parsing/fixtures/allegro-pay-mails";
+import {
   dominantSenderDomain,
   EmailReceiptParsersService,
   MAX_PARSERS_PER_USER,
@@ -910,6 +917,68 @@ describe("EmailReceiptParsersService.test", () => {
     expect(error).toBeInstanceOf(BadRequestException);
     expect(error.message).toContain("unsupported_version");
     expect(manager.getRepository).not.toHaveBeenCalled();
+  });
+});
+
+describe("EmailReceiptParsersService.test of linked receipts", () => {
+  const receiptOf = (lines: string[], id: string) =>
+    Object.assign(new EmailReceipt(), {
+      id,
+      userId: USER,
+      subject: "Subject",
+      bodyText: lines.join("\n"),
+      receivedAt: new Date("2026-01-10T10:00:00Z"),
+    });
+
+  it("returns a component's link value and waiting settlements, with the empty match", async () => {
+    const { service, manager, receiptRepo } = setup();
+    receiptRepo.findOne.mockResolvedValue(
+      receiptOf(ALLEGRO_PAY_PURCHASE_LINES, "c1"),
+    );
+    manager.query.mockResolvedValue([
+      { id: "s1", subject: "Repayment", effective_date: "2026-01-10" },
+    ]);
+
+    const result = await service.test(USER, {
+      receiptId: "c1",
+      definition: ALLEGRO_PAY_COMPONENT_DEFINITION,
+    } as never);
+
+    expect(result.component).toEqual({
+      linkKey: ALLEGRO_PAY_CONTRACT_2,
+      waitingSettlements: [
+        { id: "s1", subject: "Repayment", effectiveDate: "2026-01-10" },
+      ],
+    });
+    expect(result.links).toBeUndefined();
+    expect(result.match).toEqual({
+      kind: "unmatched",
+      considered: 0,
+      attempts: [],
+    });
+    expect(result.candidateCount).toBe(0);
+    expect(result.transaction).toBeNull();
+  });
+
+  it("returns a settlement's links per part and the joined reading", async () => {
+    const { service, manager, receiptRepo } = setup();
+    receiptRepo.findOne.mockResolvedValue(
+      receiptOf(ALLEGRO_PAY_REPAYMENT_LINES, "s1"),
+    );
+    manager.query.mockResolvedValue([]);
+
+    const result = await service.test(USER, {
+      receiptId: "s1",
+      definition: ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+    } as never);
+
+    expect(result.component).toBeUndefined();
+    expect(result.links?.map((link) => link.outcome)).toEqual([
+      "not_found",
+      "not_found",
+    ]);
+    expect(result.parsed.links).toHaveLength(2);
+    expect(result.parsed.items).toHaveLength(2);
   });
 });
 

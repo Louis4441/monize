@@ -6,6 +6,16 @@ import {
   WEALTHSIMPLE_TRADE_DEFINITION,
 } from "../parsing/fixtures/wealthsimple-trade";
 import {
+  ALLEGRO_PAY_COMPONENT_DEFINITION,
+  ALLEGRO_PAY_CONTRACT_1,
+  ALLEGRO_PAY_CONTRACT_2,
+  ALLEGRO_PAY_PURCHASE_LINES,
+  ALLEGRO_PAY_PURCHASE_SUBJECT,
+  ALLEGRO_PAY_REPAYMENT_LINES,
+  ALLEGRO_PAY_REPAYMENT_SUBJECT,
+  ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+} from "../parsing/fixtures/allegro-pay-mails";
+import {
   compareWithExpected,
   dryRunReceipt,
   loadTransactionSummaries,
@@ -294,5 +304,222 @@ describe("dryRunReceipt of a trade profile", () => {
       null,
     );
     expect(run.outcome).toBe("no_html");
+  });
+});
+
+describe("dryRunReceipt of linked receipts", () => {
+  const purchase = {
+    id: "component-1",
+    subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+    bodyText: ALLEGRO_PAY_PURCHASE_LINES.join("\n"),
+    bodyHtml: null,
+    receivedAt: new Date("2025-12-15T10:00:00Z"),
+    originalSentAt: null,
+  };
+  const repayment = {
+    id: "settlement-1",
+    subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+    bodyText: ALLEGRO_PAY_REPAYMENT_LINES.join("\n"),
+    bodyHtml: null,
+    receivedAt: new Date("2026-01-10T10:00:00Z"),
+    originalSentAt: null,
+  };
+
+  it("reads a component without a candidate or a matcher, and lists the settlements that wait for its key", async () => {
+    const query = jest.fn(async (sql: string, _params?: unknown[]) =>
+      sql.includes("FROM email_receipt_links l")
+        ? [
+            {
+              id: "settlement-1",
+              subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+              effective_date: "2026-01-10",
+            },
+          ]
+        : [],
+    );
+    const run = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_COMPONENT_DEFINITION,
+      purchase,
+      null,
+    );
+    expect(run.outcome).toBe("read");
+    expect(run.match).toEqual({
+      kind: "unmatched",
+      considered: 0,
+      attempts: [],
+    });
+    expect(run.candidates).toEqual([]);
+    expect(run.component).toEqual({
+      linkKey: ALLEGRO_PAY_CONTRACT_2,
+      waitingSettlements: [
+        {
+          id: "settlement-1",
+          subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+          effectiveDate: "2026-01-10",
+        },
+      ],
+    });
+    expect(run.trace.linkKey?.line.text).toContain(ALLEGRO_PAY_CONTRACT_2);
+    // One statement, the waiting-settlements query: no transaction is read, no lock is taken.
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).not.toContain("FOR UPDATE");
+    expect(params).toEqual([USER, "component-1", ALLEGRO_PAY_CONTRACT_2, 20]);
+  });
+
+  it("asks for no waiting settlement when the component read no link value or a guard stopped it", async () => {
+    const query = jest.fn(async () => []);
+    const none = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_COMPONENT_DEFINITION,
+      { ...purchase, bodyText: "Nothing to see" },
+      null,
+    );
+    expect(none.component).toEqual({ linkKey: null, waitingSettlements: [] });
+    const guarded = await dryRunReceipt(
+      { query } as never,
+      USER,
+      { ...ALLEGRO_PAY_COMPONENT_DEFINITION, requireLine: ["never present"] },
+      purchase,
+      null,
+    );
+    expect(guarded.outcome).toBe("not_applicable");
+    expect(guarded.component?.waitingSettlements).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  const settlementWorld = async (withComponent: boolean) => {
+    const read = await dryRunReceipt(
+      { query: jest.fn(async () => []) } as never,
+      USER,
+      ALLEGRO_PAY_COMPONENT_DEFINITION,
+      purchase,
+      null,
+    );
+    const query = jest.fn(async (sql: string, _params?: unknown[]) => {
+      if (sql.includes("FROM email_receipts r")) {
+        return withComponent
+          ? [
+              {
+                id: "component-1",
+                link_key: ALLEGRO_PAY_CONTRACT_2,
+                subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+                effective_date: "2025-12-15",
+                parsed: read.parsed,
+                parser_id: "parser-1",
+              },
+            ]
+          : [];
+      }
+      if (sql.includes("AS taken")) return [];
+      if (sql.includes("definition->>'tag'")) {
+        return [{ id: "parser-1", tag: "Allegro", name: "Shop purchases" }];
+      }
+      return [];
+    });
+    return query;
+  };
+
+  it("joins a settlement with its component through the pipeline's loader, without a lock, and matches the joined reading", async () => {
+    const query = await settlementWorld(true);
+    const run = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+    );
+    expect(run.component).toBeUndefined();
+    expect(run.links).toEqual([
+      {
+        partIndex: 0,
+        link: ALLEGRO_PAY_CONTRACT_1,
+        component: null,
+        partAmount: 1098900,
+        componentNet: null,
+        taken: null,
+        outcome: "not_found",
+        several: 0,
+      },
+      {
+        partIndex: 1,
+        link: ALLEGRO_PAY_CONTRACT_2,
+        component: {
+          id: "component-1",
+          subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+          effectiveDate: "2025-12-15",
+          profileName: "Shop purchases",
+        },
+        partAmount: 1630000,
+        componentNet: 1630000,
+        taken: 0,
+        outcome: "joined",
+        several: 1,
+      },
+    ]);
+    // The part of contract 1 stays one line; the component's three lines replace the other.
+    expect(run.parsed.items.map((item) => item.amount)).toEqual([
+      1098900, 1400000, 100000, 130000,
+    ]);
+    expect(run.parsed.links).toHaveLength(2);
+    const sqls = query.mock.calls.map(([sql]) => sql);
+    expect(sqls.some((sql) => sql.includes("FOR UPDATE"))).toBe(false);
+    // The candidate search of a settlement keeps the enriched transactions.
+    expect(sqls.find((sql) => sql.includes("FROM transactions t"))).toContain(
+      "enriched_by_receipt_id",
+    );
+  });
+
+  it("reads a settlement with no component as one line per part, every part not_found", async () => {
+    const query = await settlementWorld(false);
+    const run = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+    );
+    expect(run.links?.map((link) => link.outcome)).toEqual([
+      "not_found",
+      "not_found",
+    ]);
+    expect(run.links?.every((link) => link.component === null)).toBe(true);
+    expect(run.parsed.items.map((item) => item.amount)).toEqual([
+      1098900, 1630000,
+    ]);
+  });
+
+  it("tests the definition it is given: another link window finds no component", async () => {
+    const query = await settlementWorld(true);
+    await dryRunReceipt(
+      { query } as never,
+      USER,
+      {
+        ...ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+        link: { fromDomains: ["other.example.net"], daysBefore: 5 },
+      },
+      repayment,
+      null,
+    );
+    const [, params] = query.mock.calls.find(([sql]) =>
+      sql.includes("FROM email_receipts r"),
+    ) as [string, unknown[]];
+    expect(params[3]).toEqual(["other.example.net"]);
+    expect(params[4]).toBe("2026-01-05");
+  });
+
+  it("gives a standalone profile neither marker", async () => {
+    const run = await dryRunReceipt(
+      { query: jest.fn(async () => []) } as never,
+      USER,
+      { ...ALLEGRO_PAY_COMPONENT_DEFINITION, role: undefined },
+      purchase,
+      null,
+    );
+    expect(run.component).toBeUndefined();
+    expect(run.links).toBeUndefined();
   });
 });

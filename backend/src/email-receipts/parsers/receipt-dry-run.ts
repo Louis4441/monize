@@ -23,9 +23,16 @@ import type {
   ParsedReceipt,
   ParsedTrade,
   ReceiptParserDefinition,
+  ReceiptLinkOutcome,
   ReceiptTrace,
   ReceiptTradeTrace,
 } from "../parsing/receipt-parser.types";
+import { loadLinkedComponents } from "../linking/component-lookup";
+import { joinSettlement } from "../linking/join-settlement";
+import {
+  waitingSettlements,
+  type WaitingSettlement,
+} from "../linking/waiting-settlements";
 import { loadReceiptCandidates } from "../pipeline/receipt-candidates";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
 import { readTradeEmail } from "../pipeline/trade-reading";
@@ -46,6 +53,32 @@ export interface DryRunReceipt {
 export interface DryRunPayee {
   id: string;
   defaultCategoryId: string | null;
+}
+
+/**
+ * One part of a settlement as the join read it (linked receipts spec 10).
+ * Amounts are 1/10000 units, like `parsed`; `componentNet` and `taken` are null
+ * when the part had no complete component to measure.
+ */
+export interface DryRunLink {
+  partIndex: number;
+  /** The part's link value; null when it captured none. */
+  link: string | null;
+  /** The component the link found (the newest of several); null when none. */
+  component: {
+    id: string;
+    subject: string;
+    /** `YYYY-MM-DD`. */
+    effectiveDate: string;
+    /** The name of the component's profile; null when it has none. */
+    profileName: string | null;
+  } | null;
+  partAmount: number;
+  componentNet: number | null;
+  taken: number | null;
+  outcome: ReceiptLinkOutcome;
+  /** How many components the link found: 0, 1 or more. */
+  several: number;
 }
 
 /** What reading one stored email with a definition, and matching the result, yields. */
@@ -69,6 +102,22 @@ export interface ReceiptDryRun {
    * receipt and no candidate was looked up.
    */
   trade?: { parsed: ParsedTrade; trace: ReceiptTradeTrace };
+  /**
+   * Present only for a `component` profile, which is not matched to a bank
+   * transaction (`match` is the empty "unmatched, considered 0" shape and no
+   * candidate was looked up): the link value it read and the settlements whose
+   * link rows wait for it (at most `MAX_WAITING_SETTLEMENTS`, newest first).
+   */
+  component?: {
+    linkKey: string | null;
+    waitingSettlements: WaitingSettlement[];
+  };
+  /**
+   * Present only for a `settlement` profile that was read: one entry per part,
+   * in item order. `parsed` is then the JOINED reading, which `match` and
+   * `candidates` are computed from.
+   */
+  links?: DryRunLink[];
 }
 
 const EMPTY_PARSED: ParsedReceipt = {
@@ -117,7 +166,7 @@ export async function dryRunReceipt(
   }
   // The lines of the source the definition chose (`text` or `html`); the trace's
   // line numbers refer to them. `no_html`: it reads HTML, the email has none.
-  const { parsed, trace, outcome } = parseReceiptLinesTraced(
+  const read = parseReceiptLinesTraced(
     definition,
     receipt.subject,
     new ReceiptSourceLines(receipt).forSource(definition.source),
@@ -126,12 +175,74 @@ export async function dryRunReceipt(
   const effectiveDate = effectiveReceiptDate(receipt);
   const purchaseDate = effectiveDate.toISOString().slice(0, 10);
   const matchConfig = resolveMatchConfig(definition.match);
+  // A component never looks for a bank transaction (linked receipts spec 2.1):
+  // the pipeline stores it and re-reads the settlements waiting for its key.
+  if (definition.role === "component") {
+    const linkKey = read.parsed.linkKey ?? null;
+    return {
+      parsed: read.parsed,
+      trace: read.trace,
+      outcome: read.outcome,
+      effectiveDate,
+      purchaseDate,
+      matchConfig,
+      candidates: [],
+      match: { kind: "unmatched", considered: 0, attempts: [] },
+      hit: undefined,
+      component: {
+        linkKey,
+        waitingSettlements:
+          read.outcome === "read" && linkKey !== null
+            ? await waitingSettlements(m, userId, receipt.id, linkKey)
+            : [],
+      },
+    };
+  }
+  // A settlement is matched as its JOINED reading, through the pipeline's own
+  // loader and join, without row locks (spec 10).
+  const isSettlement = definition.role === "settlement";
+  let parsed = read.parsed;
+  let links: DryRunLink[] | undefined;
+  if (isSettlement && read.outcome === "read") {
+    const parts = await loadLinkedComponents(
+      m,
+      userId,
+      { id: receipt.id, effectiveDate: purchaseDate },
+      parsed.items.map((item) => item.link ?? null),
+      definition.link ?? {},
+      false,
+    );
+    const joined = joinSettlement(parsed, parts);
+    parsed = joined.parsed;
+    links = joined.reports.map((report) => {
+      const part = parts[report.partIndex];
+      const found = part?.component ?? null;
+      return {
+        partIndex: report.partIndex,
+        link: report.link,
+        component: found
+          ? {
+              id: found.receiptId,
+              subject: found.subject ?? "",
+              effectiveDate: found.effectiveDate ?? "",
+              profileName: found.profileName ?? null,
+            }
+          : null,
+        partAmount: report.partAmount,
+        componentNet: report.componentNet ?? null,
+        taken: report.taken ?? null,
+        outcome: report.outcome,
+        several: part?.several ?? 0,
+      };
+    });
+  }
   const candidates = await loadReceiptCandidates(
     m,
     userId,
     purchaseDate,
     receipt.id,
     matchConfig,
+    isSettlement,
   );
   const match = matchReceipt(
     parsed,
@@ -146,14 +257,15 @@ export async function dryRunReceipt(
       : undefined;
   return {
     parsed,
-    trace,
-    outcome,
+    trace: read.trace,
+    outcome: read.outcome,
     effectiveDate,
     purchaseDate,
     matchConfig,
     candidates,
     match,
     hit,
+    ...(links ? { links } : {}),
   };
 }
 

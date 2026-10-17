@@ -6,7 +6,10 @@ import { EmailReceipt } from "../entities/email-receipt.entity";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
 import { orderFromStructuredData } from "../parsing/schema-org-order";
 import { EmailReceiptTradeLinkService } from "./email-receipt-trade-link.service";
-import { EmailReceiptPipelineService } from "../pipeline/email-receipt-pipeline.service";
+import {
+  EmailReceiptPipelineService,
+  RECEIPT_ENRICHED_BY_OTHER_REASON,
+} from "../pipeline/email-receipt-pipeline.service";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
 import {
   deleteLockedReceipt,
@@ -41,6 +44,11 @@ import {
 import type { ReceiptBulkResult, ReceiptBulkTarget } from "./receipt-bulk";
 import type { ReceiptSelectionFilter } from "./receipt-filter";
 import { appliedComponentRereadClause } from "../linking/component-reread";
+import {
+  readEnrichedBy,
+  readLinkedComponents,
+  readLinkedSettlements,
+} from "./receipt-links-view";
 import { receiptDomainClause, receiptDomainParams } from "./receipt-filter";
 import type { EmailReceiptBulkAction } from "./dto/email-receipts.dto";
 import type {
@@ -142,6 +150,7 @@ interface ItemRow {
   match_kind: EmailReceiptListItem["matchKind"];
   parser_id: string | null;
   parser_name: string | null;
+  link_key?: string | null;
   ai_review_request_id: string | null;
   is_trade?: boolean;
   trade_source?: "profile" | "ai" | null;
@@ -174,7 +183,7 @@ interface DetailRow extends ItemRow {
 
 const ITEM_COLUMNS = `r.id, r.from_address, r.from_domain, r.subject, r.received_at,
        r.forwarded_by, r.original_sent_at, r.created_at, r.status, r.status_reason, r.match_kind, r.parser_id,
-       p.name AS parser_name, r.ai_review_request_id,
+       p.name AS parser_name, r.link_key, r.ai_review_request_id,
        -- A trade is read by a trade profile (its reading in r.trade) or, with
        -- none, by the AI the email's email_trade request hands it to.
        (r.trade IS NOT NULL OR rq.kind = 'email_trade') AS is_trade,
@@ -223,6 +232,7 @@ function toListItem(row: ItemRow): EmailReceiptListItem {
     matchKind: row.match_kind,
     parserId: row.parser_id,
     parserName: row.parser_name,
+    linkKey: row.link_key ?? null,
     aiReviewRequestId: row.ai_review_request_id,
     isTrade: row.is_trade === true,
     tradeSource: row.trade_source ?? null,
@@ -1006,6 +1016,17 @@ export class EmailReceiptsService {
             userId,
             row.candidate_transaction_ids ?? [],
           ),
+      linkedComponents: await readLinkedComponents(m, userId, row.id),
+      linkedSettlements:
+        row.status === "component"
+          ? await readLinkedSettlements(m, userId, row.id)
+          : [],
+      enrichedBy:
+        row.status === "review_conflict" &&
+        row.status_reason === RECEIPT_ENRICHED_BY_OTHER_REASON &&
+        row.candidate_transaction_ids?.[0]
+          ? await readEnrichedBy(m, userId, row.candidate_transaction_ids[0])
+          : null,
     };
   }
 

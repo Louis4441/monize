@@ -405,6 +405,214 @@ describe("linked email receipts (integration)", () => {
     expect(proposed[0].email_receipt_id).toBe(settlement.id);
   });
 
+  describe("the parser test and the receipt detail (spec 10)", () => {
+    const settlementDefinition = () => ({
+      ...ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      defaultCategoryId: goodsId,
+    });
+    const sumUnits = (items: { amount: number }[]) =>
+      items.reduce((sum, item) => sum + item.amount, 0);
+
+    it("tests a settlement email with the pipeline's own join: links per part and the joined lines", async () => {
+      await createProfiles();
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const component = await receiptBy("shop.example.com");
+      const settlement = await receiptBy("pay.example.com");
+
+      const run = await asAlice(() =>
+        parsers.test(aliceId, {
+          definition: settlementDefinition(),
+          receiptId: settlement.id,
+        } as never),
+      );
+
+      expect(run.component).toBeUndefined();
+      expect(run.links).toEqual([
+        {
+          partIndex: 0,
+          link: ALLEGRO_PAY_CONTRACT_1,
+          component: null,
+          partAmount: 1098900,
+          componentNet: null,
+          taken: null,
+          outcome: "not_found",
+          several: 0,
+        },
+        {
+          partIndex: 1,
+          link: ALLEGRO_PAY_CONTRACT_2,
+          component: {
+            id: component.id,
+            subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+            effectiveDate: "2025-12-15",
+            profileName: "Shop purchases",
+          },
+          partAmount: 1630000,
+          componentNet: 1630000,
+          taken: 0,
+          outcome: "joined",
+          several: 1,
+        },
+      ]);
+      // The same joined lines the pipeline stored and proposed.
+      const stored = settlement.parsed.items as { amount: number }[];
+      expect(run.parsed.items.map((item) => item.amount)).toEqual(
+        stored.map((item) => item.amount),
+      );
+      expect(sumUnits(run.parsed.items)).toBe(2728900);
+      expect(run.parsed.links?.map((l) => l.outcome)).toEqual(
+        (settlement.parsed.links as { outcome: string }[]).map(
+          (l) => l.outcome,
+        ),
+      );
+      // Reads only: the stored rows are as they were.
+      expect((await linkRows()).map((l) => l.outcome)).toEqual([
+        "not_found",
+        "joined",
+      ]);
+    });
+
+    it("tests a draft settlement definition, not the stored profile", async () => {
+      await createProfiles();
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const settlement = await receiptBy("pay.example.com");
+
+      const run = await asAlice(() =>
+        parsers.test(aliceId, {
+          definition: {
+            ...settlementDefinition(),
+            link: { fromDomains: ["nobody.example.net"] },
+          },
+          receiptId: settlement.id,
+        } as never),
+      );
+
+      expect(run.links?.map((l) => l.outcome)).toEqual([
+        "not_found",
+        "not_found",
+      ]);
+    });
+
+    it("tests a component email: outcome component, its link key and the settlements waiting for it", async () => {
+      await createProfiles();
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const component = await receiptBy("shop.example.com");
+      const settlement = await receiptBy("pay.example.com");
+      // The link row of the part waits for its component again.
+      await db.query(
+        `UPDATE email_receipt_links
+            SET component_receipt_id = NULL, outcome = 'not_found'
+          WHERE link_value = $1`,
+        [ALLEGRO_PAY_CONTRACT_2],
+      );
+
+      const run = await asAlice(() =>
+        parsers.test(aliceId, {
+          definition: {
+            ...ALLEGRO_PAY_COMPONENT_DEFINITION,
+            defaultCategoryId: goodsId,
+            shippingCategoryId: shippingId,
+          },
+          receiptId: component.id,
+        } as never),
+      );
+
+      expect(run.component).toEqual({
+        linkKey: ALLEGRO_PAY_CONTRACT_2,
+        waitingSettlements: [
+          {
+            id: settlement.id,
+            subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+            effectiveDate: "2026-01-10",
+          },
+        ],
+      });
+      expect(run.match).toEqual({
+        kind: "unmatched",
+        considered: 0,
+        attempts: [],
+      });
+      expect(run.candidateCount).toBe(0);
+      expect(run.links).toBeUndefined();
+      expect(run.trace.linkKey).not.toBeNull();
+    });
+
+    it("shows the components of a settlement and the settlements of a component in the detail", async () => {
+      await createProfiles();
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const component = await receiptBy("shop.example.com");
+      const settlement = await receiptBy("pay.example.com");
+
+      const settlementDetail = await asAlice(() =>
+        receipts.get(aliceId, settlement.id),
+      );
+      expect(settlementDetail.linkKey).toBeNull();
+      expect(settlementDetail.linkedComponents).toEqual([
+        {
+          partIndex: 1,
+          receiptId: component.id,
+          subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+          effectiveDate: "2025-12-15T10:00:00.000Z",
+        },
+      ]);
+      expect(settlementDetail.linkedSettlements).toEqual([]);
+      expect(settlementDetail.enrichedBy).toBeNull();
+
+      const componentDetail = await asAlice(() =>
+        receipts.get(aliceId, component.id),
+      );
+      expect(componentDetail.linkKey).toBe(ALLEGRO_PAY_CONTRACT_2);
+      expect(componentDetail.linkedComponents).toEqual([]);
+      expect(componentDetail.linkedSettlements).toEqual([
+        {
+          receiptId: settlement.id,
+          subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+          effectiveDate: "2026-01-10T10:00:00.000Z",
+          partAmount: 163,
+          outcome: "joined",
+          transactionId: txId,
+        },
+      ]);
+      const listed = await asAlice(() => receipts.list(aliceId, {}));
+      expect(listed.find((r) => r.id === component.id)?.linkKey).toBe(
+        ALLEGRO_PAY_CONTRACT_2,
+      );
+    });
+
+    it("names the email that enriched the transaction of an enriched_by_other conflict", async () => {
+      await createProfiles();
+      await poll(
+        serverReturns(
+          "other.example.org",
+          "Unrelated",
+          "Fri, 09 Jan 2026 10:00:00 +0000",
+          ["Hello"],
+        ),
+      );
+      const unrelated = await receiptBy("other.example.org");
+      await db.query(
+        `INSERT INTO ai_review_requests
+           (user_id, transaction_id, kind, instruction, status, email_receipt_id)
+         VALUES ($1, $2, 'email_receipt', 'x', 'applied', $3)`,
+        [aliceId, txId, unrelated.id],
+      );
+      await poll(repaymentMail());
+      const settlement = await receiptBy("pay.example.com");
+
+      const detail = await asAlice(() => receipts.get(aliceId, settlement.id));
+
+      expect(detail.status).toBe("review_conflict");
+      expect(detail.enrichedBy).toEqual({
+        receiptId: unrelated.id,
+        subject: "Unrelated",
+      });
+    });
+  });
+
   /** The purchase for contract 1 (the one the repayment pays first): an item of 100,00 and shipping 9,89. */
   const FIRST_PURCHASE_LINES = [
     "Dziękujemy za zamówienie",

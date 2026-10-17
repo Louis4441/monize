@@ -13,6 +13,6 @@
 | L3 | Backend: `joinSettlement`, line `kind` in completeness and the proposal, tags, auto-apply `linked` | L2 | done |
 | L4 | Database and backend: migration, entities, component and settlement paths in the pipeline, link rows, conflicts | L3 | done |
 | L5 | Backend: a late component re-joins its settlements; a component re-reads an applied email; batch and reprocessable count | L4 | done |
-| L6 | Backend: the `test` operation for components and settlements | L4 | open |
+| L6 | Backend: the `test` operation for components and settlements | L4 | done |
 | L7 | Frontend: status `component`, reasons, parts and components on the receipt page, the conflict | L4 | open |
 | L8 | i18n: English, pseudo-locale, every other locale | L2, L7 | open |

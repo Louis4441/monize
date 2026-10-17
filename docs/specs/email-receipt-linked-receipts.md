@@ -300,14 +300,38 @@ only, and marks one that is left alone as passed over so the run ends.
 
 ## 10. The `test` operation
 
-- On a component email: `linkKey` (the value and its trace hit), and
-  `match: {outcome: "component"}`, plus `waitingSettlements` (id, subject,
-  date) whose link rows wait for this key.
-- On a settlement email: per part, `link`, the component found (id, subject,
-  date, profile name) or none, `partAmount`, `componentNet`, `taken`, the
-  report, and the joined lines; then the match against the joined receipt as
-  today. The test reads with the same loader and the same `joinSettlement` as
-  the pipeline, without row locks.
+One function, `dryRunReceipt`, serves the assistant's `test` operation, the
+REST test endpoint and the preview. It calls the pipeline's own functions
+(`loadLinkedComponents` with `lock: false`, `joinSettlement`,
+`loadReceiptCandidates` with `includeEnriched`, `matchReceipt`,
+`waitingSettlements`) and uses the definition it is given, not the stored
+profile. It writes nothing and takes no row lock.
+
+- On a component email: no candidates and no matcher (`match` is the empty
+  "unmatched, considered 0" result). Assistant tool and MCP: `linkKey:
+  {value, hit}` (the value and its trace hit), `match: {outcome:
+  "component"}`, `waitingSettlements: [{receiptId, subject, date}]` (the
+  settlements whose link rows wait for this key, newest first, at most 20).
+  REST: `component: {linkKey, waitingSettlements: [{id, subject,
+  effectiveDate}]}` (`effectiveDate` is `YYYY-MM-DD`); the trace holds the hit.
+  The preview outcome is `component`, or `parse_failed` with reason
+  `no_link_key` when no link value was read.
+- On a settlement email: `parsed` is the JOINED reading (its items are the
+  joined lines; a line that is not an item carries `kind`: `shipping`, `fee`
+  or `discount`), and `links`, one entry per part: `{partIndex, link,
+  component: {receiptId (REST: id), subject, effectiveDate (YYYY-MM-DD),
+  profileName} | null, partAmount, componentNet, taken, outcome, several}`.
+  `componentNet` and `taken` are null when the part had no complete component.
+  The assistant tool lists at most 20 parts and gives decimal amounts; REST
+  gives 1/10000 units, like `parsed`. The match is computed on the joined
+  reading, as the pipeline does.
+- The receipt detail (`GET /email-receipts/:id`) gains `linkKey` (also on the
+  list item), `linkedComponents: [{partIndex, receiptId, subject,
+  effectiveDate}]` (settlement), `linkedSettlements: [{receiptId, subject,
+  effectiveDate, partAmount, outcome, transactionId}]` (component; newest
+  first, at most 20; `effectiveDate` is an ISO timestamp) and `enrichedBy:
+  {receiptId, subject} | null` (a `review_conflict` with reason
+  `enriched_by_other`: the email whose applied request is on the candidate).
 
 ## 11. Concurrency
 

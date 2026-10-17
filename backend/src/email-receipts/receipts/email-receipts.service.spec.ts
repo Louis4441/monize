@@ -208,6 +208,7 @@ describe("EmailReceiptsService.list", () => {
       matchKind: "order_id",
       parserId: "p1",
       parserName: "Shop",
+      linkKey: null,
       aiReviewRequestId: "rq1",
       isTrade: false,
       tradeSource: null,
@@ -777,7 +778,161 @@ describe("EmailReceiptsService.get", () => {
       { ...row(), body_text: "", parsed: null, candidate_transaction_ids: [] },
     ]);
     await service.get(USER, ID);
-    expect(manager.query).toHaveBeenCalledTimes(1);
+    // The row, then the components its link rows name: no candidate query.
+    expect(manager.query).toHaveBeenCalledTimes(2);
+    expect(manager.query.mock.calls[1][0]).toContain("email_receipt_links");
+  });
+
+  describe("linked receipts (spec 5 and 6)", () => {
+    const detailRow = (over: Record<string, unknown> = {}) => ({
+      ...row(over),
+      body_text: "",
+      parsed: null,
+      candidate_transaction_ids: [],
+    });
+
+    it("carries the link key of a component and the settlements that name it, newest first, one query each, user-scoped", async () => {
+      const { service, manager } = setup();
+      manager.query
+        .mockResolvedValueOnce([
+          detailRow({ status: "component", link_key: "1000000002" }),
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: "s2",
+            subject: "Repayment",
+            effective_at: new Date("2026-01-10T10:00:00Z"),
+            part_amount: "163.0000",
+            outcome: "joined",
+            transaction_id: "t1",
+          },
+          {
+            id: "s1",
+            subject: "Earlier repayment",
+            effective_at: new Date("2025-12-20T10:00:00Z"),
+            part_amount: "50.5000",
+            outcome: "scaled",
+            transaction_id: null,
+          },
+        ]);
+
+      const detail = await service.get(USER, ID);
+
+      expect(detail.linkKey).toBe("1000000002");
+      expect(detail.linkedComponents).toEqual([]);
+      expect(detail.linkedSettlements).toEqual([
+        {
+          receiptId: "s2",
+          subject: "Repayment",
+          effectiveDate: "2026-01-10T10:00:00.000Z",
+          partAmount: 163,
+          outcome: "joined",
+          transactionId: "t1",
+        },
+        {
+          receiptId: "s1",
+          subject: "Earlier repayment",
+          effectiveDate: "2025-12-20T10:00:00.000Z",
+          partAmount: 50.5,
+          outcome: "scaled",
+          transactionId: null,
+        },
+      ]);
+      expect(detail.enrichedBy).toBeNull();
+      const [sql, params] = manager.query.mock.calls[2];
+      expect(sql).toContain("l.user_id = $1");
+      expect(sql).toContain("DESC");
+      expect(params).toEqual([USER, ID, 20]);
+    });
+
+    it("lists the components of a settlement by part and asks for no settlements of a receipt that is no component", async () => {
+      const { service, manager } = setup();
+      manager.query.mockResolvedValueOnce([detailRow()]).mockResolvedValueOnce([
+        {
+          part_index: 1,
+          id: "c1",
+          subject: "Purchase",
+          effective_at: "2025-12-15T10:00:00.000Z",
+        },
+      ]);
+
+      const detail = await service.get(USER, ID);
+
+      expect(detail.linkKey).toBeNull();
+      expect(detail.linkedComponents).toEqual([
+        {
+          partIndex: 1,
+          receiptId: "c1",
+          subject: "Purchase",
+          effectiveDate: "2025-12-15T10:00:00.000Z",
+        },
+      ]);
+      expect(detail.linkedSettlements).toEqual([]);
+      expect(manager.query).toHaveBeenCalledTimes(2);
+      expect(manager.query.mock.calls[1][1]).toEqual([USER, ID]);
+    });
+
+    it("names the email whose applied request sits on the candidate of an enriched_by_other conflict", async () => {
+      const { service, manager } = setup();
+      manager.query
+        .mockResolvedValueOnce([
+          {
+            ...detailRow({
+              status: "review_conflict",
+              status_reason: "enriched_by_other",
+              transaction_id: null,
+              tx_date: null,
+            }),
+            candidate_transaction_ids: ["t9", "t8"],
+          },
+        ])
+        .mockResolvedValueOnce([]) // the candidates
+        .mockResolvedValueOnce([]) // the components
+        .mockResolvedValueOnce([{ id: "other", subject: "Unrelated" }])
+        .mockResolvedValue([]);
+
+      const detail = await service.get(USER, ID);
+
+      expect(detail.enrichedBy).toEqual({
+        receiptId: "other",
+        subject: "Unrelated",
+      });
+      const enrichedCall = manager.query.mock.calls.find(([sql]) =>
+        String(sql).includes("FROM ai_review_requests applied"),
+      );
+      expect(enrichedCall?.[1]).toEqual([USER, "t9"]);
+    });
+
+    it("has no enrichedBy for another conflict reason, or when that email is gone", async () => {
+      const { service, manager } = setup();
+      manager.query
+        .mockResolvedValueOnce([
+          {
+            ...detailRow({
+              status: "review_conflict",
+              status_reason: "something_else",
+            }),
+            candidate_transaction_ids: ["t9"],
+          },
+        ])
+        .mockResolvedValue([]);
+      expect((await service.get(USER, ID)).enrichedBy).toBeNull();
+
+      manager.query.mockReset();
+      manager.query
+        .mockResolvedValueOnce([
+          {
+            ...detailRow({
+              status: "review_conflict",
+              status_reason: "enriched_by_other",
+            }),
+            candidate_transaction_ids: ["t9"],
+          },
+        ])
+        .mockResolvedValue([]);
+      expect((await service.get(USER, ID)).enrichedBy).toBeNull();
+    });
   });
 
   it("is a 404 for an email that is not the user's", async () => {
@@ -955,9 +1110,16 @@ describe("EmailReceiptsService.ignore", () => {
   it("ignoring an ignored receipt is a no-op", async () => {
     const { service, manager, receiptRepo } = setup();
     receiptRepo.findOne.mockResolvedValue(locked({ status: "ignored" }));
-    manager.query.mockResolvedValue([
-      { ...row(), body_text: "", parsed: null, candidate_transaction_ids: [] },
-    ]);
+    manager.query
+      .mockResolvedValueOnce([
+        {
+          ...row(),
+          body_text: "",
+          parsed: null,
+          candidate_transaction_ids: [],
+        },
+      ])
+      .mockResolvedValue([]);
     await service.ignore(USER, ID);
     expect(receiptRepo.update).not.toHaveBeenCalled();
   });

@@ -104,7 +104,7 @@ describe("loadLinkedComponents", () => {
         return [{ component_receipt_id: "a", taken: "100.0000" }];
       }
       if (sql.includes("definition->>'tag'")) {
-        return [{ id: "p1", tag: "Shop" }];
+        return [{ id: "p1", tag: "Shop", name: "Shop purchases" }];
       }
       return [];
     });
@@ -133,7 +133,13 @@ describe("loadLinkedComponents", () => {
       "2026-02-08",
     ]);
     expect(parts[0]).toMatchObject({
-      component: { receiptId: "a", tagName: "Shop" },
+      component: {
+        receiptId: "a",
+        tagName: "Shop",
+        subject: "Order",
+        effectiveDate: "2026-01-05",
+        profileName: "Shop purchases",
+      },
       taken: 1000000,
     });
     expect(parts[1].component).toBeNull();

@@ -24,7 +24,8 @@ import {
   coveredByDomainSql,
 } from "../linking/component-reread";
 import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "../receipts/dto/email-receipts.dto";
-import { dryRunReceipt } from "./receipt-dry-run";
+import { dryRunReceipt, type DryRunLink } from "./receipt-dry-run";
+import type { WaitingSettlement } from "../linking/waiting-settlements";
 import type {
   ParsedReceipt,
   ParsedTrade,
@@ -116,6 +117,21 @@ export interface EmailReceiptParserTestResult {
    * `trace`, `match` and `transaction` are then empty. Absent for a receipt.
    */
   trade?: { parsed: ParsedTrade; trace: ReceiptTradeTrace };
+  /**
+   * For a `component` profile (linked receipts spec 10): the link value it read
+   * (the trace's `linkKey` holds the line) and the settlements waiting for it,
+   * newest first, at most 20. Such an email is not matched to a bank
+   * transaction, so `match` is the empty "unmatched, considered 0" result.
+   */
+  component?: {
+    linkKey: string | null;
+    waitingSettlements: WaitingSettlement[];
+  };
+  /**
+   * For a `settlement` profile: one entry per part, amounts in 1/10000 units.
+   * `parsed` is then the JOINED reading, which `match` is computed from.
+   */
+  links?: DryRunLink[];
 }
 
 /**
@@ -425,6 +441,8 @@ export class EmailReceiptParsersService {
       const { parsed, trace, outcome, match, candidates, hit } = run;
       return {
         ...(run.trade ? { trade: run.trade } : {}),
+        ...(run.component ? { component: run.component } : {}),
+        ...(run.links ? { links: run.links } : {}),
         parsed,
         trace,
         outcome,

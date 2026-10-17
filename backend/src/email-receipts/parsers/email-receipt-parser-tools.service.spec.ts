@@ -5,6 +5,16 @@ import {
   WEALTHSIMPLE_TRADE_DEFINITION,
 } from "../parsing/fixtures/wealthsimple-trade";
 import {
+  ALLEGRO_PAY_COMPONENT_DEFINITION,
+  ALLEGRO_PAY_CONTRACT_1,
+  ALLEGRO_PAY_CONTRACT_2,
+  ALLEGRO_PAY_PURCHASE_LINES,
+  ALLEGRO_PAY_PURCHASE_SUBJECT,
+  ALLEGRO_PAY_REPAYMENT_LINES,
+  ALLEGRO_PAY_REPAYMENT_SUBJECT,
+  ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+} from "../parsing/fixtures/allegro-pay-mails";
+import {
   ConflictException,
   NotFoundException,
   BadRequestException,
@@ -1401,5 +1411,167 @@ describe("EmailReceiptParserToolsService.saveDraft updating a draft", () => {
         expectedRevision: 1,
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe("EmailReceiptParserToolsService.testDefinition of linked receipts", () => {
+  const component = {
+    ...ALLEGRO_PAY_COMPONENT_DEFINITION,
+    defaultCategoryId: CAT_BOOKS,
+    shippingCategoryId: CAT_SHIP,
+  };
+  const settlement = {
+    ...ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+    defaultCategoryId: CAT_BOOKS,
+  };
+  const purchaseReceipt = () =>
+    receipt({
+      id: "component-1",
+      subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+      bodyText: ALLEGRO_PAY_PURCHASE_LINES.join("\n"),
+      receivedAt: new Date("2025-12-15T10:00:00Z"),
+    });
+  const repaymentReceipt = () =>
+    receipt({
+      id: "settlement-1",
+      subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+      bodyText: ALLEGRO_PAY_REPAYMENT_LINES.join("\n"),
+      receivedAt: new Date("2026-01-10T10:00:00Z"),
+    });
+
+  it("gives a component email its link key with the line that read it, outcome component and the settlements that wait", async () => {
+    const { service, receiptRepo, manager } = setup();
+    receiptRepo.find.mockResolvedValue([purchaseReceipt()]);
+    manager.query.mockImplementation(async (sql: string) =>
+      String(sql).includes("FROM email_receipt_links l")
+        ? Array.from({ length: 25 }, (_, i) => ({
+            id: `settlement-${i}`,
+            subject: `Repayment ${i}`,
+            effective_date: "2026-01-10",
+          }))
+        : [],
+    );
+
+    const result = await service.testDefinition(USER, {
+      definition: component,
+      receiptIds: ["component-1"],
+    });
+
+    const [email] = result.emails;
+    expect(email.linkKey?.value).toBe(ALLEGRO_PAY_CONTRACT_2);
+    expect(email.linkKey?.hit?.line.text).toContain(ALLEGRO_PAY_CONTRACT_2);
+    expect(email.match).toEqual({
+      outcome: "component",
+      strategy: null,
+      transaction: null,
+      considered: 0,
+      attempts: [],
+    });
+    expect(email.waitingSettlements).toHaveLength(20);
+    expect(email.waitingSettlements?.[0]).toEqual({
+      receiptId: "settlement-0",
+      subject: "Repayment 0",
+      date: "2026-01-10",
+    });
+    expect(email.links).toBeUndefined();
+    expect(email.parsed.linkKey).toBe(ALLEGRO_PAY_CONTRACT_2);
+  });
+
+  it("gives a settlement email one entry per part in decimals, and the joined lines with their kind", async () => {
+    const { service, receiptRepo, manager } = setup();
+    receiptRepo.find.mockResolvedValue([repaymentReceipt()]);
+    // The stored component, as the loader reads it: its reading in `parsed`.
+    const { dryRunReceipt } = jest.requireActual("./receipt-dry-run");
+    const read = await dryRunReceipt(
+      { query: jest.fn(async () => []) },
+      USER,
+      component,
+      purchaseReceipt(),
+      null,
+    );
+    manager.query.mockImplementation(async (sql: string) => {
+      const text = String(sql);
+      if (text.includes("FROM email_receipts r")) {
+        return [
+          {
+            id: "component-1",
+            link_key: ALLEGRO_PAY_CONTRACT_2,
+            subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+            effective_date: "2025-12-15",
+            parsed: read.parsed,
+            parser_id: "parser-1",
+          },
+        ];
+      }
+      if (text.includes("definition->>'tag'")) {
+        return [{ id: "parser-1", tag: null, name: "Shop purchases" }];
+      }
+      return [];
+    });
+
+    const result = await service.testDefinition(USER, {
+      definition: settlement,
+      receiptIds: ["settlement-1"],
+    });
+
+    const [email] = result.emails;
+    expect(email.linkKey).toBeUndefined();
+    expect(email.waitingSettlements).toBeUndefined();
+    expect(email.links).toEqual([
+      {
+        partIndex: 0,
+        link: ALLEGRO_PAY_CONTRACT_1,
+        component: null,
+        partAmount: 109.89,
+        componentNet: null,
+        taken: null,
+        outcome: "not_found",
+        several: 0,
+      },
+      {
+        partIndex: 1,
+        link: ALLEGRO_PAY_CONTRACT_2,
+        component: {
+          receiptId: "component-1",
+          subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+          effectiveDate: "2025-12-15",
+          profileName: "Shop purchases",
+        },
+        partAmount: 163,
+        componentNet: 163,
+        taken: 0,
+        outcome: "joined",
+        several: 1,
+      },
+    ]);
+    expect(email.parsed.items.map((item) => item.amount)).toEqual([
+      109.89, 140, 10, 13,
+    ]);
+    expect(email.parsed.items[3]).toMatchObject({ kind: "shipping" });
+    expect(email.parsed.items[1].kind).toBeUndefined();
+    expect(email.match.outcome).toBe("unmatched");
+  });
+
+  it("lists at most 20 parts of a settlement, as it cuts the trace", async () => {
+    const { service, receiptRepo } = setup();
+    const block = (n: number) =>
+      ALLEGRO_PAY_REPAYMENT_LINES.slice(4, 14).map((line) =>
+        line === ALLEGRO_PAY_CONTRACT_1 ? String(2000000000 + n) : line,
+      );
+    receiptRepo.find.mockResolvedValue([
+      receipt({
+        subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+        bodyText: [
+          ...ALLEGRO_PAY_REPAYMENT_LINES.slice(0, 4),
+          ...Array.from({ length: 22 }, (_, n) => block(n)).flat(),
+        ].join("\n"),
+      }),
+    ]);
+    const result = await service.testDefinition(USER, {
+      definition: settlement,
+      receiptIds: [R1],
+    });
+    expect(result.emails[0].parsed.items).toHaveLength(22);
+    expect(result.emails[0].links).toHaveLength(20);
   });
 });
