@@ -600,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transaction fits} other {# transactions fit}} equally well, so none would be linked until you choose.",
     "unmatched": "No transaction matches, out of {count, plural, one {# candidate} other {# candidates}}.",
     "jsonInvalid": "The JSON is not valid, so there is nothing to test yet.",
+    "component": {
+      "heading": "Purchase email (component): link key {linkKey}",
+      "noLinkKey": "Purchase email (component): no link key was read, so no repayment email can find it.",
+      "noneWaiting": "No repayment email is waiting for this link key.",
+      "waiting": "{count, plural, one {# repayment email is} other {# repayment emails are}} waiting for this link key:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "This profile would not read this email: none of its required lines is in it, so the next profile for the sender would be tried.",
       "skip_line": "This profile would set this email aside: a line it skips on is in it.",
@@ -622,6 +629,7 @@
         "skipIfLine": "Skip line",
         "waitIfLine": "Wait line",
         "reference": "Reference",
+        "linkKey": "Link key",
         "action": "Buy or sell",
         "symbol": "Ticker",
         "quantity": "Shares",
@@ -700,6 +708,8 @@
       "link": "Link",
       "outcome": "Result",
       "noLink": "No link",
+      "component": "Purchase email: {subject} ({date}).",
+      "componentProfile": "Profile: {name}.",
       "componentNet": "Purchase total: {amount}.",
       "taken": "Already used: {amount}."
     },
@@ -1032,6 +1042,15 @@
       "empty": "No lines.",
       "listLabel": "Numbered lines of the email"
     },
+    "linkedReceipts": {
+      "componentsHeading": "Linked purchase emails",
+      "component": "Part {part}: {subject} ({date})",
+      "settlementsHeading": "Paid by",
+      "settlement": "{subject} ({date}), part {amount}",
+      "enrichedBy": "Already enriched by: {subject}",
+      "openButton": "Open",
+      "open": "Open the email {subject}"
+    },
     "tradeTransactionSummary": "{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.",
     "noTradeTransaction": "None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.",
     "candidateShares": "{quantity} shares",
@@ -1359,7 +1378,8 @@
         "discard_delete": "Deleted by this profile",
         "no_html": "No HTML part",
         "trade": "Proposes a trade",
-        "trade_exists": "Already in your ledger"
+        "trade_exists": "Already in your ledger",
+        "component": "Purchase email (waits for repayment)"
       },
       "parsedTradeAccount": "Account: {account}",
       "accountWithCurrency": "{name} ({currency})",

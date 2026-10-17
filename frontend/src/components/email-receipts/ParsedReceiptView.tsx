@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/Badge';
+import { ReceiptPartsTable, type ReceiptPartRow } from '@/components/email-receipts/ReceiptPartsTable';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Th, Td } from '@/components/ui/Table';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { fromReceiptUnits } from '@/lib/email-receipts-format';
@@ -18,6 +19,8 @@ interface ParsedReceiptViewProps {
    * says so instead of calling every category unknown.
    */
   categoryLabels: ReadonlyMap<string, string> | null;
+  /** The parts to list instead of `parsed.links` (a test names the component each one found). */
+  parts?: readonly ReceiptPartRow[];
 }
 
 /**
@@ -29,9 +32,11 @@ interface ParsedReceiptViewProps {
  * state is `null` and renders as "not found", never as a zero that would read
  * as a stated free shipping.
  */
-export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: ParsedReceiptViewProps) {
+export function ParsedReceiptView({ parsed, currencyCode, categoryLabels, parts: partsOverride }: ParsedReceiptViewProps) {
   const t = useTranslations('emailReceipts.parsed');
   const { formatCurrency } = useNumberFormat();
+
+  const parts = partsOverride ?? parsed.links;
 
   const money = (units: number | null) =>
     units === null ? (
@@ -128,51 +133,7 @@ export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: Pars
         </div>
       )}
 
-      {parsed.links !== undefined && parsed.links.length > 0 && (
-        <div className="space-y-1">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{t('parts.heading')}</h4>
-          <div className="overflow-x-auto">
-            <table className={TABLE_CLASS}>
-              <thead>
-                <tr>
-                  <Th className="px-2 sm:px-4">{t('parts.part')}</Th>
-                  <Th className="px-2 sm:px-4">{t('parts.link')}</Th>
-                  <Th align="right" className="px-2 sm:px-4">
-                    {t('columns.amount')}
-                  </Th>
-                  <Th className="px-2 sm:px-4">{t('parts.outcome')}</Th>
-                </tr>
-              </thead>
-              <tbody className={TABLE_BODY_CLASS}>
-                {parsed.links.map((report) => (
-                  <tr key={report.partIndex}>
-                    <Td className="px-2 sm:px-4 whitespace-nowrap">{report.partIndex + 1}</Td>
-                    <Td className="px-2 sm:px-4 break-words">
-                      {report.link ?? <span className="text-gray-500 dark:text-gray-400">{t('parts.noLink')}</span>}
-                    </Td>
-                    <Td align="right" className="px-2 sm:px-4 whitespace-nowrap">
-                      {money(report.partAmount)}
-                    </Td>
-                    <Td className="px-2 sm:px-4">
-                      <div>{t(`linkOutcomes.${report.outcome}`)}</div>
-                      {report.componentNet !== undefined && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {t('parts.componentNet', { amount: formatCurrency(fromReceiptUnits(report.componentNet), currencyCode) })}
-                          {report.taken !== undefined &&
-                            ` ${t('parts.taken', { amount: formatCurrency(fromReceiptUnits(report.taken), currencyCode) })}`}
-                        </div>
-                      )}
-                      {report.componentReason != null && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{t(`reasons.${report.componentReason}`)}</div>
-                      )}
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {parts !== undefined && parts.length > 0 && <ReceiptPartsTable parts={parts} currencyCode={currencyCode} />}
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Badge variant={parsed.complete ? 'green' : 'amber'}>

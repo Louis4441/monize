@@ -955,6 +955,7 @@ export function EmailReceiptsManager() {
           receiptId={detailId}
           categoryLabels={categoryLabels}
           onClose={() => setDetailId(null)}
+          onOpenReceipt={setDetailId}
           onChanged={() => void reload()}
         />
       )}

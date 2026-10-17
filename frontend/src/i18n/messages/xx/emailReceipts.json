@@ -600,6 +600,13 @@
     "ambiguous": "[XX-{count, plural, one {# transaction fits} other {# transactions fit}} equally well, so none would be linked until you choose.-XX]",
     "unmatched": "[XX-No transaction matches, out of {count, plural, one {# candidate} other {# candidates}}.-XX]",
     "jsonInvalid": "[XX-The JSON is not valid, so there is nothing to test yet.-XX]",
+    "component": {
+      "heading": "[XX-Purchase email (component): link key {linkKey}-XX]",
+      "noLinkKey": "[XX-Purchase email (component): no link key was read, so no repayment email can find it.-XX]",
+      "noneWaiting": "[XX-No repayment email is waiting for this link key.-XX]",
+      "waiting": "[XX-{count, plural, one {# repayment email is} other {# repayment emails are}} waiting for this link key:-XX]",
+      "settlement": "[XX-{subject} ({date})-XX]"
+    },
     "outcome": {
       "not_applicable": "[XX-This profile would not read this email: none of its required lines is in it, so the next profile for the sender would be tried.-XX]",
       "skip_line": "[XX-This profile would set this email aside: a line it skips on is in it.-XX]",
@@ -622,6 +629,7 @@
         "skipIfLine": "[XX-Skip line-XX]",
         "waitIfLine": "[XX-Wait line-XX]",
         "reference": "[XX-Reference-XX]",
+        "linkKey": "[XX-Link key-XX]",
         "action": "[XX-Buy or sell-XX]",
         "symbol": "[XX-Ticker-XX]",
         "quantity": "[XX-Shares-XX]",
@@ -700,6 +708,8 @@
       "link": "[XX-Link-XX]",
       "outcome": "[XX-Result-XX]",
       "noLink": "[XX-No link-XX]",
+      "component": "[XX-Purchase email: {subject} ({date}).-XX]",
+      "componentProfile": "[XX-Profile: {name}.-XX]",
       "componentNet": "[XX-Purchase total: {amount}.-XX]",
       "taken": "[XX-Already used: {amount}.-XX]"
     },
@@ -1032,6 +1042,15 @@
       "empty": "[XX-No lines.-XX]",
       "listLabel": "[XX-Numbered lines of the email-XX]"
     },
+    "linkedReceipts": {
+      "componentsHeading": "[XX-Linked purchase emails-XX]",
+      "component": "[XX-Part {part}: {subject} ({date})-XX]",
+      "settlementsHeading": "[XX-Paid by-XX]",
+      "settlement": "[XX-{subject} ({date}), part {amount}-XX]",
+      "enrichedBy": "[XX-Already enriched by: {subject}-XX]",
+      "openButton": "[XX-Open-XX]",
+      "open": "[XX-Open the email {subject}-XX]"
+    },
     "tradeTransactionSummary": "[XX-{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.-XX]",
     "noTradeTransaction": "[XX-None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.-XX]",
     "candidateShares": "[XX-{quantity} shares-XX]",
@@ -1359,7 +1378,8 @@
         "discard_delete": "[XX-Deleted by this profile-XX]",
         "no_html": "[XX-No HTML part-XX]",
         "trade": "[XX-Proposes a trade-XX]",
-        "trade_exists": "[XX-Already in your ledger-XX]"
+        "trade_exists": "[XX-Already in your ledger-XX]",
+        "component": "[XX-Purchase email (waits for repayment)-XX]"
       },
       "parsedTradeAccount": "[XX-Account: {account}-XX]",
       "accountWithCurrency": "[XX-{name} ({currency})-XX]",

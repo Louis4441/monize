@@ -291,6 +291,36 @@ export interface EmailReceiptTradeProposal {
   currencyCode: string;
 }
 
+/** A component a settlement's part joined (linked receipts spec 5). */
+export interface EmailReceiptLinkedComponent {
+  /** The settlement's item index the component paid for. */
+  partIndex: number;
+  receiptId: string;
+  subject: string;
+  /** ISO timestamp: `original_sent_at ?? received_at` of the component. */
+  effectiveDate: string;
+}
+
+/** A settlement part that names a component, seen from the component. */
+export interface EmailReceiptLinkedSettlement {
+  receiptId: string;
+  subject: string;
+  /** ISO timestamp: `original_sent_at ?? received_at` of the settlement. */
+  effectiveDate: string;
+  /** The part's amount, a decimal number. */
+  partAmount: number;
+  /** What the join did with the part (`ReceiptLinkOutcome`). */
+  outcome: string;
+  /** The transaction the settlement is matched to, when it is. */
+  transactionId: string | null;
+}
+
+/** The email that enriched the transaction a settlement stopped at. */
+export interface EmailReceiptEnrichedBy {
+  receiptId: string;
+  subject: string;
+}
+
 /** One stored email in the list: never its text. */
 export interface EmailReceiptListItem {
   id: string;
@@ -315,6 +345,8 @@ export interface EmailReceiptListItem {
   matchKind: EmailReceiptMatchKind | null;
   parserId: string | null;
   parserName: string | null;
+  /** A `component` email's link value; null for every other email. */
+  linkKey: string | null;
   aiReviewRequestId: string | null;
   /** A brokerage trade confirmation (`tradeSource` says who reads it): it proposes an investment transaction to create, so the bank-transaction actions do not apply. */
   isTrade: boolean;
@@ -484,6 +516,12 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
   /** Who answers the email's `email_trade` request: its trade profile, or the AI ("Recognize as a trade"); null when it has none. Absent from a server that predates it. */
   tradeRequestSource?: 'profile' | 'ai' | null;
   candidates: EmailReceiptCandidateSummary[];
+  /** A settlement: the components its parts joined, by part; empty for every other email. */
+  linkedComponents: EmailReceiptLinkedComponent[];
+  /** A component: the settlements whose parts name it, newest first, at most 20; empty for every other email. */
+  linkedSettlements: EmailReceiptLinkedSettlement[];
+  /** A `review_conflict` with reason `enriched_by_other`: the email that enriched the candidate transaction; null otherwise or when it is gone. */
+  enrichedBy: EmailReceiptEnrichedBy | null;
 }
 
 /**
@@ -1054,10 +1092,15 @@ export const RECEIPT_TRACE_FIELDS = [
   'requireLine',
   'skipIfLine',
   'waitIfLine',
+  'linkKey',
 ] as const;
 export type ReceiptTraceField = (typeof RECEIPT_TRACE_FIELDS)[number];
 
-export type ReceiptTrace = Record<ReceiptTraceField, ReceiptTraceHit | null> & { items: ReceiptTraceItem[] };
+/** `linkKey` is the line a component's link value was read from; absent from a profile that is not a component and from a server that predates it. */
+export type ReceiptTrace = Record<Exclude<ReceiptTraceField, 'linkKey'>, ReceiptTraceHit | null> & {
+  linkKey?: ReceiptTraceHit | null;
+  items: ReceiptTraceItem[];
+};
 
 /** The fields a trade trace names, in the order the panel lists them. */
 export const RECEIPT_TRADE_TRACE_FIELDS = [
@@ -1087,7 +1130,45 @@ export type ReceiptOutcome =
   | 'discard_delete'
   | 'no_html';
 
+/** A settlement waiting for a component's link key (`WaitingSettlement`). */
+export interface ParserTestWaitingSettlement {
+  id: string;
+  subject: string;
+  /** `YYYY-MM-DD` (UTC): `original_sent_at ?? received_at`. */
+  effectiveDate: string;
+}
+
+/** One part of a settlement as the test's join read it. Amounts are in 1/10000 units; `componentNet` and `taken` are null without a complete component. */
+export interface ParserTestLink {
+  partIndex: number;
+  /** The part's link value; null when it captured none. */
+  link: string | null;
+  /** The component the link found (the newest of several); null when none. */
+  component: {
+    id: string;
+    subject: string;
+    /** `YYYY-MM-DD`. */
+    effectiveDate: string;
+    /** The name of the component's profile; null when it has none. */
+    profileName: string | null;
+  } | null;
+  partAmount: number;
+  componentNet: number | null;
+  taken: number | null;
+  outcome: ReceiptLinkOutcome;
+  /** How many components the link found: 0, 1 or more. */
+  several: number;
+}
+
 export interface EmailReceiptParserTestResult {
+  /**
+   * For a `component` profile: the link value it read and the settlements
+   * waiting for it (newest first, at most 20). Such an email is not matched to
+   * a bank transaction, so `match` is empty.
+   */
+  component?: { linkKey: string | null; waitingSettlements: ParserTestWaitingSettlement[] };
+  /** For a `settlement` profile: one entry per part. `parsed` is then the JOINED reading. */
+  links?: ParserTestLink[];
   /**
    * For a profile with a `trade` section: what it read, and which entry and
    * line read each value (`trace`, absent from a server that predates it).
@@ -1180,6 +1261,7 @@ export const PARSER_PREVIEW_OUTCOMES = [
   'no_html',
   'trade',
   'trade_exists',
+  'component',
 ] as const;
 export type ParserPreviewOutcome = (typeof PARSER_PREVIEW_OUTCOMES)[number];
 

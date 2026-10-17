@@ -799,3 +799,102 @@ describe('EmailReceiptDetailDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+describe('EmailReceiptDetailDialog linked receipts', () => {
+  const onOpenReceipt = vi.fn();
+
+  async function renderLinked(detail: ReturnType<typeof makeDetail>, withOpen = true) {
+    api.get.mockResolvedValue(detail);
+    await act(async () => {
+      render(
+        <EmailReceiptDetailDialog
+          receiptId="r-1"
+          categoryLabels={labels}
+          onClose={onClose}
+          onChanged={onChanged}
+          {...(withOpen ? { onOpenReceipt } : {})}
+        />,
+      );
+    });
+    await act(async () => {});
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    accountsApi.getAll.mockResolvedValue([]);
+  });
+
+  it('lists the purchase emails a settlement joined and opens one in the same dialog', async () => {
+    await renderLinked(
+      makeDetail({
+        linkedComponents: [
+          { partIndex: 0, receiptId: 'c-1', subject: 'Order A', effectiveDate: '2026-08-01T10:00:00.000Z' },
+          { partIndex: 1, receiptId: 'c-2', subject: 'Order B', effectiveDate: '2026-08-02T10:00:00.000Z' },
+        ],
+      }),
+    );
+    const section = screen.getByRole('region', { name: 'Linked purchase emails' });
+    expect(within(section).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(section).getByText(/Part 1: Order A/)).toBeInTheDocument();
+    expect(within(section).getByText(/Part 2: Order B/)).toBeInTheDocument();
+    fireEvent.click(within(section).getByRole('button', { name: 'Open the email Order B' }));
+    expect(onOpenReceipt).toHaveBeenCalledWith('c-2');
+  });
+
+  it('lists the settlements that paid a component with the part amount and what the join did', async () => {
+    await renderLinked(
+      makeDetail({
+        status: 'component',
+        linkKey: 'KEY-1',
+        linkedSettlements: [
+          {
+            receiptId: 's-1',
+            subject: 'Card statement',
+            effectiveDate: '2026-09-01T10:00:00.000Z',
+            partAmount: 12.5,
+            outcome: 'joined',
+            transactionId: null,
+          },
+        ],
+      }),
+    );
+    const section = screen.getByRole('region', { name: 'Paid by' });
+    expect(within(section).getByText(/Card statement/)).toHaveTextContent('12.50');
+    expect(within(section).getByText('Replaced by the lines of the purchase email.')).toBeInTheDocument();
+    fireEvent.click(within(section).getByRole('button', { name: 'Open the email Card statement' }));
+    expect(onOpenReceipt).toHaveBeenCalledWith('s-1');
+  });
+
+  it('names the email that already enriched the candidate and opens it', async () => {
+    await renderLinked(
+      makeDetail({
+        status: 'review_conflict',
+        statusReason: 'enriched_by_other',
+        candidates: [candidate('tx-1', -25)],
+        enrichedBy: { receiptId: 'e-1', subject: 'Earlier order' },
+      }),
+    );
+    expect(screen.getByText('Already enriched by: Earlier order')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Link to this transaction' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open the email Earlier order' }));
+    expect(onOpenReceipt).toHaveBeenCalledWith('e-1');
+  });
+
+  it('shows no linked section and no enrichment line for an ordinary email', async () => {
+    await renderLinked(makeDetail({ enrichedBy: { receiptId: 'e-1', subject: 'Stray' } }));
+    expect(screen.queryByRole('region', { name: 'Linked purchase emails' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Paid by' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Already enriched by/)).not.toBeInTheDocument();
+  });
+
+  it('names the linked email without a button when the dialog cannot open another', async () => {
+    await renderLinked(
+      makeDetail({
+        linkedComponents: [{ partIndex: 0, receiptId: 'c-1', subject: 'Order A', effectiveDate: '2026-08-01T10:00:00.000Z' }],
+      }),
+      false,
+    );
+    expect(screen.getByText(/Part 1: Order A/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open the email Order A' })).not.toBeInTheDocument();
+  });
+});

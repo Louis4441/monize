@@ -40,6 +40,8 @@ interface EmailReceiptDetailDialogProps {
   onClose: () => void;
   /** A change was written (a link): the list behind the dialog reloads. */
   onChanged: () => void;
+  /** Open another receipt (a linked component, a settlement, the email that enriched a transaction); without it those rows name the email and offer no button. */
+  onOpenReceipt?: (receiptId: string) => void;
 }
 
 type DetailState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; detail: EmailReceiptDetail };
@@ -53,9 +55,10 @@ type DetailState = { status: 'loading' } | { status: 'error' } | { status: 'read
  * neither is ever markup of this page. Mount it only while open and key it on the
  * receipt, so its state starts fresh for each one.
  */
-export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, onChanged }: EmailReceiptDetailDialogProps) {
+export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, onChanged, onOpenReceipt }: EmailReceiptDetailDialogProps) {
   const t = useTranslations('emailReceipts.detail');
   const tState = useTranslations('emailReceipts.state');
+  const tParsed = useTranslations('emailReceipts.parsed');
   const tc = useTranslations('common');
   const { formatDate, formatDateTime } = useDateFormat();
   const { formatCurrency, formatShareQuantity } = useNumberFormat();
@@ -167,6 +170,13 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     const booked = detail.investmentTransaction ?? null;
     // An email the matcher could not tie to a transaction can be tied by hand.
     const canPick = !isTradeEmail && PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);
+    const enrichedBy = detail.status === 'review_conflict' && detail.statusReason === 'enriched_by_other' ? detail.enrichedBy : null;
+    const openButton = (id: string, subject: string) =>
+      onOpenReceipt && (
+        <Button variant="outline" size="sm" aria-label={t('linkedReceipts.open', { subject })} onClick={() => onOpenReceipt(id)}>
+          {t('linkedReceipts.openButton')}
+        </Button>
+      );
     const reasonKey = detail.statusReason ? `reasons.${detail.statusReason}` : null;
 
     body = (
@@ -318,6 +328,58 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
           </>
         )}
 
+        {detail.linkedComponents.length > 0 && (
+          <section aria-labelledby="receipt-components-heading" className="space-y-2">
+            <h3 id="receipt-components-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {t('linkedReceipts.componentsHeading')}
+            </h3>
+            <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
+              {detail.linkedComponents.map((component) => (
+                <li key={`${component.partIndex}-${component.receiptId}`} className="flex flex-col gap-2 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 break-words text-gray-900 dark:text-gray-100">
+                    {t('linkedReceipts.component', {
+                      part: component.partIndex + 1,
+                      subject: component.subject,
+                      date: formatDate(component.effectiveDate),
+                    })}
+                  </div>
+                  {openButton(component.receiptId, component.subject)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {detail.linkedSettlements.length > 0 && (
+          <section aria-labelledby="receipt-settlements-heading" className="space-y-2">
+            <h3 id="receipt-settlements-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {t('linkedReceipts.settlementsHeading')}
+            </h3>
+            <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
+              {detail.linkedSettlements.map((settlement, index) => {
+                const outcomeKey = `linkOutcomes.${settlement.outcome}`;
+                return (
+                  <li key={`${settlement.receiptId}-${index}`} className="flex flex-col gap-2 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 break-words">
+                      <div className="text-gray-900 dark:text-gray-100">
+                        {t('linkedReceipts.settlement', {
+                          subject: settlement.subject,
+                          date: formatDate(settlement.effectiveDate),
+                          amount: formatCurrency(settlement.partAmount),
+                        })}
+                      </div>
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {tParsed.has(outcomeKey) ? tParsed(outcomeKey) : settlement.outcome}
+                      </div>
+                    </div>
+                    {openButton(settlement.receiptId, settlement.subject)}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
         {detail.candidates.length > 0 && (!isTradeEmail || tradeLinkable) && (
           <section aria-labelledby="receipt-candidates-heading" className="space-y-2">
             <h3 id="receipt-candidates-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -326,6 +388,14 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {isTradeEmail ? t('tradeCandidatesHelp') : t('candidatesHelp')}
             </p>
+            {enrichedBy && (
+              <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="min-w-0 break-words text-gray-700 dark:text-gray-300">
+                  {t('linkedReceipts.enrichedBy', { subject: enrichedBy.subject })}
+                </p>
+                {openButton(enrichedBy.receiptId, enrichedBy.subject)}
+              </div>
+            )}
             <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
               {detail.candidates.map((candidate) => (
                 <li key={candidate.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
