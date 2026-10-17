@@ -20,6 +20,11 @@ describe('ReceiptStateBadge', () => {
     expect(screen.getByText('Request missing')).toBeInTheDocument();
   });
 
+  it('names a component as waiting for its repayment', () => {
+    render(<ReceiptStateBadge receipt={{ status: 'component', displayState: null }} />);
+    expect(screen.getByText('Waiting for its repayment')).toBeInTheDocument();
+  });
+
   it('has a label for every state an email can be shown in', () => {
     const labels = en.state as Record<string, string>;
     for (const state of EMAIL_RECEIPT_SHOWN_STATES) {

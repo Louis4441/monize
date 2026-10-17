@@ -2,11 +2,14 @@ import {
   EMAIL_RECEIPT_DISPLAY_STATES,
   EMAIL_RECEIPT_STATUSES,
   PARSED_RECEIPT_REASONS,
+  RECEIPT_LINE_KINDS,
+  RECEIPT_LINK_OUTCOMES,
   type EmailReceiptDomainCount,
   type EmailReceiptListItem,
   type ParsedReceipt,
   type ParsedReceiptItem,
   type ParsedReceiptReason,
+  type ReceiptLinkReport,
 } from '@/types/email-receipts';
 
 /** A parsed receipt's amounts are integers in 1/10000 units (`decimal(20,4)`'s scale). */
@@ -41,6 +44,31 @@ function readItem(value: unknown): ParsedReceiptItem | null {
     amount,
     categoryId: readText(value.categoryId),
     ...(value.categorySource === 'ai' ? { categorySource: 'ai' as const } : {}),
+    ...(RECEIPT_LINE_KINDS.find((kind) => kind === value.kind) ? { kind: value.kind as ParsedReceiptItem['kind'] } : {}),
+    ...(readText(value.link) !== null ? { link: readText(value.link) as string } : {}),
+    ...(readText(value.instalment) !== null ? { instalment: readText(value.instalment) as string } : {}),
+  };
+}
+
+function readLinkReport(value: unknown): ReceiptLinkReport | null {
+  if (!isRecord(value)) return null;
+  const outcome = RECEIPT_LINK_OUTCOMES.find((o) => o === value.outcome);
+  const partAmount = readAmount(value.partAmount);
+  if (!outcome || partAmount === null) return null;
+  const componentNet = readAmount(value.componentNet);
+  const taken = readAmount(value.taken);
+  const several = readAmount(value.several);
+  const componentReason = PARSED_RECEIPT_REASONS.find((r) => r === value.componentReason);
+  return {
+    partIndex: readAmount(value.partIndex) ?? 0,
+    link: readText(value.link),
+    partAmount,
+    outcome,
+    componentReceiptId: readText(value.componentReceiptId),
+    ...(componentNet !== null ? { componentNet } : {}),
+    ...(taken !== null ? { taken } : {}),
+    ...(several !== null ? { several } : {}),
+    ...(componentReason ? { componentReason } : {}),
   };
 }
 
@@ -66,6 +94,11 @@ export function readParsedReceipt(value: unknown): ParsedReceipt | null {
       : [],
     shippingCategoryId: readText(value.shippingCategoryId),
     discountCategoryId: readText(value.discountCategoryId),
+    // Absent is "not a component / not a joined settlement"; an empty text is no key.
+    ...(value.linkKey === null || typeof value.linkKey === 'string' ? { linkKey: readText(value.linkKey) } : {}),
+    ...(Array.isArray(value.links)
+      ? { links: value.links.map(readLinkReport).filter((link): link is ReceiptLinkReport => link !== null) }
+      : {}),
     complete: value.complete === true,
     reason: reason ?? null,
     ...(value.source === 'ai' || value.source === 'parser' || value.source === 'schema_org' ? { source: value.source } : {}),
@@ -159,8 +192,8 @@ export function canRecognizeWithAi(receipt: Pick<EmailReceiptListItem, 'status' 
   return RECOGNIZABLE_STATES.includes(shownReceiptState(receipt));
 }
 
-/** States whose email "Draft parser with AI" is offered for: no parser read it, or the one that did could not. */
-const DRAFTABLE_STATES: readonly EmailReceiptShownState[] = ['no_parser', 'parse_failed'];
+/** States whose email "Draft parser with AI" is offered for: no parser read it, the one that did could not, or it is a component (a profile can be edited). */
+const DRAFTABLE_STATES: readonly EmailReceiptShownState[] = ['no_parser', 'parse_failed', 'component'];
 
 /** Whether the row's own "Draft parser with AI" action is offered for an email. */
 export function canDraftParser(receipt: Pick<EmailReceiptListItem, 'status' | 'displayState'>): boolean {

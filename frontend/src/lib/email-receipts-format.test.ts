@@ -98,6 +98,8 @@ describe('isReceiptActionable', () => {
     ['review', 'applied', false],
     ['review', 'proposed', true],
     ['unmatched', null, true],
+    // A component is read again after its profile changes (the server allows it).
+    ['component', null, true],
   ] as const)('%s / %s is %s', (status, displayState, expected) => {
     expect(isReceiptActionable({ status, displayState })).toBe(expected);
   });
@@ -120,6 +122,7 @@ describe('canRecognizeWithAi', () => {
     ['ignored', null, false],
     ['skipped', null, false],
     ['pending', null, false],
+    ['component', null, false],
   ] as const)('%s / %s is %s', (status, displayState, expected) => {
     expect(canRecognizeWithAi({ status, displayState })).toBe(expected);
   });
@@ -135,10 +138,44 @@ describe('readParsedReceipt source', () => {
   });
 });
 
+describe('readParsedReceipt linked receipts', () => {
+  it('keeps a line kind, a link, an instalment, the link key and the part reports', () => {
+    const read = readParsedReceipt({
+      items: [
+        { name: 'Part', amount: 100000, link: 'abc-1', instalment: '2/10' },
+        { name: 'Delivery', amount: 50000, kind: 'shipping' },
+        { name: 'Odd', amount: 1, kind: 'gift' },
+      ],
+      linkKey: 'abc-1',
+      links: [
+        { partIndex: 0, link: 'abc-1', partAmount: 100000, outcome: 'scaled', componentReceiptId: 'r-1', componentNet: 300000, taken: 100000 },
+        { partIndex: 1, link: null, partAmount: 5, outcome: 'no_link', componentReceiptId: null },
+        { partIndex: 2, link: 'x', partAmount: 5, outcome: 'invented', componentReceiptId: null },
+      ],
+    });
+    expect(read?.items[0]).toMatchObject({ link: 'abc-1', instalment: '2/10' });
+    expect(read?.items[0]).not.toHaveProperty('kind');
+    expect(read?.items[1].kind).toBe('shipping');
+    expect(read?.items[2]).not.toHaveProperty('kind');
+    expect(read?.linkKey).toBe('abc-1');
+    expect(read?.links).toHaveLength(2);
+    expect(read?.links?.[0]).toMatchObject({ outcome: 'scaled', componentNet: 300000, taken: 100000 });
+    expect(read?.links?.[1]).toMatchObject({ link: null, componentReceiptId: null });
+  });
+
+  it('leaves them absent on a receipt that has none, and keeps a component without a key as null', () => {
+    const plain = readParsedReceipt({ items: [] });
+    expect(plain).not.toHaveProperty('linkKey');
+    expect(plain).not.toHaveProperty('links');
+    expect(readParsedReceipt({ items: [], linkKey: null })?.linkKey).toBeNull();
+  });
+});
+
 describe('canDraftParser', () => {
   it.each([
     ['no_parser', null, true],
     ['parse_failed', null, true],
+    ['component', null, true],
     ['unmatched', null, false],
     ['ambiguous', null, false],
     ['skipped', null, false],

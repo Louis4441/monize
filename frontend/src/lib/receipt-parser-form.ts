@@ -753,6 +753,14 @@ export const PARSER_VALIDATION_CODES = [
   'invalid_currency',
   'too_many_lines',
   'line_break_not_allowed',
+  'role_invalid',
+  'link_key_requires_component',
+  'link_key_missing',
+  'link_capture_requires_settlement',
+  'link_requires_settlement',
+  'link_domain_invalid',
+  'link_days_invalid',
+  'role_trade_conflict',
 ] as const;
 
 const PROBLEM = new RegExp(

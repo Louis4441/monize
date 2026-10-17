@@ -60,6 +60,8 @@ export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: Pars
     ...(parsed.payee ? [{ key: 'payee', label: t('payee'), value: parsed.payee }] : []),
     // What the profile's `reference` field read: the identifier the bank operation should carry.
     ...(parsed.reference ? [{ key: 'reference', label: t('reference'), value: parsed.reference }] : []),
+    // A component (a purchase email waiting for its settlement): the key that ties it to one.
+    ...(parsed.linkKey ? [{ key: 'linkKey', label: t('linkKey'), value: parsed.linkKey }] : []),
   ];
 
   return (
@@ -93,12 +95,22 @@ export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: Pars
             <tbody className={TABLE_BODY_CLASS}>
               {parsed.items.map((item, index) => (
                 <tr key={`${index}-${item.name}`}>
-                  <Td className="px-2 sm:px-4 break-words">{item.name}</Td>
+                  <Td className="px-2 sm:px-4 break-words">
+                    {item.name}
+                    {item.instalment ? ` (${item.instalment})` : ''}
+                    {/* A joined component's shipping, fee or discount line says what it is. */}
+                    {item.kind !== undefined && item.kind !== 'item' && (
+                      <Badge variant="gray" className="ml-2">
+                        {t(`kinds.${item.kind}`)}
+                      </Badge>
+                    )}
+                  </Td>
                   <Td align="right" className="px-2 sm:px-4 whitespace-nowrap">
                     {item.qty}
                   </Td>
                   <Td align="right" className="px-2 sm:px-4 whitespace-nowrap">
-                    {money(item.amount)}
+                    {/* A discount line holds a non-negative amount that counts against the total. */}
+                    {money(item.kind === 'discount' && item.amount !== 0 ? -item.amount : item.amount)}
                   </Td>
                   <Td className="px-2 sm:px-4">
                     {category(item.categoryId)}
@@ -113,6 +125,52 @@ export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: Pars
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {parsed.links !== undefined && parsed.links.length > 0 && (
+        <div className="space-y-1">
+          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{t('parts.heading')}</h4>
+          <div className="overflow-x-auto">
+            <table className={TABLE_CLASS}>
+              <thead>
+                <tr>
+                  <Th className="px-2 sm:px-4">{t('parts.part')}</Th>
+                  <Th className="px-2 sm:px-4">{t('parts.link')}</Th>
+                  <Th align="right" className="px-2 sm:px-4">
+                    {t('columns.amount')}
+                  </Th>
+                  <Th className="px-2 sm:px-4">{t('parts.outcome')}</Th>
+                </tr>
+              </thead>
+              <tbody className={TABLE_BODY_CLASS}>
+                {parsed.links.map((report) => (
+                  <tr key={report.partIndex}>
+                    <Td className="px-2 sm:px-4 whitespace-nowrap">{report.partIndex + 1}</Td>
+                    <Td className="px-2 sm:px-4 break-words">
+                      {report.link ?? <span className="text-gray-500 dark:text-gray-400">{t('parts.noLink')}</span>}
+                    </Td>
+                    <Td align="right" className="px-2 sm:px-4 whitespace-nowrap">
+                      {money(report.partAmount)}
+                    </Td>
+                    <Td className="px-2 sm:px-4">
+                      <div>{t(`linkOutcomes.${report.outcome}`)}</div>
+                      {report.componentNet !== undefined && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {t('parts.componentNet', { amount: formatCurrency(fromReceiptUnits(report.componentNet), currencyCode) })}
+                          {report.taken !== undefined &&
+                            ` ${t('parts.taken', { amount: formatCurrency(fromReceiptUnits(report.taken), currencyCode) })}`}
+                        </div>
+                      )}
+                      {report.componentReason != null && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t(`reasons.${report.componentReason}`)}</div>
+                      )}
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

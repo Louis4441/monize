@@ -33,6 +33,8 @@ export const EMAIL_RECEIPT_STATUSES = [
   'review_conflict',
   'review',
   'ignored',
+  // The purchase email of a linked receipt: stored, never matched, waits for its settlement.
+  'component',
 ] as const;
 export type EmailReceiptStatus = (typeof EMAIL_RECEIPT_STATUSES)[number];
 
@@ -98,6 +100,26 @@ export type ParsedTradeReason = (typeof PARSED_TRADE_REASONS)[number];
  */
 export const TRADE_CURRENCY_SOURCES = ['amount', 'marker', 'security'] as const;
 export type TradeCurrencySource = (typeof TRADE_CURRENCY_SOURCES)[number];
+
+/** What a profile's emails are for (linked receipts); absent is `standalone`. */
+export const RECEIPT_PARSER_ROLES = ['standalone', 'component', 'settlement'] as const;
+export type ReceiptParserRole = (typeof RECEIPT_PARSER_ROLES)[number];
+
+/** What a split line is: an `item` (absent reads as one), or the `shipping`, a `fee` or the `discount` of a joined component. */
+export const RECEIPT_LINE_KINDS = ['item', 'shipping', 'fee', 'discount'] as const;
+export type ReceiptLineKind = (typeof RECEIPT_LINE_KINDS)[number];
+
+/** What a settlement part became (`ParsedReceipt.links[].outcome`). */
+export const RECEIPT_LINK_OUTCOMES = [
+  'no_link',
+  'not_found',
+  'component_incomplete',
+  'component_used',
+  'joined',
+  'scaled',
+  'amount_exceeds',
+] as const;
+export type ReceiptLinkOutcome = (typeof RECEIPT_LINK_OUTCOMES)[number];
 
 // ---------------------------------------------------------------- mailbox
 
@@ -658,6 +680,8 @@ export const RECEIPT_PARSER_LIMITS = {
   maxLineGuards: 10,
   maxNameLength: 100,
   maxFromDomains: 10,
+  /** `link.daysBefore` of a settlement profile (0 to this). */
+  maxLinkDaysBefore: 365,
   maxSubjectWords: 10,
   maxSubjectWordLength: 100,
   maxTagLength: 50,
@@ -788,6 +812,14 @@ export interface ReceiptTradeDefinition {
   currencyMarkers?: ReceiptTradeCurrencyMarker[];
 }
 
+/** The `link` section of a settlement profile: where its parts look for their components. */
+export interface ReceiptLinkDefinition {
+  /** 1 to 10 sender domains the search is limited to; absent means any sender. */
+  fromDomains?: string[];
+  /** 0 to 365 (default 120): how many days before the settlement's date a component may be dated. */
+  daysBefore?: number;
+}
+
 /** A parser definition, version 2 (`definition` of an `email_receipt_parsers` row). */
 /** What a profile does with the emails it matches instead of reading them: ignore them, or delete them. */
 export const RECEIPT_DISCARD_MODES = ['ignore', 'delete'] as const;
@@ -806,6 +838,12 @@ export interface ReceiptParserDefinition {
   /** An identifier the shop or the payment gateway puts into the bank operation. Capture `{reference}`. */
   reference?: ReceiptFieldEntry[];
   match?: ReceiptMatchDefinition;
+  /** What the profile's emails are for; absent is `standalone`. */
+  role?: ReceiptParserRole;
+  /** A `component` only: the key that ties the email to a settlement. Capture `{link}`. */
+  linkKey?: ReceiptFieldEntry[];
+  /** A `settlement` only: where its parts look for their components. */
+  link?: ReceiptLinkDefinition;
   /** A tag the proposal adds to every transaction the profile categorises. */
   tag?: string;
   /** Ask the user's AI for the category of an item no rule matched. */
@@ -888,6 +926,31 @@ export interface ParsedReceiptItem {
   categoryId: string | null;
   /** `"ai"` when the AI chose this item's category. */
   categorySource?: 'ai';
+  /** What the line is; absent is `item`. Only a joined component's lines carry another kind. */
+  kind?: ReceiptLineKind;
+  /** A settlement part's link value; absent otherwise. */
+  link?: string;
+  /** A settlement part's instalment text; absent otherwise. */
+  instalment?: string;
+}
+
+/** The report of one settlement part (`ParsedReceipt.links`). Amounts are in 1/10000 units. */
+export interface ReceiptLinkReport {
+  partIndex: number;
+  /** The part's link value; null when it captured none. */
+  link: string | null;
+  partAmount: number;
+  outcome: ReceiptLinkOutcome;
+  /** The component found; null when none was. */
+  componentReceiptId: string | null;
+  /** The component's net (its lines, discount subtracted). */
+  componentNet?: number;
+  /** What other settlements already took from the component. */
+  taken?: number;
+  /** How many components the link found (more than one: a resend). */
+  several?: number;
+  /** Why an incomplete component is incomplete. */
+  componentReason?: ParsedReceiptReason | null;
 }
 
 /** What a parser read from one email. Every amount is in 1/10000 units; null means the email did not state it. */
@@ -900,11 +963,15 @@ export interface ParsedReceipt {
   payee?: string | null;
   /** The identifier the profile's `reference` field read. Absent on a receipt stored before the field existed. */
   reference?: string | null;
+  /** A component's link value; null when its email holds none. Absent on every other receipt. */
+  linkKey?: string | null;
   shipping: number | null;
   discount: number | null;
   items: ParsedReceiptItem[];
   shippingCategoryId: string | null;
   discountCategoryId: string | null;
+  /** A joined settlement only: one report per part. */
+  links?: ReceiptLinkReport[];
   complete: boolean;
   reason: ParsedReceiptReason | null;
   /** Who read the email: a saved parser, the AI, or the email's own schema.org markup. Absent on a receipt stored before the field existed. */

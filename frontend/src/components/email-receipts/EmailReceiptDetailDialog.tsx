@@ -163,7 +163,7 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     // candidates of one that cannot be linked are not listed at all: its own row
     // would be among them.
     const tradeLinkable = isTradeEmail && canLinkTradeEmail(detail);
-    const canLink = detail.candidates.length > 0 && (isTradeEmail ? tradeLinkable : isReceiptActionable(detail));
+    const canLink = detail.candidates.length > 0 && (isTradeEmail ? tradeLinkable : isReceiptActionable(detail) && detail.status !== 'component');
     const booked = detail.investmentTransaction ?? null;
     // An email the matcher could not tie to a transaction can be tied by hand.
     const canPick = !isTradeEmail && PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);

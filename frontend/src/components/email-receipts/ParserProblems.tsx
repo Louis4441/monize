@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { PARSER_VALIDATION_CODES } from '@/lib/receipt-parser-form';
 import { RECEIPT_PARSER_LIMITS, type ReceiptParserValidationError } from '@/types/email-receipts';
 
-const PATTERN_FIELDS = ['orderId', 'total', 'paid', 'shipping', 'discount', 'fees', 'payee', 'reference'] as const;
+const PATTERN_FIELDS = ['orderId', 'total', 'paid', 'shipping', 'discount', 'fees', 'payee', 'reference', 'linkKey'] as const;
 const GUARD_FIELDS = ['requireLine', 'skipIfLine', 'waitIfLine'] as const;
 type PatternField = (typeof PATTERN_FIELDS)[number];
 
@@ -119,6 +119,12 @@ export function describeProblemPath(path: string, t: Translator): string {
     return t('paths.rule', { rule: Number(rule[1]) + 1, part: t(part) });
   }
   if (path === 'source') return t('fields.source');
+  if (path === 'role') return t('fields.role');
+  if (path === 'link') return t('fields.link');
+  if (path === 'link.daysBefore') return t('fields.linkDaysBefore');
+  if (path === 'link.fromDomains') return t('fields.linkFromDomains');
+  const linkDomain = /^link\.fromDomains\[(\d+)\]$/.exec(path);
+  if (linkDomain) return t('paths.line', { field: t('fields.linkFromDomains'), line: Number(linkDomain[1]) + 1 });
   const choice = /^match\.(by|referenceIn)\[(\d+)\]$/.exec(path);
   if (choice) {
     return t('paths.line', {
@@ -152,9 +158,12 @@ function boundFor(code: string, path: string): number {
     if (/^items\.record\[\d+\]\.line$/.test(path)) return RECEIPT_PARSER_LIMITS.maxStepAlternatives;
     if (path === 'items.skipLines') return RECEIPT_PARSER_LIMITS.maxSkipLines;
     if (path === 'items.record') return RECEIPT_PARSER_LIMITS.maxRecordSteps;
+    if (path === 'link.fromDomains') return RECEIPT_PARSER_LIMITS.maxFromDomains;
     return RECEIPT_PARSER_LIMITS.maxPatternsPerField;
   }
   if (code === 'too_many_lines') return RECEIPT_PARSER_LIMITS.maxPatternLines;
+  if (code === 'link_days_invalid') return RECEIPT_PARSER_LIMITS.maxLinkDaysBefore;
+  if (code === 'link_domain_invalid') return RECEIPT_PARSER_LIMITS.maxFromDomains;
   if (code === 'out_of_range') {
     if (path === 'match.daysBefore') return RECEIPT_PARSER_LIMITS.maxDaysBefore;
     if (path === 'match.daysAfter') return RECEIPT_PARSER_LIMITS.maxDaysAfter;

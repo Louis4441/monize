@@ -524,7 +524,12 @@
       "currencyMarkers": "[XX-Currency markers-XX]",
       "defaultAccount": "[XX-Default account-XX]",
       "ruleAccount": "[XX-account-XX]",
-      "ruleCurrency": "[XX-currency-XX]"
+      "ruleCurrency": "[XX-currency-XX]",
+      "role": "[XX-Profile role-XX]",
+      "link": "[XX-The link section-XX]",
+      "linkDaysBefore": "[XX-Days before the repayment-XX]",
+      "linkFromDomains": "[XX-Sender domains of the purchase emails-XX]",
+      "linkKey": "[XX-Link key patterns-XX]"
     },
     "codes": {
       "not_object": "[XX-is not a valid definition-XX]",
@@ -560,7 +565,15 @@
       "invalid_currency": "[XX-is not a 3-letter currency code, such as USD-XX]",
       "too_many_lines": "[XX-spans too many lines (at most {max})-XX]",
       "line_break_not_allowed": "[XX-is matched against one text (an item name, the merchant or an account), so it cannot span several lines-XX]",
-      "invalid_uuid_account": "[XX-is not a valid account-XX]"
+      "invalid_uuid_account": "[XX-is not a valid account-XX]",
+      "role_invalid": "[XX-must be standalone, component or settlement-XX]",
+      "link_key_requires_component": "[XX-can only be used when the role is component-XX]",
+      "link_key_missing": "[XX-is needed when the role is component-XX]",
+      "link_capture_requires_settlement": "[XX-uses a link or instalment capture, which only a settlement profile accepts-XX]",
+      "link_requires_settlement": "[XX-can only be used when the role is settlement-XX]",
+      "link_domain_invalid": "[XX-is not a valid sender domain (at most {max} domains)-XX]",
+      "link_days_invalid": "[XX-must be a whole number from 0 to {max}-XX]",
+      "role_trade_conflict": "[XX-cannot be component or settlement in a brokerage trade profile, which reads only the trade-XX]"
     }
   },
   "test": {
@@ -674,7 +687,31 @@
     "paid": "[XX-Paid-XX]",
     "payee": "[XX-Merchant-XX]",
     "reference": "[XX-Reference-XX]",
-    "categoryByAi": "[XX-AI-XX]"
+    "categoryByAi": "[XX-AI-XX]",
+    "linkKey": "[XX-Link key-XX]",
+    "kinds": {
+      "shipping": "[XX-Shipping-XX]",
+      "fee": "[XX-Fee-XX]",
+      "discount": "[XX-Discount-XX]"
+    },
+    "parts": {
+      "heading": "[XX-Parts-XX]",
+      "part": "[XX-Part-XX]",
+      "link": "[XX-Link-XX]",
+      "outcome": "[XX-Result-XX]",
+      "noLink": "[XX-No link-XX]",
+      "componentNet": "[XX-Purchase total: {amount}.-XX]",
+      "taken": "[XX-Already used: {amount}.-XX]"
+    },
+    "linkOutcomes": {
+      "no_link": "[XX-The part has no link, so it stays one line.-XX]",
+      "not_found": "[XX-No purchase email was found for this link, so the part stays one line.-XX]",
+      "component_incomplete": "[XX-The purchase email was not read completely, so the part stays one line.-XX]",
+      "component_used": "[XX-Other repayments already used the whole purchase, so the part stays one line.-XX]",
+      "joined": "[XX-Replaced by the lines of the purchase email.-XX]",
+      "scaled": "[XX-Replaced by the lines of the purchase email, scaled to this part.-XX]",
+      "amount_exceeds": "[XX-The part is more than what is left of the purchase, so it stays one line.-XX]"
+    }
   },
   "state": {
     "pending": "[XX-Waiting to be read-XX]",
@@ -690,7 +727,8 @@
     "dismissed": "[XX-Dismissed-XX]",
     "expired": "[XX-Expired-XX]",
     "pending_ai": "[XX-Waiting for the AI-XX]",
-    "request_missing": "[XX-Request missing-XX]"
+    "request_missing": "[XX-Request missing-XX]",
+    "component": "[XX-Waiting for its repayment-XX]"
   },
   "receipts": {
     "loading": "[XX-Loading emails-XX]",
@@ -710,7 +748,8 @@
       "ambiguous": "[XX-Several transactions fit-XX]",
       "review_conflict": "[XX-Another request is open-XX]",
       "review": "[XX-In review-XX]",
-      "ignored": "[XX-Ignored-XX]"
+      "ignored": "[XX-Ignored-XX]",
+      "component": "[XX-Waiting for repayment-XX]"
     },
     "domainFilter": {
       "label": "[XX-Sender domain-XX]",
@@ -939,7 +978,13 @@
       "trade_no_account": "[XX-The profile could not tell which account this trade is for.-XX]",
       "trade_exists": "[XX-Your accounts already hold this trade, so nothing was proposed.-XX]",
       "trade_linked": "[XX-Linked to the transaction it reports, so nothing was proposed.-XX]",
-      "trade_no_currency": "[XX-The profile could not tell which currency this trade is in, so it could not choose its account.-XX]"
+      "trade_no_currency": "[XX-The profile could not tell which currency this trade is in, so it could not choose its account.-XX]",
+      "awaiting_settlement": "[XX-Purchase email stored. It waits for the repayment email that pays for it.-XX]",
+      "settled": "[XX-Purchase email stored. The repayment emails joined with it pay its whole amount.-XX]",
+      "instalment": "[XX-Purchase email stored. Repayments paid part of it; the rest is still to be paid.-XX]",
+      "partially_linked": "[XX-Some parts of this repayment have no purchase email yet. They are shown as one line each.-XX]",
+      "enriched_by_other": "[XX-The matched transaction was already enriched by another email. Open it and use Link to replace that enrichment, or ignore this email.-XX]",
+      "no_link_key": "[XX-This purchase email holds no link key, so no repayment can find it.-XX]"
     },
     "reasonUnknown": "[XX-Reason: {reason}-XX]",
     "requestNote": "[XX-Review request ({state}): {note}-XX]",
