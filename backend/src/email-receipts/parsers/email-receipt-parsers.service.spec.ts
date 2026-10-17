@@ -278,6 +278,10 @@ describe("EmailReceiptParsersService reprocessableCount", () => {
     expect(sql).toContain("right(r.from_domain, length(pd.domain) + 1)");
     expect(sql).toContain("p.user_id = $1");
     expect(sql).toContain("r.user_id = p.user_id");
+    // a component profile also counts the applied review emails it covers (spec 9)
+    expect(sql).toContain("p.definition->>'role' = 'component'");
+    expect(sql).toContain("r.link_key IS NULL");
+    expect(sql).toContain("applied_rq.status = 'applied'");
     expect(params).toEqual([
       USER,
       [

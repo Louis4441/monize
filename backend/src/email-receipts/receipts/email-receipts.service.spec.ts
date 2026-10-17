@@ -7,6 +7,7 @@ import {
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { MAX_PARSE_LINES } from "../parsing/receipt-parser.types";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "./dto/email-receipts.dto";
 import type { EmailReceiptPipelineService } from "../pipeline/email-receipt-pipeline.service";
 import {
   deriveDisplayState,
@@ -1209,6 +1210,81 @@ describe("EmailReceiptsService.processBatch", () => {
     });
   });
 
+  describe("an applied email a component profile covers (linked receipts spec 9)", () => {
+    const batchWithReread = (rows: Array<{ id: string; reread: boolean }>) => {
+      const h = setup();
+      h.manager.query.mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        if (text.includes("AS since")) return [{ since: SINCE }];
+        if (text.includes("SELECT r.id")) return rows;
+        if (text.includes("COUNT(*)::int AS remaining"))
+          return [{ remaining: 0 }];
+        return [];
+      });
+      return h;
+    };
+    const selectionSqls = (h: ReturnType<typeof batchWithReread>) =>
+      h.manager.query.mock.calls
+        .map(([sql]) => String(sql))
+        .filter(
+          (sql) =>
+            sql.includes("SELECT r.id") ||
+            sql.includes("COUNT(*)::int AS remaining"),
+        );
+
+    it("selects them with the default statuses, in the batch and in the remaining count", async () => {
+      const h = batchWithReread([]);
+      await h.service.processBatch(USER, {});
+      const sqls = selectionSqls(h);
+      expect(sqls).toHaveLength(2);
+      for (const sql of sqls) {
+        expect(sql).toContain("r.link_key IS NULL");
+        expect(sql).toContain("applied_rq.status = 'applied'");
+        expect(sql).toContain("cp.definition->>'role' = 'component'");
+        expect(sql).toContain("cp.status = 'approved'");
+      }
+    });
+
+    it("selects none of them when the caller names the statuses", async () => {
+      const h = batchWithReread([]);
+      await h.service.processBatch(USER, { statuses: ["pending"] });
+      for (const sql of selectionSqls(h)) {
+        expect(sql).not.toContain("applied_rq");
+      }
+    });
+
+    it("lets the pipeline act on review for those emails only", async () => {
+      const h = batchWithReread([
+        { id: "applied", reread: true },
+        { id: "plain", reread: false },
+      ]);
+      h.pipeline.process.mockResolvedValue(result("component") as never);
+      await h.service.processBatch(USER, {});
+      const [first, second] = h.pipeline.process.mock.calls;
+      expect(first[2]?.onlyWhenStatusIn).toEqual([
+        ...EMAIL_RECEIPT_PROCESSABLE_STATUSES,
+        "review",
+      ]);
+      expect(second[2]?.onlyWhenStatusIn).toEqual([
+        ...EMAIL_RECEIPT_PROCESSABLE_STATUSES,
+      ]);
+    });
+
+    it("passes over one the pipeline left as it was, so the run does not select it again", async () => {
+      const h = batchWithReread([{ id: "applied", reread: true }]);
+      h.pipeline.process.mockResolvedValue(
+        result("review", { unchanged: true }) as never,
+      );
+      const out = await h.service.processBatch(USER, {});
+      expect(out.processed).toBe(0);
+      expect(
+        h.manager.query.mock.calls.some(([sql]) =>
+          String(sql).includes("SET status_reason = status_reason"),
+        ),
+      ).toBe(true);
+    });
+  });
+
   it("is sequential: the next email starts after the previous one finished", async () => {
     const h = batch(["a", "b"]);
     const order: string[] = [];
@@ -1678,7 +1754,22 @@ describe("EmailReceiptsService.bulk", () => {
   it("runs in one transaction", async () => {
     const h = bulkSetup([locked(A)]);
     await h.service.bulk(USER, "delete", { ids: [A] }, 1);
-    expect(h.manager.query.mock.calls.length).toBe(3);
+    // Lock, close, the link rows (a component loses its reason first), delete.
+    expect(h.manager.query.mock.calls.length).toBe(4);
+  });
+
+  it("deletes the link rows of deleted settlements before the receipts", async () => {
+    const h = bulkSetup([locked(A)]);
+    await h.service.bulk(USER, "delete", { ids: [A] }, 1);
+    const sqls = h.manager.query.mock.calls.map(([sql]) => String(sql));
+    const links = sqls.findIndex((s) =>
+      s.includes("DELETE FROM email_receipt_links"),
+    );
+    const receipts = sqls.findIndex((s) =>
+      s.includes("DELETE FROM email_receipts"),
+    );
+    expect(links).toBeGreaterThanOrEqual(0);
+    expect(links).toBeLessThan(receipts);
   });
 });
 

@@ -1,4 +1,5 @@
 import type { EntityManager } from "typeorm";
+import { returnedRows } from "../../common/db/query-result";
 import type {
   ReceiptLinkOutcome,
   ReceiptLinkReport,
@@ -41,8 +42,90 @@ export function unitsToDecimal(units: number): string {
   return `${negative ? "-" : ""}${whole}.${fraction}`;
 }
 
+/** The reason of a component no settlement row names any more (spec 2.1). */
+const AWAITING_SETTLEMENT = "awaiting_settlement";
+
 /**
- * Replace the rows of a settlement (spec 5): delete, then one multi-row insert.
+ * Delete the link rows of these settlements and return the components they
+ * named. The caller holds the settlements' row locks and then calls
+ * `resetOrphanedComponents` with the result once its own rows are written.
+ */
+async function deleteLinkRows(
+  m: EntityManager,
+  userId: string,
+  settlementReceiptIds: readonly string[],
+): Promise<string[]> {
+  const rows = returnedRows<{ component_receipt_id: string | null }>(
+    await m.query(
+      `DELETE FROM email_receipt_links
+        WHERE settlement_receipt_id = ANY($1::uuid[]) AND user_id = $2
+    RETURNING component_receipt_id`,
+      [[...settlementReceiptIds], userId],
+    ),
+  );
+  return [
+    ...new Set(
+      rows.flatMap((row) =>
+        row.component_receipt_id === null ? [] : [row.component_receipt_id],
+      ),
+    ),
+  ];
+}
+
+/**
+ * A component that no row of any settlement names any more is
+ * `awaiting_settlement` again (spec 2.1); one that another settlement still
+ * names keeps the reason it has, which that settlement's own join set (an
+ * instalment may then read `settled` although part of it was released: the
+ * next join of that settlement corrects it). The rows are locked in ascending
+ * id, as every writer of component rows does (spec 11).
+ */
+async function resetOrphanedComponents(
+  m: EntityManager,
+  userId: string,
+  componentIds: readonly string[],
+): Promise<void> {
+  if (componentIds.length === 0) return;
+  await m.query(
+    `WITH locked AS (
+       SELECT r.id
+         FROM email_receipts r
+        WHERE r.user_id = $1
+          AND r.id = ANY($2::uuid[])
+          AND r.status = 'component'
+          AND r.status_reason IS DISTINCT FROM $3::varchar
+          AND NOT EXISTS (SELECT 1
+                            FROM email_receipt_links l
+                           WHERE l.component_receipt_id = r.id
+                             AND l.user_id = $1)
+        ORDER BY r.id
+          FOR UPDATE OF r)
+     UPDATE email_receipts SET status_reason = $3::varchar
+      WHERE id IN (SELECT id FROM locked)`,
+    [userId, [...componentIds], AWAITING_SETTLEMENT],
+  );
+}
+
+/**
+ * Remove the link rows of settlements that are ignored or deleted (spec 5), and
+ * give back the components they alone used. Call it BEFORE the receipt rows are
+ * deleted.
+ */
+export async function removeLinkRows(
+  m: EntityManager,
+  userId: string,
+  settlementReceiptIds: readonly string[],
+): Promise<void> {
+  await resetOrphanedComponents(
+    m,
+    userId,
+    await deleteLinkRows(m, userId, settlementReceiptIds),
+  );
+}
+
+/**
+ * Replace the rows of a settlement (spec 5): delete, then one multi-row insert,
+ * then the components it no longer names fall back to `awaiting_settlement`.
  * `rows` undefined or empty leaves the settlement with none, which is what an
  * outcome that never reached the join stores.
  */
@@ -52,12 +135,19 @@ export async function replaceLinkRows(
   settlementReceiptId: string,
   rows: readonly LinkRowInput[] | undefined,
 ): Promise<void> {
-  await m.query(
-    `DELETE FROM email_receipt_links
-      WHERE settlement_receipt_id = $1 AND user_id = $2`,
-    [settlementReceiptId, userId],
-  );
-  if (!rows || rows.length === 0) return;
+  const previous = await deleteLinkRows(m, userId, [settlementReceiptId]);
+  if (rows && rows.length > 0) {
+    await insertLinkRows(m, userId, settlementReceiptId, rows);
+  }
+  await resetOrphanedComponents(m, userId, previous);
+}
+
+async function insertLinkRows(
+  m: EntityManager,
+  userId: string,
+  settlementReceiptId: string,
+  rows: readonly LinkRowInput[],
+): Promise<void> {
   const values: unknown[] = [userId, settlementReceiptId];
   const tuples = rows.map((row) => {
     const base = values.length;

@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
 import { tr } from "../../i18n/translate";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import { removeLinkRows } from "../linking/link-rows";
 import {
   closeReceiptRequests,
   currentReceiptRequestStatus,
@@ -78,11 +79,7 @@ export async function ignoreLockedReceipt(
   }
   await closeReceiptRequests(m, userId, receipt.id);
   // An ignored settlement takes nothing from a component (linked receipts spec 5).
-  await m.query(
-    `DELETE FROM email_receipt_links
-      WHERE settlement_receipt_id = $1 AND user_id = $2`,
-    [receipt.id, userId],
-  );
+  await removeLinkRows(m, userId, [receipt.id]);
   await m.getRepository(EmailReceipt).update(
     { id: receipt.id, userId },
     {
@@ -104,5 +101,8 @@ export async function deleteLockedReceipt(
     await lockReceiptTransaction(m, receipt.transactionId);
   }
   await closeReceiptRequests(m, userId, receipt.id);
+  // The rows go through the helper first, so a component only this settlement
+  // used falls back to awaiting_settlement (the cascade would leave its reason).
+  await removeLinkRows(m, userId, [receipt.id]);
   await m.getRepository(EmailReceipt).delete({ id: receipt.id, userId });
 }

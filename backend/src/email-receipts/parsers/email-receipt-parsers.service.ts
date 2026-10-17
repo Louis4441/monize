@@ -19,6 +19,10 @@ import {
   type ReceiptMatchTrace,
 } from "../matching/match-trace";
 import type { ReceiptOutcome } from "../parsing/parse-receipt";
+import {
+  appliedReviewClause,
+  coveredByDomainSql,
+} from "../linking/component-reread";
 import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "../receipts/dto/email-receipts.dto";
 import { dryRunReceipt } from "./receipt-dry-run";
 import type {
@@ -477,7 +481,8 @@ export class EmailReceiptParsersService {
  * For the user's APPROVED parsers (or only `ids`), how many stored emails of
  * the parser's sender domains (a sub-domain matches, as in the pipeline) are in
  * a processable status and were last updated before the parser's last change:
- * the emails reading them again can change something. ONE statement however
+ * the emails reading them again can change something. A `component` profile
+ * also counts the applied `review` emails it covers (linked receipts spec 9). ONE statement however
  * many parsers; a parser with none is absent from the map. A draft reads no
  * mail, so it never counts.
  */
@@ -492,14 +497,14 @@ export async function reprocessableCounts(
          FROM email_receipt_parsers p
          JOIN email_receipts r
            ON r.user_id = p.user_id
-          AND r.status = ANY($2::varchar[])
+          AND (r.status = ANY($2::varchar[])
+               OR (p.definition->>'role' = 'component'
+                   AND ${appliedReviewClause("r")}))
           AND r.updated_at < p.updated_at
           AND EXISTS (
                 SELECT 1
                   FROM unnest(p.from_domains) AS pd(domain)
-                 WHERE r.from_domain = pd.domain
-                    OR right(r.from_domain, length(pd.domain) + 1)
-                       = '.' || pd.domain)
+                 WHERE ${coveredByDomainSql("r", "pd.domain")})
         WHERE p.user_id = $1
           AND p.status = 'approved'
           AND ($3::uuid[] IS NULL OR p.id = ANY($3::uuid[]))

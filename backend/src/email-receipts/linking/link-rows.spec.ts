@@ -1,5 +1,10 @@
 import type { ReceiptLinkReport } from "../parsing/receipt-parser.types";
-import { linkRowsOf, replaceLinkRows, unitsToDecimal } from "./link-rows";
+import {
+  linkRowsOf,
+  removeLinkRows,
+  replaceLinkRows,
+  unitsToDecimal,
+} from "./link-rows";
 
 const report = (over: Partial<ReceiptLinkReport>): ReceiptLinkReport => ({
   partIndex: 0,
@@ -81,7 +86,7 @@ describe("replaceLinkRows", () => {
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]).toEqual([
       expect.stringContaining("DELETE FROM email_receipt_links"),
-      ["s1", "u1"],
+      [["s1"], "u1"],
     ]);
     const [sql, values] = query.mock.calls[1] as unknown as [string, unknown[]];
     expect(sql).toContain("INSERT INTO email_receipt_links");
@@ -106,5 +111,57 @@ describe("replaceLinkRows", () => {
     await replaceLinkRows({ query } as never, "u1", "s1", undefined);
     await replaceLinkRows({ query } as never, "u1", "s1", []);
     expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets the components the old rows named once the new rows are written", async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([
+        { component_receipt_id: "c1" },
+        { component_receipt_id: "c1" },
+        { component_receipt_id: null },
+        { component_receipt_id: "c2" },
+      ])
+      .mockResolvedValue([]);
+    await replaceLinkRows({ query } as never, "u1", "s1", [
+      {
+        partIndex: 0,
+        link: "L1",
+        partAmount: 1,
+        componentReceiptId: "c2",
+        outcome: "joined",
+      },
+    ]);
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(query.mock.calls[1][0]).toContain("INSERT INTO email_receipt_links");
+    const [sql, values] = query.mock.calls[2] as [string, unknown[]];
+    expect(sql).toContain("status = 'component'");
+    expect(sql).toContain("NOT EXISTS");
+    expect(values).toEqual(["u1", ["c1", "c2"], "awaiting_settlement"]);
+  });
+});
+
+describe("removeLinkRows", () => {
+  it("deletes the rows of every settlement, then resets the components that lost their last row", async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([{ component_receipt_id: "c1" }])
+      .mockResolvedValue([]);
+    await removeLinkRows({ query } as never, "u1", ["s1", "s2"]);
+    expect(query.mock.calls[0]).toEqual([
+      expect.stringContaining("RETURNING component_receipt_id"),
+      [["s1", "s2"], "u1"],
+    ]);
+    expect(query.mock.calls[1][1]).toEqual([
+      "u1",
+      ["c1"],
+      "awaiting_settlement",
+    ]);
+  });
+
+  it("resets nothing when the rows named no component", async () => {
+    const query = jest.fn(async () => []);
+    await removeLinkRows({ query } as never, "u1", ["s1"]);
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });

@@ -266,18 +266,37 @@ component.
 | none, or open (`pending`, `proposed`) | an ordinary reprocess: matched again, joined, a new card |
 | `applied` | **re-join**: the transaction is the settlement's own `transaction_id` (no new match); a new card is proposed on it; status `review`; the person confirms, and `confirm` replaces the split set |
 
-A re-join runs only when the new join changes some part from `not_found` to
-`joined` or `scaled`; otherwise nothing is written.
+The settlements are the newest first (by `original_sent_at ?? received_at`),
+at most 20 (`MAX_REJOINED_SETTLEMENTS`). A re-join does not match again: the
+transaction is read with the refusals of a link, and the receipt keeps its
+stored match kind. It runs only when the new join changes some part from any
+outcome other than `joined` or `scaled` (`not_found`, `component_incomplete`,
+...) to `joined` or `scaled`; otherwise nothing is written (no link rows, no
+reasons, no request). The applied request stays `applied`; the receipt then
+points at the new card, which auto-apply never applies (section 7). A
+settlement the profile no longer reads as a settlement (a guard, a discard, a
+changed role) is left as it is.
+
+A component's reason also falls back to `awaiting_settlement` when the link
+rows that named it are replaced, ignored or deleted and no row of any
+settlement names it any more. A component that another settlement still names
+keeps its reason until that settlement is read again.
 
 ## 9. Re-reading an email as a component
 
 A component reading never writes the ledger and never opens a request. An email
 whose chosen profile is a `component` is therefore read as one even when its
 earlier request was applied (the old standalone purchase profile): the applied
-request is left as it is, `transaction_id` is kept, the status becomes
-`component`. `process-batch` and a profile's `reprocessableCount` include such
-emails (status `review`, `link_key` null, the domain of an approved component
-profile).
+request is left as it is, `transaction_id` and `match_kind` are kept, `ai_review_request_id` still names
+the applied request, the status becomes `component`. A person's own link is
+refused, as it is for any applied email. An applied email that the chosen
+profile does not read as a component (another role, or a guard, a discard or a
+trade section turns it aside) is left as it is: a person's reprocess is a 409,
+an automatic pass writes nothing. `process-batch` (when it is given no
+statuses) and a component profile's `reprocessableCount` include such emails
+(status `review`, `link_key` null, request applied, the domain of an approved
+component profile); the batch lets the pipeline act on `review` for those ids
+only, and marks one that is left alone as passed over so the run ends.
 
 ## 10. The `test` operation
 

@@ -404,4 +404,245 @@ describe("linked email receipts (integration)", () => {
     expect(proposed).toHaveLength(1);
     expect(proposed[0].email_receipt_id).toBe(settlement.id);
   });
+
+  /** The purchase for contract 1 (the one the repayment pays first): an item of 100,00 and shipping 9,89. */
+  const FIRST_PURCHASE_LINES = [
+    "Dziękujemy za zamówienie",
+    "Pozycje zamówienia",
+    "Klocki drewniane zestaw",
+    "100,00 zł",
+    "Koszt dostawy",
+    "9,89 zł",
+    "Razem do zapłaty",
+    "109,89 zł",
+    "Forma płatności",
+    "Allegro Pay",
+    "Umowa Allegro Pay",
+    `${ALLEGRO_PAY_CONTRACT_1} (umowa w załączniku)`,
+    "Tytuł przelewu",
+    `Allegro Pay ${ALLEGRO_PAY_CONTRACT_1}`,
+  ];
+  const firstPurchaseMail = () =>
+    serverReturns(
+      "shop.example.com",
+      ALLEGRO_PAY_PURCHASE_SUBJECT,
+      "Fri, 12 Dec 2025 10:00:00 +0000",
+      FIRST_PURCHASE_LINES,
+    );
+
+  const splitAmounts = (request: { proposal: { input: unknown } }) =>
+    (request.proposal.input as { splits: { amount: number }[] }).splits.map(
+      (split) => split.amount,
+    );
+  const sumCents = (amounts: number[]) =>
+    Math.round(amounts.reduce((sum, amount) => sum + amount * 100, 0));
+
+  describe("a component that arrives after its settlement (spec 8)", () => {
+    it("reprocesses a settlement that waits with an open card: a new card with both purchases' lines", async () => {
+      await createProfiles();
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const settlement = await receiptBy("pay.example.com");
+      const [first] = await requests();
+      expect(splitAmounts(first)).toEqual([-109.89, -140, -10, -13]);
+
+      await poll(firstPurchaseMail());
+
+      const first2 = (await requests()).find((r) => r.id === first.id);
+      expect(first2?.status).toBe("rejected");
+      const proposed = (await requests()).filter(
+        (r) => r.status === "proposed",
+      );
+      expect(proposed).toHaveLength(1);
+      expect(proposed[0]).toMatchObject({
+        transaction_id: txId,
+        email_receipt_id: settlement.id,
+      });
+      const amounts = splitAmounts(proposed[0]);
+      expect(amounts).toEqual([-100, -9.89, -140, -10, -13]);
+      expect(sumCents(amounts)).toBe(-27289);
+      expect(await receiptBy("pay.example.com")).toMatchObject({
+        status: "review",
+        status_reason: null,
+        ai_review_request_id: proposed[0].id,
+      });
+      const links = await linkRows();
+      expect(links.map((l) => l.outcome)).toEqual(["joined", "joined"]);
+      expect(links.every((l) => l.component_receipt_id !== null)).toBe(true);
+    });
+
+    it("proposes a re-join card on the same transaction when the first card was applied, and leaves the applied request applied", async () => {
+      await createProfiles();
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const [first] = await requests();
+      await db.query(
+        `UPDATE ai_review_requests SET status = 'applied' WHERE id = $1`,
+        [first.id],
+      );
+
+      await poll(firstPurchaseMail());
+
+      const all = await requests();
+      expect(all.find((r) => r.id === first.id)?.status).toBe("applied");
+      const proposed = all.filter((r) => r.status === "proposed");
+      expect(proposed).toHaveLength(1);
+      expect(proposed[0].transaction_id).toBe(txId);
+      const amounts = splitAmounts(proposed[0]);
+      expect(amounts).toEqual([-100, -9.89, -140, -10, -13]);
+      expect(sumCents(amounts)).toBe(-27289);
+      expect(await receiptBy("pay.example.com")).toMatchObject({
+        status: "review",
+        transaction_id: txId,
+        ai_review_request_id: proposed[0].id,
+      });
+      expect((await linkRows()).map((l) => l.outcome)).toEqual([
+        "joined",
+        "joined",
+      ]);
+    });
+
+    it("writes nothing for an applied settlement when the component that arrives joins no missing part", async () => {
+      await createProfiles();
+      await poll(repaymentMail());
+      const [first] = await requests();
+      await db.query(
+        `UPDATE ai_review_requests SET status = 'applied' WHERE id = $1`,
+        [first.id],
+      );
+      // a purchase for a contract the repayment does not name
+      await poll(
+        serverReturns(
+          "shop.example.com",
+          ALLEGRO_PAY_PURCHASE_SUBJECT,
+          "Fri, 12 Dec 2025 10:00:00 +0000",
+          ALLEGRO_PAY_PURCHASE_LINES.map((line) =>
+            line.replace(ALLEGRO_PAY_CONTRACT_2, "1999999999"),
+          ),
+        ),
+      );
+      const all = await requests();
+      expect(all).toHaveLength(1);
+      expect(all[0]).toMatchObject({ id: first.id, status: "applied" });
+      expect((await linkRows()).map((l) => l.outcome)).toEqual([
+        "not_found",
+        "not_found",
+      ]);
+    });
+  });
+
+  it("gives a component back its awaiting_settlement reason when the settlement that used it is deleted", async () => {
+    await createProfiles();
+    await poll(purchaseMail());
+    await poll(repaymentMail());
+    const settlement = await receiptBy("pay.example.com");
+    expect(await receiptBy("shop.example.com")).toMatchObject({
+      status: "component",
+      status_reason: "settled",
+    });
+
+    await asAlice(() => receipts.remove(aliceId, settlement.id));
+
+    expect(await receiptBy("shop.example.com")).toMatchObject({
+      status: "component",
+      status_reason: "awaiting_settlement",
+    });
+    expect(await linkRows()).toHaveLength(0);
+  });
+
+  it("reads an applied purchase email as a component once its profile is one, then lets the repayment take the transaction over", async () => {
+    // The old, standalone purchase profile: no role, no link key.
+    const {
+      role: _role,
+      linkKey: _linkKey,
+      ...standalone
+    } = ALLEGRO_PAY_COMPONENT_DEFINITION;
+    const profile = await asAlice(() =>
+      parsers.create(aliceId, {
+        name: "Shop purchases",
+        fromDomains: ["shop.example.com"],
+        definition: {
+          ...standalone,
+          defaultCategoryId: goodsId,
+          shippingCategoryId: shippingId,
+        },
+      } as never),
+    );
+    await asAlice(() =>
+      parsers.create(aliceId, {
+        name: "Repayments",
+        fromDomains: ["pay.example.com"],
+        definition: {
+          ...ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+          defaultCategoryId: goodsId,
+        },
+      } as never),
+    );
+    await poll(purchaseMail());
+    const purchase = await receiptBy("shop.example.com");
+    // Standalone: the purchase email found no transaction of its own (163,00).
+    expect(purchase.status).not.toBe("component");
+    await asAlice(() => receipts.link(aliceId, purchase.id, txId));
+    const linked = await receiptBy("shop.example.com");
+    expect(linked).toMatchObject({ status: "review", transaction_id: txId });
+    await db.query(
+      `UPDATE ai_review_requests SET status = 'applied' WHERE id = $1`,
+      [linked.ai_review_request_id],
+    );
+
+    // The profile becomes a component.
+    await db.query(
+      `UPDATE email_receipt_parsers SET definition = $2::jsonb, updated_at = now() WHERE id = $1`,
+      [
+        profile.id,
+        JSON.stringify({
+          ...ALLEGRO_PAY_COMPONENT_DEFINITION,
+          defaultCategoryId: goodsId,
+          shippingCategoryId: shippingId,
+        }),
+      ],
+    );
+    const counts = await asAlice(() => parsers.list(aliceId));
+    expect(
+      counts.find((view) => view.id === profile.id)?.reprocessableCount,
+    ).toBe(1);
+
+    // A default process-batch reads it again, as a component.
+    const run = await asAlice(() => receipts.processBatch(aliceId, {}));
+    expect(run).toMatchObject({ processed: 1, failed: 0, remaining: 0 });
+    expect(await receiptBy("shop.example.com")).toMatchObject({
+      status: "component",
+      status_reason: "awaiting_settlement",
+      link_key: ALLEGRO_PAY_CONTRACT_2,
+      transaction_id: txId,
+      ai_review_request_id: linked.ai_review_request_id,
+    });
+    const [appliedRequest] = await requests();
+    expect(appliedRequest).toMatchObject({ status: "applied" });
+
+    // The repayment takes the transaction over: a new card, not review_conflict.
+    await poll(repaymentMail());
+    const settlement = await receiptBy("pay.example.com");
+    expect(settlement).toMatchObject({
+      status: "review",
+      transaction_id: txId,
+    });
+    const proposed = (await requests()).filter((r) => r.status === "proposed");
+    expect(proposed).toHaveLength(1);
+    expect(proposed[0].email_receipt_id).toBe(settlement.id);
+    expect(sumCents(splitAmounts(proposed[0]))).toBe(-27289);
+  });
+
+  it("leaves an applied review email that no component profile covers out of a default process-batch", async () => {
+    await createProfiles();
+    await poll(repaymentMail());
+    const [first] = await requests();
+    await db.query(
+      `UPDATE ai_review_requests SET status = 'applied' WHERE id = $1`,
+      [first.id],
+    );
+    const run = await asAlice(() => receipts.processBatch(aliceId, {}));
+    expect(run).toMatchObject({ processed: 0, remaining: 0 });
+    expect((await receiptBy("pay.example.com")).status).toBe("review");
+  });
 });

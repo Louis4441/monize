@@ -40,6 +40,7 @@ import {
 } from "./receipt-bulk-queries";
 import type { ReceiptBulkResult, ReceiptBulkTarget } from "./receipt-bulk";
 import type { ReceiptSelectionFilter } from "./receipt-filter";
+import { appliedComponentRereadClause } from "../linking/component-reread";
 import { receiptDomainClause, receiptDomainParams } from "./receipt-filter";
 import type { EmailReceiptBulkAction } from "./dto/email-receipts.dto";
 import type {
@@ -566,11 +567,19 @@ export class EmailReceiptsService {
       since?: string;
     } = {},
   ): Promise<ProcessBatchResult> {
+    const explicitStatuses = Boolean(
+      options.statuses && options.statuses.length > 0,
+    );
     const statuses = [
       ...(options.statuses && options.statuses.length > 0
         ? options.statuses
         : EMAIL_RECEIPT_PROCESSABLE_STATUSES),
     ] as EmailReceiptStatus[];
+    // With no statuses named, an applied email that a component profile covers
+    // is read again too (linked receipts spec 9); no other `review` one is.
+    const statusClause = explicitStatuses
+      ? "r.status = ANY($2::varchar[])"
+      : `(r.status = ANY($2::varchar[]) OR ${appliedComponentRereadClause("r")})`;
     const limit = Math.min(
       Math.max(
         Math.trunc(options.limit ?? EMAIL_RECEIPTS_DEFAULT_BATCH_LIMIT),
@@ -590,12 +599,12 @@ export class EmailReceiptsService {
           [options.since ?? null],
         ),
       );
-      const ids = returnedRows<{ id: string }>(
+      const ids = returnedRows<{ id: string; reread: boolean }>(
         await m.query(
-          `SELECT r.id
+          `SELECT r.id, (r.status = 'review') AS reread
              FROM email_receipts r
             WHERE r.user_id = $1
-              AND r.status = ANY($2::varchar[])
+              AND ${statusClause}
               AND ${receiptDomainClause(3, 4)}
               AND r.updated_at < $5::timestamptz
             ORDER BY r.received_at ASC, r.id ASC
@@ -603,7 +612,7 @@ export class EmailReceiptsService {
           [userId, statuses, domain, domainLike, stamp.since, limit],
         ),
       );
-      return { since: stamp.since, ids: ids.map((row) => row.id) };
+      return { since: stamp.since, rows: ids };
     });
 
     const byOutcome: ProcessBatchResult["byOutcome"] = {};
@@ -611,10 +620,11 @@ export class EmailReceiptsService {
     let deleted = 0;
     let failed = 0;
     const budget = { remaining: EMAIL_RECEIPTS_BATCH_AI_CATEGORY_CALLS };
-    for (const id of selected.ids) {
+    for (const { id, reread } of selected.rows) {
       try {
         const result = await this.pipeline.process(userId, id, {
-          onlyWhenStatusIn: statuses,
+          // `review` is allowed for the applied emails only (spec 9).
+          onlyWhenStatusIn: reread ? [...statuses, "review"] : statuses,
           aiCategoryBudget: budget,
         });
         if (result.deleted) {
@@ -623,6 +633,10 @@ export class EmailReceiptsService {
         } else if (!result.unchanged) {
           processed++;
           byOutcome[result.status] = (byOutcome[result.status] ?? 0) + 1;
+        } else if (reread) {
+          // An applied email its profile does not read as a component stays as
+          // it is; passed over, so the run does not select it again.
+          await this.touch(userId, id);
         }
       } catch (error) {
         failed++;
@@ -639,7 +653,7 @@ export class EmailReceiptsService {
           `SELECT COUNT(*)::int AS remaining
              FROM email_receipts r
             WHERE r.user_id = $1
-              AND r.status = ANY($2::varchar[])
+              AND ${statusClause}
               AND ${receiptDomainClause(3, 4)}
               AND r.updated_at < $5::timestamptz`,
           [userId, statuses, domain, domainLike, selected.since],
