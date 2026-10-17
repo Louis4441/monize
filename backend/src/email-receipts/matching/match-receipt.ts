@@ -179,7 +179,9 @@ function namesParsedPayee(
  * with A and P; `amount_date` those with A. A strategy with exactly one candidate
  * matches; several are ambiguous with exactly those candidates; none passes to the
  * next strategy; none left is unmatched. A candidate outside the window around
- * `purchaseDate` (the profile's, else 3 days before and 14 after) is ignored. With
+ * `purchaseDate` (the profile's, else 3 days before and 14 after) is ignored. An
+ * order email describes a purchase, so only an expense (amount below zero) is a
+ * candidate for any strategy; income and a zero amount are ignored. With
  * no `config` the strategies are `orderId`, `amount_payee`, `amount_date`: the
  * truth table a profile without a `match` section always had.
  */
@@ -196,6 +198,7 @@ export function matchReceipt(
   const window = receiptCandidateWindow(purchaseDate, config);
   const inWindow = candidates.filter(
     (candidate) =>
+      candidate.amount < 0 &&
       candidate.transactionDate >= window.from &&
       candidate.transactionDate <= window.to,
   );

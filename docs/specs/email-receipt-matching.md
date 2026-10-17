@@ -56,7 +56,10 @@ Candidates are the user's transactions, loaded in one query: not a transfer,
 not VOID, not an investment row, in the currency of the account, dated from
 `purchase_date - 3` to `purchase_date + 14` (calendar dates in UTC,
 `addDaysYMD`), at most 200, newest first. A transaction that already has an
-applied receipt, or an open receipt request, is not a candidate.
+applied receipt, or an open receipt request, is not a candidate. An order
+email describes a purchase, so only an expense (amount below zero) is a
+candidate for an automatic match; income and a zero amount are not. A manual
+link is not limited to expenses.
 
 `purchase_date` is the date of the original message: `original_sent_at` when
 the mailbox owner forwarded the receipt to the mailbox and the forwarded
@@ -72,7 +75,7 @@ Signals per candidate:
 
 - **O**: the parsed order id (at least 4 characters) appears, case-insensitive,
   in the transaction's `description`, `payeeName` or `referenceNumber`.
-- **A**: `abs(amount)` in units equals the amount the bank was charged,
+- **A**: `abs(amount)` of an expense in units equals the amount the bank was charged,
   `paid ?? total`, exactly. With neither parsed, A is false for every candidate.
 - **P**: the transaction's payee is the parser's payee (by id), OR the
   transaction's payee NAME is the merchant the email names (`ParsedReceipt.payee`),
