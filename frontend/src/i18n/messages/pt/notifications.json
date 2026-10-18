@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "Recibos de e-mail precisam de atenção",
     "message": "Sua caixa de entrada de recibos contém {noParser} sem perfil e {parseFailed} que seu perfil não reconheceu. Abra para revisar."
+  },
+  "aiReview": {
+    "readyTitle": "Propostas de IA aguardam a sua aprovação",
+    "readyMessage": "{count, plural, one {# proposta de IA aguarda} other {# propostas de IA aguardam}} a sua aprovação, {added} das quais novas. Abra a caixa de revisão de IA para aprovar ou dispensar.",
+    "expiringTitle": "Propostas de IA a expirar em breve",
+    "expiringMessage": "{count, plural, one {# proposta de IA expira} other {# propostas de IA expiram}} em breve. A primeira expira em {date}. Abra a caixa de revisão de IA para aprovar ou dispensar."
   }
 }

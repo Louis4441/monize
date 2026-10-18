@@ -1352,4 +1352,41 @@ describe('NotificationList', () => {
       expect(mockPush).toHaveBeenCalledWith('/email-receipts?tab=emails');
     });
   });
+
+  describe('AI review proposals', () => {
+    const aiReview = (overrides: Partial<Notification> = {}) =>
+      makeNotification({
+        id: 'air-1',
+        budgetId: null,
+        budgetCategoryId: null,
+        type: 'AI_REVIEW_PROPOSALS_READY',
+        category: 'AI_REVIEW',
+        severity: 'info',
+        title: 'stored title',
+        message: 'stored message',
+        data: { count: 3, added: 2 },
+        target: '/ai-reviews',
+        ...overrides,
+      });
+
+    it('composes the ready copy from the counts and opens the review inbox', () => {
+      mockPush.mockClear();
+      render(<NotificationList {...defaultProps} notifications={[aiReview()]} />);
+      expect(screen.getByText('AI proposals wait for your approval')).toBeInTheDocument();
+      expect(screen.getByText(/3 AI proposals wait for your approval \(2 new\)/)).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('notification-item-air-1'));
+      expect(mockPush).toHaveBeenCalledWith('/ai-reviews');
+    });
+
+    it.each(['AI_REVIEW_PROPOSALS_READY', 'AI_REVIEW_PROPOSALS_EXPIRING'] as const)(
+      'opens the review inbox for %s without a stored target',
+      (type) => {
+        mockPush.mockClear();
+        render(<NotificationList {...defaultProps} notifications={[aiReview({ type, target: null, data: {} })]} />);
+        expect(screen.getByText('stored title')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('notification-item-air-1'));
+        expect(mockPush).toHaveBeenCalledWith('/ai-reviews');
+      },
+    );
+  });
 });

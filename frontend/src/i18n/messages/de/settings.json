@@ -385,7 +385,8 @@
         "BANK_SYNC": "Bankverbindungen",
         "BANK_SYNC_ACTIVITY": "Ergebnisse der Bank-Synchronisierung",
         "EMAIL_RECEIPTS": "E-Mail-Belege",
-        "BONDS": "Anleihen"
+        "BONDS": "Anleihen",
+        "AI_REVIEW": "KI-Prüfvorschläge"
       },
       "channelNotApplicable": "Für diese Benachrichtigungsart nicht zutreffend",
       "emailToggleLabel": "Bericht-E-Mail für {category}",

@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "E-mailkwitanties vereisen aandacht",
     "message": "Uw kwitantiemap bevat {noParser} zonder profiel en {parseFailed} die het profiel niet herkende. Open om te controleren."
+  },
+  "aiReview": {
+    "readyTitle": "AI-voorstellen wachten op uw goedkeuring",
+    "readyMessage": "{count, plural, one {# AI-voorstel wacht} other {# AI-voorstellen wachten}} op uw goedkeuring, waarvan {added} nieuw. Open de AI-beoordelingsinbox om ze goed te keuren of te negeren.",
+    "expiringTitle": "AI-voorstellen verlopen binnenkort",
+    "expiringMessage": "{count, plural, one {# AI-voorstel verloopt} other {# AI-voorstellen verlopen}} binnenkort. Het eerste verloopt op {date}. Open de AI-beoordelingsinbox om ze goed te keuren of te negeren."
   }
 }

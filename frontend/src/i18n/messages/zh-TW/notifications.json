@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "電子郵件收據需要關注",
     "message": "您的收據收件箱包含 {noParser} 個沒有個人檔案的郵件和 {parseFailed} 個其個人檔案未識別的郵件。打開以查閱。"
+  },
+  "aiReview": {
+    "readyTitle": "AI 提案正在等待您的核准",
+    "readyMessage": "{count, plural, other {#則}} AI 提案正在等待您的核准，其中 {added} 則為新提案。開啟 AI 審核收件匣以核准或忽略。",
+    "expiringTitle": "AI 提案即將到期",
+    "expiringMessage": "{count, plural, other {#則}} AI 提案即將到期。最早的一則將於 {date} 到期。開啟 AI 審核收件匣以核准或忽略。"
   }
 }

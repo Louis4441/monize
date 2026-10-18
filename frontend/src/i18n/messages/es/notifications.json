@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "Los recibos de correo necesitan atención",
     "message": "Su bandeja de recibos contiene {noParser} sin perfil y {parseFailed} que su perfil no reconoció. Abra para revisar."
+  },
+  "aiReview": {
+    "readyTitle": "Propuestas de IA esperan su aprobación",
+    "readyMessage": "{count, plural, one {# propuesta de IA espera} other {# propuestas de IA esperan}} su aprobación, {added} de ellas nuevas. Abra la bandeja de revisión de IA para aprobarlas o descartarlas.",
+    "expiringTitle": "Propuestas de IA a punto de caducar",
+    "expiringMessage": "{count, plural, one {# propuesta de IA caduca} other {# propuestas de IA caducan}} pronto. La primera caduca el {date}. Abra la bandeja de revisión de IA para aprobarlas o descartarlas."
   }
 }

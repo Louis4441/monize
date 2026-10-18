@@ -38,6 +38,9 @@ function notificationRoute(notification: Notification): string | null {
     case 'ENCRYPTION_KEY_MISSING':
     case 'SMTP_FAILURE':
       return '/settings';
+    case 'AI_REVIEW_PROPOSALS_READY':
+    case 'AI_REVIEW_PROPOSALS_EXPIRING':
+      return '/ai-reviews';
     case 'EMAIL_RECEIPTS_ATTENTION':
       return '/email-receipts?tab=emails';
     case 'PROVIDER_OUTAGE':
