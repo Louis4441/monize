@@ -1,5 +1,6 @@
 import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
+import type { EmailReceiptSearchField } from "./dto/email-receipts.dto";
 
 /**
  * The sender-domain predicate of the receipts page, written once: an email
@@ -40,12 +41,70 @@ export function receiptDomainClause(
                    OR r.from_domain LIKE $${likeIndex}::varchar ESCAPE '\\')`;
 }
 
+/** What a person typed to find emails by their text and dates, as the DTOs carry it. */
+export interface ReceiptSearchFilter {
+  /** Free text; trimmed here, blank means no search. */
+  search?: string;
+  /** Where `search` looks; default `all`. Ignored without `search`. */
+  searchIn?: EmailReceiptSearchField;
+  /** `YYYY-MM-DD`, inclusive, a UTC day on the effective date of the email. */
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+/** How many bind values `receiptSearchClause` uses. */
+export const RECEIPT_SEARCH_PARAM_COUNT = 4;
+
+/**
+ * The four bind values of the search predicate, in the order of
+ * `receiptSearchClause`: the LIKE pattern (`null` without a search), the field
+ * it looks in, and the two days. The text is escaped so `%`, `_` and `\` match
+ * themselves.
+ */
+export function receiptSearchParams(filter: ReceiptSearchFilter): unknown[] {
+  const text = filter.search?.trim() || null;
+  return [
+    text === null ? null : `%${escapeLikePattern(text)}%`,
+    filter.searchIn || "all",
+    filter.dateFrom || null,
+    filter.dateTo || null,
+  ];
+}
+
+/**
+ * The search predicate as SQL over alias `r`: a case-insensitive substring of
+ * the subject, the sender (address, domain, forwarding user) or the body text,
+ * and the effective date (`original_sent_at`, else `received_at`: the date the
+ * list shows and sorts by) within the two UTC days. `firstIndex` is where the
+ * `RECEIPT_SEARCH_PARAM_COUNT` values of `receiptSearchParams` are bound.
+ */
+export function receiptSearchClause(firstIndex: number): string {
+  const pattern = `$${firstIndex}::varchar`;
+  const field = `$${firstIndex + 1}::varchar`;
+  const from = `$${firstIndex + 2}::date`;
+  const to = `$${firstIndex + 3}::date`;
+  const effective = "COALESCE(r.original_sent_at, r.received_at)";
+  return `(${pattern} IS NULL
+                   OR (${field} IN ('all', 'subject')
+                       AND r.subject ILIKE ${pattern} ESCAPE '\\')
+                   OR (${field} IN ('all', 'sender')
+                       AND (r.from_address ILIKE ${pattern} ESCAPE '\\'
+                            OR r.from_domain ILIKE ${pattern} ESCAPE '\\'
+                            OR r.forwarded_by ILIKE ${pattern} ESCAPE '\\'))
+                   OR (${field} IN ('all', 'body')
+                       AND r.body_text ILIKE ${pattern} ESCAPE '\\'))
+            AND (${from} IS NULL
+                 OR ${effective} >= (${from})::timestamp AT TIME ZONE 'UTC')
+            AND (${to} IS NULL
+                 OR ${effective} < ((${to}) + 1)::timestamp AT TIME ZONE 'UTC')`;
+}
+
 /**
  * What a bulk command, its count, a reprocess and the approval listing select,
  * written once. Every field is optional; the fields combine with AND. The
  * excluded states and domains take emails out of what `status` and `domain` keep.
  */
-export interface ReceiptSelectionFilter {
+export interface ReceiptSelectionFilter extends ReceiptSearchFilter {
   status?: EmailReceiptStatus;
   domain?: string;
   /** States taken out of the selection. */
@@ -58,7 +117,7 @@ export interface ReceiptSelectionFilter {
 }
 
 /** How many bind values `receiptSelectionClause` uses. */
-export const RECEIPT_SELECTION_PARAM_COUNT = 8;
+export const RECEIPT_SELECTION_PARAM_COUNT = 8 + RECEIPT_SEARCH_PARAM_COUNT;
 
 /**
  * The selection as SQL over alias `r` (`email_receipts`) and the bind values it
@@ -88,7 +147,8 @@ export function receiptSelectionClause(
             AND ($${at(6)}::date IS NULL
                  OR r.received_at >= ($${at(6)}::date)::timestamp AT TIME ZONE 'UTC')
             AND ($${at(7)}::date IS NULL
-                 OR r.received_at < (($${at(7)}::date) + 1)::timestamp AT TIME ZONE 'UTC')`;
+                 OR r.received_at < (($${at(7)}::date) + 1)::timestamp AT TIME ZONE 'UTC')
+            AND ${receiptSearchClause(at(8))}`;
   return {
     sql,
     params: [
@@ -100,6 +160,7 @@ export function receiptSelectionClause(
       excluded.map((d) => `%.${escapeLikePattern(d)}`),
       filter.receivedFrom ?? null,
       filter.receivedTo ?? null,
+      ...receiptSearchParams(filter),
     ],
   };
 }

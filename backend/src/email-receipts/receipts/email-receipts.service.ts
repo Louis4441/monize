@@ -40,7 +40,13 @@ import {
 } from "./receipt-bulk-queries";
 import type { ReceiptBulkResult, ReceiptBulkTarget } from "./receipt-bulk";
 import type { ReceiptSelectionFilter } from "./receipt-filter";
-import { receiptDomainClause, receiptDomainParams } from "./receipt-filter";
+import {
+  receiptDomainClause,
+  receiptDomainParams,
+  receiptSearchClause,
+  receiptSearchParams,
+  type ReceiptSearchFilter,
+} from "./receipt-filter";
 import type { EmailReceiptBulkAction } from "./dto/email-receipts.dto";
 import type {
   EmailReceiptCandidateSummary,
@@ -284,11 +290,13 @@ export class EmailReceiptsService {
    * detection), each with its count: most emails first, then by name, at most
    * 200. What the receipts page's domain filter offers. With `status` the
    * domains and the counts are those of the emails in that state only, so the
-   * filter never offers a domain the chosen state has no email from.
+   * filter never offers a domain the chosen state has no email from. The
+   * search options (`search`, `searchIn`, `dateFrom`, `dateTo`) narrow the
+   * counted emails the same way as in the list.
    */
   async listDomains(
     userId: string,
-    options: { status?: EmailReceiptStatus } = {},
+    options: { status?: EmailReceiptStatus } & ReceiptSearchFilter = {},
   ): Promise<EmailReceiptDomainCount[]> {
     const rows = await withScopedDb(this.dataSource, async (m) =>
       returnedRows<{
@@ -305,6 +313,7 @@ export class EmailReceiptsService {
             WHERE r.user_id = $1
               AND r.from_domain <> ''
               AND ($4::varchar IS NULL OR r.status = $4::varchar)
+              AND ${receiptSearchClause(5)}
             GROUP BY r.from_domain
             ORDER BY count DESC, r.from_domain ASC
             LIMIT $2`,
@@ -313,6 +322,7 @@ export class EmailReceiptsService {
             EMAIL_RECEIPTS_MAX_DOMAINS,
             [...EMAIL_RECEIPT_PROCESSABLE_STATUSES],
             options.status ?? null,
+            ...receiptSearchParams(options),
           ],
         ),
       ),
@@ -396,11 +406,13 @@ export class EmailReceiptsService {
    * How many of the user's emails are in each state, optionally only those from
    * one sender domain (or a sub-domain of it, as the list's filter reads it):
    * what the status tabs show next to their names. A state with no email is
-   * absent from `byStatus`; `total` is their sum.
+   * absent from `byStatus`; `total` is their sum. The search options
+   * (`search`, `searchIn`, `dateFrom`, `dateTo`) narrow the counted emails the
+   * same way as in the list.
    */
   async statusCounts(
     userId: string,
-    options: { domain?: string } = {},
+    options: { domain?: string } & ReceiptSearchFilter = {},
   ): Promise<EmailReceiptStatusCounts> {
     const { domain, domainLike } = receiptDomainParams(options.domain);
     const rows = await withScopedDb(this.dataSource, async (m) =>
@@ -410,8 +422,9 @@ export class EmailReceiptsService {
              FROM email_receipts r
             WHERE r.user_id = $1
               AND ${receiptDomainClause(2, 3)}
+              AND ${receiptSearchClause(4)}
             GROUP BY r.status`,
-          [userId, domain, domainLike],
+          [userId, domain, domainLike, ...receiptSearchParams(options)],
         ),
       ),
     );
@@ -677,7 +690,9 @@ export class EmailReceiptsService {
    * The user's emails, newest first by the day the shop sent the order
    * (`original_sent_at`, else `received_at`: the list's `effectiveDate`), without their text. `domain` keeps the
    * emails from exactly that sender domain or one of its sub-domains; it
-   * combines with `status`.
+   * combines with `status`. `search` keeps the emails whose subject, sender or
+   * body text holds the text (`searchIn` picks which), and `dateFrom` / `dateTo`
+   * the emails whose effective date falls on those UTC days, inclusive.
    */
   async list(
     userId: string,
@@ -686,7 +701,7 @@ export class EmailReceiptsService {
       domain?: string;
       limit?: number;
       offset?: number;
-    } = {},
+    } & ReceiptSearchFilter = {},
   ): Promise<EmailReceiptListItem[]> {
     const limit = Math.min(
       Math.max(
@@ -708,9 +723,18 @@ export class EmailReceiptsService {
             WHERE r.user_id = $1
               AND ($2::varchar IS NULL OR r.status = $2::varchar)
               AND ${receiptDomainClause(3, 4)}
+              AND ${receiptSearchClause(7)}
             ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id DESC
             LIMIT $5 OFFSET $6`,
-          [userId, options.status ?? null, domain, domainLike, limit, offset],
+          [
+            userId,
+            options.status ?? null,
+            domain,
+            domainLike,
+            limit,
+            offset,
+            ...receiptSearchParams(options),
+          ],
         ),
       ),
     );
