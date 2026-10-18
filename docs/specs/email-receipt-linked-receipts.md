@@ -320,7 +320,7 @@ profile. It writes nothing and takes no row lock.
   joined lines; a line that is not an item carries `kind`: `shipping`, `fee`
   or `discount`), and `links`, one entry per part: `{partIndex, link,
   component: {receiptId (REST: id), subject, effectiveDate (YYYY-MM-DD),
-  profileName} | null, partAmount, componentNet, taken, outcome, several}`.
+  profileName, source (`stored` | `draft`, section 10a)} | null, partAmount, componentNet, taken, outcome, several}`.
   `componentNet` and `taken` are null when the part had no complete component.
   The assistant tool lists at most 20 parts and gives decimal amounts; REST
   gives 1/10000 units, like `parsed`. The match is computed on the joined

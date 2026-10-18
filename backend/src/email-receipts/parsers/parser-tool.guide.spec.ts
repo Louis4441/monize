@@ -11,11 +11,16 @@ import {
   EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE,
   EMAIL_RECEIPT_PARSER_OPERATIONS,
   EMAIL_RECEIPT_PARSER_TOOL_DESCRIPTION,
+  EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS,
   EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS,
 } from "./parser-tool.guide";
 import { PARSER_TOOL_MAX_RECEIPTS } from "./email-receipt-parser-tools.service";
 import { PARSER_DRAFT_MAX_RECEIPTS } from "./dto/email-receipt-parser.dto";
-import { MAX_PARSER_DRAFT_EMAILS } from "../../ai-review/ai-review-request.entity";
+import {
+  MAX_PARSER_DRAFT_DOMAINS,
+  MAX_PARSER_DRAFT_EMAILS,
+  MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
+} from "../../ai-review/ai-review-request.entity";
 import { validateReceiptParserDefinition } from "../parsing/receipt-parser.validation";
 
 describe("the email_receipt_parsers guide", () => {
@@ -41,8 +46,14 @@ describe("the email_receipt_parsers guide", () => {
     expect(MAX_CATEGORY_RULES).toBe(50);
   });
 
-  it("holds the five-email bound in every place that states it", () => {
-    expect(EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS).toBe(5);
+  it("holds the 25-email bound (5 per domain, 5 domains) in every place that states it", () => {
+    expect(EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS).toBe(25);
+    expect(MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN).toBe(5);
+    expect(MAX_PARSER_DRAFT_DOMAINS).toBe(5);
+    expect(MAX_PARSER_DRAFT_EMAILS).toBe(
+      MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN * MAX_PARSER_DRAFT_DOMAINS,
+    );
+    expect(EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS).toBe(MAX_PARSER_DRAFT_DOMAINS);
     expect(PARSER_TOOL_MAX_RECEIPTS).toBe(
       EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS,
     );
@@ -52,7 +63,7 @@ describe("the email_receipt_parsers guide", () => {
     expect(MAX_PARSER_DRAFT_EMAILS).toBe(
       EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS,
     );
-    expect(text).toContain("1 to 5 emails");
+    expect(text).toContain("1 to 25 emails");
   });
 
   it("names every operation and the loop", () => {

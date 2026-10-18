@@ -145,6 +145,9 @@ function setup() {
         status: "claimed",
         claimed_by: CALLER,
         live: true,
+        parser_domain: "shop.example.com",
+        proposal: null,
+        domains: ["shop.example.com"],
         ...over,
       },
     ]);
@@ -616,7 +619,7 @@ describe("EmailReceiptParserToolsService.testDefinition", () => {
     expect(receiptRepo.find.mock.calls[0][0].where.userId).toBe(USER);
   });
 
-  it.each([[[]], [[R1, R1, R1, R1, R1, R1]]])(
+  it.each([[[]], [Array.from({ length: 26 }, () => R1)]])(
     "refuses %j emails",
     async (receiptIds) => {
       const { service, receiptRepo } = setup();
@@ -1009,6 +1012,8 @@ describe("EmailReceiptParserToolsService.saveDraft", () => {
         claimed_by: CALLER,
         live: true,
         parser_domain: "shop.example.com",
+        proposal: null,
+        domains: ["shop.example.com"],
       };
       const oldDraft = (over: Partial<EmailReceiptParser> = {}) =>
         Object.assign(new EmailReceiptParser(), {
@@ -1039,7 +1044,7 @@ describe("EmailReceiptParserToolsService.saveDraft", () => {
         expect(sql).toContain("p.status = 'draft'");
         expect(sql).toContain("p.user_id = $1");
         expect(sql).toContain("ORDER BY p.updated_at DESC, p.id DESC");
-        expect(params).toEqual([USER, "shop.example.com"]);
+        expect(params).toEqual([USER, ["shop.example.com"], null]);
         expect(parserRepo.findOne).toHaveBeenCalledWith({
           where: { id: "p-old", userId: USER, status: "draft" },
           lock: { mode: "pessimistic_write" },
@@ -1100,6 +1105,145 @@ describe("EmailReceiptParserToolsService.saveDraft", () => {
 
         expect(parserRepo.findOne.mock.calls[0][0].where.status).toBe("draft");
         expect(parserRepo.save).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("a request that spans several sender domains", () => {
+      const multi = (over: Record<string, unknown> = {}) => ({
+        kind: "email_parser_draft",
+        status: "proposed",
+        claimed_by: CALLER,
+        live: true,
+        parser_domain: "shop.example.com",
+        proposal: { parserId: "p-a", parserIds: ["p-a"] },
+        domains: ["pay.example.com", "shop.example.com"],
+        ...over,
+      });
+      const draftA = () =>
+        Object.assign(new EmailReceiptParser(), {
+          id: "p-a",
+          userId: USER,
+          status: "draft",
+          revision: 1,
+          fromDomains: ["shop.example.com"],
+        });
+      const payInput = { ...input, fromDomains: ["pay.example.com"] };
+
+      it("accepts the second sender's draft while the request is proposed", async () => {
+        const { service, manager, parserRepo, requests } = setup();
+        manager.query.mockResolvedValueOnce([multi()]);
+        parserRepo.find.mockResolvedValue([draftA()]);
+
+        const result = await service.saveDraft(USER, CALLER, {
+          ...payInput,
+          requestId: REQ,
+        });
+
+        expect(parserRepo.save).toHaveBeenCalledTimes(1);
+        expect(requests.proposeParserDraft).toHaveBeenCalledWith(
+          manager,
+          USER,
+          REQ,
+          CALLER,
+          "p-new",
+        );
+        expect(result.requestProposed).toBe(true);
+      });
+
+      it("accepts the first draft while the request is claimed", async () => {
+        const { service, manager, parserRepo } = setup();
+        manager.query.mockResolvedValueOnce([
+          multi({ status: "claimed", proposal: null }),
+        ]);
+
+        await service.saveDraft(USER, CALLER, {
+          ...payInput,
+          requestId: REQ,
+        });
+
+        expect(parserRepo.save).toHaveBeenCalledTimes(1);
+        // the lookup is for the request's domain the draft covers
+        expect(manager.query.mock.calls[1][1]).toEqual([
+          USER,
+          ["pay.example.com"],
+          null,
+        ]);
+      });
+
+      it("updates the listed draft that covers the domain instead of adding another", async () => {
+        const { service, manager, parserRepo, requests } = setup();
+        manager.query
+          .mockResolvedValueOnce([multi()])
+          .mockResolvedValueOnce([{ id: "p-a" }]);
+        parserRepo.findOne.mockResolvedValue(draftA());
+        parserRepo.findOneByOrFail.mockResolvedValue({
+          ...draftA(),
+          revision: 2,
+        });
+
+        const result = await service.saveDraft(USER, CALLER, {
+          ...input,
+          requestId: REQ,
+        });
+
+        // the first lookup is limited to the drafts the request lists
+        expect(manager.query.mock.calls[1][1]).toEqual([
+          USER,
+          ["shop.example.com"],
+          ["p-a"],
+        ]);
+        expect(parserRepo.save).not.toHaveBeenCalled();
+        expect(requests.proposeParserDraft).toHaveBeenCalledWith(
+          manager,
+          USER,
+          REQ,
+          CALLER,
+          "p-a",
+        );
+        expect(result).toMatchObject({ parserId: "p-a", revision: 2 });
+      });
+
+      it("refuses a draft that covers no domain of the request, writing nothing", async () => {
+        const { service, manager, parserRepo, requests } = setup();
+        manager.query.mockResolvedValueOnce([multi()]);
+        parserRepo.find.mockResolvedValue([draftA()]);
+
+        await expect(
+          service.saveDraft(USER, CALLER, {
+            ...input,
+            fromDomains: ["third.example.com"],
+            requestId: REQ,
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(parserRepo.save).not.toHaveBeenCalled();
+        expect(requests.proposeParserDraft).not.toHaveBeenCalled();
+      });
+
+      it("refuses a new draft for a domain a listed draft already covers", async () => {
+        const { service, manager, parserRepo } = setup();
+        // the listed draft cannot be found to update (it was approved meanwhile)
+        manager.query.mockResolvedValueOnce([multi()]);
+        parserRepo.find.mockResolvedValue([draftA()]);
+
+        await expect(
+          service.saveDraft(USER, CALLER, { ...input, requestId: REQ }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(parserRepo.save).not.toHaveBeenCalled();
+      });
+
+      it("still refuses a proposed request that spans one domain", async () => {
+        const { service, manager, parserRepo } = setup();
+        manager.query.mockResolvedValueOnce([
+          multi({ domains: ["shop.example.com"] }),
+        ]);
+
+        await expect(
+          service.saveDraft(USER, CALLER, {
+            ...payInput,
+            requestId: REQ,
+          }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(parserRepo.save).not.toHaveBeenCalled();
       });
     });
 
@@ -1307,7 +1451,7 @@ describe("EmailReceiptParserToolsService.testDefinition with expected transactio
     expect(result.allAgree).toBeNull();
   });
 
-  it("takes the emails from samples when both are sent, and refuses six", async () => {
+  it("takes the emails from samples when both are sent, and refuses 26", async () => {
     const { service, receiptRepo } = setup();
     await service.testDefinition(USER, {
       definition: DEFINITION,
@@ -1321,7 +1465,7 @@ describe("EmailReceiptParserToolsService.testDefinition with expected transactio
     await expect(
       service.testDefinition(USER, {
         definition: DEFINITION,
-        samples: Array.from({ length: 6 }, () => ({ receiptId: R1 })),
+        samples: Array.from({ length: 26 }, () => ({ receiptId: R1 })),
       }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
@@ -1477,6 +1621,100 @@ describe("EmailReceiptParserToolsService.testDefinition of linked receipts", () 
     expect(email.parsed.linkKey).toBe(ALLEGRO_PAY_CONTRACT_2);
   });
 
+  it("joins the settlement's parts with a drafted component when none is stored, in decimals, with source draft", async () => {
+    const { service, receiptRepo, manager } = setup();
+    receiptRepo.find.mockResolvedValue([repaymentReceipt()]);
+    manager.query.mockImplementation(async (sql: string) =>
+      String(sql).includes("r.body_text")
+        ? [
+            {
+              id: "component-1",
+              subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+              body_text: ALLEGRO_PAY_PURCHASE_LINES.join("\n"),
+              body_html: null,
+              effective_date: "2025-12-15",
+            },
+          ]
+        : [],
+    );
+
+    const result = await service.testDefinition(USER, {
+      definition: settlement,
+      receiptIds: ["settlement-1"],
+      componentDrafts: [
+        { definition: component, fromDomains: ["shop.example.com"] },
+      ],
+    });
+
+    expect(result.valid).toBe(true);
+    const part = result.emails[0].links?.find((l) => l.partIndex === 1);
+    expect(part).toMatchObject({
+      outcome: "joined",
+      componentNet: 163,
+      component: { receiptId: "component-1", source: "draft" },
+    });
+    expect(result.emails[0].links?.[0].component).toBeNull();
+    expect(result.unknownCategoryIds).toEqual([]);
+  });
+
+  it("returns valid:false with the code, not a throw, for a draft beside a definition that is not a settlement", async () => {
+    const { service, receiptRepo } = setup();
+
+    const result = await service.testDefinition(USER, {
+      definition: component,
+      receiptIds: ["component-1"],
+      componentDrafts: [
+        { definition: component, fromDomains: ["shop.example.com"] },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      valid: false,
+      errors: [
+        {
+          path: "componentDrafts",
+          code: "component_draft_requires_settlement",
+        },
+      ],
+      emails: [],
+      allComplete: false,
+    });
+    expect(receiptRepo.find).not.toHaveBeenCalled();
+  });
+
+  it("returns valid:false for a draft that is invalid, not a component, or has bad domains, and for too many drafts", async () => {
+    const { service } = setup();
+    const draft = { definition: component, fromDomains: ["shop.example.com"] };
+
+    const bad = await service.testDefinition(USER, {
+      definition: settlement,
+      receiptIds: ["settlement-1"],
+      componentDrafts: [
+        { definition: { total: 5 }, fromDomains: ["nope"] },
+        { definition: settlement, fromDomains: ["shop.example.com"] },
+      ],
+    });
+    expect(bad.valid).toBe(false);
+    expect(bad.errors.map((e) => e.code)).toEqual(
+      expect.arrayContaining([
+        "component_draft_domain_invalid",
+        "component_draft_requires_component",
+      ]),
+    );
+    expect(bad.errors.every((e) => e.path.startsWith("componentDrafts["))).toBe(
+      true,
+    );
+
+    const many = await service.testDefinition(USER, {
+      definition: settlement,
+      receiptIds: ["settlement-1"],
+      componentDrafts: Array.from({ length: 6 }, () => draft),
+    });
+    expect(many.errors).toEqual([
+      { path: "componentDrafts", code: "component_draft_too_many" },
+    ]);
+  });
+
   it("gives a settlement email one entry per part in decimals, and the joined lines with their kind", async () => {
     const { service, receiptRepo, manager } = setup();
     receiptRepo.find.mockResolvedValue([repaymentReceipt()]);
@@ -1536,6 +1774,7 @@ describe("EmailReceiptParserToolsService.testDefinition of linked receipts", () 
           subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
           effectiveDate: "2025-12-15",
           profileName: "Shop purchases",
+          source: "stored",
         },
         partAmount: 163,
         componentNet: 163,

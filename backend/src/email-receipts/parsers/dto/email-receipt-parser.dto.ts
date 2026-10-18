@@ -22,6 +22,7 @@ import {
   EMAIL_RECEIPT_PARSER_MAX_FROM_DOMAINS,
   EMAIL_RECEIPT_PARSER_MAX_SUBJECT_WORDS,
 } from "../../entities/email-receipt-parser.entity";
+import { EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS } from "../parser-tool.guide";
 import {
   IsReceiptDomain,
   normalizeReceiptDomain,
@@ -134,6 +135,31 @@ export class ApproveEmailReceiptParserDto {
   expectedRevision?: number;
 }
 
+/**
+ * An unsaved component profile tested beside a settlement (linked receipts spec
+ * 10a). The service checks it with `checkComponentDraft`: the tested definition
+ * must be a settlement and this one a component.
+ */
+export class ComponentDraftDto {
+  @ApiProperty({ type: "object", additionalProperties: true })
+  @IsObject()
+  definition: Record<string, unknown>;
+
+  @ApiProperty({
+    type: [String],
+    minItems: 1,
+    maxItems: 10,
+    description:
+      "Sender domains the component would cover (a sub-domain of one also matches).",
+  })
+  @Transform(eachDomain)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @IsReceiptDomain({ each: true })
+  fromDomains: string[];
+}
+
 /** Body of `POST /email-receipt-parsers/test`: a draft definition against a stored email. */
 export class TestEmailReceiptParserDto {
   @ApiProperty({ type: "object", additionalProperties: true })
@@ -153,10 +179,29 @@ export class TestEmailReceiptParserDto {
   @ValidateIf(notBlank)
   @IsUUID()
   payeeId?: string | null;
+
+  @ApiPropertyOptional({
+    type: [ComponentDraftDto],
+    minItems: 1,
+    maxItems: EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS,
+    description:
+      "A settlement under test only: unsaved component profiles (one per sender) whose readings of the user's stored emails join the settlement's parts (links[].component.source: draft). Any other role is refused with component_draft_requires_settlement.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS)
+  @ValidateNested({ each: true })
+  @Type(() => ComponentDraftDto)
+  componentDrafts?: ComponentDraftDto[];
 }
 
-/** Most emails one "draft a parser with AI" request names (the schema's CHECK). */
-export const PARSER_DRAFT_MAX_RECEIPTS = 5;
+/**
+ * Most emails one "draft a parser with AI" request names (the schema's CHECK):
+ * 5 per sender domain, 5 domains. The per-domain and domain limits are the
+ * service's (`requestAiDraft`).
+ */
+export const PARSER_DRAFT_MAX_RECEIPTS = 25;
 
 /**
  * Body of `POST /email-receipt-parsers/draft-with-ai`: the stored emails an
@@ -169,7 +214,7 @@ export class DraftParserWithAiDto {
     minItems: 1,
     maxItems: PARSER_DRAFT_MAX_RECEIPTS,
     description:
-      "The stored emails to write the parser from (1 to 5, distinct).",
+      "The stored emails to write the parser from (1 to 25, distinct): one to five sender domains, at most 5 emails per domain (a trade draft takes one domain).",
   })
   @IsArray()
   @ArrayMinSize(1)

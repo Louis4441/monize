@@ -36,6 +36,7 @@ import {
 import { loadReceiptCandidates } from "../pipeline/receipt-candidates";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
 import { readTradeEmail } from "../pipeline/trade-reading";
+import { readDraftComponents, type ComponentDraft } from "./component-draft";
 
 const MONEY_UNITS = 10_000;
 
@@ -72,6 +73,8 @@ export interface DryRunLink {
     effectiveDate: string;
     /** The name of the component's profile; null when it has none. */
     profileName: string | null;
+    /** `draft`: read with the test's `componentDrafts`; `stored`: the receipt as the pipeline stored it. */
+    source: "stored" | "draft";
   } | null;
   partAmount: number;
   componentNet: number | null;
@@ -153,6 +156,11 @@ const EMPTY_TRACE: ReceiptTrace = {
  * with the result. The one implementation behind the parser test endpoint, the
  * assistant's `test` operation and the preview, so a preview computes what the
  * commit will do through the same code. Reads only.
+ *
+ * `componentDrafts` (a settlement only, already checked by `checkComponentDrafts`)
+ * add candidates to the component search: the user's stored emails read with the
+ * unsaved component profiles, which replace the stored component of the same email
+ * and are chosen among exactly as stored ones are (linked receipts spec 10a).
  */
 export async function dryRunReceipt(
   m: EntityManager,
@@ -160,6 +168,7 @@ export async function dryRunReceipt(
   definition: ReceiptParserDefinition,
   receipt: DryRunReceipt,
   payee: DryRunPayee | null,
+  componentDrafts?: readonly ComponentDraft[],
 ): Promise<ReceiptDryRun> {
   if (definition.trade) {
     return dryRunTrade(m, userId, definition, definition.trade, receipt);
@@ -204,13 +213,27 @@ export async function dryRunReceipt(
   let parsed = read.parsed;
   let links: DryRunLink[] | undefined;
   if (isSettlement && read.outcome === "read") {
+    const settlement = { id: receipt.id, effectiveDate: purchaseDate };
+    const partLinks = parsed.items.map((item) => item.link ?? null);
+    const drafts = componentDrafts
+      ? await readDraftComponents(
+          m,
+          userId,
+          settlement,
+          new Set(partLinks.filter((link): link is string => link !== null)),
+          definition.link ?? {},
+          componentDrafts,
+        )
+      : [];
+    const draftIds = new Set(drafts.map((draft) => draft.id));
     const parts = await loadLinkedComponents(
       m,
       userId,
-      { id: receipt.id, effectiveDate: purchaseDate },
-      parsed.items.map((item) => item.link ?? null),
+      settlement,
+      partLinks,
       definition.link ?? {},
       false,
+      drafts,
     );
     const joined = joinSettlement(parsed, parts);
     parsed = joined.parsed;
@@ -226,6 +249,9 @@ export async function dryRunReceipt(
               subject: found.subject ?? "",
               effectiveDate: found.effectiveDate ?? "",
               profileName: found.profileName ?? null,
+              source: draftIds.has(found.receiptId)
+                ? ("draft" as const)
+                : ("stored" as const),
             }
           : null,
         partAmount: report.partAmount,

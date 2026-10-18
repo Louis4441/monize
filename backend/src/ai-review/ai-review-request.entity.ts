@@ -17,8 +17,8 @@ import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
  * What a request asks for. `transaction_review` is a rule's (or a person's)
  * question about one transaction; `email_receipt` is raised for a stored order
  * confirmation and carries `emailReceiptId` (email-receipts design section 4);
- * `email_parser_draft` asks an agent to write a receipt parser from up to five
- * stored emails of one sender: it has NO transaction and carries
+ * `email_parser_draft` asks an agent to write a receipt parser from up to 25
+ * stored emails of one or more senders (at most five): it has NO transaction and carries
  * `emailReceiptIds` and `parserDomain` instead; `email_trade` is the proposal
  * to CREATE the investment transaction a brokerage's trade-confirmation email
  * reports: it has NO transaction either (there is none yet) and carries
@@ -28,8 +28,15 @@ import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
 export type AiReviewRequestKind =
   "transaction_review" | "email_receipt" | "email_parser_draft" | "email_trade";
 
-/** Most emails one parser-draft request names (the schema's CHECK). */
-export const MAX_PARSER_DRAFT_EMAILS = 5;
+/** Most emails of one sender domain a parser-draft request names. */
+export const MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN = 5;
+
+/** Most sender domains a parser-draft request spans (components and the settlements that pay for them). */
+export const MAX_PARSER_DRAFT_DOMAINS = 5;
+
+/** Most emails one parser-draft request names in all (the schema's CHECK). */
+export const MAX_PARSER_DRAFT_EMAILS =
+  MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN * MAX_PARSER_DRAFT_DOMAINS;
 
 export type AiReviewRequestStatus =
   "pending" | "claimed" | "proposed" | "applied" | "rejected" | "expired";

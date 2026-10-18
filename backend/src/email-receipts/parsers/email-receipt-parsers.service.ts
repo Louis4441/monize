@@ -5,6 +5,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { DataSource, EntityManager, In, QueryDeepPartialEntity } from "typeorm";
+import {
+  MAX_PARSER_DRAFT_DOMAINS,
+  MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
+} from "../../ai-review/ai-review-request.entity";
 import { AiReviewRequestsService } from "../../ai-review/ai-review-requests.service";
 import { loadQualifiedCategoryNames } from "../../categories/category-name.util";
 import { returnedRows } from "../../common/db/query-result";
@@ -25,6 +29,7 @@ import {
 } from "../linking/component-reread";
 import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "../receipts/dto/email-receipts.dto";
 import { dryRunReceipt, type DryRunLink } from "./receipt-dry-run";
+import { checkComponentDrafts, type ComponentDraft } from "./component-draft";
 import type { WaitingSettlement } from "../linking/waiting-settlements";
 import type {
   ParsedReceipt,
@@ -40,6 +45,7 @@ import {
 } from "../parsing/receipt-parser.validation";
 import { isReceiptDomain } from "./dto/receipt-domain.validator";
 import {
+  RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION,
   RECEIPT_PARSER_DRAFT_INSTRUCTION,
   RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION,
 } from "./parser-draft-instruction";
@@ -294,14 +300,16 @@ export class EmailReceiptParsersService {
 
   /**
    * Queue a request for an assistant (or an MCP agent) to write a parser from
-   * 1 to 5 of the user's stored emails. No provider is called here: the request
-   * waits `pending` in the AI review inbox, and the receipts page opens the chat
-   * with the emails attached, or says it waits for an agent. ONE transaction holds
-   * every check and the write, so a refusal has written nothing: every email must
-   * be the user's (an email that is not is a 404, never read as absent) and must
-   * have been read (a `skipped` one has no text), and the sender domain they share
-   * must be a usable one. Several senders may be selected together; the request is
-   * filed under the most common one. At most one request is open per (user,
+   * 1 to 25 of the user's stored emails of one to five senders (at most 5 per
+   * sender; a trade draft takes one sender). No provider is called here: the
+   * request waits `pending` in the AI review inbox, and the receipts page opens
+   * the chat with the emails attached, or says it waits for an agent. ONE
+   * transaction holds every check and the write, so a refusal has written
+   * nothing: every email must be the user's (an email that is not is a 404, never
+   * read as absent) and must have been read (a `skipped` one has no text), every
+   * sender domain must be a usable one, and the selection must keep to the limits
+   * (400). The request is filed under the most common sender; several senders get the
+   * multi-sender instruction (spec 10a). At most one request is open per (user,
    * domain): a new one replaces the open one (`enqueueParserDraft`).
    */
   async requestAiDraft(
@@ -326,10 +334,14 @@ export class EmailReceiptParsersService {
           ),
         );
       }
-      const domain = dominantSenderDomain(
-        receiptIds.map((id) => byId.get(id)?.fromDomain ?? ""),
+      const senderDomains = receiptIds.map(
+        (id) => byId.get(id)?.fromDomain ?? "",
       );
-      if (!isReceiptDomain(domain)) {
+      const domain = dominantSenderDomain(senderDomains);
+      const distinctDomains = [
+        ...new Set(senderDomains.filter((d) => d !== "")),
+      ];
+      if (!isReceiptDomain(domain) || !distinctDomains.every(isReceiptDomain)) {
         throw new BadRequestException(
           tr(
             "errors.emailReceipts.receiptNoSender",
@@ -337,13 +349,16 @@ export class EmailReceiptParsersService {
           ),
         );
       }
+      assertDraftSelectionWithinLimits(senderDomains, distinctDomains, kind);
       const request = await this.requests.enqueueParserDraft(m, userId, {
         emailReceiptIds: receiptIds,
         parserDomain: domain,
         instruction:
           kind === "trade"
             ? RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION
-            : RECEIPT_PARSER_DRAFT_INSTRUCTION,
+            : distinctDomains.length > 1
+              ? RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION
+              : RECEIPT_PARSER_DRAFT_INSTRUCTION,
       });
       return { ok: true as const, requestId: request.id };
     });
@@ -437,7 +452,20 @@ export class EmailReceiptParsersService {
           ),
         );
       }
-      const run = await dryRunReceipt(m, userId, definition, receipt, payee);
+      let componentDrafts: ComponentDraft[] | undefined;
+      if (dto.componentDrafts !== undefined) {
+        const checked = checkComponentDrafts(definition, dto.componentDrafts);
+        if (!checked.ok) throw invalidDefinitionError(checked.errors);
+        componentDrafts = checked.drafts;
+      }
+      const run = await dryRunReceipt(
+        m,
+        userId,
+        definition,
+        receipt,
+        payee,
+        componentDrafts,
+      );
       const { parsed, trace, outcome, match, candidates, hit } = run;
       return {
         ...(run.trade ? { trade: run.trade } : {}),
@@ -541,6 +569,50 @@ function validDefinition(input: unknown): ReceiptParserDefinition {
 }
 
 const unique = (values: readonly string[]): string[] => [...new Set(values)];
+
+/**
+ * The limits of a parser-draft selection (spec 10a), a 400 each, checked before
+ * anything is written: at most `MAX_PARSER_DRAFT_DOMAINS` sender domains, at most
+ * `MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN` emails of one, and one domain for a trade
+ * draft. `senders` is one domain per selected email ("" for none).
+ */
+function assertDraftSelectionWithinLimits(
+  senders: readonly string[],
+  distinctDomains: readonly string[],
+  kind: "receipt" | "trade",
+): void {
+  if (distinctDomains.length > MAX_PARSER_DRAFT_DOMAINS) {
+    throw new BadRequestException(
+      tr(
+        "errors.emailReceipts.draftTooManyDomains",
+        `Select emails from at most ${MAX_PARSER_DRAFT_DOMAINS} senders.`,
+        { max: MAX_PARSER_DRAFT_DOMAINS },
+      ),
+    );
+  }
+  if (kind === "trade" && distinctDomains.length > 1) {
+    throw new BadRequestException(
+      tr(
+        "errors.emailReceipts.tradeDraftOneDomain",
+        "A trade profile is drafted from one sender. Select trade emails from one sender only.",
+      ),
+    );
+  }
+  for (const domain of distinctDomains) {
+    if (
+      senders.filter((d) => d === domain).length >
+      MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.emailReceipts.draftTooManyPerDomain",
+          `Select at most ${MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN} emails from one sender.`,
+          { max: MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN },
+        ),
+      );
+    }
+  }
+}
 
 function receiptNotFound(id: string): NotFoundException {
   return new NotFoundException(

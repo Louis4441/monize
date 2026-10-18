@@ -23,7 +23,12 @@ import {
   EMAIL_RECEIPT_PARSER_MAX_SUBJECT_WORDS,
 } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
-import { EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE } from "./parser-tool.guide";
+import {
+  EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE,
+  EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS,
+  EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS,
+} from "./parser-tool.guide";
+import { checkComponentDrafts, type ComponentDraft } from "./component-draft";
 import { effectiveMatchDefinition } from "../parsing/receipt-match-config";
 import { resolveParserCategoryNames } from "./parser-category-names.util";
 import type {
@@ -85,8 +90,8 @@ import {
 
 /** Categories one `categories` call returns. */
 export const PARSER_TOOL_MAX_CATEGORIES = 300;
-/** Emails one `test` call reads (the same bound a draft request has). */
-export const PARSER_TOOL_MAX_RECEIPTS = 5;
+/** Emails one `test` call reads (the same bound a draft request has: 5 per sender, 2 senders). */
+export const PARSER_TOOL_MAX_RECEIPTS = EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS;
 
 const MONEY_UNITS = 10_000;
 const MAX_NAME_LENGTH = 100;
@@ -178,6 +183,8 @@ export interface ParserToolLink {
     /** `YYYY-MM-DD`. */
     effectiveDate: string;
     profileName: string | null;
+    /** `draft`: read with the test's `componentDrafts`; `stored`: the receipt as the pipeline stored it. */
+    source: "stored" | "draft";
   } | null;
   partAmount: number;
   /** The component's net; null when it was not measured (no component, or an incomplete one). */
@@ -286,6 +293,12 @@ export type ParserToolDetail = Omit<
 > & {
   payeeName: string | null;
 };
+
+/** An unsaved component profile offered beside a settlement under test (spec 10a). */
+export interface ParserToolComponentDraft {
+  definition: unknown;
+  fromDomains: readonly string[];
+}
 
 export interface ParserToolSaveInput {
   /** The claimed parser-draft request this draft answers, when there is one. */
@@ -507,13 +520,19 @@ export class EmailReceiptParserToolsService {
   }
 
   /**
-   * Read 1 to 5 of the user's stored emails with a definition that is not saved.
+   * Read 1 to 10 of the user's stored emails with a definition that is not saved.
    * An invalid definition is a RESULT (`valid: false` and every error with its
    * path), not an exception, so the agent can fix it and test again. Reads only:
    * nothing is written and no email changes. A category id the definition names
    * that is not the user's is listed in `unknownCategoryIds`, and an account id
    * that is not an open brokerage account of theirs in `unknownAccountIds`: the
    * draft would be refused on save.
+   *
+   * `componentDrafts` (a settlement under test only) are unsaved component
+   * profiles: the dry run also reads the user's stored emails with them and joins
+   * the settlement's parts to what they read (`links[].component.source`), without
+   * writing anything. It is refused as a result (`valid: false`) on any other
+   * role, and when its own definition or domains are invalid.
    */
   async testDefinition(
     userId: string,
@@ -523,6 +542,7 @@ export class EmailReceiptParserToolsService {
       receiptIds?: readonly string[];
       samples?: readonly ParserToolSample[];
       payeeName?: string;
+      componentDrafts?: readonly ParserToolComponentDraft[];
     },
   ): Promise<ParserToolTestResult> {
     const samples: readonly ParserToolSample[] =
@@ -532,7 +552,8 @@ export class EmailReceiptParserToolsService {
       throw new ConflictException(
         tr(
           "errors.emailReceipts.parserToolReceiptCount",
-          "Name 1 to 5 emails to test the parser on.",
+          `Name 1 to ${PARSER_TOOL_MAX_RECEIPTS} emails to test the parser on.`,
+          { max: PARSER_TOOL_MAX_RECEIPTS },
         ),
       );
     }
@@ -551,6 +572,34 @@ export class EmailReceiptParserToolsService {
       };
     }
     const definition: ReceiptParserDefinition = validation.definition;
+    let componentDrafts: ComponentDraft[] | undefined;
+    if (input.componentDrafts !== undefined) {
+      const resolved: Array<{ definition: unknown; fromDomains: unknown }> = [];
+      for (const draft of input.componentDrafts.slice(
+        0,
+        EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS + 1,
+      )) {
+        resolved.push({
+          definition: withVersion(
+            await this.resolveNames(userId, draft.definition),
+          ),
+          fromDomains: draft.fromDomains,
+        });
+      }
+      const checked = checkComponentDrafts(definition, resolved);
+      if (!checked.ok) {
+        return {
+          valid: false,
+          errors: checked.errors,
+          unknownCategoryIds: [],
+          unknownAccountIds: [],
+          emails: [],
+          allComplete: false,
+          allAgree: null,
+        };
+      }
+      componentDrafts = checked.drafts;
+    }
     const payee = input.payeeName
       ? await this.payees.resolveByName(userId, input.payeeName)
       : null;
@@ -592,7 +641,14 @@ export class EmailReceiptParserToolsService {
             ),
           );
         }
-        const run = await dryRunReceipt(m, userId, definition, receipt, payee);
+        const run = await dryRunReceipt(
+          m,
+          userId,
+          definition,
+          receipt,
+          payee,
+          componentDrafts,
+        );
         const { parsed, trace, outcome, match: matched, hit } = run;
         emails.push({
           receiptId: receipt.id,
@@ -632,6 +688,7 @@ export class EmailReceiptParserToolsService {
                         subject: link.component.subject,
                         effectiveDate: link.component.effectiveDate,
                         profileName: link.component.profileName,
+                        source: link.component.source,
                       }
                     : null,
                   partAmount: units(link.partAmount) ?? 0,
@@ -681,9 +738,14 @@ export class EmailReceiptParserToolsService {
             : null,
         });
       }
-      const unknownCategoryIds = collectParserCategoryIds(definition).filter(
-        (id) => !categoryNames.has(id),
-      );
+      const unknownCategoryIds = [
+        ...new Set([
+          ...collectParserCategoryIds(definition),
+          ...(componentDrafts ?? []).flatMap((draft) =>
+            collectParserCategoryIds(draft.definition),
+          ),
+        ]),
+      ].filter((id) => !categoryNames.has(id));
       const accountIds = collectParserAccountIds(definition);
       const usableAccounts = await usableTradeAccountIds(m, userId, accountIds);
       const unknownAccountIds = accountIds.filter(
@@ -766,7 +828,7 @@ export class EmailReceiptParserToolsService {
       : null;
 
     return withScopedDb(this.dataSource, async (m) => {
-      const requestDomain = input.requestId
+      const request = input.requestId
         ? await this.lockClaimedRequest(m, userId, caller, input.requestId)
         : null;
       const repo = m.getRepository(EmailReceiptParser);
@@ -779,10 +841,45 @@ export class EmailReceiptParserToolsService {
           )
         : null;
       // An answer to a request must not pile up drafts: when an unapproved draft
-      // already covers the request's sender, the newest one is updated (its
+      // already covers the sender being answered, the newest one is updated (its
       // revision bumped) instead of a second one created.
-      if (!existing && requestDomain) {
-        existing = await this.lockNewestDraftCovering(m, userId, requestDomain);
+      if (!existing && request) {
+        const answered = request.domains.filter((domain) =>
+          domainCoveredBy(domain, fromDomains),
+        );
+        // A request over several domains answers only the domains the draft
+        // covers (a draft that covers none updates nothing); a one-domain
+        // request answers the domain it is filed under, as it always did.
+        const targets =
+          request.domains.length > 1
+            ? answered
+            : request.parserDomain
+              ? [request.parserDomain]
+              : [];
+        if (targets.length > 0) {
+          // A draft the request already lists for one of these senders is the
+          // one a new save updates; only then any other newest draft.
+          if (request.status === "proposed" && request.parserIds.length > 0) {
+            existing = await this.lockNewestDraftCovering(
+              m,
+              userId,
+              targets,
+              request.parserIds,
+            );
+          }
+          existing ??= await this.lockNewestDraftCovering(m, userId, targets);
+        }
+      }
+      // A request that already has a draft takes another one only for the other
+      // sender of a multi-domain request (or an update of one it has).
+      if (request?.status === "proposed") {
+        await this.assertSecondDraftAccepted(
+          m,
+          userId,
+          request,
+          existing,
+          fromDomains,
+        );
       }
       if (
         !existing &&
@@ -905,15 +1002,16 @@ export class EmailReceiptParserToolsService {
   }
 
   /**
-   * The newest DRAFT parser of the user's that covers `domain` (names it or a
-   * parent of it, as the uncovered-domains list reads `from_domains`), locked for
-   * the update, or null. No revision compare: the caller is an agent answering a
-   * request, not a person who read a revision.
+   * The newest DRAFT parser of the user's that covers any of `domains` (names one
+   * or a parent of one, as the uncovered-domains list reads `from_domains`),
+   * locked for the update, or null. No revision compare: the caller is an agent
+   * answering a request, not a person who read a revision.
    */
   private async lockNewestDraftCovering(
     m: EntityManager,
     userId: string,
-    domain: string,
+    domains: readonly string[],
+    among: readonly string[] | null = null,
   ): Promise<EmailReceiptParser | null> {
     const rows = returnedRows<{ id: string }>(
       await m.query(
@@ -921,15 +1019,17 @@ export class EmailReceiptParserToolsService {
            FROM email_receipt_parsers p
           WHERE p.user_id = $1
             AND p.status = 'draft'
+            AND ($3::uuid[] IS NULL OR p.id = ANY($3::uuid[]))
             AND EXISTS (
                   SELECT 1
                     FROM unnest(p.from_domains) AS pd(domain)
-                   WHERE $2::varchar = pd.domain
-                      OR right($2::varchar, length(pd.domain) + 1)
+                    CROSS JOIN unnest($2::varchar[]) AS d(domain)
+                   WHERE d.domain = pd.domain
+                      OR right(d.domain, length(pd.domain) + 1)
                          = '.' || pd.domain)
           ORDER BY p.updated_at DESC, p.id DESC
           LIMIT 1`,
-        [userId, domain],
+        [userId, [...domains], among ? [...among] : null],
       ),
     );
     if (rows.length === 0) return null;
@@ -941,26 +1041,38 @@ export class EmailReceiptParserToolsService {
 
   /**
    * Lock the named request and refuse unless it is the user's parser-draft
-   * request, claimed by `caller` and still alive. The check runs before the
-   * parser is written, in the same transaction, so a refusal has written nothing.
-   * Returns the sender domain the request is for (null for a request without one).
+   * request, claimed by `caller` and still alive. A request that spans several sender
+   * domains is also accepted while `proposed` (a draft saved, other senders'
+   * to come); `assertSecondDraftAccepted` then decides which drafts. The
+   * check runs before the parser is written, in the same transaction, so a
+   * refusal has written nothing. Returns the domain the request is filed under,
+   * the distinct sender domains of its emails (read now, in this transaction),
+   * its status and the parsers it already lists.
    */
   private async lockClaimedRequest(
     m: EntityManager,
     userId: string,
     caller: string,
     requestId: string,
-  ): Promise<string | null> {
+  ): Promise<LockedDraftRequest> {
     const rows = returnedRows<{
       kind: string;
       status: string;
       claimed_by: string | null;
       parser_domain: string | null;
+      proposal: { parserId?: unknown; parserIds?: unknown } | null;
+      domains: string[];
       live: boolean;
     }>(
       await m.query(
-        `SELECT kind, status, claimed_by, parser_domain,
-                (expires_at > CURRENT_TIMESTAMP) AS live
+        `SELECT kind, status, claimed_by, parser_domain, proposal,
+                (expires_at > CURRENT_TIMESTAMP) AS live,
+                ARRAY(SELECT DISTINCT r.from_domain
+                        FROM email_receipts r
+                       WHERE r.user_id = $2
+                         AND r.id = ANY(email_receipt_ids)
+                         AND r.from_domain <> ''
+                       ORDER BY 1) AS domains
            FROM ai_review_requests
           WHERE id = $1
             AND user_id = $2
@@ -978,16 +1090,77 @@ export class EmailReceiptParserToolsService {
         ),
       );
     }
+    const twoDomains = row.domains.length > 1;
     if (
       row.kind !== "email_parser_draft" ||
-      row.status !== "claimed" ||
+      !(
+        row.status === "claimed" ||
+        (row.status === "proposed" && twoDomains)
+      ) ||
       row.claimed_by !== caller ||
       !row.live
     ) {
       throw requestNotClaimed();
     }
-    return row.parser_domain;
+    const listed = Array.isArray(row.proposal?.parserIds)
+      ? row.proposal.parserIds
+      : [row.proposal?.parserId];
+    return {
+      parserDomain: row.parser_domain,
+      domains: row.domains,
+      status: row.status,
+      parserIds: listed.filter((id): id is string => typeof id === "string"),
+    };
   }
+
+  /**
+   * A `proposed` multi-domain request takes another save only for a domain of the
+   * request that no listed draft covers (and while it lists fewer than
+   * `MAX_PARSER_DRAFT_DOMAINS` drafts: the conditional UPDATE in
+   * `proposeParserDraft` holds that, as the authority), or as an update of a
+   * draft it lists. A draft that covers no domain of the request is refused
+   * before anything is written.
+   */
+  private async assertSecondDraftAccepted(
+    m: EntityManager,
+    userId: string,
+    request: LockedDraftRequest,
+    existing: EmailReceiptParser | null,
+    fromDomains: readonly string[],
+  ): Promise<void> {
+    if (existing && request.parserIds.includes(existing.id)) return;
+    const listed =
+      request.parserIds.length === 0
+        ? []
+        : await m.getRepository(EmailReceiptParser).find({
+            where: { userId, id: In(request.parserIds) },
+            select: { id: true, fromDomains: true },
+          });
+    const uncovered = request.domains.filter(
+      (domain) =>
+        domainCoveredBy(domain, fromDomains) &&
+        !listed.some((parser) => domainCoveredBy(domain, parser.fromDomains)),
+    );
+    if (uncovered.length === 0) throw requestAlreadyAnswered();
+  }
+}
+
+/** What `lockClaimedRequest` read about a parser-draft request. */
+interface LockedDraftRequest {
+  /** The domain the request is filed under (null for a request without one). */
+  parserDomain: string | null;
+  /** The distinct sender domains of its emails. */
+  domains: string[];
+  status: string;
+  /** The parsers its proposal lists, in save order. */
+  parserIds: string[];
+}
+
+/** `domain` is one of `covering` or a sub-domain of one (the module's own rule). */
+function domainCoveredBy(domain: string, covering: readonly string[]): boolean {
+  return covering.some(
+    (parent) => domain === parent || domain.endsWith(`.${parent}`),
+  );
 }
 
 function requestNotClaimed(): ConflictException {
@@ -995,6 +1168,15 @@ function requestNotClaimed(): ConflictException {
     tr(
       "errors.emailReceipts.parserDraftRequestNotClaimed",
       "This parser draft request is not claimed by you. Claim it first with ai_review_requests, or save the draft without a requestId.",
+    ),
+  );
+}
+
+function requestAlreadyAnswered(): ConflictException {
+  return new ConflictException(
+    tr(
+      "errors.emailReceipts.parserDraftRequestAnswered",
+      "This request already has a draft for each of its senders. Update one of them with parserId, or save the draft without a requestId.",
     ),
   );
 }

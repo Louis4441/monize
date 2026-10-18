@@ -1,4 +1,5 @@
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+import type { ReceiptParserDefinition } from "../parsing/receipt-parser.types";
 import { Category } from "../../categories/entities/category.entity";
 import {
   WEALTHSIMPLE_BUY_BODY,
@@ -452,6 +453,7 @@ describe("dryRunReceipt of linked receipts", () => {
           subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
           effectiveDate: "2025-12-15",
           profileName: "Shop purchases",
+          source: "stored",
         },
         partAmount: 1630000,
         componentNet: 1630000,
@@ -521,5 +523,269 @@ describe("dryRunReceipt of linked receipts", () => {
     );
     expect(run.component).toBeUndefined();
     expect(run.links).toBeUndefined();
+  });
+});
+
+describe("dryRunReceipt of a settlement with componentDrafts", () => {
+  const purchase = {
+    id: "component-1",
+    subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+    bodyText: ALLEGRO_PAY_PURCHASE_LINES.join("\n"),
+    bodyHtml: null,
+    receivedAt: new Date("2025-12-15T10:00:00Z"),
+    originalSentAt: null,
+  };
+  const repayment = {
+    id: "settlement-1",
+    subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+    bodyText: ALLEGRO_PAY_REPAYMENT_LINES.join("\n"),
+    bodyHtml: null,
+    receivedAt: new Date("2026-01-10T10:00:00Z"),
+    originalSentAt: null,
+  };
+  const draft = (
+    definition: ReceiptParserDefinition = ALLEGRO_PAY_COMPONENT_DEFINITION,
+  ) => ({ definition, fromDomains: ["shop.example.com"] });
+  const draftRow = (over: Record<string, unknown> = {}) => ({
+    id: "component-1",
+    subject: purchase.subject,
+    body_text: purchase.bodyText,
+    body_html: null,
+    effective_date: "2025-12-15",
+    ...over,
+  });
+
+  /** `stored` rows are what the pipeline's loader finds; `drafted` what the draft read query returns. */
+  const world = (stored: unknown[], drafted: unknown[]) =>
+    jest.fn(async (sql: string, _params?: unknown[]) => {
+      if (sql.includes("r.body_text")) return drafted;
+      if (sql.includes("r.link_key")) return stored;
+      if (sql.includes("definition->>'tag'")) {
+        return [{ id: "parser-1", tag: null, name: "Stored profile" }];
+      }
+      return [];
+    });
+  const storedRow = async (over: Record<string, unknown> = {}) => {
+    const read = await dryRunReceipt(
+      { query: jest.fn(async () => []) } as never,
+      USER,
+      ALLEGRO_PAY_COMPONENT_DEFINITION,
+      purchase,
+      null,
+    );
+    return {
+      id: "component-1",
+      link_key: ALLEGRO_PAY_CONTRACT_2,
+      subject: purchase.subject,
+      effective_date: "2025-12-15",
+      parsed: read.parsed,
+      parser_id: "parser-1",
+      ...over,
+    };
+  };
+  const partOf = (run: { links?: Array<{ partIndex: number }> }) =>
+    run.links?.find((link) => link.partIndex === 1);
+
+  it("joins a part with a draft reading when no component is stored, marking its source draft, and never writes or locks", async () => {
+    const query = world([], [draftRow()]);
+    const run = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [draft()],
+    );
+
+    expect(partOf(run)).toMatchObject({
+      outcome: "joined",
+      several: 1,
+      component: {
+        id: "component-1",
+        effectiveDate: "2025-12-15",
+        profileName: null,
+        source: "draft",
+      },
+    });
+    expect(run.parsed.items.map((item) => item.amount)).toEqual([
+      1098900, 1400000, 100000, 130000,
+    ]);
+    const sqls = query.mock.calls.map(([sql]) => sql);
+    expect(sqls.some((sql) => /\b(INSERT|UPDATE|DELETE)\b/.test(sql))).toBe(
+      false,
+    );
+    expect(sqls.some((sql) => sql.includes("FOR UPDATE"))).toBe(false);
+  });
+
+  it("reads the user's emails not skipped, of the draft's domains, in the settlement's window, newest first, at most 200", async () => {
+    const query = world([], []);
+    await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [draft()],
+    );
+
+    const [sql, params] = query.mock.calls.find(([text]) =>
+      text.includes("r.body_text"),
+    ) as [string, unknown[]];
+    expect(sql).toContain("r.status <> 'skipped'");
+    expect(sql).toContain("r.user_id = $1");
+    expect(sql).toContain("r.id <> $2");
+    expect(sql).toMatch(/right\(r\.from_domain/);
+    expect(sql).toContain(
+      "ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id ASC",
+    );
+    expect(sql).toContain("LIMIT 200");
+    // 120 days before the settlement (2026-01-10) and 7 days after it.
+    expect(params).toEqual([
+      USER,
+      "settlement-1",
+      ["shop.example.com"],
+      "2025-09-12",
+      "2026-01-17",
+    ]);
+  });
+
+  it("lets a draft reading replace the stored component of the same email", async () => {
+    const query = world(
+      [
+        await storedRow({
+          parsed: {
+            ...(await storedRow()).parsed,
+            complete: false,
+            reason: "no_total",
+          },
+        }),
+      ],
+      [draftRow()],
+    );
+    const run = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [draft()],
+    );
+
+    expect(partOf(run)).toMatchObject({
+      outcome: "joined",
+      several: 1,
+      component: { id: "component-1", source: "draft" },
+    });
+  });
+
+  it("keeps a stored component marked stored when no draft reads that email, and counts both when they are different emails", async () => {
+    const query = world(
+      [await storedRow()],
+      [draftRow({ id: "component-2", effective_date: "2025-12-20" })],
+    );
+    const run = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [draft()],
+    );
+
+    // two emails carry the key: the newest date is chosen (the draft), and the count says two
+    expect(partOf(run)).toMatchObject({
+      several: 2,
+      component: { id: "component-2", source: "draft" },
+    });
+    const stored = await dryRunReceipt(
+      { query: world([await storedRow()], []) } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [draft()],
+    );
+    expect(partOf(stored)).toMatchObject({
+      component: { id: "component-1", source: "stored" },
+    });
+  });
+
+  it("leaves out an email the draft's guards turn aside, and one whose key no part carries", async () => {
+    const guarded = await dryRunReceipt(
+      { query: world([], [draftRow()]) } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [
+        draft({
+          ...ALLEGRO_PAY_COMPONENT_DEFINITION,
+          requireLine: ["never present"],
+        }),
+      ],
+    );
+    expect(partOf(guarded)).toMatchObject({
+      outcome: "not_found",
+      component: null,
+    });
+
+    const otherKey = await dryRunReceipt(
+      {
+        query: world(
+          [],
+          [
+            draftRow({
+              body_text: purchase.bodyText.replace(
+                ALLEGRO_PAY_CONTRACT_2,
+                "9999999999",
+              ),
+            }),
+          ],
+        ),
+      } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [draft()],
+    );
+    expect(partOf(otherKey)).toMatchObject({ outcome: "not_found" });
+  });
+
+  it("runs one read per draft and takes an email two drafts both read once", async () => {
+    const query = world([], [draftRow()]);
+    const run = await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      [draft(), { ...draft(), fromDomains: ["other.example.com"] }],
+    );
+
+    const reads = query.mock.calls.filter(([sql]) =>
+      sql.includes("r.body_text"),
+    );
+    expect(reads).toHaveLength(2);
+    expect(reads[1][1]?.[2]).toEqual(["other.example.com"]);
+    expect(partOf(run)).toMatchObject({
+      several: 1,
+      component: { source: "draft" },
+    });
+  });
+
+  it("reads nothing with a draft when the settlement's parts carry no key", async () => {
+    const query = world([], [draftRow()]);
+    await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      { ...repayment, bodyText: "Nothing to see" },
+      null,
+      [draft()],
+    );
+    expect(query.mock.calls.some(([sql]) => sql.includes("r.body_text"))).toBe(
+      false,
+    );
   });
 });

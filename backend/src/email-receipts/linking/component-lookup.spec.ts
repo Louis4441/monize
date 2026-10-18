@@ -52,6 +52,49 @@ describe("chooseComponents", () => {
   });
 });
 
+describe("chooseComponents with draft candidates", () => {
+  it("lets a draft replace the stored row of the same receipt, whatever its date", () => {
+    const chosen = chooseComponents(
+      ["L1"],
+      [row({ id: "a", effectiveDate: "2026-01-09", parserId: "p1" })],
+      [row({ id: "a", effectiveDate: "2026-01-02", parserId: null })],
+    );
+    expect(chosen.get("L1")?.row).toMatchObject({
+      id: "a",
+      effectiveDate: "2026-01-02",
+      parserId: null,
+    });
+    expect(chosen.get("L1")?.several).toBe(1);
+  });
+
+  it("chooses among stored and draft candidates with the same rule: newest date, then lower id", () => {
+    const stored = [row({ id: "s", effectiveDate: "2026-01-05" })];
+    const drafts = [
+      row({ id: "d", effectiveDate: "2026-01-08", parserId: null }),
+    ];
+    const chosen = chooseComponents(["L1"], stored, drafts);
+    expect(chosen.get("L1")?.row.id).toBe("d");
+    expect(chosen.get("L1")?.several).toBe(2);
+    const tie = chooseComponents(
+      ["L1"],
+      [row({ id: "z" })],
+      [row({ id: "m", parserId: null })],
+    );
+    expect(tie.get("L1")?.row.id).toBe("m");
+  });
+
+  it("finds a link value only a draft carries, and is unchanged with no drafts", () => {
+    const onlyDraft = chooseComponents(
+      ["L9"],
+      [row()],
+      [row({ id: "d", linkKey: "L9" })],
+    );
+    expect(onlyDraft.get("L9")?.row.id).toBe("d");
+    const none = chooseComponents(["L1"], [row({ id: "a" })], []);
+    expect(none.get("L1")?.row.id).toBe("a");
+  });
+});
+
 describe("toJoinParts", () => {
   it("gives one part per item: the component with its taken units and tag, or none", () => {
     const chosen = chooseComponents(["L1"], [row({ id: "a" })]);

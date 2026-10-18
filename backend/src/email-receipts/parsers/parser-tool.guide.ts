@@ -24,8 +24,11 @@ export const EMAIL_RECEIPT_PARSER_OPERATIONS = [
 export type EmailReceiptParserOperation =
   (typeof EMAIL_RECEIPT_PARSER_OPERATIONS)[number];
 
-/** Emails one `test` call reads. */
-export const EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS = 5;
+/** Emails one `test` call reads, and one draft request names (5 per sender, 5 senders). */
+export const EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS = 25;
+
+/** Component drafts one `test` takes: one per sender domain of a request. */
+export const EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS = 5;
 
 export const EMAIL_RECEIPT_PARSER_TOOL_DESCRIPTION =
   "Draft an order-email parser. " +
@@ -36,7 +39,7 @@ export const EMAIL_RECEIPT_PARSER_TOOL_DESCRIPTION =
   "patterns: one item per line. record: one item over several lines (a step per line, optional steps may be absent); skipLines drop lines first. startAfter/stopAt: substrings bounding the items. " +
   "categories: category ids and the full language guide. " +
   "get: saved parsers; parserId: one in full, to copy as a new draft. " +
-  "test: 1 to 5 emails (receiptIds), writes nothing. Test every email, fix until complete, then save_draft (requestId if claimed). The user must approve the draft; never say it was applied.";
+  "test: 1 to 25 emails (receiptIds), writes nothing. Test every email, fix until complete, then save_draft (requestId if claimed). The user must approve the draft; never say it was applied.";
 
 /**
  * The whole parser language, returned by the `categories` operation (the first
@@ -65,6 +68,7 @@ export const EMAIL_RECEIPT_PARSER_LANGUAGE_GUIDE = [
   "{link} and {instalment} (settlement only, in items patterns or record steps, both optional): {link} is the part's key, normalized like linkKey, and the pipeline finds the stored component with that key and replaces the part by the component's items. {instalment} is free text such as \"1. spłata z 3\", cut to 50 characters, copied into the memo of the split lines. test returns them on the item as link and instalment, then links per part (component found, partAmount, componentNet, taken, outcome) and the joined lines as parsed.items; match is computed on the joined reading.",
   "link section (settlement only, every key optional): fromDomains, 1-10 sender domains the component search is limited to (default any sender); daysBefore, 0-365 (default 120), how far before the email's date a component may be dated; a component up to 7 days after it is still found.",
   'Example, a purchase email as component: {"version":2,"role":"component","linkKey":[{"label":"Umowa Allegro Pay","value":"{link} (umowa*"},"Allegro Pay {link}"],"total":[...],"items":{...}}. The repayment email as settlement: {"version":2,"role":"settlement","link":{"fromDomains":["shop.example.com"]},"paid":[...],"items":{"skipLines":[...],"record":[{"line":"umowa Allegro Pay"},{"line":"{link}"},{"line":"data zakupu"},{"line":"*"},{"line":"kwota wpłaty"},{"line":"{amount} zł"},{"line":"{instalment}"},{"line":"Spłacone przedmioty"},{"line":"Zakup od *"},{"line":"{name}"}]}}: one part per purchase block.',
+  "Multi-sender requests: a request may carry emails of up to 5 senders (up to 5 each). Decide per sender: purchases (a component profile), repayments or payment confirmations that pay for other senders' purchases under a shared key (a settlement profile whose link.fromDomains names the component senders), or unrelated (standalone). Test each component on its emails, then test each settlement with componentDrafts [{definition: a component, fromDomains: its sender's domains}], one per component sender: the dry run also reads the user's stored emails of those domains (up to 200 each, inside the settlement's link window) with them, joins each part to a stored or drafted component and marks links[].component.source stored or draft. componentDrafts only works on a settlement; test is read-only. Save every profile with save_draft, this requestId and its own fromDomains: the request takes one draft per sender (a save for a sender that has one updates it; a draft covering none of the request's senders is refused). The user approves each draft; the request is applied when all are approved.",
   "get: with no parserId, the user's saved parsers (id, name, status, senders); with one, that parser in full (any status). Its definition, category names as they are, can be edited, tested and saved with save_draft WITHOUT parserId as a NEW draft; a saved parser is never changed by the tool.",
   "Bounds: 10 entries per field, 200 characters per pattern, 5 lines per pattern, 50 category rules, 100 characters per startAfter/stopAt. test also returns, per email, outcome (read, not_applicable, skip_line, wait_line or no_html), match and trace: for each field the entry index, the pattern and the line (number, text) that produced it (a multi-line pattern: also lines, every line it matched; a labelled entry: its label line too), and each item's patterns and lines.",
 ].join("\n");

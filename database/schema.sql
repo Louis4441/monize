@@ -900,11 +900,11 @@ CREATE INDEX idx_email_receipt_links_component
 -- nullable, and NULLs are distinct there, so a manual request is not deduped
 -- (NULLS NOT DISTINCT would make deleting a rule fail on two open requests).
 -- A request of kind email_parser_draft (email-receipts design section 6) asks an
--- agent to write a receipt parser from up to five stored emails of one sender: it
--- has no transaction, names its emails in email_receipt_ids (no foreign key: an
--- array has none) and its sender domain in parser_domain, and at most one is open
--- per (user, domain). NULL transaction ids are distinct in the open-request index
--- above, so it never conflicts there.
+-- agent to write a receipt parser from up to 25 stored emails (at most five per
+-- sender, at most five senders): it has no transaction, names its emails in
+-- email_receipt_ids (no foreign key: an array has none) and its main sender domain
+-- in parser_domain, and at most one is open per (user, domain). NULL transaction
+-- ids are distinct in the open-request index above, so it never conflicts there.
 -- The defaults on kind, status and expires_at exist for the RLS spec's generic
 -- row seeder.
 CREATE TABLE ai_review_requests (
@@ -927,7 +927,7 @@ CREATE TABLE ai_review_requests (
     CONSTRAINT ck_ai_review_requests_kind
       CHECK (kind IN ('transaction_review', 'email_receipt', 'email_parser_draft', 'email_trade')),
     CONSTRAINT ck_ai_review_requests_email_receipt_ids
-      CHECK (email_receipt_ids IS NULL OR cardinality(email_receipt_ids) <= 5),
+      CHECK (email_receipt_ids IS NULL OR cardinality(email_receipt_ids) <= 25),
     CONSTRAINT ck_ai_review_requests_transaction_required
       CHECK (kind IN ('email_parser_draft', 'email_trade') OR transaction_id IS NOT NULL),
     CONSTRAINT ck_ai_review_requests_trade_shape

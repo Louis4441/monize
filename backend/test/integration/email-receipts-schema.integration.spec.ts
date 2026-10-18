@@ -780,7 +780,7 @@ describe("email receipts schema (schema.sql and migrations)", () => {
         });
       });
 
-      it("holds one to five emails, no more, and never none", async () => {
+      it("holds one to 25 emails, no more, and never none", async () => {
         const ids = (n: number) =>
           Array.from(
             { length: n },
@@ -788,11 +788,11 @@ describe("email receipts schema (schema.sql and migrations)", () => {
               `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
           );
         await draft({
-          email_receipt_ids: ids(5),
+          email_receipt_ids: ids(25),
           parser_domain: "a.example.com",
         });
         await expect(
-          draft({ email_receipt_ids: ids(6), parser_domain: "b.example.com" }),
+          draft({ email_receipt_ids: ids(26), parser_domain: "b.example.com" }),
         ).rejects.toThrow(/ck_ai_review_requests_email_receipt_ids/);
         await expect(
           draft({ email_receipt_ids: [], parser_domain: "c.example.com" }),

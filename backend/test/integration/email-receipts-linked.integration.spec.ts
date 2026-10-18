@@ -5,6 +5,10 @@ import { DataSource } from "typeorm";
 import { settlePendingHistoryWrites } from "@/action-history/action-history.service";
 import { AiModule } from "@/ai/ai.module";
 import { AiReviewModule } from "@/ai-review/ai-review.module";
+import { AiReviewWorkService } from "@/ai-review/ai-review-work.service";
+import { ASSISTANT_CLAIM_KEY } from "@/ai-review/ai-review-work.types";
+import { RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION } from "@/email-receipts/parsers/parser-draft-instruction";
+import { EmailReceiptParserToolsService } from "@/email-receipts/parsers/email-receipt-parser-tools.service";
 import { AiReviewQueueModule } from "@/ai-review/ai-review-queue.module";
 import { EVENT_BUS } from "@/common/events/event-bus.interface";
 import { MemoryEventBus } from "@/common/events/memory-event-bus";
@@ -68,6 +72,8 @@ describe("linked email receipts (integration)", () => {
   let poller: EmailReceiptPollService;
   let receipts: EmailReceiptsService;
   let parsers: EmailReceiptParsersService;
+  let parserTools: EmailReceiptParserToolsService;
+  let work: AiReviewWorkService;
   let transactions: TransactionsService;
   let imap: ImapMailboxClient;
   let encryption: EncryptionService;
@@ -194,6 +200,8 @@ describe("linked email receipts (integration)", () => {
     poller = module.get(EmailReceiptPollService);
     receipts = module.get(EmailReceiptsService);
     parsers = module.get(EmailReceiptParsersService);
+    parserTools = module.get(EmailReceiptParserToolsService);
+    work = module.get(AiReviewWorkService);
     transactions = module.get(TransactionsService);
     imap = module.get(ImapMailboxClient);
     encryption = module.get(EncryptionService);
@@ -447,6 +455,7 @@ describe("linked email receipts (integration)", () => {
             subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
             effectiveDate: "2025-12-15",
             profileName: "Shop purchases",
+            source: "stored",
           },
           partAmount: 1630000,
           componentNet: 1630000,
@@ -852,5 +861,345 @@ describe("linked email receipts (integration)", () => {
     const run = await asAlice(() => receipts.processBatch(aliceId, {}));
     expect(run).toMatchObject({ processed: 0, remaining: 0 });
     expect((await receiptBy("pay.example.com")).status).toBe("review");
+  });
+
+  describe("drafting a component and its settlement with AI (spec 10a)", () => {
+    const componentDefinition = () => ({
+      ...ALLEGRO_PAY_COMPONENT_DEFINITION,
+      defaultCategoryId: goodsId,
+      shippingCategoryId: shippingId,
+    });
+    const settlementDefinition = () => ({
+      ...ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      defaultCategoryId: goodsId,
+    });
+    const draftRequests = () =>
+      db.query(
+        `SELECT status, parser_domain, proposal, instruction
+           FROM ai_review_requests WHERE kind = 'email_parser_draft'`,
+      );
+    const parserStatus = async (id: string) =>
+      (
+        await db.query(
+          `SELECT status FROM email_receipt_parsers WHERE id = $1`,
+          [id],
+        )
+      )[0]?.status;
+
+    /** Both emails stored with no profile at all: the state a draft request starts from. */
+    const claimedRequest = async () => {
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const shop = await receiptBy("shop.example.com");
+      const pay = await receiptBy("pay.example.com");
+      const { requestId } = await asAlice(() =>
+        parsers.requestAiDraft(aliceId, [shop.id, pay.id]),
+      );
+      await asAlice(() => work.claim(aliceId, ASSISTANT_CLAIM_KEY, requestId));
+      return { requestId, shop, pay };
+    };
+    const save = (
+      requestId: string,
+      name: string,
+      domain: string,
+      definition: unknown,
+    ) =>
+      asAlice(() =>
+        parserTools.saveDraft(aliceId, ASSISTANT_CLAIM_KEY, {
+          requestId,
+          name,
+          fromDomains: [domain],
+          definition,
+        }),
+      );
+
+    it("files a two-domain request with the multi-sender instruction, and tests the settlement against the unsaved component", async () => {
+      const { requestId, pay } = await claimedRequest();
+      const [request] = await draftRequests();
+      expect(request).toMatchObject({
+        status: "claimed",
+        instruction: RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION,
+      });
+
+      const tested = await asAlice(() =>
+        parserTools.testDefinition(aliceId, {
+          definition: settlementDefinition(),
+          receiptIds: [pay.id],
+          componentDrafts: [
+            {
+              definition: componentDefinition(),
+              fromDomains: ["shop.example.com"],
+            },
+          ],
+        }),
+      );
+
+      expect(tested.valid).toBe(true);
+      const [email] = tested.emails;
+      expect(email.links?.map((l) => l.outcome)).toEqual([
+        "not_found",
+        "joined",
+      ]);
+      expect(email.links?.[1].component).toMatchObject({
+        source: "draft",
+        effectiveDate: "2025-12-15",
+      });
+      expect(email.links?.[1]).toMatchObject({
+        partAmount: 163,
+        componentNet: 163,
+      });
+      // 109.89 (the part) + 140 + 10 + 13 (the draft component's lines)
+      expect(
+        Math.round(
+          email.parsed.items.reduce((sum, item) => sum + item.amount * 100, 0),
+        ),
+      ).toBe(27289);
+      // Reads only: no parser, no stored component, no link row, request unchanged.
+      expect(
+        await db.query(`SELECT 1 FROM email_receipt_parsers`),
+      ).toHaveLength(0);
+      expect(await linkRows()).toHaveLength(0);
+      expect((await receiptBy("shop.example.com")).status).not.toBe(
+        "component",
+      );
+      expect((await draftRequests())[0].status).toBe("claimed");
+      expect(requestId).toBeDefined();
+    });
+
+    it("refuses a component draft beside a definition that is not a settlement, as a result and as a 400", async () => {
+      const { shop } = await claimedRequest();
+      const draft = {
+        definition: componentDefinition(),
+        fromDomains: ["shop.example.com"],
+      };
+
+      const tool = await asAlice(() =>
+        parserTools.testDefinition(aliceId, {
+          definition: componentDefinition(),
+          receiptIds: [shop.id],
+          componentDrafts: [draft],
+        }),
+      );
+      expect(tool).toMatchObject({
+        valid: false,
+        errors: [
+          {
+            path: "componentDrafts",
+            code: "component_draft_requires_settlement",
+          },
+        ],
+      });
+      await expect(
+        asAlice(() =>
+          parsers.test(aliceId, {
+            definition: componentDefinition(),
+            receiptId: shop.id,
+            componentDrafts: [draft],
+          } as never),
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("lets a draft reading replace the stored component of the same email, in the REST test too", async () => {
+      await createProfiles();
+      await poll(purchaseMail());
+      await poll(repaymentMail());
+      const pay = await receiptBy("pay.example.com");
+
+      const run = await asAlice(() =>
+        parsers.test(aliceId, {
+          definition: settlementDefinition(),
+          receiptId: pay.id,
+          componentDrafts: [
+            {
+              definition: componentDefinition(),
+              fromDomains: ["shop.example.com"],
+            },
+          ],
+        } as never),
+      );
+
+      expect(run.links?.[1]).toMatchObject({
+        outcome: "joined",
+        several: 1,
+        component: { source: "draft" },
+      });
+    });
+
+    it("takes one draft per sender, proposed after the first, applied only when both are approved", async () => {
+      const { requestId } = await claimedRequest();
+
+      const component = await save(
+        requestId,
+        "Shop purchases",
+        "shop.example.com",
+        componentDefinition(),
+      );
+      let [request] = await draftRequests();
+      expect(request.status).toBe("proposed");
+      expect(request.proposal).toMatchObject({
+        parserId: component.parserId,
+        parserIds: [component.parserId],
+      });
+
+      // a draft for a sender the request does not hold is refused, writing nothing
+      await expect(
+        save(requestId, "Other", "other.example.net", componentDefinition()),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(
+        await db.query(`SELECT 1 FROM email_receipt_parsers`),
+      ).toHaveLength(1);
+
+      const settlement = await save(
+        requestId,
+        "Repayments",
+        "pay.example.com",
+        settlementDefinition(),
+      );
+      expect(settlement.parserId).not.toBe(component.parserId);
+      [request] = await draftRequests();
+      expect(request.status).toBe("proposed");
+      expect(request.proposal).toMatchObject({
+        parserId: component.parserId,
+        parserIds: [component.parserId, settlement.parserId],
+      });
+
+      // saving for a sender that has a draft updates it
+      const again = await save(
+        requestId,
+        "Repayments 2",
+        "pay.example.com",
+        settlementDefinition(),
+      );
+      expect(again).toMatchObject({
+        parserId: settlement.parserId,
+        revision: 2,
+      });
+      expect(
+        await db.query(`SELECT 1 FROM email_receipt_parsers`),
+      ).toHaveLength(2);
+      [request] = await draftRequests();
+      expect(request.proposal.parserIds).toEqual([
+        component.parserId,
+        settlement.parserId,
+      ]);
+
+      // the inbox lists both
+      const [item] = await asAlice(() => work.listInbox(aliceId));
+      expect(item.parserDraft).toMatchObject({
+        parserId: component.parserId,
+        parserIds: [component.parserId, settlement.parserId],
+      });
+
+      await asAlice(() => parsers.approve(aliceId, component.parserId));
+      expect((await draftRequests())[0].status).toBe("proposed");
+      await asAlice(() => parsers.approve(aliceId, settlement.parserId));
+      expect((await draftRequests())[0].status).toBe("applied");
+      expect(await parserStatus(settlement.parserId)).toBe("approved");
+    });
+
+    it("is dismissed only when none of its drafts exists any more", async () => {
+      const { requestId } = await claimedRequest();
+      const component = await save(
+        requestId,
+        "Shop purchases",
+        "shop.example.com",
+        componentDefinition(),
+      );
+      const settlement = await save(
+        requestId,
+        "Repayments",
+        "pay.example.com",
+        settlementDefinition(),
+      );
+
+      await asAlice(() => parsers.remove(aliceId, component.parserId));
+      expect((await draftRequests())[0].status).toBe("proposed");
+      await asAlice(() => parsers.remove(aliceId, settlement.parserId));
+      expect((await draftRequests())[0].status).toBe("rejected");
+    });
+
+    it("stays proposed when one draft is approved and the other deleted", async () => {
+      const { requestId } = await claimedRequest();
+      const component = await save(
+        requestId,
+        "Shop purchases",
+        "shop.example.com",
+        componentDefinition(),
+      );
+      const settlement = await save(
+        requestId,
+        "Repayments",
+        "pay.example.com",
+        settlementDefinition(),
+      );
+
+      await asAlice(() => parsers.remove(aliceId, settlement.parserId));
+      await asAlice(() => parsers.approve(aliceId, component.parserId));
+
+      expect((await draftRequests())[0].status).toBe("proposed");
+    });
+
+    it("keeps a one-sender request at one draft: a second save is refused as before", async () => {
+      await poll(purchaseMail());
+      const shop = await receiptBy("shop.example.com");
+      const { requestId } = await asAlice(() =>
+        parsers.requestAiDraft(aliceId, [shop.id]),
+      );
+      await asAlice(() => work.claim(aliceId, ASSISTANT_CLAIM_KEY, requestId));
+      await save(
+        requestId,
+        "Shop purchases",
+        "shop.example.com",
+        componentDefinition(),
+      );
+
+      await expect(
+        save(requestId, "Again", "shop.example.com", componentDefinition()),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it("refuses a selection of six domains, or six emails of one, writing nothing", async () => {
+      let uid = 900;
+      const stored = async (domain: string) => {
+        const [row] = await db.query(
+          `INSERT INTO email_receipts
+             (user_id, mailbox_id, uid_validity, uid, from_address, from_domain,
+              subject, received_at, body_text, status)
+           VALUES ($1, $2, 1001, $3, $4, $5, 'x', NOW(), 'x', 'no_parser')
+           RETURNING id`,
+          [aliceId, mailboxId, ++uid, `a@${domain}`, domain],
+        );
+        return row.id as string;
+      };
+      const sixDomains: string[] = [];
+      for (let d = 1; d <= 6; d += 1) {
+        sixDomains.push(await stored(`d${d}.example.com`));
+      }
+      await expect(
+        asAlice(() => parsers.requestAiDraft(aliceId, sixDomains)),
+      ).rejects.toMatchObject({ status: 400 });
+
+      const sixOfOne: string[] = [];
+      for (let n = 1; n <= 6; n += 1) {
+        sixOfOne.push(await stored("one.example.com"));
+      }
+      await expect(
+        asAlice(() => parsers.requestAiDraft(aliceId, sixOfOne)),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(await draftRequests()).toHaveLength(0);
+
+      // five domains of five emails each (25) are taken
+      const full: string[] = [];
+      for (let d = 1; d <= 5; d += 1) {
+        for (let n = 1; n <= 5; n += 1)
+          full.push(await stored(`f${d}.example.com`));
+      }
+      await asAlice(() => parsers.requestAiDraft(aliceId, full));
+      const [request] = await draftRequests();
+      expect(request.instruction).toBe(
+        RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION,
+      );
+    });
   });
 });

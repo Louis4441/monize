@@ -49,14 +49,23 @@ export const unitsOf = (amount: string | number | null | undefined): number =>
 /**
  * Spec 3, pure: for each link value the newest component first (ties by id),
  * with the number found. A link value no row carries is absent from the map.
+ * `drafts` are extra candidates (the test operation's `componentDraft` readings,
+ * spec 10a): a draft replaces the stored row of the same receipt id, and the
+ * choice among all of them is the same one.
  */
 export function chooseComponents(
   links: readonly string[],
   rows: readonly ComponentRow[],
+  drafts: readonly ComponentRow[] = [],
 ): Map<string, ChosenComponent> {
+  const replaced = new Set(drafts.map((draft) => draft.id));
+  const candidates = [
+    ...rows.filter((row) => !replaced.has(row.id)),
+    ...drafts,
+  ];
   const chosen = new Map<string, ChosenComponent>();
   for (const link of new Set(links)) {
-    const found = rows
+    const found = candidates
       .filter((row) => row.linkKey === link)
       .sort((a, b) =>
         a.effectiveDate !== b.effectiveDate
@@ -73,6 +82,31 @@ export function chooseComponents(
       chosen.set(link, { row: found[0], several: found.length });
   }
   return chosen;
+}
+
+/** Where a settlement looks for its components (spec 2.2 and 3): dates `YYYY-MM-DD`, domains null for any sender. */
+export interface ComponentWindow {
+  from: string;
+  to: string;
+  domains: string[] | null;
+}
+
+/** The date window and sender domains of a settlement's component search, written once for the pipeline and the dry run. */
+export function componentWindow(
+  settlementDate: string,
+  search: ComponentSearch,
+): ComponentWindow {
+  return {
+    from: addDaysYMD(
+      settlementDate,
+      -(search.daysBefore ?? DEFAULT_LINK_DAYS_BEFORE),
+    ),
+    to: addDaysYMD(settlementDate, LINK_DAYS_AFTER),
+    domains:
+      search.fromDomains && search.fromDomains.length > 0
+        ? [...search.fromDomains]
+        : null,
+  };
 }
 
 /**
@@ -117,7 +151,8 @@ export function toJoinParts(
  * `lock` takes `FOR UPDATE OF r`, rows in ascending id: the second step of the
  * lock order (the settlement's own row, then these, then the advisory lock on
  * the matched transaction), so two settlements of one component read `taken`
- * one after the other. A read-only preview passes false.
+ * one after the other. A read-only preview passes false. `drafts` are extra
+ * candidates a preview read with an unsaved component profile (`chooseComponents`).
  *
  * A DATE is read with `TO_CHAR` and a numeric with `Number` (backend/CLAUDE.md).
  */
@@ -128,21 +163,17 @@ export async function loadLinkedComponents(
   links: readonly (string | null)[],
   search: ComponentSearch,
   lock: boolean,
+  drafts: readonly ComponentRow[] = [],
 ): Promise<JoinPart[]> {
   const wanted = [...new Set(links.filter((l): l is string => l !== null))];
   const items = links.map((link) => ({ link: link ?? undefined }));
   if (wanted.length === 0) {
     return toJoinParts(items, new Map(), new Map(), new Map());
   }
-  const from = addDaysYMD(
+  const { from, to, domains } = componentWindow(
     settlement.effectiveDate,
-    -(search.daysBefore ?? DEFAULT_LINK_DAYS_BEFORE),
+    search,
   );
-  const to = addDaysYMD(settlement.effectiveDate, LINK_DAYS_AFTER);
-  const domains =
-    search.fromDomains && search.fromDomains.length > 0
-      ? [...search.fromDomains]
-      : null;
   const rows: FoundRow[] = await m.query(
     `SELECT r.id, r.link_key, r.subject,
             TO_CHAR((COALESCE(r.original_sent_at, r.received_at) AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS effective_date,
@@ -173,6 +204,7 @@ export async function loadLinkedComponents(
       parsed: row.parsed,
       parserId: row.parser_id,
     })),
+    drafts,
   );
   const ids = [...chosen.values()].map((c) => c.row.id);
   const taken = new Map<string, number>();
