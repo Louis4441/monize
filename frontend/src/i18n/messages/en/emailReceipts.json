@@ -712,6 +712,22 @@
       "review": "In review",
       "ignored": "Ignored"
     },
+    "search": {
+      "label": "Search emails",
+      "text": "Search",
+      "placeholder": "Subject, sender or content",
+      "in": "Search in",
+      "fields": {
+        "all": "All fields",
+        "subject": "Subject",
+        "sender": "Sender",
+        "body": "Content"
+      },
+      "from": "From date",
+      "to": "To date",
+      "rangeBackwards": "The end date is before the start date. The date range is not applied.",
+      "clear": "Clear search"
+    },
     "domainFilter": {
       "label": "Sender domain",
       "all": "All senders",
@@ -741,6 +757,8 @@
       "body": "Order confirmations appear here once the mailbox has been read.",
       "filteredTitle": "No emails in this state",
       "filteredBody": "Choose another state to see the rest.",
+      "searchTitle": "No email matches the search",
+      "searchBody": "Change the words or the dates, or clear the search to see every email.",
       "noMailboxBody": "No mailbox is connected yet. Connect one to start reading order confirmations.",
       "connectButton": "Connect a mailbox"
     },
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {# trade email is left out. Approve it on its card in the AI review inbox.} other {# trade emails are left out. Approve them on their cards in the AI review inbox.}}",
         "confirm": "Approve"
       },
+      "searchNote": "Only the emails that match the search are included.",
       "narrowedNote": "Emails taken out of the selection are not touched."
     },
     "bulk": {

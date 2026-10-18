@@ -569,8 +569,29 @@ export const PARSER_DRAFT_MAX_RECEIPTS = 5;
 /** What a bulk command does to the emails it names. */
 export type EmailReceiptBulkAction = 'delete' | 'ignore';
 
-/** The list's own filter (state and sender domain), as a bulk command names its emails. */
-export interface EmailReceiptBulkFilter {
+/** Where the list's free-text search looks: every field, or one of them ("sender" is the address, the domain and the forwarder). */
+export const EMAIL_RECEIPT_SEARCH_FIELDS = ['all', 'subject', 'sender', 'body'] as const;
+export type EmailReceiptSearchField = (typeof EMAIL_RECEIPT_SEARCH_FIELDS)[number];
+
+/** Longest search text the server accepts. */
+export const EMAIL_RECEIPT_SEARCH_MAX_LENGTH = 200;
+
+/**
+ * The list's search as the server takes it (`GET /email-receipts` and its
+ * `status-counts` and `domains`, and a bulk filter). A field left out is not
+ * applied; `searchIn` is left out for "all" and when there is no `search`.
+ * `dateFrom` and `dateTo` are `YYYY-MM-DD`, inclusive, on the UTC day of the
+ * email's `effectiveDate` (the date the list shows), not of `receivedAt`.
+ */
+export interface EmailReceiptSearch {
+  search?: string;
+  searchIn?: EmailReceiptSearchField;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+/** The list's own filter (state, sender domain and search), as a bulk command names its emails. */
+export interface EmailReceiptBulkFilter extends EmailReceiptSearch {
   status?: EmailReceiptStatus;
   domain?: string;
   /** States taken out of the selection (the server takes each state once). */

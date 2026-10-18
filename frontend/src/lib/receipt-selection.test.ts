@@ -31,6 +31,19 @@ describe('receipt selection', () => {
     });
   });
 
+  it('writes the search into the filter beside the state and domain, and the exclusions on top of it', () => {
+    const search = { search: 'invoice', searchIn: 'sender' as const, dateFrom: '2026-09-01', dateTo: '2026-09-30' };
+    expect(selectionFilter({ status: 'review', domain: 'shop.pl', ...search }, NO_EXCLUSIONS)).toEqual({
+      status: 'review',
+      domain: 'shop.pl',
+      ...search,
+    });
+    const ex = addExclusion(NO_EXCLUSIONS, { kind: 'status', status: 'ignored' });
+    expect(selectionFilter(search, ex)).toEqual({ ...search, excludeStatuses: ['ignored'] });
+    // The search's dates are not the received-day exclusions.
+    expect(selectionFilter(search, ex)).not.toHaveProperty('receivedFrom');
+  });
+
   it('keeps the same object for a repeated exclusion and only narrows a range', () => {
     const one = addExclusion(NO_EXCLUSIONS, { kind: 'status', status: 'ignored' });
     expect(addExclusion(one, { kind: 'status', status: 'ignored' })).toBe(one);

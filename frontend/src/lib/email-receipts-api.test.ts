@@ -207,6 +207,50 @@ describe('emailReceiptsApi', () => {
       expect(client.get).toHaveBeenLastCalledWith('/email-receipts/domains', { params: { status: 'review' } });
     });
 
+    it('sends only the search fields that are set, on the list, the counts and the domains', async () => {
+      client.get.mockResolvedValue({ data: [] });
+      await emailReceiptsApi.receipts.list('review', undefined, 'shop.example.com', 50, {
+        search: 'invoice',
+        searchIn: 'subject',
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-30',
+      });
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', {
+        params: {
+          status: 'review',
+          domain: 'shop.example.com',
+          offset: 50,
+          search: 'invoice',
+          searchIn: 'subject',
+          dateFrom: '2026-09-01',
+          dateTo: '2026-09-30',
+        },
+      });
+      // "all" and a search of nothing are not sent; a date range alone is.
+      await emailReceiptsApi.receipts.list(undefined, undefined, undefined, undefined, { search: 'x', searchIn: 'all' });
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: { search: 'x' } });
+      await emailReceiptsApi.receipts.list(undefined, undefined, undefined, undefined, { searchIn: 'body', dateFrom: '2026-09-01' });
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: { dateFrom: '2026-09-01' } });
+      await emailReceiptsApi.receipts.list(undefined, undefined, undefined, undefined, {});
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts', { params: undefined });
+
+      client.get.mockResolvedValue({ data: { total: 4, byStatus: { review: 3 } } });
+      expect(await emailReceiptsApi.receipts.countMatching('review', 'shop.example.com', { search: 'a', searchIn: 'sender' })).toBe(3);
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts', {
+        params: { domain: 'shop.example.com', search: 'a', searchIn: 'sender' },
+      });
+      await emailReceiptsApi.receipts.getStatusCounts({ dateTo: '2026-09-30' });
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/status-counts', { params: { dateTo: '2026-09-30' } });
+
+      client.get.mockResolvedValue({ data: [] });
+      await emailReceiptsApi.receipts.listDomains(undefined, { search: 'a' });
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/domains', { params: { search: 'a' } });
+      await emailReceiptsApi.receipts.listDomains('review', { search: 'a', searchIn: 'body' });
+      expect(client.get).toHaveBeenLastCalledWith('/email-receipts/domains', {
+        params: { status: 'review', search: 'a', searchIn: 'body' },
+      });
+    });
+
     it('reads the overview and processes in bulk with the run\'s own request', async () => {
       client.get.mockResolvedValue({ data: { processable: 4 } });
       await expect(emailReceiptsApi.receipts.overview()).resolves.toEqual({ processable: 4 });
