@@ -712,6 +712,22 @@
       "review": "审核中",
       "ignored": "已忽略"
     },
+    "search": {
+      "label": "搜索邮件",
+      "text": "搜索",
+      "placeholder": "主题、发件人或内容",
+      "in": "搜索范围",
+      "fields": {
+        "all": "所有字段",
+        "subject": "主题",
+        "sender": "发件人",
+        "body": "内容"
+      },
+      "from": "开始日期",
+      "to": "结束日期",
+      "rangeBackwards": "结束日期早于开始日期。日期范围未应用。",
+      "clear": "清除搜索"
+    },
     "domainFilter": {
       "label": "发件人域名",
       "all": "所有发件人",
@@ -742,7 +758,9 @@
       "filteredTitle": "没有此状态的邮件",
       "filteredBody": "选择其他状态以查看其余邮件。",
       "noMailboxBody": "尚未连接邮箱。请连接一个邮箱以开始读取订单确认邮件。",
-      "connectButton": "连接邮箱"
+      "connectButton": "连接邮箱",
+      "searchTitle": "没有与搜索匹配的邮件",
+      "searchBody": "请更改关键词或日期，或清除搜索以查看所有邮件。"
     },
     "actions": {
       "view": "查看",
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {已跳过 # 封交易邮件。请在 AI 审核收件箱中对应的卡片上批准。} other {已跳过 # 封交易邮件。请在 AI 审核收件箱中对应的卡片上批准。}}",
         "confirm": "批准"
       },
+      "searchNote": "仅包含与搜索匹配的邮件。",
       "narrowedNote": "从选择中排除的邮件不会被更改。"
     },
     "bulk": {

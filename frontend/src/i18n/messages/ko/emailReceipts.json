@@ -712,6 +712,22 @@
       "review": "검토 중",
       "ignored": "제외됨"
     },
+    "search": {
+      "label": "이메일 검색",
+      "text": "검색",
+      "placeholder": "제목, 보낸 사람 또는 내용",
+      "in": "검색 대상",
+      "fields": {
+        "all": "모든 항목",
+        "subject": "제목",
+        "sender": "보낸 사람",
+        "body": "내용"
+      },
+      "from": "시작 날짜",
+      "to": "종료 날짜",
+      "rangeBackwards": "종료 날짜가 시작 날짜보다 앞섭니다. 날짜 범위가 적용되지 않습니다.",
+      "clear": "검색 지우기"
+    },
     "domainFilter": {
       "label": "발신자 도메인",
       "all": "모든 발신자",
@@ -742,7 +758,9 @@
       "filteredTitle": "이 상태의 이메일이 없습니다",
       "filteredBody": "나머지를 보려면 다른 상태를 선택하세요.",
       "noMailboxBody": "아직 연결된 메일함이 없습니다. 주문 확인 메일을 읽으려면 메일함을 연결하세요.",
-      "connectButton": "메일함 연결"
+      "connectButton": "메일함 연결",
+      "searchTitle": "검색과 일치하는 이메일이 없습니다",
+      "searchBody": "단어나 날짜를 바꾸거나 검색을 지워 모든 이메일을 보세요."
     },
     "actions": {
       "view": "보기",
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {거래 메일 #개는 제외되었습니다. AI 검토함의 해당 카드에서 승인하세요.} other {거래 메일 #개는 제외되었습니다. AI 검토함의 해당 카드에서 승인하세요.}}",
         "confirm": "승인"
       },
+      "searchNote": "검색과 일치하는 이메일만 포함됩니다.",
       "narrowedNote": "선택에서 제외한 메일은 변경되지 않습니다."
     },
     "bulk": {

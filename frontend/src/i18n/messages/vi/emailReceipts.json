@@ -712,6 +712,22 @@
       "review": "Đang xem xét",
       "ignored": "Đã phớt lờ"
     },
+    "search": {
+      "label": "Tìm email",
+      "text": "Tìm kiếm",
+      "placeholder": "Tiêu đề, người gửi hoặc nội dung",
+      "in": "Tìm trong",
+      "fields": {
+        "all": "Tất cả các trường",
+        "subject": "Tiêu đề",
+        "sender": "Người gửi",
+        "body": "Nội dung"
+      },
+      "from": "Từ ngày",
+      "to": "Đến ngày",
+      "rangeBackwards": "Ngày kết thúc trước ngày bắt đầu. Khoảng ngày không được áp dụng.",
+      "clear": "Xóa tìm kiếm"
+    },
     "domainFilter": {
       "label": "Tên miền người gửi",
       "all": "Tất cả người gửi",
@@ -742,7 +758,9 @@
       "filteredTitle": "Không có email ở trạng thái này",
       "filteredBody": "Hãy chọn trạng thái khác để xem phần còn lại.",
       "noMailboxBody": "Chưa kết nối hộp thư nào. Hãy kết nối một hộp thư để bắt đầu đọc email xác nhận đơn hàng.",
-      "connectButton": "Kết nối hộp thư"
+      "connectButton": "Kết nối hộp thư",
+      "searchTitle": "Không có email nào khớp với tìm kiếm",
+      "searchBody": "Đổi từ khóa hoặc ngày, hoặc xóa tìm kiếm để xem tất cả email."
     },
     "actions": {
       "view": "Xem",
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {# email giao dịch được bỏ qua. Hãy duyệt trên thẻ của email trong hộp thư xem xét AI.} other {# email giao dịch được bỏ qua. Hãy duyệt trên thẻ của từng email trong hộp thư xem xét AI.}}",
         "confirm": "Duyệt"
       },
+      "searchNote": "Chỉ bao gồm các email khớp với tìm kiếm.",
       "narrowedNote": "Email đã loại khỏi lựa chọn không bị thay đổi."
     },
     "bulk": {

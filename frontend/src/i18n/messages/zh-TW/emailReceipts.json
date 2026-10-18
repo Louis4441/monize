@@ -712,6 +712,22 @@
       "review": "審核中",
       "ignored": "已忽略"
     },
+    "search": {
+      "label": "搜尋郵件",
+      "text": "搜尋",
+      "placeholder": "主旨、寄件者或內容",
+      "in": "搜尋範圍",
+      "fields": {
+        "all": "所有欄位",
+        "subject": "主旨",
+        "sender": "寄件者",
+        "body": "內容"
+      },
+      "from": "開始日期",
+      "to": "結束日期",
+      "rangeBackwards": "結束日期早於開始日期。日期範圍未套用。",
+      "clear": "清除搜尋"
+    },
     "domainFilter": {
       "label": "寄件者網域",
       "all": "所有寄件者",
@@ -742,7 +758,9 @@
       "filteredTitle": "沒有此狀態的郵件",
       "filteredBody": "選擇其他狀態以檢視其餘郵件。",
       "noMailboxBody": "尚未連接信箱。請連接一個信箱以開始讀取訂單確認郵件。",
-      "connectButton": "連接信箱"
+      "connectButton": "連接信箱",
+      "searchTitle": "沒有符合搜尋的郵件",
+      "searchBody": "請變更關鍵字或日期，或清除搜尋以檢視所有郵件。"
     },
     "actions": {
       "view": "檢視",
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {已略過 # 封交易郵件。請在 AI 審核收件匣中對應的卡片上核准。} other {已略過 # 封交易郵件。請在 AI 審核收件匣中對應的卡片上核准。}}",
         "confirm": "核准"
       },
+      "searchNote": "僅包含符合搜尋的郵件。",
       "narrowedNote": "從選取中排除的郵件不會被變更。"
     },
     "bulk": {

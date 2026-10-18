@@ -712,6 +712,22 @@
       "review": "Sedang ditinjau",
       "ignored": "Dikecualikan"
     },
+    "search": {
+      "label": "Cari email",
+      "text": "Cari",
+      "placeholder": "Subjek, pengirim, atau isi",
+      "in": "Cari di",
+      "fields": {
+        "all": "Semua bidang",
+        "subject": "Subjek",
+        "sender": "Pengirim",
+        "body": "Isi"
+      },
+      "from": "Dari tanggal",
+      "to": "Sampai tanggal",
+      "rangeBackwards": "Tanggal akhir sebelum tanggal awal. Rentang tanggal tidak diterapkan.",
+      "clear": "Hapus pencarian"
+    },
     "domainFilter": {
       "label": "Domain pengirim",
       "all": "Semua pengirim",
@@ -742,7 +758,9 @@
       "filteredTitle": "Tidak ada surel dengan status ini",
       "filteredBody": "Pilih status lain untuk melihat sisanya.",
       "noMailboxBody": "Belum ada kotak surel yang terhubung. Hubungkan satu untuk mulai membaca konfirmasi pesanan.",
-      "connectButton": "Hubungkan kotak surel"
+      "connectButton": "Hubungkan kotak surel",
+      "searchTitle": "Tidak ada email yang cocok dengan pencarian",
+      "searchBody": "Ubah kata atau tanggal, atau hapus pencarian untuk melihat semua email."
     },
     "actions": {
       "view": "Lihat",
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {# email transaksi dilewati. Setujui di kartunya di kotak masuk tinjauan AI.} other {# email transaksi dilewati. Setujui di kartunya di kotak masuk tinjauan AI.}}",
         "confirm": "Setujui"
       },
+      "searchNote": "Hanya email yang cocok dengan pencarian yang disertakan.",
       "narrowedNote": "Email yang dikeluarkan dari pilihan tidak diubah."
     },
     "bulk": {

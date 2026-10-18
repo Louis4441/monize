@@ -712,6 +712,22 @@
       "review": "In Prüfung",
       "ignored": "Ignoriert"
     },
+    "search": {
+      "label": "E-Mails durchsuchen",
+      "text": "Suche",
+      "placeholder": "Betreff, Absender oder Inhalt",
+      "in": "Suchen in",
+      "fields": {
+        "all": "Alle Felder",
+        "subject": "Betreff",
+        "sender": "Absender",
+        "body": "Inhalt"
+      },
+      "from": "Von Datum",
+      "to": "Bis Datum",
+      "rangeBackwards": "Das Enddatum liegt vor dem Startdatum. Der Zeitraum wird nicht angewendet.",
+      "clear": "Suche löschen"
+    },
     "domainFilter": {
       "label": "Absenderdomain",
       "all": "Alle Absender",
@@ -742,7 +758,9 @@
       "filteredTitle": "Keine E-Mails mit diesem Status",
       "filteredBody": "Wähle einen anderen Status, um die übrigen zu sehen.",
       "noMailboxBody": "Es ist noch kein Postfach verbunden. Verbinde eines, um Bestellbestätigungen zu lesen.",
-      "connectButton": "Postfach verbinden"
+      "connectButton": "Postfach verbinden",
+      "searchTitle": "Keine E-Mail entspricht der Suche",
+      "searchBody": "Ändern Sie die Wörter oder die Daten, oder löschen Sie die Suche, um alle E-Mails zu sehen."
     },
     "actions": {
       "view": "Anzeigen",
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {# Trade-E-Mail wird ausgelassen. Genehmigen Sie sie auf ihrer Karte im KI-Prüfeingang.} other {# Trade-E-Mails werden ausgelassen. Genehmigen Sie sie auf ihren Karten im KI-Prüfeingang.}}",
         "confirm": "Genehmigen"
       },
+      "searchNote": "Nur die E-Mails, die der Suche entsprechen, sind enthalten.",
       "narrowedNote": "E-Mails, die aus der Auswahl herausgenommen wurden, bleiben unverändert."
     },
     "bulk": {

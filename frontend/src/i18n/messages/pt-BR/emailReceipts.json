@@ -712,6 +712,22 @@
       "review": "Em revisão",
       "ignored": "Ignorado"
     },
+    "search": {
+      "label": "Pesquisar e-mails",
+      "text": "Pesquisar",
+      "placeholder": "Assunto, remetente ou conteúdo",
+      "in": "Pesquisar em",
+      "fields": {
+        "all": "Todos os campos",
+        "subject": "Assunto",
+        "sender": "Remetente",
+        "body": "Conteúdo"
+      },
+      "from": "Data inicial",
+      "to": "Data final",
+      "rangeBackwards": "A data final é anterior à data inicial. O intervalo de datas não é aplicado.",
+      "clear": "Limpar pesquisa"
+    },
     "domainFilter": {
       "label": "Domínio do remetente",
       "all": "Todos os remetentes",
@@ -742,7 +758,9 @@
       "filteredTitle": "Nenhum e-mail neste status",
       "filteredBody": "Escolha outro status para ver os demais.",
       "noMailboxBody": "Ainda não há nenhuma caixa de e-mail conectada. Conecte uma para começar a ler confirmações de pedido.",
-      "connectButton": "Conectar uma caixa de e-mail"
+      "connectButton": "Conectar uma caixa de e-mail",
+      "searchTitle": "Nenhum e-mail corresponde à pesquisa",
+      "searchBody": "Altere as palavras ou as datas, ou limpe a pesquisa para ver todos os e-mails."
     },
     "actions": {
       "view": "Ver",
@@ -856,6 +874,7 @@
         "trades": "{count, plural, one {# e-mail de operação fica de fora. Aprove-o no cartão dele na caixa de revisão de IA.} other {# e-mails de operações ficam de fora. Aprove-os nos cartões deles na caixa de revisão de IA.}}",
         "confirm": "Aprovar"
       },
+      "searchNote": "Somente os e-mails que correspondem à pesquisa são incluídos.",
       "narrowedNote": "Os e-mails retirados da seleção não são alterados."
     },
     "bulk": {
