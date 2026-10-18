@@ -590,6 +590,44 @@ describe('EmailReceiptsManager', () => {
       expect(screen.getByRole('dialog', { name: 'Email receipt' })).toBeInTheDocument();
     });
 
+    describe('?email=', () => {
+      const ID = '11111111-2222-4333-8444-555555555555';
+
+      it('opens the detail dialog for a valid id', async () => {
+        nav.params = new URLSearchParams(`tab=emails&email=${ID}`);
+        api.get.mockResolvedValue(makeDetail({ id: ID, subject: 'Linked email' }));
+        await renderManager();
+        expect(api.get).toHaveBeenCalledWith(ID);
+        expect(screen.getByRole('dialog', { name: 'Email receipt' })).toBeInTheDocument();
+      });
+
+      it('opens nothing for a value that is no id', async () => {
+        nav.params = new URLSearchParams('tab=emails&email=not-an-id');
+        await renderManager();
+        expect(api.get).not.toHaveBeenCalled();
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+
+      it('removes the parameter, keeping the others, when the dialog closes', async () => {
+        nav.params = new URLSearchParams(`tab=emails&domain=shop.example.com&email=${ID}`);
+        api.get.mockResolvedValue(makeDetail({ id: ID, subject: 'Linked email' }));
+        await renderManager();
+        await click(screen.getAllByRole('button', { name: 'Close' }).at(-1) as HTMLElement);
+        expect(nav.router.replace).toHaveBeenLastCalledWith('/email-receipts?tab=emails&domain=shop.example.com', {
+          scroll: false,
+        });
+        expect(screen.queryByRole('dialog', { name: 'Email receipt' })).not.toBeInTheDocument();
+      });
+
+      it('does not touch the URL when a dialog opened from a row closes', async () => {
+        api.get.mockResolvedValue(makeDetail({ id: 'r-proposed', subject: 'Order proposed' }));
+        await renderManager();
+        await runAction('Order proposed', 'View');
+        await click(screen.getAllByRole('button', { name: 'Close' }).at(-1) as HTMLElement);
+        expect(nav.router.replace).not.toHaveBeenCalled();
+      });
+    });
+
     it('links an ambiguous email to a candidate from the dialog and refreshes the list', async () => {
       api.get.mockResolvedValue(
         makeDetail({

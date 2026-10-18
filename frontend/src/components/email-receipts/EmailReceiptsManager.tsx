@@ -46,6 +46,7 @@ import {
   senderDomain,
 } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
+import { isUuid } from '@/lib/uuid';
 import { leadActionKey, orderActionsForCard, type ReceiptActionKey } from '@/lib/receipt-row-actions';
 import { createLogger } from '@/lib/logger';
 import { deselects, isBulkApprovable, isTradeProposal, type Deselection } from '@/lib/receipt-selection';
@@ -159,7 +160,11 @@ export function EmailReceiptsManager() {
   const [drafting, setDrafting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  // The detail dialog opens on `?email=<id>` (the review inbox links to one email); a value that is no id opens nothing.
+  const [detailId, setDetailId] = useState<string | null>(() => {
+    const requested = searchParams.get('email');
+    return requested !== null && isUuid(requested) ? requested : null;
+  });
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [parserFor, setParserFor] = useState<EmailReceiptListItem | null>(null);
   const [recognizeFor, setRecognizeFor] = useState<{ receipt: EmailReceiptListItem; asTrade: boolean } | null>(null);
@@ -323,6 +328,16 @@ export function EmailReceiptsManager() {
   const bulk = useReceiptBulkActions({ reload, onDone: clearSelection });
   const processing = useReceiptBulkProcessing({ reload, onDone: clearSelection });
   const locked = bulk.running || processing.running;
+
+  /** Closes the detail dialog; an `?email=` that opened it leaves the URL, so a reload does not open it again. */
+  const closeDetail = () => {
+    setDetailId(null);
+    if (!searchParams.has('email')) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('email');
+    const query = params.toString();
+    router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false });
+  };
 
   const changeDomain = (next: string) => {
     setDomain(next);
@@ -954,7 +969,7 @@ export function EmailReceiptsManager() {
           key={detailId}
           receiptId={detailId}
           categoryLabels={categoryLabels}
-          onClose={() => setDetailId(null)}
+          onClose={closeDetail}
           onChanged={() => void reload()}
         />
       )}
