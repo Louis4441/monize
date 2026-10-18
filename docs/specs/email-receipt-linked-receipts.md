@@ -361,6 +361,18 @@ selected), as today. A request over several domains:
   (dismissed) when none of them exists any more. Approving or deleting some of
   them leaves it `proposed`.
 
+**What the app says.** Selecting several domains is for one case only: the
+facts of ONE bank transaction are spread over emails of several senders (a
+deferred-payment provider and the shop, a payment gateway and the shop).
+Unrelated shops are drafted one domain at a time. So the list never offers a
+multi-domain draft silently: when the selection spans more than one domain, the
+"Draft parser with AI" action first opens a confirmation that says this, names
+the selected domains with their email counts and the limits (5 per domain, 5
+domains), and offers "Draft linked profiles" or "Cancel". A selection over a
+limit shows which limit it breaks and cannot be sent. Selecting every email of
+the page is no shortcut: "select all" never turns into a multi-domain draft
+without that confirmation.
+
 ### `componentDrafts` in `test`
 
 `test` on a `settlement` definition may carry `componentDrafts: [{definition,
