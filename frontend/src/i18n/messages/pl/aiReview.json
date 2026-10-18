@@ -57,7 +57,8 @@
     "waitingForAgent": "Oczekiwanie na agenta AI. <link>Połącz dostawcę AI w Ustawieniach</link> lub pozwól klientowi MCP ją przejąć.",
     "parserDraftReady": "Szkic profilu gotowy. <link>Przetestuj i zatwierdź go w ustawieniach profili</link>.",
     "tradePending": "Transakcja z e-maila, jeszcze nieodczytana",
-    "tradeEmail": "Wiadomość z potwierdzeniem transakcji"
+    "tradeEmail": "Wiadomość z potwierdzeniem transakcji",
+    "parserDraftIds": "Identyfikatory szkiców profili: {ids}"
   },
   "actions": {
     "dismiss": "Odrzuć"

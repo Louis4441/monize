@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { EnvelopeIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { BulkConfirmDialog } from '@/components/email-receipts/BulkConfirmDialog';
+import { LinkedDraftDialog } from '@/components/email-receipts/LinkedDraftDialog';
+import { LinkedProfilesHint } from '@/components/email-receipts/LinkedProfilesHint';
 import { EmailReceiptDetailDialog } from '@/components/email-receipts/EmailReceiptDetailDialog';
 import { ReceiptBulkBar } from '@/components/email-receipts/ReceiptBulkBar';
 import { RetryFailedEmailsButton } from '@/components/email-receipts/RetryFailedEmailsButton';
@@ -41,6 +43,7 @@ import {
   canReprocessReceipt,
   distinctSenderDomains,
   draftBlock,
+  senderDomainCounts,
   isReceiptActionable,
   normalizeDomainFilter,
   senderDomain,
@@ -51,7 +54,6 @@ import { createLogger } from '@/lib/logger';
 import { deselects, isBulkApprovable, isTradeProposal, type Deselection } from '@/lib/receipt-selection';
 import {
   EMAIL_RECEIPT_STATUSES,
-  PARSER_DRAFT_MAX_RECEIPTS,
   type EmailReceiptBulkScope,
   type EmailReceiptDomainCount,
   type EmailReceiptListItem,
@@ -123,7 +125,8 @@ interface Notice {
  * Any number of rows can be selected. A selection of every row on the page can be
  * widened to every email matching the filter, which the server counts (`matching`);
  * a bulk delete or ignore then names the filter, not ids. A profile is drafted from
- * one to five emails of one sender only (`draftBlock` says why it is off).
+ * one to five emails of each of one to five senders (`draftBlock` says why it is off); a
+ * selection over several senders is confirmed first, since it is for one transaction's linked emails.
  */
 export function EmailReceiptsManager() {
   const t = useTranslations('emailReceipts.receipts');
@@ -157,6 +160,8 @@ export function EmailReceiptsManager() {
   const [matching, setMatching] = useState<MatchingCount | null>(null);
   const [allMatching, setAllMatching] = useState<number | null>(null);
   const [drafting, setDrafting] = useState(false);
+  // A draft over several sender domains waits here for the person's confirmation.
+  const [linkedDraftFor, setLinkedDraftFor] = useState<readonly EmailReceiptListItem[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -414,6 +419,12 @@ export function EmailReceiptsManager() {
     } finally {
       setDrafting(false);
     }
+  };
+
+  // Several sender domains are for one transaction's linked emails: confirm that before any request is made.
+  const askDraft = () => {
+    if (distinctSenderDomains(selected).length > 1) setLinkedDraftFor(selected);
+    else void handleDraftParser(selected);
   };
 
   const handleApprove = (receipt: EmailReceiptListItem) => {
@@ -825,6 +836,8 @@ export function EmailReceiptsManager() {
         </Link>
       </div>
 
+      <LinkedProfilesHint variant="emails" />
+
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <div role="group" aria-label={t('filter.label')} className={`${SEGMENTED_GROUP_CLASS} max-w-full flex-wrap`}>
           {FILTERS.map((option) => (
@@ -886,7 +899,7 @@ export function EmailReceiptsManager() {
           pageCount={pageItems.length}
           matchingTotal={matchingTotal}
           canSelectAllMatching={canSelectAllMatching}
-          draftBlock={draftBlock(selected, PARSER_DRAFT_MAX_RECEIPTS, allMatching !== null)}
+          draftBlock={draftBlock(selected, allMatching !== null)}
           senderDomains={selectedDomains}
           busy={locked}
           drafting={drafting}
@@ -914,7 +927,7 @@ export function EmailReceiptsManager() {
           onChangeExclusions={narrowing.restore}
           onDelete={() => askBulk('delete')}
           onIgnore={() => askBulk('ignore')}
-          onDraft={() => void handleDraftParser(selected)}
+          onDraft={askDraft}
           onClear={clearSelection}
         />
       )}
@@ -993,6 +1006,17 @@ export function EmailReceiptsManager() {
           onChanged={() => void reload()}
         />
       )}
+
+      <LinkedDraftDialog
+        domains={linkedDraftFor === null ? [] : senderDomainCounts(linkedDraftFor)}
+        isOpen={linkedDraftFor !== null}
+        onConfirm={() => {
+          const receipts = linkedDraftFor;
+          setLinkedDraftFor(null);
+          if (receipts !== null) void handleDraftParser(receipts);
+        }}
+        onCancel={() => setLinkedDraftFor(null)}
+      />
 
       <BulkConfirmDialog
         request={bulk.request}

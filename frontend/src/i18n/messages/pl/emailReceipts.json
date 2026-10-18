@@ -865,11 +865,12 @@
         "remove": "Przywróć: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Parser można przygotować z maksymalnie {max} wiadomości. Zaznacz {max} wiadomości lub mniej.",
-        "differentSenders": "Zaznaczone wiadomości pochodzą od różnych nadawców ({domains}). Parser odczytuje wiadomości jednego nadawcy, więc zaznacz wiadomości od jednego nadawcy.",
         "skipped": "Nie można odczytać tej wiadomości, więc nie ma tekstu do przygotowania parsera. Usuń ją z zaznaczenia.",
         "allMatching": "Parser przygotowuje się z wiadomości, które zaznaczasz sam. Maksymalnie {max}. Wyczyść to zaznaczenie i zaznacz do {max} wiadomości.",
-        "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami."
+        "mixedKinds": "Wybrane wiadomości łączą potwierdzenia transakcji i wiadomości z zamówieniami. Profil odczytuje jeden rodzaj, więc wybierz tylko potwierdzenia transakcji albo tylko wiadomości z zamówieniami.",
+        "tooManyPerDomain": "Można użyć najwyżej {perDomain} wiadomości od jednego nadawcy. Zaznacz od każdego nadawcy ({domains}) {perDomain} wiadomości lub mniej.",
+        "tooManyDomains": "Można użyć razem najwyżej {maxDomains} nadawców ({domains}). Zaznacz wiadomości od {maxDomains} nadawców lub mniej.",
+        "tradeOneDomain": "Profil transakcji giełdowej odczytuje wiadomości jednego nadawcy ({domains}). Zaznacz potwierdzenia transakcji od jednego nadawcy."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Nie udało się zatwierdzić propozycji",
       "noApprovable": "W tym zaznaczeniu nie ma propozycji do zatwierdzenia.",
       "narrowFailed": "Nie udało się policzyć wiadomości. Zmiana nie została zastosowana."
+    },
+    "linkedDraftDialog": {
+      "title": "Przygotować powiązane profile?",
+      "message": "Zaznaczono e-maile od kilku nadawców: {domains}. Użyj tego tylko wtedy, gdy dane jednej transakcji bankowej są rozproszone w e-mailach kilku nadawców, na przykład sklepu i dostawcy płatności odroczonych albo sklepu i bramki płatności. Aby przygotować profile dla niezwiązanych sklepów, anuluj i przygotuj jedną domenę naraz. Jedno zgłoszenie obejmuje najwyżej {perDomain} e-maili od jednego nadawcy i najwyżej {maxDomains} nadawców.",
+      "domainEntry": "{domain} ({count, plural, one {# wiadomość} few {# wiadomości} many {# wiadomości} other {# wiadomości}})",
+      "confirm": "Przygotuj powiązane profile"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Księgowane na: {account}",
     "bookToNotTradable": "Księgowane na {account}, które nie jest otwartym kontem maklerskim, więc transakcji nie można tam zaksięgować.",
     "bookToUnknown": "Księgowane na konto spoza Twojej listy, więc transakcji nie można tam zaksięgować."
+  },
+  "linkedHint": {
+    "emails": "Jedna transakcja bankowa opisana w e-mailach od kilku nadawców (na przykład sklepu i dostawcy płatności odroczonych)? Zaznacz razem do {max} e-maili od każdego z tych nadawców i przygotuj powiązane profile.",
+    "profiles": "Kreator poniżej przygotowuje profil dla jednego nadawcy. Jedna transakcja bankowa opisana w e-mailach od kilku nadawców (na przykład sklepu i dostawcy płatności odroczonych)? Zaznacz na karcie Wiadomości do {max} e-maili od każdego z tych nadawców i przygotuj powiązane profile.",
+    "openEmails": "Otwórz kartę Wiadomości"
   }
 }

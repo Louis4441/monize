@@ -865,11 +865,12 @@
         "remove": "還原:{label}"
       },
       "draftBlocked": {
-        "tooMany": "最多可用 {max} 封郵件準備解析器。請選取不超過 {max} 封郵件。",
-        "differentSenders": "所選郵件來自不同的寄件者（{domains}）。解析器只讀取一個寄件者的郵件，請選取同一寄件者的郵件。",
         "skipped": "無法讀取的郵件沒有可用於準備解析器的文字。請將其從選取中移除。",
         "allMatching": "解析器需用您自己選取的郵件準備，最多 {max} 封。請清除目前的選取，再選取不超過 {max} 封郵件。",
-        "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。"
+        "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。",
+        "tooManyPerDomain": "每個寄件者最多可使用 {perDomain} 封郵件。請為每個寄件者（{domains}）選取不超過 {perDomain} 封郵件。",
+        "tooManyDomains": "最多可同時使用 {maxDomains} 個寄件者（{domains}）。請選取不超過 {maxDomains} 個寄件者的郵件。",
+        "tradeOneDomain": "交易設定檔只讀取一個寄件者（{domains}）的郵件。請選取同一寄件者的交易確認郵件。"
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "無法核准這些提案",
       "noApprovable": "此選取中沒有可核准的提案。",
       "narrowFailed": "無法計算郵件數量。變更未套用。"
+    },
+    "linkedDraftDialog": {
+      "title": "起草關聯的設定檔？",
+      "message": "您選取了多個寄件者的郵件：{domains}。僅當一筆銀行交易的資訊分散在多個寄件者的郵件裡時才使用，例如商店及其延期付款服務商，或商店及支付閘道。要為互不相關的商店起草設定檔，請取消並每次處理一個網域。一次請求每個寄件者最多 {perDomain} 封郵件，最多 {maxDomains} 個寄件者。",
+      "domainEntry": "{domain}（{count, plural, one {# 封} other {# 封}}）",
+      "confirm": "起草關聯的設定檔"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "記入：{account}",
     "bookToNotTradable": "記入 {account}，但它不是開放的證券帳戶，因此交易無法記入該帳戶。",
     "bookToUnknown": "記入不在您清單中的帳戶，因此交易無法記入該帳戶。"
+  },
+  "linkedHint": {
+    "emails": "一筆銀行交易的資訊分散在多個寄件者的郵件裡（例如商店及其延期付款服務商）？請同時選取這些寄件者各自最多 {max} 封郵件，並起草關聯的設定檔。",
+    "profiles": "下面的精靈只為一個寄件者起草設定檔。一筆銀行交易的資訊分散在多個寄件者的郵件裡（例如商店及其延期付款服務商）？請在「郵件」分頁選取這些寄件者各自最多 {max} 封郵件，並起草關聯的設定檔。",
+    "openEmails": "開啟「郵件」分頁"
   }
 }

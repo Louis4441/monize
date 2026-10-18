@@ -11,7 +11,11 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { DraftBlock } from '@/lib/email-receipts-format';
 import { hasExclusions, type Deselection, type SelectionExclusions } from '@/lib/receipt-selection';
-import { PARSER_DRAFT_MAX_RECEIPTS, type EmailReceiptStatus } from '@/types/email-receipts';
+import {
+  MAX_PARSER_DRAFT_DOMAINS,
+  MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
+  type EmailReceiptStatus,
+} from '@/types/email-receipts';
 import type { ReprocessProgress } from '@/components/email-receipts/useReceiptBulkProcessing';
 
 /** A command that is shown only for some selections, and the number it names when that is known. */
@@ -34,7 +38,7 @@ interface ReceiptBulkBarProps {
   canSelectAllMatching: boolean;
   /** Why the draft button is off, or null when it is on. */
   draftBlock: DraftBlock | null;
-  /** The sender domains of the selection, for the "different senders" reason. */
+  /** The sender domains of the selection, for the reasons that name them. */
   senderDomains: readonly string[];
   /** A command is running: nothing in the bar can be pressed. */
   busy: boolean;
@@ -68,7 +72,7 @@ interface ReceiptBulkBarProps {
  * them (Reprocess, Restore ignored, Approve proposals, Delete, Ignore, Prepare a
  * profile with AI), the "Deselect by" menu (state, sender, received day) and,
  * Gmail style, the offer to widen a full page to every email matching the filter. The draft button is on
- * only for one to five emails of one sender; when it is off, a line beside it says
+ * only for one to five emails of each of one to five senders; when it is off, a line beside it says
  * why and the button points at that line.
  */
 export function ReceiptBulkBar({
@@ -273,7 +277,12 @@ export function ReceiptBulkBar({
       )}
       {draftBlock !== null && (
         <p id={reasonId} className="text-amber-800 dark:text-amber-200">
-          {t(`draftBlocked.${draftBlock}`, { max: PARSER_DRAFT_MAX_RECEIPTS, domains: senderDomains.join(', ') })}
+          {t(`draftBlocked.${draftBlock}`, {
+            max: MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
+            perDomain: MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
+            maxDomains: MAX_PARSER_DRAFT_DOMAINS,
+            domains: senderDomains.join(', '),
+          })}
         </p>
       )}
     </div>

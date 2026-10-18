@@ -623,8 +623,11 @@ export interface EmailReceiptParserDraftRequestResult {
   requestId: string;
 }
 
-/** Most emails one "Draft parser with AI" request names (the server's bound). */
-export const PARSER_DRAFT_MAX_RECEIPTS = 5;
+/** Most emails of one sender domain one "Draft parser with AI" request names (the server's bound). */
+export const MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN = 5;
+
+/** Most sender domains one "Draft parser with AI" request spans (the server's bound); a trade draft takes one. */
+export const MAX_PARSER_DRAFT_DOMAINS = 5;
 
 /** What a bulk command does to the emails it names. */
 export type EmailReceiptBulkAction = 'delete' | 'ignore';

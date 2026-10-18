@@ -865,11 +865,12 @@
         "remove": "Geri al: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Bir ayrıştırıcı en çok {max} e-postadan hazırlanabilir. En fazla {max} e-posta seçin.",
-        "differentSenders": "Seçilen e-postalar farklı göndericilerden geliyor ({domains}). Bir ayrıştırıcı tek bir göndericinin e-postalarını okur, bu yüzden tek bir göndericinin e-postalarını seçin.",
         "skipped": "Okunamayan bir e-postanın ayrıştırıcı için metni yoktur. Onu seçimden çıkarın.",
         "allMatching": "Ayrıştırıcı, kendi seçtiğiniz e-postalardan hazırlanır; en çok {max} e-posta. Bu seçimi temizleyin ve en fazla {max} e-posta seçin.",
-        "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin."
+        "mixedKinds": "Seçilen e-postalar işlem onaylarını ve sipariş e-postalarını karıştırıyor. Bir profil tek bir türü okur, bu yüzden yalnızca işlem onaylarını ya da yalnızca sipariş e-postalarını seçin.",
+        "tooManyPerDomain": "Bir göndericiden en fazla {perDomain} e-posta kullanılabilir. Her göndericiden ({domains}) en fazla {perDomain} e-posta seçin.",
+        "tooManyDomains": "En fazla {maxDomains} gönderici birlikte kullanılabilir ({domains}). En fazla {maxDomains} göndericiden e-posta seçin.",
+        "tradeOneDomain": "Bir işlem profili tek bir göndericinin e-postalarını okur ({domains}). Tek bir göndericiden işlem onayları seçin."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Öneriler onaylanamadı",
       "noApprovable": "Bu seçimdeki hiçbir öneri onaylanamaz.",
       "narrowFailed": "E-postalar sayılamadı. Değişiklik uygulanmadı."
+    },
+    "linkedDraftDialog": {
+      "title": "Bağlantılı profil taslakları oluşturulsun mu?",
+      "message": "Birkaç göndericinin e-postalarını seçtiniz: {domains}. Bunu yalnızca tek bir banka işleminin bilgileri birkaç göndericinin e-postalarına dağılmışsa kullanın; örneğin bir mağaza ve ertelenmiş ödeme sağlayıcısı ya da bir mağaza ve bir ödeme geçidi. Birbiriyle ilgisiz mağazalar için iptal edin ve her seferinde bir alan adı için taslak oluşturun. Bir istek gönderici başına en fazla {perDomain} e-posta ve en fazla {maxDomains} gönderici kabul eder.",
+      "domainEntry": "{domain} ({count, plural, one {# e-posta} other {# e-posta}})",
+      "confirm": "Bağlantılı profil taslakları oluştur"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Kaydedileceği hesap: {account}",
     "bookToNotTradable": "{account} hesabına kaydedilir; bu açık bir aracı kurum hesabı olmadığından işlem oraya kaydedilemez.",
     "bookToUnknown": "Listenizde olmayan bir hesaba kaydedilir, bu yüzden işlem oraya kaydedilemez."
+  },
+  "linkedHint": {
+    "emails": "Tek bir banka işlemi birkaç göndericinin e-postalarında mı anlatılıyor (örneğin bir mağaza ve ertelenmiş ödeme sağlayıcısı)? Bu göndericilerin her birinden en fazla {max} e-postayı birlikte seçin ve bağlantılı profil taslakları oluşturun.",
+    "profiles": "Aşağıdaki sihirbaz tek bir gönderici için profil taslağı oluşturur. Tek bir banka işlemi birkaç göndericinin e-postalarında mı anlatılıyor (örneğin bir mağaza ve ertelenmiş ödeme sağlayıcısı)? E-postalar sekmesinde bu göndericilerin her birinden en fazla {max} e-postayı seçin ve bağlantılı profil taslakları oluşturun.",
+    "openEmails": "E-postalar sekmesini aç"
   }
 }

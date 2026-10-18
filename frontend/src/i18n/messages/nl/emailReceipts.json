@@ -865,11 +865,12 @@
         "remove": "Terugzetten: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Een profiel wordt voorbereid met maximaal {max} e-mails. Selecteer {max} e-mails of minder.",
-        "differentSenders": "De geselecteerde e-mails komen van verschillende afzenders ({domains}). Een profiel leest de e-mails van één afzender, dus selecteer e-mails van één afzender.",
         "skipped": "Een e-mail die niet gelezen kon worden, heeft geen tekst voor een profiel. Haal hem uit de selectie.",
         "allMatching": "Een profiel wordt voorbereid met e-mails die je zelf selecteert, maximaal {max}. Wis deze selectie en selecteer maximaal {max} e-mails.",
-        "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails."
+        "mixedKinds": "De geselecteerde e-mails mengen transactiebevestigingen en bestelmails. Een profiel leest één soort, dus selecteer alleen transactiebevestigingen of alleen bestelmails.",
+        "tooManyPerDomain": "Van één afzender kunnen maximaal {perDomain} e-mails worden gebruikt. Selecteer van elke afzender ({domains}) {perDomain} e-mails of minder.",
+        "tooManyDomains": "Er kunnen samen maximaal {maxDomains} afzenders worden gebruikt ({domains}). Selecteer e-mails van {maxDomains} afzenders of minder.",
+        "tradeOneDomain": "Een handelsprofiel leest de e-mails van één afzender ({domains}). Selecteer handelsbevestigingen van één afzender."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "De voorstellen konden niet worden goedgekeurd",
       "noApprovable": "Geen enkel voorstel in deze selectie kan worden goedgekeurd.",
       "narrowFailed": "De e-mails konden niet worden geteld. De wijziging is niet toegepast."
+    },
+    "linkedDraftDialog": {
+      "title": "Gekoppelde profielen laten opstellen?",
+      "message": "U hebt e-mails van meerdere afzenders geselecteerd: {domains}. Gebruik dit alleen als de gegevens van één banktransactie verspreid staan over e-mails van meerdere afzenders, bijvoorbeeld een webwinkel en zijn aanbieder van uitgestelde betaling, of een webwinkel en een betaalprovider. Voor webwinkels zonder verband annuleert u en stelt u één domein per keer op. Een verzoek neemt maximaal {perDomain} e-mails per afzender en maximaal {maxDomains} afzenders.",
+      "domainEntry": "{domain} ({count, plural, one {# e-mail} other {# e-mails}})",
+      "confirm": "Gekoppelde profielen laten opstellen"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Geboekt op: {account}",
     "bookToNotTradable": "Geboekt op {account}, dat geen open effectenrekening is, dus de transactie kan daar niet worden geboekt.",
     "bookToUnknown": "Geboekt op een rekening die niet in je lijst staat, dus de transactie kan daar niet worden geboekt."
+  },
+  "linkedHint": {
+    "emails": "Eén banktransactie die in e-mails van meerdere afzenders staat (bijvoorbeeld een webwinkel en zijn aanbieder van uitgestelde betaling)? Selecteer samen maximaal {max} e-mails van elk van die afzenders en laat gekoppelde profielen opstellen.",
+    "profiles": "Het stappenplan hieronder stelt een profiel op voor één afzender. Eén banktransactie die in e-mails van meerdere afzenders staat (bijvoorbeeld een webwinkel en zijn aanbieder van uitgestelde betaling)? Selecteer op het tabblad E-mails maximaal {max} e-mails van elk van die afzenders en laat gekoppelde profielen opstellen.",
+    "openEmails": "Tabblad E-mails openen"
   }
 }

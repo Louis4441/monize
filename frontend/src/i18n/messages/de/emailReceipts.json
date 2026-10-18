@@ -865,11 +865,12 @@
         "remove": "Zurücknehmen: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Ein Profil kann aus höchstens {max} E-Mails erstellt werden. Wähle {max} oder weniger E-Mails aus.",
-        "differentSenders": "Die ausgewählten E-Mails stammen von verschiedenen Absendern ({domains}). Ein Profil liest die E-Mails eines Absenders, wähle also E-Mails von einem Absender.",
         "skipped": "Eine E-Mail, die nicht gelesen werden konnte, hat keinen Text für ein Profil. Entferne sie aus der Auswahl.",
         "allMatching": "Ein Profil wird aus E-Mails erstellt, die du selbst auswählst, höchstens {max}. Hebe diese Auswahl auf und wähle bis zu {max} E-Mails aus.",
-        "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails."
+        "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails.",
+        "tooManyPerDomain": "Von einem Absender können höchstens {perDomain} E-Mails verwendet werden. Wähle von jedem Absender ({domains}) {perDomain} oder weniger E-Mails.",
+        "tooManyDomains": "Höchstens {maxDomains} Absender können zusammen verwendet werden ({domains}). Wähle E-Mails von {maxDomains} Absendern oder weniger.",
+        "tradeOneDomain": "Ein Trade-Profil liest die E-Mails eines Absenders ({domains}). Wähle Trade-Bestätigungen von einem Absender."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Die Vorschläge konnten nicht genehmigt werden",
       "noApprovable": "In dieser Auswahl kann kein Vorschlag genehmigt werden.",
       "narrowFailed": "Die E-Mails konnten nicht gezählt werden. Die Änderung wurde nicht übernommen."
+    },
+    "linkedDraftDialog": {
+      "title": "Verknüpfte Profile entwerfen?",
+      "message": "Du hast E-Mails mehrerer Absender gewählt: {domains}. Nutze das nur, wenn die Angaben zu einer Banktransaktion auf E-Mails mehrerer Absender verteilt sind, zum Beispiel ein Shop und sein Anbieter für Ratenzahlung oder ein Shop und ein Zahlungsdienst. Für voneinander unabhängige Shops brich ab und entwirf eine Domain nach der anderen. Eine Anfrage nimmt höchstens {perDomain} E-Mails je Absender und höchstens {maxDomains} Absender.",
+      "domainEntry": "{domain} ({count, plural, one {# E-Mail} other {# E-Mails}})",
+      "confirm": "Verknüpfte Profile entwerfen"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Gebucht auf: {account}",
     "bookToNotTradable": "Gebucht auf {account}, das kein offenes Depotkonto ist, daher kann der Handel dort nicht gebucht werden.",
     "bookToUnknown": "Gebucht auf ein Konto, das nicht in deiner Liste ist, daher kann der Handel dort nicht gebucht werden."
+  },
+  "linkedHint": {
+    "emails": "Eine Banktransaktion, die in E-Mails mehrerer Absender beschrieben wird (zum Beispiel ein Shop und sein Anbieter für Ratenzahlung)? Wähle zusammen bis zu {max} E-Mails von jedem dieser Absender und entwirf verknüpfte Profile.",
+    "profiles": "Die Anleitung unten entwirft ein Profil für einen Absender. Eine Banktransaktion, die in E-Mails mehrerer Absender beschrieben wird (zum Beispiel ein Shop und sein Anbieter für Ratenzahlung)? Wähle auf dem Tab E-Mails bis zu {max} E-Mails von jedem dieser Absender und entwirf verknüpfte Profile.",
+    "openEmails": "Tab E-Mails öffnen"
   }
 }

@@ -865,11 +865,12 @@
         "remove": "Rimetti: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Un profilo si prepara con al massimo {max} email. Seleziona {max} email o meno.",
-        "differentSenders": "Le email selezionate provengono da mittenti diversi ({domains}). Un profilo legge le email di un solo mittente, quindi seleziona email di un solo mittente.",
         "skipped": "Un'email che non è stato possibile leggere non ha testo per preparare un profilo. Toglila dalla selezione.",
         "allMatching": "Un profilo si prepara con email che selezioni tu, al massimo {max}. Cancella questa selezione e seleziona fino a {max} email.",
-        "mixedKinds": "Le email selezionate mescolano conferme di operazioni ed email di ordini. Un profilo legge un solo tipo, quindi seleziona solo conferme di operazioni o solo email di ordini."
+        "mixedKinds": "Le email selezionate mescolano conferme di operazioni ed email di ordini. Un profilo legge un solo tipo, quindi seleziona solo conferme di operazioni o solo email di ordini.",
+        "tooManyPerDomain": "Si possono usare al massimo {perDomain} email di un mittente. Seleziona {perDomain} email o meno per ogni mittente ({domains}).",
+        "tooManyDomains": "Si possono usare insieme al massimo {maxDomains} mittenti ({domains}). Seleziona email di {maxDomains} mittenti o meno.",
+        "tradeOneDomain": "Un profilo di operazione legge le email di un solo mittente ({domains}). Seleziona conferme di operazione di un solo mittente."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Impossibile approvare le proposte",
       "noApprovable": "Nessuna proposta di questa selezione può essere approvata.",
       "narrowFailed": "Impossibile contare le e-mail. La modifica non è stata applicata."
+    },
+    "linkedDraftDialog": {
+      "title": "Preparare profili collegati?",
+      "message": "Hai selezionato email di più mittenti: {domains}. Usa questa opzione solo quando i dati di una transazione bancaria sono distribuiti nelle email di più mittenti, per esempio un negozio e il suo fornitore di pagamento differito, o un negozio e un gateway di pagamento. Per negozi non collegati, annulla e prepara un dominio alla volta. Una richiesta accetta al massimo {perDomain} email per mittente e {maxDomains} mittenti.",
+      "domainEntry": "{domain} ({count, plural, one {# email} other {# email}})",
+      "confirm": "Prepara profili collegati"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Registrata su: {account}",
     "bookToNotTradable": "Registrata su {account}, che non è un conto titoli aperto, quindi l'operazione non può esservi registrata.",
     "bookToUnknown": "Registrata su un conto non presente nel tuo elenco, quindi l'operazione non può esservi registrata."
+  },
+  "linkedHint": {
+    "emails": "Una transazione bancaria descritta dalle email di più mittenti (per esempio un negozio e il suo fornitore di pagamento differito)? Seleziona insieme fino a {max} email di ciascuno di quei mittenti e prepara profili collegati.",
+    "profiles": "La guida qui sotto prepara un profilo per un solo mittente. Una transazione bancaria descritta dalle email di più mittenti (per esempio un negozio e il suo fornitore di pagamento differito)? Seleziona nella scheda Email fino a {max} email di ciascuno di quei mittenti e prepara profili collegati.",
+    "openEmails": "Apri la scheda Email"
   }
 }

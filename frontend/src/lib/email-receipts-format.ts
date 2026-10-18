@@ -1,6 +1,8 @@
 import {
   EMAIL_RECEIPT_DISPLAY_STATES,
   EMAIL_RECEIPT_STATUSES,
+  MAX_PARSER_DRAFT_DOMAINS,
+  MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
   PARSED_RECEIPT_REASONS,
   RECEIPT_LINE_KINDS,
   RECEIPT_LINK_OUTCOMES,
@@ -227,26 +229,49 @@ export function distinctSenderDomains(receipts: ReadonlyArray<Pick<EmailReceiptL
   return [...seen];
 }
 
+/** How many of some emails come from each sender domain, in the order the domains first appear. */
+export function senderDomainCounts(
+  receipts: ReadonlyArray<Pick<EmailReceiptListItem, 'fromDomain' | 'fromAddress'>>,
+): { domain: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const receipt of receipts) {
+    const domain = receipt.fromDomain || senderDomain(receipt.fromAddress);
+    if (domain !== '') counts.set(domain, (counts.get(domain) ?? 0) + 1);
+  }
+  return [...counts].map(([domain, count]) => ({ domain, count }));
+}
+
 /** Why "Prepare a profile with AI" is off for a selection, or `null` when it is on. */
-export type DraftBlock = 'tooMany' | 'differentSenders' | 'skipped' | 'mixedKinds' | 'allMatching';
+export type DraftBlock =
+  | 'tooManyPerDomain'
+  | 'tooManyDomains'
+  | 'tradeOneDomain'
+  | 'skipped'
+  | 'mixedKinds'
+  | 'allMatching';
 
 /**
- * Whether a selection can be drafted from: one to `max` emails, all from one
- * sender, none of them unreadable (a skipped email has no text to write a profile
- * from). `allMatching` is a selection by filter, not a list of emails a profile
- * could be read from. The first reason that applies is the one returned.
+ * Whether a selection can be drafted from: one to `MAX_PARSER_DRAFT_DOMAINS` sender
+ * domains with one to `MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN` emails each (the server's
+ * bounds), none of them unreadable (a skipped email has no text to write a profile
+ * from). A trade draft takes one domain. `allMatching` is a selection by filter, not
+ * a list of emails a profile could be read from. The first reason that applies is
+ * the one returned. A selection over several domains is allowed, but the caller
+ * confirms it first (`distinctSenderDomains(selected).length > 1`).
  */
 export function draftBlock(
   selected: ReadonlyArray<Pick<EmailReceiptListItem, 'status' | 'fromDomain' | 'fromAddress' | 'isTrade'>>,
-  max: number,
   allMatching: boolean,
 ): DraftBlock | null {
   if (allMatching) return 'allMatching';
-  if (selected.length > max) return 'tooMany';
+  const domains = senderDomainCounts(selected);
+  if (domains.some((entry) => entry.count > MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN)) return 'tooManyPerDomain';
+  if (domains.length > MAX_PARSER_DRAFT_DOMAINS) return 'tooManyDomains';
   if (selected.some((receipt) => receipt.status === 'skipped')) return 'skipped';
   // One profile reads one kind of email: trade confirmations and order emails are never drafted together.
-  if (parserDraftKind(selected) === 'mixed') return 'mixedKinds';
-  if (distinctSenderDomains(selected).length > 1) return 'differentSenders';
+  const kind = parserDraftKind(selected);
+  if (kind === 'mixed') return 'mixedKinds';
+  if (kind === 'trade' && domains.length > 1) return 'tradeOneDomain';
   return null;
 }
 

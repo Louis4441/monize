@@ -57,7 +57,8 @@
     "waitingForAgent": "AI 에이전트를 기다리는 중입니다. <link>설정에서 AI 제공자를 연결</link>하거나 MCP 클라이언트가 맡도록 하세요.",
     "parserDraftReady": "프로필 초안이 준비되었습니다. <link>프로필 설정에서 테스트하고 승인하세요</link>.",
     "tradePending": "이메일의 거래, 아직 읽지 않음",
-    "tradeEmail": "거래 확인 메일"
+    "tradeEmail": "거래 확인 메일",
+    "parserDraftIds": "프로필 초안 ID: {ids}"
   },
   "actions": {
     "dismiss": "무시"

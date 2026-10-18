@@ -865,11 +865,12 @@
         "remove": "Remettre : {label}"
       },
       "draftBlocked": {
-        "tooMany": "Un profil se prépare avec {max} e-mails au maximum. Sélectionnez {max} e-mails ou moins.",
-        "differentSenders": "Les e-mails sélectionnés viennent d'expéditeurs différents ({domains}). Un profil lit les e-mails d'un seul expéditeur : sélectionnez des e-mails d'un seul expéditeur.",
         "skipped": "Un e-mail illisible n'a pas de texte pour préparer un profil. Retirez-le de la sélection.",
         "allMatching": "Un profil se prépare avec des e-mails que vous sélectionnez vous-même, {max} au maximum. Effacez cette sélection et sélectionnez jusqu'à {max} e-mails.",
-        "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande."
+        "mixedKinds": "Les e-mails sélectionnés mélangent des confirmations d'opérations et des e-mails de commande. Un profil lit un seul type : sélectionnez uniquement des confirmations d'opérations ou uniquement des e-mails de commande.",
+        "tooManyPerDomain": "Au plus {perDomain} e-mails d'un même expéditeur peuvent être utilisés. Sélectionnez {perDomain} e-mails ou moins par expéditeur ({domains}).",
+        "tooManyDomains": "Au plus {maxDomains} expéditeurs peuvent être utilisés ensemble ({domains}). Sélectionnez des e-mails de {maxDomains} expéditeurs ou moins.",
+        "tradeOneDomain": "Un profil d'opération lit les e-mails d'un seul expéditeur ({domains}). Sélectionnez des confirmations d'opération d'un seul expéditeur."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Impossible d'approuver les propositions",
       "noApprovable": "Aucune proposition de cette sélection ne peut être approuvée.",
       "narrowFailed": "Impossible de compter les e-mails. La modification n'a pas été appliquée."
+    },
+    "linkedDraftDialog": {
+      "title": "Préparer des profils liés ?",
+      "message": "Vous avez sélectionné des e-mails de plusieurs expéditeurs : {domains}. N'utilisez cette option que si les informations d'une seule transaction bancaire sont réparties dans les e-mails de plusieurs expéditeurs, par exemple une boutique et son prestataire de paiement différé, ou une boutique et une passerelle de paiement. Pour des boutiques sans rapport, annulez et préparez un domaine à la fois. Une demande accepte au plus {perDomain} e-mails par expéditeur et {maxDomains} expéditeurs.",
+      "domainEntry": "{domain} ({count, plural, one {# e-mail} other {# e-mails}})",
+      "confirm": "Préparer des profils liés"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Inscrit à : {account}",
     "bookToNotTradable": "Inscrit à {account}, qui n'est pas un compte de courtage ouvert : l'opération ne peut pas y être inscrite.",
     "bookToUnknown": "Inscrit à un compte absent de votre liste : l'opération ne peut pas y être inscrite."
+  },
+  "linkedHint": {
+    "emails": "Une transaction bancaire décrite par les e-mails de plusieurs expéditeurs (par exemple une boutique et son prestataire de paiement différé) ? Sélectionnez ensemble jusqu'à {max} e-mails de chacun de ces expéditeurs et préparez des profils liés.",
+    "profiles": "L'assistant ci-dessous prépare un profil pour un seul expéditeur. Une transaction bancaire décrite par les e-mails de plusieurs expéditeurs (par exemple une boutique et son prestataire de paiement différé) ? Sélectionnez dans l'onglet E-mails jusqu'à {max} e-mails de chacun de ces expéditeurs et préparez des profils liés.",
+    "openEmails": "Ouvrir l'onglet E-mails"
   }
 }

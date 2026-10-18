@@ -865,11 +865,12 @@
         "remove": "恢复:{label}"
       },
       "draftBlocked": {
-        "tooMany": "最多可用 {max} 封邮件准备解析器。请选择不超过 {max} 封邮件。",
-        "differentSenders": "所选邮件来自不同的发件人（{domains}）。解析器只读取一个发件人的邮件，请选择同一发件人的邮件。",
         "skipped": "无法读取的邮件没有可用于准备解析器的文本。请将其从选择中移除。",
         "allMatching": "解析器需用你自己选择的邮件准备，最多 {max} 封。请清除当前选择，再选择不超过 {max} 封邮件。",
-        "mixedKinds": "所选邮件中混有交易确认邮件和订单邮件。一个配置文件只读取一种邮件，请只选择交易确认邮件或只选择订单邮件。"
+        "mixedKinds": "所选邮件中混有交易确认邮件和订单邮件。一个配置文件只读取一种邮件，请只选择交易确认邮件或只选择订单邮件。",
+        "tooManyPerDomain": "每个发件人最多可使用 {perDomain} 封邮件。请为每个发件人（{domains}）选择不超过 {perDomain} 封邮件。",
+        "tooManyDomains": "最多可同时使用 {maxDomains} 个发件人（{domains}）。请选择不超过 {maxDomains} 个发件人的邮件。",
+        "tradeOneDomain": "交易配置文件只读取一个发件人（{domains}）的邮件。请选择同一发件人的交易确认邮件。"
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "无法批准这些提案",
       "noApprovable": "此选择中没有可批准的提案。",
       "narrowFailed": "无法统计邮件数量。更改未应用。"
+    },
+    "linkedDraftDialog": {
+      "title": "起草关联的配置文件？",
+      "message": "您选择了多个发件人的邮件：{domains}。仅当一笔银行交易的信息分散在多个发件人的邮件里时才使用，例如商店及其延期付款服务商，或商店及支付网关。要为互不相关的商店起草配置文件，请取消并每次处理一个域名。一次请求每个发件人最多 {perDomain} 封邮件，最多 {maxDomains} 个发件人。",
+      "domainEntry": "{domain}（{count, plural, one {# 封} other {# 封}}）",
+      "confirm": "起草关联的配置文件"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "记入：{account}",
     "bookToNotTradable": "记入 {account}，但它不是开放的证券账户，因此交易无法记入该账户。",
     "bookToUnknown": "记入不在您列表中的账户，因此交易无法记入该账户。"
+  },
+  "linkedHint": {
+    "emails": "一笔银行交易的信息分散在多个发件人的邮件里（例如商店及其延期付款服务商）？请同时选择这些发件人各自最多 {max} 封邮件，并起草关联的配置文件。",
+    "profiles": "下面的向导只为一个发件人起草配置文件。一笔银行交易的信息分散在多个发件人的邮件里（例如商店及其延期付款服务商）？请在“邮件”标签页中选择这些发件人各自最多 {max} 封邮件，并起草关联的配置文件。",
+    "openEmails": "打开“邮件”标签页"
   }
 }

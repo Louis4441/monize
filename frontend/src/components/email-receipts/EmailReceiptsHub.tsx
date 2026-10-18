@@ -87,7 +87,15 @@ export function EmailReceiptsHub() {
           {isDemoMode ? demoNote : <MailboxSection />}
         </TabPanel>
         <TabPanel idPrefix={ID_PREFIX} tabKey="profiles" isActive={tab === 'profiles'}>
-          {isDemoMode ? demoNote : <ParsersSection wizardDomain={wizardDomain} onWizardDomainChange={setWizardDomain} />}
+          {isDemoMode ? (
+            demoNote
+          ) : (
+            <ParsersSection
+              wizardDomain={wizardDomain}
+              onWizardDomainChange={setWizardDomain}
+              onOpenEmails={() => selectTab('emails')}
+            />
+          )}
         </TabPanel>
         <TabPanel idPrefix={ID_PREFIX} tabKey="emails" isActive={tab === 'emails'}>
           <EmailReceiptsManager />

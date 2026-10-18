@@ -865,11 +865,12 @@
         "remove": "Masukkan kembali: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Profil dapat disiapkan dari paling banyak {max} surel. Pilih {max} surel atau kurang.",
-        "differentSenders": "Surel terpilih berasal dari pengirim yang berbeda ({domains}). Profil membaca surel dari satu pengirim, jadi pilih surel dari satu pengirim saja.",
         "skipped": "Surel yang tidak dapat dibaca tidak punya teks untuk menyiapkan profil. Hapus dari pilihan.",
         "allMatching": "Profil disiapkan dari surel yang Anda pilih sendiri, paling banyak {max}. Hapus pilihan ini lalu pilih paling banyak {max} surel.",
-        "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan."
+        "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan.",
+        "tooManyPerDomain": "Paling banyak {perDomain} surel dari satu pengirim dapat dipakai. Pilih {perDomain} surel atau kurang dari setiap pengirim ({domains}).",
+        "tooManyDomains": "Paling banyak {maxDomains} pengirim dapat dipakai bersamaan ({domains}). Pilih surel dari {maxDomains} pengirim atau kurang.",
+        "tradeOneDomain": "Profil transaksi efek membaca surel dari satu pengirim ({domains}). Pilih konfirmasi transaksi dari satu pengirim."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Usulan tidak dapat disetujui",
       "noApprovable": "Tidak ada usulan dalam pilihan ini yang dapat disetujui.",
       "narrowFailed": "Email tidak dapat dihitung. Perubahan tidak diterapkan."
+    },
+    "linkedDraftDialog": {
+      "title": "Siapkan profil yang saling terkait?",
+      "message": "Anda memilih surel dari beberapa pengirim: {domains}. Gunakan ini hanya jika data satu transaksi bank tersebar di surel dari beberapa pengirim, misalnya toko dan penyedia pembayaran tertunda, atau toko dan gerbang pembayaran. Untuk toko yang tidak berkaitan, batalkan dan siapkan satu domain setiap kali. Satu permintaan menerima paling banyak {perDomain} surel per pengirim dan {maxDomains} pengirim.",
+      "domainEntry": "{domain} ({count, plural, one {# surel} other {# surel}})",
+      "confirm": "Siapkan profil terkait"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Dicatat ke: {account}",
     "bookToNotTradable": "Dicatat ke {account}, yang bukan akun pialang yang terbuka, jadi transaksi tidak dapat dicatat di sana.",
     "bookToUnknown": "Dicatat ke akun yang tidak ada di daftar Anda, jadi transaksi tidak dapat dicatat di sana."
+  },
+  "linkedHint": {
+    "emails": "Satu transaksi bank dijelaskan dalam surel dari beberapa pengirim (misalnya toko dan penyedia pembayaran tertunda)? Pilih bersamaan hingga {max} surel dari setiap pengirim itu dan siapkan profil yang saling terkait.",
+    "profiles": "Panduan di bawah menyiapkan profil untuk satu pengirim. Satu transaksi bank dijelaskan dalam surel dari beberapa pengirim (misalnya toko dan penyedia pembayaran tertunda)? Pilih di tab Surel hingga {max} surel dari setiap pengirim itu dan siapkan profil yang saling terkait.",
+    "openEmails": "Buka tab Surel"
   }
 }

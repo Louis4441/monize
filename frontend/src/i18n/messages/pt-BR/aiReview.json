@@ -57,7 +57,8 @@
     "waitingForAgent": "Aguardando um agente de IA. <link>Conecte um provedor de IA em Configurações</link> ou deixe um cliente MCP assumi-la.",
     "parserDraftReady": "Rascunho de perfil pronto. <link>Teste e aprove-o nas configurações de perfis</link>.",
     "tradePending": "Uma operação de um e-mail, ainda não lida",
-    "tradeEmail": "E-mail de confirmação de negociação"
+    "tradeEmail": "E-mail de confirmação de negociação",
+    "parserDraftIds": "IDs dos rascunhos de perfil: {ids}"
   },
   "actions": {
     "dismiss": "Dispensar"

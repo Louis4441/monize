@@ -865,11 +865,12 @@
         "remove": "Repor: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Um analisador é preparado com, no máximo, {max} e-mails. Selecione {max} e-mails ou menos.",
-        "differentSenders": "Os e-mails selecionados vêm de remetentes diferentes ({domains}). Um analisador lê os e-mails de um só remetente, por isso selecione e-mails de um único remetente.",
         "skipped": "Um e-mail que não foi possível ler não tem texto para preparar um analisador. Retire-o da seleção.",
         "allMatching": "Um analisador é preparado com e-mails que selecionar, no máximo {max}. Limpe esta seleção e selecione até {max} e-mails.",
-        "mixedKinds": "Os e-mails selecionados misturam confirmações de negociação e e-mails de encomenda. Um perfil lê um só tipo, por isso selecione apenas confirmações de negociação ou apenas e-mails de encomenda."
+        "mixedKinds": "Os e-mails selecionados misturam confirmações de negociação e e-mails de encomenda. Um perfil lê um só tipo, por isso selecione apenas confirmações de negociação ou apenas e-mails de encomenda.",
+        "tooManyPerDomain": "Só se podem usar no máximo {perDomain} e-mails de um remetente. Selecione {perDomain} e-mails ou menos de cada remetente ({domains}).",
+        "tooManyDomains": "Só se podem usar em conjunto no máximo {maxDomains} remetentes ({domains}). Selecione e-mails de {maxDomains} remetentes ou menos.",
+        "tradeOneDomain": "Um perfil de negociação lê os e-mails de um só remetente ({domains}). Selecione confirmações de negociação de um só remetente."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Não foi possível aprovar as propostas",
       "noApprovable": "Nenhuma proposta desta seleção pode ser aprovada.",
       "narrowFailed": "Não foi possível contar os e-mails. A alteração não foi aplicada."
+    },
+    "linkedDraftDialog": {
+      "title": "Redigir perfis ligados?",
+      "message": "Selecionou e-mails de vários remetentes: {domains}. Use isto apenas quando os dados de uma transação bancária estão repartidos por e-mails de vários remetentes, por exemplo uma loja e o seu fornecedor de pagamento diferido, ou uma loja e um gateway de pagamento. Para lojas sem relação, cancele e redija um domínio de cada vez. Um pedido aceita no máximo {perDomain} e-mails por remetente e {maxDomains} remetentes.",
+      "domainEntry": "{domain} ({count, plural, one {# e-mail} other {# e-mails}})",
+      "confirm": "Redigir perfis ligados"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Registada em: {account}",
     "bookToNotTradable": "Registada em {account}, que não é uma conta de corretagem aberta, por isso a operação não pode ser registada lá.",
     "bookToUnknown": "Registada numa conta que não está na sua lista, por isso a operação não pode ser registada lá."
+  },
+  "linkedHint": {
+    "emails": "Uma transação bancária descrita em e-mails de vários remetentes (por exemplo, uma loja e o seu fornecedor de pagamento diferido)? Selecione em conjunto até {max} e-mails de cada um desses remetentes e redija perfis ligados.",
+    "profiles": "O guia abaixo redige um perfil para um só remetente. Uma transação bancária descrita em e-mails de vários remetentes (por exemplo, uma loja e o seu fornecedor de pagamento diferido)? Selecione no separador E-mails até {max} e-mails de cada um desses remetentes e redija perfis ligados.",
+    "openEmails": "Abrir o separador E-mails"
   }
 }

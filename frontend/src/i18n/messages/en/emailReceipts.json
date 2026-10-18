@@ -865,11 +865,12 @@
         "remove": "Put back: {label}"
       },
       "draftBlocked": {
-        "tooMany": "A profile can be prepared from at most {max} emails. Select {max} or fewer emails to use it.",
-        "differentSenders": "The selected emails come from different senders ({domains}). A profile reads one sender's emails, so select emails from one sender.",
         "skipped": "An email that could not be read has no text to prepare a profile from. Remove it from the selection to use this.",
         "allMatching": "A profile is prepared from emails you select yourself, at most {max}. Clear this selection and select up to {max} emails.",
-        "mixedKinds": "The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails."
+        "mixedKinds": "The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.",
+        "tooManyPerDomain": "At most {perDomain} emails from one sender can be used. Select {perDomain} or fewer emails from each sender ({domains}).",
+        "tooManyDomains": "At most {maxDomains} senders can be used together ({domains}). Select emails from {maxDomains} senders or fewer.",
+        "tradeOneDomain": "A trade profile reads the emails of one sender ({domains}). Select trade confirmations from one sender."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Could not approve the proposals",
       "noApprovable": "No proposals in this selection can be approved.",
       "narrowFailed": "Could not count the emails. The change was not applied."
+    },
+    "linkedDraftDialog": {
+      "title": "Draft linked profiles?",
+      "message": "You selected emails from several senders: {domains}. Use this only when the facts of one bank transaction are spread over emails of several senders, for example a shop and its deferred-payment provider, or a shop and a payment gateway. To draft profiles for unrelated shops, cancel and draft one domain at a time. A request takes at most {perDomain} emails per sender and at most {maxDomains} senders.",
+      "domainEntry": "{domain} ({count, plural, one {# email} other {# emails}})",
+      "confirm": "Draft linked profiles"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Books to: {account}",
     "bookToNotTradable": "Books to {account}, which is not an open brokerage account, so the trade cannot be booked there.",
     "bookToUnknown": "Books to an account that is not in your list, so the trade cannot be booked there."
+  },
+  "linkedHint": {
+    "emails": "One bank transaction described by emails from several senders (for example a shop and its deferred-payment provider)? Select up to {max} emails from each of those senders together and draft linked profiles.",
+    "profiles": "The wizard below drafts a profile for one sender. One bank transaction described by emails from several senders (for example a shop and its deferred-payment provider)? Select up to {max} emails from each of those senders on the Emails tab and draft linked profiles.",
+    "openEmails": "Open the Emails tab"
   }
 }

@@ -865,11 +865,12 @@
         "remove": "Thêm lại: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Trình phân tích chỉ có thể được soạn từ tối đa {max} email. Hãy chọn {max} email trở xuống.",
-        "differentSenders": "Các email đã chọn đến từ những người gửi khác nhau ({domains}). Một trình phân tích đọc email của một người gửi, vì vậy hãy chọn email từ cùng một người gửi.",
         "skipped": "Email không đọc được thì không có văn bản để soạn trình phân tích. Hãy bỏ nó khỏi lựa chọn.",
         "allMatching": "Trình phân tích được soạn từ các email bạn tự chọn, tối đa {max}. Hãy bỏ lựa chọn này rồi chọn tối đa {max} email.",
-        "mixedKinds": "Các email đã chọn trộn lẫn xác nhận giao dịch và email đơn hàng. Một hồ sơ chỉ đọc một loại, vì vậy hãy chỉ chọn xác nhận giao dịch hoặc chỉ chọn email đơn hàng."
+        "mixedKinds": "Các email đã chọn trộn lẫn xác nhận giao dịch và email đơn hàng. Một hồ sơ chỉ đọc một loại, vì vậy hãy chỉ chọn xác nhận giao dịch hoặc chỉ chọn email đơn hàng.",
+        "tooManyPerDomain": "Chỉ dùng được tối đa {perDomain} email từ một người gửi. Hãy chọn {perDomain} email trở xuống từ mỗi người gửi ({domains}).",
+        "tooManyDomains": "Chỉ dùng chung được tối đa {maxDomains} người gửi ({domains}). Hãy chọn email từ {maxDomains} người gửi trở xuống.",
+        "tradeOneDomain": "Hồ sơ giao dịch chứng khoán đọc email của một người gửi ({domains}). Hãy chọn xác nhận giao dịch từ một người gửi."
       }
     },
     "pager": {
@@ -928,6 +929,12 @@
       "approveFailed": "Không thể duyệt các đề xuất",
       "noApprovable": "Không có đề xuất nào trong lựa chọn này có thể duyệt.",
       "narrowFailed": "Không thể đếm các email. Thay đổi chưa được áp dụng."
+    },
+    "linkedDraftDialog": {
+      "title": "Soạn các hồ sơ liên kết?",
+      "message": "Bạn đã chọn email của nhiều người gửi: {domains}. Chỉ dùng cách này khi dữ liệu của một giao dịch ngân hàng nằm rải rác trong email của nhiều người gửi, ví dụ một cửa hàng và đơn vị thanh toán trả sau, hoặc một cửa hàng và một cổng thanh toán. Với các cửa hàng không liên quan, hãy hủy và soạn từng tên miền một. Mỗi yêu cầu nhận tối đa {perDomain} email cho mỗi người gửi và tối đa {maxDomains} người gửi.",
+      "domainEntry": "{domain} ({count, plural, one {# email} other {# email}})",
+      "confirm": "Soạn hồ sơ liên kết"
     }
   },
   "detail": {
@@ -1409,5 +1416,10 @@
     "bookTo": "Ghi vào: {account}",
     "bookToNotTradable": "Ghi vào {account}, vốn không phải tài khoản chứng khoán đang mở, nên không thể ghi giao dịch vào đó.",
     "bookToUnknown": "Ghi vào một tài khoản không có trong danh sách của bạn, nên không thể ghi giao dịch vào đó."
+  },
+  "linkedHint": {
+    "emails": "Một giao dịch ngân hàng được mô tả trong email của nhiều người gửi (ví dụ một cửa hàng và đơn vị thanh toán trả sau của nó)? Hãy chọn cùng lúc tối đa {max} email từ mỗi người gửi đó và soạn các hồ sơ liên kết.",
+    "profiles": "Trình hướng dẫn bên dưới soạn hồ sơ cho một người gửi. Một giao dịch ngân hàng được mô tả trong email của nhiều người gửi (ví dụ một cửa hàng và đơn vị thanh toán trả sau của nó)? Hãy chọn trên tab Email tối đa {max} email từ mỗi người gửi đó và soạn các hồ sơ liên kết.",
+    "openEmails": "Mở tab Email"
   }
 }

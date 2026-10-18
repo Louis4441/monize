@@ -84,6 +84,14 @@ export interface AiReviewParserDraft {
   emailCount: number;
   /** The draft parser an agent saved for it, once `proposed`; else null. */
   parserId: string | null;
+  /** Every draft parser saved for it, in save order (one per domain of the request); absent on an older payload. */
+  parserIds?: string[];
+}
+
+/** The draft parsers a parser-draft row names: every id of `parserIds` when present, else the single `parserId`. */
+export function draftParserIds(draft: Pick<AiReviewParserDraft, 'parserId' | 'parserIds'>): string[] {
+  if (draft.parserIds && draft.parserIds.length > 0) return draft.parserIds;
+  return draft.parserId ? [draft.parserId] : [];
 }
 
 /** The fixed instructions the email receipt pipeline writes (`receipt-instructions.ts`). */

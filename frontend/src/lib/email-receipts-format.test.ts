@@ -5,6 +5,7 @@ import {
   canReprocessReceipt,
   distinctSenderDomains,
   draftBlock,
+  senderDomainCounts,
   dominantSenderDomain,
   fromReceiptUnits,
   looksLikeHtml,
@@ -379,29 +380,53 @@ describe('draftBlock', () => {
   });
 
   it('is off for a mix of trade confirmations and order emails', () => {
-    expect(draftBlock([mail('a.com'), mail('a.com', 'no_parser', true)], 5, false)).toBe('mixedKinds');
-    expect(draftBlock([mail('a.com', 'no_parser', true)], 5, false)).toBeNull();
+    expect(draftBlock([mail('a.com'), mail('a.com', 'no_parser', true)], false)).toBe('mixedKinds');
+    expect(draftBlock([mail('a.com', 'no_parser', true)], false)).toBeNull();
   });
 
-  it('is on for one to five emails of one sender', () => {
-    expect(draftBlock([mail('a.com')], 5, false)).toBeNull();
-    expect(draftBlock([1, 2, 3, 4, 5].map(() => mail('a.com')), 5, false)).toBeNull();
+  it('is on for one to five emails of each of one to five senders', () => {
+    expect(draftBlock([mail('a.com')], false)).toBeNull();
+    expect(draftBlock([1, 2, 3, 4, 5].map(() => mail('a.com')), false)).toBeNull();
+    expect(draftBlock([mail('a.com'), mail('b.com')], false)).toBeNull();
+    const fiveByFive = [1, 2, 3, 4, 5].flatMap((d) => [1, 2, 3, 4, 5].map(() => mail(`d${d}.com`)));
+    expect(fiveByFive).toHaveLength(25);
+    expect(draftBlock(fiveByFive, false)).toBeNull();
   });
 
-  it('is off above the limit', () => {
-    expect(draftBlock([1, 2, 3, 4, 5, 6].map(() => mail('a.com')), 5, false)).toBe('tooMany');
+  it('is off above five emails of one sender, even when other senders are within the limit', () => {
+    expect(draftBlock([1, 2, 3, 4, 5, 6].map(() => mail('a.com')), false)).toBe('tooManyPerDomain');
+    expect(draftBlock([...[1, 2, 3, 4, 5, 6].map(() => mail('a.com')), mail('b.com')], false)).toBe('tooManyPerDomain');
   });
 
-  it('is off for several senders and for an unreadable email', () => {
-    expect(draftBlock([mail('a.com'), mail('b.com')], 5, false)).toBe('differentSenders');
-    expect(draftBlock([mail('a.com'), mail('a.com', 'skipped')], 5, false)).toBe('skipped');
+  it('is off above five senders', () => {
+    expect(draftBlock([1, 2, 3, 4, 5, 6].map((n) => mail(`d${n}.com`)), false)).toBe('tooManyDomains');
+  });
+
+  it('is off for trade confirmations of more than one sender', () => {
+    expect(draftBlock([mail('a.com', 'no_parser', true), mail('b.com', 'no_parser', true)], false)).toBe('tradeOneDomain');
+    expect(draftBlock([mail('a.com', 'no_parser', true), mail('a.com', 'no_parser', true)], false)).toBeNull();
+  });
+
+  it('is off for an unreadable email', () => {
+    expect(draftBlock([mail('a.com'), mail('a.com', 'skipped')], false)).toBe('skipped');
   });
 
   it('is off for a selection by filter, whatever its size', () => {
-    expect(draftBlock([mail('a.com')], 5, true)).toBe('allMatching');
+    expect(draftBlock([mail('a.com')], true)).toBe('allMatching');
   });
+});
 
-  it('names the limit before the sender when both apply', () => {
-    expect(draftBlock([1, 2, 3, 4, 5, 6].map((n) => mail(`d${n}.com`)), 5, false)).toBe('tooMany');
+describe('senderDomainCounts', () => {
+  it('counts emails per sender domain in first-seen order, falling back to the address', () => {
+    expect(
+      senderDomainCounts([
+        { fromDomain: 'a.com', fromAddress: 'x@a.com' },
+        { fromDomain: '', fromAddress: 'y@b.com' },
+        { fromDomain: 'a.com', fromAddress: 'z@a.com' },
+      ]),
+    ).toEqual([
+      { domain: 'a.com', count: 2 },
+      { domain: 'b.com', count: 1 },
+    ]);
   });
 });

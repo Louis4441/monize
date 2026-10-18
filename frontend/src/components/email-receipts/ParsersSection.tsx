@@ -48,9 +48,11 @@ interface ParsersSectionProps {
   /** The domain the profile wizard is open for (the hub keeps it in `?wizard=`); `null` or absent when closed. */
   wizardDomain?: string | null;
   onWizardDomainChange?: (domain: string | null) => void;
+  /** Switches the hub to the Emails tab (the hint on linked profiles links there). */
+  onOpenEmails?: () => void;
 }
 
-export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: ParsersSectionProps = {}) {
+export function ParsersSection({ wizardDomain = null, onWizardDomainChange, onOpenEmails }: ParsersSectionProps = {}) {
   const t = useTranslations('emailReceipts.parsers');
   const tc = useTranslations('common');
   const { state: lookups, reload: reloadLookups } = useReceiptParserLookups();
@@ -321,6 +323,7 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange }: Pa
           refreshKey={uncoveredAttempt}
           onSelect={(domain) => onWizardDomainChange?.(domain)}
           disabled={!onWizardDomainChange}
+          onOpenEmails={onOpenEmails}
         />
       )}
       {processState.status !== 'idle' && (
