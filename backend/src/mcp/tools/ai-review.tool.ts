@@ -6,6 +6,8 @@ import {
   AI_REVIEW_TRADE_GUIDANCE,
 } from "../../ai-review/ai-review-work.types";
 import { aiReviewRequestsFields } from "../../ai/query/tool-input-schemas";
+import { AiRelayService } from "../../ai/relay/ai-relay.service";
+import { emitRelayCard } from "../mcp-relay-confirm";
 import { stripHtml } from "../../common/sanitization.util";
 import {
   callerKey,
@@ -25,16 +27,24 @@ const CLAIM_GUIDANCE =
 const SUBMITTED =
   "Proposal stored. Nothing was changed: the user reviews it in Monize and approves or dismisses it. Do not say it was applied.";
 
+const SUBMITTED_CARD_SHOWN =
+  "Proposal stored and a confirmation card was shown to the user in the Monize web chat. Nothing was changed: it is applied only when the user approves the card there (or in the review inbox). Do not say it was applied; tell the user to review and approve the card.";
+
 /**
  * The AI review queue (design 6.5) for an MCP agent: claim a transaction a rule
  * asked an AI to look at, read it, and propose an edit. A proposal is never a
  * write -- it is a signed card the person approves in the review inbox -- so
  * this tool confirms nothing and spends none of the daily write cap; the
- * approval that saves it is counted where it happens.
+ * approval that saves it is counted where it happens. On a web-chat relay turn
+ * a submitted proposal is also offered to the chat as its confirmation card
+ * (`emitRelayCard`), so the person can approve it there as well as in the inbox.
  */
 @Injectable()
 export class McpAiReviewTools {
-  constructor(private readonly work: AiReviewWorkService) {}
+  constructor(
+    private readonly work: AiReviewWorkService,
+    private readonly relayService: AiRelayService,
+  ) {}
 
   register(server: McpServer) {
     server.registerTool(
@@ -134,11 +144,22 @@ export class McpAiReviewTools {
                 ...(args.trade ? { trade: args.trade } : {}),
               },
             );
+            // The proposal is stored either way (the review inbox shows it).
+            // On a relay turn the same card is also offered to the web chat,
+            // where approving it through /ai/actions/confirm applies it. Only
+            // on the first round: a retry has already been answered elsewhere.
+            const shownInChat =
+              !ctx.mcpReq.requestState() &&
+              (await emitRelayCard(
+                this.relayService,
+                user.userId,
+                submitted.action,
+              ));
             return toolResult({
               status: "proposed",
               request: submitted.request,
               proposal: submitted.action.preview,
-              message: SUBMITTED,
+              message: shownInChat ? SUBMITTED_CARD_SHOWN : SUBMITTED,
             });
           }
 
