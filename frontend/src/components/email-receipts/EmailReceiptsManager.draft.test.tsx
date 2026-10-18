@@ -182,16 +182,16 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
       expect(checkbox('Order 1')).not.toBeChecked();
     });
 
-    it('clears the selection when the filter changes, so no action can be aimed at an email of the other list', async () => {
+    it('keeps the ticked emails when the state filter changes', async () => {
       await renderManager();
       await click(checkbox('Order 1'));
       api.list.mockResolvedValueOnce([shop(1), shop(2)]);
       await click(screen.getByRole('button', { name: 'No profile' }));
-      expect(bar()).not.toBeInTheDocument();
-      expect(checkbox('Order 1')).not.toBeChecked();
+      expect(bar()).toHaveTextContent('1 email selected');
+      expect(checkbox('Order 1')).toBeChecked();
     });
 
-    it('drops an email a reload no longer lists from the selection, and keeps the others', async () => {
+    it('keeps an email a reload no longer lists in the selection, and says it is not shown', async () => {
       api.reprocess.mockResolvedValue(makeDetail());
       await renderManager();
       await click(checkbox('Order 1'));
@@ -202,7 +202,8 @@ describe('EmailReceiptsManager: drafting a profile with AI from selected emails'
       await click(within(row).getByRole('button', { name: 'More actions' }));
       await click(screen.getByRole('menuitem', { name: 'Reprocess' }));
 
-      expect(bar()).toHaveTextContent('1 email selected');
+      expect(bar()).toHaveTextContent('2 emails selected');
+      expect(bar()).toHaveTextContent('1 of the selected emails is not shown in this list.');
       expect(checkbox('Order 2')).toBeChecked();
     });
   });

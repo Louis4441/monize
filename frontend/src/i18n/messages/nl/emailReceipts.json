@@ -836,6 +836,7 @@
       "pageSelected": "Alle {count} e-mails op deze pagina zijn geselecteerd.",
       "selectAllMatching": "Selecteer alle {total} e-mails die bij dit filter passen.",
       "allMatchingSelected": "Alle {total} e-mails die bij dit filter passen, zijn geselecteerd.",
+      "hiddenSelected": "{hidden, plural, one {# van de geselecteerde e-mails staat niet in deze lijst.} other {# van de geselecteerde e-mails staan niet in deze lijst.}}",
       "reprocessButton": "Opnieuw verwerken ({count})",
       "restoreButton": "Genegeerde herstellen ({count})",
       "restoreButtonAll": "Genegeerde herstellen",

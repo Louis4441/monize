@@ -836,6 +836,7 @@
       "pageSelected": "此页面上的 {count} 封邮件已全部选中。",
       "selectAllMatching": "选择符合此筛选条件的全部 {total} 封邮件。",
       "allMatchingSelected": "符合此筛选条件的全部 {total} 封邮件已选中。",
+      "hiddenSelected": "{hidden, plural, other {已选中的邮件中有 # 封未显示在此列表中。}}",
       "reprocessButton": "重新处理({count})",
       "restoreButton": "恢复已忽略({count})",
       "restoreButtonAll": "恢复已忽略",

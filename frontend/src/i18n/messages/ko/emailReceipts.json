@@ -836,6 +836,7 @@
       "pageSelected": "이 페이지의 메일 {count}개가 모두 선택되었습니다.",
       "selectAllMatching": "이 필터와 일치하는 메일 {total}개 모두 선택",
       "allMatchingSelected": "이 필터와 일치하는 메일 {total}개가 모두 선택되었습니다.",
+      "hiddenSelected": "{hidden, plural, other {선택한 메일 중 #개는 이 목록에 표시되지 않습니다.}}",
       "reprocessButton": "다시 처리 ({count})",
       "restoreButton": "무시한 메일 복원 ({count})",
       "restoreButtonAll": "무시한 메일 복원",

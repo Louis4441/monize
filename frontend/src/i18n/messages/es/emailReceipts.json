@@ -836,6 +836,7 @@
       "pageSelected": "Los {count} correos de esta página están seleccionados.",
       "selectAllMatching": "Seleccionar los {total} correos que coinciden con este filtro.",
       "allMatchingSelected": "Los {total} correos que coinciden con este filtro están seleccionados.",
+      "hiddenSelected": "{hidden, plural, one {# de los correos seleccionados no aparece en esta lista.} many {# de los correos seleccionados no aparecen en esta lista.} other {# de los correos seleccionados no aparecen en esta lista.}}",
       "reprocessButton": "Reprocesar ({count})",
       "restoreButton": "Restaurar ignorados ({count})",
       "restoreButtonAll": "Restaurar ignorados",

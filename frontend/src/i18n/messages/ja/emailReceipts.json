@@ -836,6 +836,7 @@
       "pageSelected": "このページの {count} 件がすべて選択されています。",
       "selectAllMatching": "このフィルターに一致する {total} 件をすべて選択",
       "allMatchingSelected": "このフィルターに一致する {total} 件のメールがすべて選択されています。",
+      "hiddenSelected": "{hidden, plural, other {選択したメールのうち # 件はこの一覧に表示されていません。}}",
       "reprocessButton": "再処理 ({count})",
       "restoreButton": "無視を元に戻す ({count})",
       "restoreButtonAll": "無視を元に戻す",

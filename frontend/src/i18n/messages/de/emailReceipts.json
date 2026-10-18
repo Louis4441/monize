@@ -836,6 +836,7 @@
       "pageSelected": "Alle {count} E-Mails auf dieser Seite sind ausgewählt.",
       "selectAllMatching": "Alle {total} E-Mails auswählen, die zu diesem Filter passen.",
       "allMatchingSelected": "Alle {total} E-Mails, die zu diesem Filter passen, sind ausgewählt.",
+      "hiddenSelected": "{hidden, plural, one {# der ausgewählten E-Mails wird in dieser Liste nicht angezeigt.} other {# der ausgewählten E-Mails werden in dieser Liste nicht angezeigt.}}",
       "reprocessButton": "Erneut verarbeiten ({count})",
       "restoreButton": "Ignorierte wiederherstellen ({count})",
       "restoreButtonAll": "Ignorierte wiederherstellen",

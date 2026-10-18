@@ -836,6 +836,7 @@
       "pageSelected": "Semua {count} surel di halaman ini dipilih.",
       "selectAllMatching": "Pilih semua {total} surel yang cocok dengan filter ini.",
       "allMatchingSelected": "Semua {total} surel yang cocok dengan filter ini dipilih.",
+      "hiddenSelected": "{hidden, plural, other {# surel yang dipilih tidak tampil di daftar ini.}}",
       "reprocessButton": "Proses ulang ({count})",
       "restoreButton": "Pulihkan yang diabaikan ({count})",
       "restoreButtonAll": "Pulihkan yang diabaikan",

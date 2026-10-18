@@ -836,6 +836,7 @@
       "pageSelected": "All {count} on this page are selected.",
       "selectAllMatching": "Select all {total} matching this filter.",
       "allMatchingSelected": "All {total} emails matching this filter are selected.",
+      "hiddenSelected": "{hidden, plural, one {# of the selected emails is not shown in this list.} other {# of the selected emails are not shown in this list.}}",
       "reprocessButton": "Reprocess ({count})",
       "restoreButton": "Restore ignored ({count})",
       "restoreButtonAll": "Restore ignored",

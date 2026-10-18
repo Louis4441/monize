@@ -32,6 +32,8 @@ interface ReceiptBulkBarProps {
   allMatching: boolean;
   /** Rows on the page. */
   pageCount: number;
+  /** Ticked emails that are not in the list on screen (another page, state or sender). */
+  hiddenCount: number;
   /** How many emails match the filter, as the server counts them; null while unknown or failed. */
   matchingTotal: number | null;
   /** Every row of the page is ticked and more emails match the filter. */
@@ -79,6 +81,7 @@ export function ReceiptBulkBar({
   count,
   allMatching,
   pageCount,
+  hiddenCount,
   matchingTotal,
   canSelectAllMatching,
   draftBlock,
@@ -272,6 +275,7 @@ export function ReceiptBulkBar({
           </button>
         </p>
       )}
+      {hiddenCount > 0 && <p>{t('hiddenSelected', { hidden: hiddenCount })}</p>}
       {allMatching && (
         <p>{t(narrowed ? 'narrowedSelected' : 'allMatchingSelected', { total: formatNumber(count, 0) })}</p>
       )}

@@ -836,6 +836,7 @@
       "pageSelected": "Tất cả {count} email trên trang này đã được chọn.",
       "selectAllMatching": "Chọn tất cả {total} email khớp với bộ lọc này.",
       "allMatchingSelected": "Tất cả {total} email khớp với bộ lọc này đã được chọn.",
+      "hiddenSelected": "{hidden, plural, other {# email đã chọn không hiển thị trong danh sách này.}}",
       "reprocessButton": "Xử lý lại ({count})",
       "restoreButton": "Khôi phục email bị bỏ qua ({count})",
       "restoreButtonAll": "Khôi phục email bị bỏ qua",

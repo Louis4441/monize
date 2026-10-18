@@ -836,6 +836,7 @@
       "pageSelected": "Zaznaczono wszystkie wiadomości na tej stronie: {count}.",
       "selectAllMatching": "Zaznacz wszystkie wiadomości pasujące do filtra: {total}.",
       "allMatchingSelected": "Zaznaczono wszystkie wiadomości pasujące do filtra: {total}.",
+      "hiddenSelected": "{hidden, plural, one {# z zaznaczonych wiadomości nie jest widoczna na tej liście.} few {# z zaznaczonych wiadomości nie jest widoczne na tej liście.} many {# z zaznaczonych wiadomości nie jest widocznych na tej liście.} other {# z zaznaczonych wiadomości nie jest widocznych na tej liście.}}",
       "reprocessButton": "Przetwórz ponownie ({count})",
       "restoreButton": "Przywróć zignorowane ({count})",
       "restoreButtonAll": "Przywróć zignorowane",

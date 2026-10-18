@@ -836,6 +836,7 @@
       "pageSelected": "इस पृष्ठ के सभी {count} ईमेल चुने गए हैं।",
       "selectAllMatching": "इस फ़िल्टर से मेल खाने वाले सभी {total} ईमेल चुनें।",
       "allMatchingSelected": "इस फ़िल्टर से मेल खाने वाले सभी {total} ईमेल चुने गए हैं।",
+      "hiddenSelected": "{hidden, plural, one {चुने गए # ईमेल इस सूची में नहीं दिख रहा है।} other {चुने गए # ईमेल इस सूची में नहीं दिख रहे हैं।}}",
       "reprocessButton": "दोबारा प्रोसेस करें ({count})",
       "restoreButton": "अनदेखे ईमेल बहाल करें ({count})",
       "restoreButtonAll": "अनदेखे ईमेल बहाल करें",

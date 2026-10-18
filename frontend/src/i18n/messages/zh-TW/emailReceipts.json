@@ -836,6 +836,7 @@
       "pageSelected": "此頁面上的 {count} 封郵件已全部選取。",
       "selectAllMatching": "選取符合此篩選條件的全部 {total} 封郵件。",
       "allMatchingSelected": "符合此篩選條件的全部 {total} 封郵件已選取。",
+      "hiddenSelected": "{hidden, plural, other {已選取的郵件中有 # 封未顯示在此列表中。}}",
       "reprocessButton": "重新處理({count})",
       "restoreButton": "還原已忽略({count})",
       "restoreButtonAll": "還原已忽略",

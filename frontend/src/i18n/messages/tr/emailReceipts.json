@@ -836,6 +836,7 @@
       "pageSelected": "Bu sayfadaki {count} e-postanın tümü seçildi.",
       "selectAllMatching": "Bu filtreye uyan {total} e-postanın tümünü seç.",
       "allMatchingSelected": "Bu filtreye uyan {total} e-postanın tümü seçildi.",
+      "hiddenSelected": "{hidden, plural, one {Seçilen e-postalardan # tanesi bu listede gösterilmiyor.} other {Seçilen e-postalardan # tanesi bu listede gösterilmiyor.}}",
       "reprocessButton": "Yeniden işle ({count})",
       "restoreButton": "Yok sayılanları geri yükle ({count})",
       "restoreButtonAll": "Yok sayılanları geri yükle",

@@ -189,14 +189,18 @@ describe('EmailReceiptsManager: paging', () => {
   });
 
   describe('selection', () => {
-    it('clears the ticked rows when the page changes', async () => {
+    it('keeps the ticked rows when the page changes, and says how many are not shown', async () => {
       await renderManager();
       await click(row(1));
       expect(bar()).toHaveTextContent('1 email selected');
       await click(next());
-      expect(bar()).not.toBeInTheDocument();
+      expect(bar()).toHaveTextContent('1 email selected');
+      expect(bar()).toHaveTextContent('1 of the selected emails is not shown in this list.');
+      await click(row(51));
+      expect(bar()).toHaveTextContent('2 emails selected');
       await click(previous());
-      expect(row(1)).not.toBeChecked();
+      expect(row(1)).toBeChecked();
+      expect(bar()).toHaveTextContent('1 of the selected emails is not shown in this list.');
     });
 
     it('ticks the rows of the current page with the header box, and offers every matching email', async () => {

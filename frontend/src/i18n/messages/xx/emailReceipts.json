@@ -836,6 +836,7 @@
       "pageSelected": "[XX-All {count} on this page are selected.-XX]",
       "selectAllMatching": "[XX-Select all {total} matching this filter.-XX]",
       "allMatchingSelected": "[XX-All {total} emails matching this filter are selected.-XX]",
+      "hiddenSelected": "[XX-{hidden, plural, one {# of the selected emails is not shown in this list.} other {# of the selected emails are not shown in this list.}}-XX]",
       "reprocessButton": "[XX-Reprocess ({count})-XX]",
       "restoreButton": "[XX-Restore ignored ({count})-XX]",
       "restoreButtonAll": "[XX-Restore ignored-XX]",
