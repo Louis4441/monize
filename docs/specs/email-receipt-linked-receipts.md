@@ -391,8 +391,12 @@ fromDomains}]`, at most 5 entries (each definition must validate with
 `role: "component"`; `fromDomains` 1 to 10 domains). Besides the stored
 components, the dry run reads, without writing anything, for each entry the
 user's stored emails (not `skipped`) whose sender is covered by its domains and
-whose date is inside the settlement's `link` window, newest first, at most 200
-per entry (`MAX_DRAFT_COMPONENT_EMAILS`), with that definition. Each reading
+whose date is inside the settlement's `link` window, newest first, with that
+definition. One `test` call reads at most 200 stored emails in all
+(`MAX_DRAFT_COMPONENT_READS`), over every entry and every tested email: each
+email is read once per entry for the whole call, and past the limit nothing more
+is read and the result says `componentDraftsExhausted: true`, so a part
+reported `not_found` may still have a component. Each reading
 with a link value is a component candidate, `source: "draft"`; it replaces a
 stored component of the same email. The choice per link, `taken` and the join
 are exactly sections 3 and 4. Each found component in the result says

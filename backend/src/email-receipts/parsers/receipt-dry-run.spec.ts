@@ -22,6 +22,10 @@ import {
   loadTransactionSummaries,
   summarizeTransaction,
 } from "./receipt-dry-run";
+import {
+  DraftComponentReader,
+  MAX_DRAFT_COMPONENT_READS,
+} from "./component-draft";
 
 const USER = "user-1";
 const T1 = "40000000-0000-4000-8000-000000000001";
@@ -559,6 +563,10 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
   const world = (stored: unknown[], drafted: unknown[]) =>
     jest.fn(async (sql: string, _params?: unknown[]) => {
       if (sql.includes("r.body_text")) return drafted;
+      // The draft reader's search returns ids only; the bodies come next.
+      if (sql.includes("r.status <> 'skipped'")) {
+        return (drafted as Array<{ id: string }>).map(({ id }) => ({ id }));
+      }
       if (sql.includes("r.link_key")) return stored;
       if (sql.includes("definition->>'tag'")) {
         return [{ id: "parser-1", tag: null, name: "Stored profile" }];
@@ -594,7 +602,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [draft()],
+      new DraftComponentReader([draft()]),
     );
 
     expect(partOf(run)).toMatchObject({
@@ -625,11 +633,11 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [draft()],
+      new DraftComponentReader([draft()]),
     );
 
     const [sql, params] = query.mock.calls.find(([text]) =>
-      text.includes("r.body_text"),
+      text.includes("r.status <> 'skipped'"),
     ) as [string, unknown[]];
     expect(sql).toContain("r.status <> 'skipped'");
     expect(sql).toContain("r.user_id = $1");
@@ -668,7 +676,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [draft()],
+      new DraftComponentReader([draft()]),
     );
 
     expect(partOf(run)).toMatchObject({
@@ -689,7 +697,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [draft()],
+      new DraftComponentReader([draft()]),
     );
 
     // two emails carry the key: the newest date is chosen (the draft), and the count says two
@@ -703,7 +711,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [draft()],
+      new DraftComponentReader([draft()]),
     );
     expect(partOf(stored)).toMatchObject({
       component: { id: "component-1", source: "stored" },
@@ -717,12 +725,12 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [
+      new DraftComponentReader([
         draft({
           ...ALLEGRO_PAY_COMPONENT_DEFINITION,
           requireLine: ["never present"],
         }),
-      ],
+      ]),
     );
     expect(partOf(guarded)).toMatchObject({
       outcome: "not_found",
@@ -747,7 +755,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [draft()],
+      new DraftComponentReader([draft()]),
     );
     expect(partOf(otherKey)).toMatchObject({ outcome: "not_found" });
   });
@@ -760,14 +768,17 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      [draft(), { ...draft(), fromDomains: ["other.example.com"] }],
+      new DraftComponentReader([
+        draft(),
+        { ...draft(), fromDomains: ["other.example.com"] },
+      ]),
     );
 
-    const reads = query.mock.calls.filter(([sql]) =>
-      sql.includes("r.body_text"),
+    const searches = query.mock.calls.filter(([sql]) =>
+      sql.includes("r.status <> 'skipped'"),
     );
-    expect(reads).toHaveLength(2);
-    expect(reads[1][1]?.[2]).toEqual(["other.example.com"]);
+    expect(searches).toHaveLength(2);
+    expect(searches[1][1]?.[2]).toEqual(["other.example.com"]);
     expect(partOf(run)).toMatchObject({
       several: 1,
       component: { source: "draft" },
@@ -782,10 +793,58 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       { ...repayment, bodyText: "Nothing to see" },
       null,
-      [draft()],
+      new DraftComponentReader([draft()]),
     );
     expect(query.mock.calls.some(([sql]) => sql.includes("r.body_text"))).toBe(
       false,
     );
+  });
+
+  it("reads each email once per draft for the whole call when one reader serves several emails", async () => {
+    const query = world([], [draftRow()]);
+    const reader = new DraftComponentReader([draft()]);
+    for (let i = 0; i < 3; i++) {
+      const run = await dryRunReceipt(
+        { query } as never,
+        USER,
+        ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+        { ...repayment, id: `repayment-${i}` },
+        null,
+        reader,
+      );
+      expect(partOf(run)).toMatchObject({ component: { source: "draft" } });
+    }
+    expect(
+      query.mock.calls.filter(([sql]) => sql.includes("r.body_text")),
+    ).toHaveLength(1);
+    expect(reader.exhausted).toBe(false);
+  });
+
+  it("stops at the call's read limit over every draft and email, and says so", async () => {
+    const many = Array.from({ length: MAX_DRAFT_COMPONENT_READS + 1 }, (_, i) =>
+      draftRow({ id: `component-${i}` }),
+    );
+    const query = world([], many);
+    const reader = new DraftComponentReader([
+      draft(),
+      { ...draft(), fromDomains: ["other.example.com"] },
+    ]);
+    await dryRunReceipt(
+      { query } as never,
+      USER,
+      ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+      repayment,
+      null,
+      reader,
+    );
+    const bodyReads = query.mock.calls.filter(([sql]) =>
+      sql.includes("r.body_text"),
+    );
+    const read = bodyReads.reduce(
+      (sum, [, params]) => sum + (params?.[1] as string[]).length,
+      0,
+    );
+    expect(read).toBe(MAX_DRAFT_COMPONENT_READS);
+    expect(reader.exhausted).toBe(true);
   });
 });

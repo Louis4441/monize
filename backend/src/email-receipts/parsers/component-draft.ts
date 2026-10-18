@@ -29,8 +29,14 @@ import {
  * saved. Nothing here writes.
  */
 
-/** Stored emails a dry run reads with ONE component draft (newest first). */
-export const MAX_DRAFT_COMPONENT_EMAILS = 200;
+/**
+ * Stored emails ONE `test` call reads with its component drafts, over every
+ * draft and every tested email together (each email once per draft: the
+ * reading is cached). A call that would read more stops there and says so
+ * (`DraftComponentReader.exhausted`), so a test of 25 settlement emails with
+ * 5 drafts never parses thousands of emails.
+ */
+export const MAX_DRAFT_COMPONENT_READS = 200;
 
 /** A component draft that passed `checkComponentDrafts`. */
 export interface ComponentDraft {
@@ -127,103 +133,154 @@ export function checkComponentDrafts(
   return { ok: true, drafts };
 }
 
-/**
- * Read the user's stored emails with the component drafts, as the candidates a
- * settlement's parts may join (spec 10a). The emails are the user's, not
- * `skipped`, from a sender the draft covers (the module's equal-or-subdomain
- * rule), dated inside the settlement's component window (the one
- * `loadLinkedComponents` uses), newest first, at most
- * `MAX_DRAFT_COMPONENT_EMAILS` per draft; the settlement's own email is left out. Each is
- * read with the draft over the lines of its `source`; a reading that the draft's
- * guards turn aside, or that holds no link value among `wanted`, is not a
- * candidate. Reads only: no write, no row lock.
- */
-export async function readDraftComponents(
-  m: EntityManager,
-  userId: string,
-  settlement: { id: string; effectiveDate: string },
-  wanted: ReadonlySet<string>,
-  search: ComponentSearch,
-  drafts: readonly ComponentDraft[],
-): Promise<ComponentRow[]> {
-  if (wanted.size === 0) return [];
-  const found: ComponentRow[] = [];
-  const seen = new Set<string>();
-  for (const draft of drafts) {
-    for (const row of await readOneDraft(
-      m,
-      userId,
-      settlement,
-      wanted,
-      search,
-      draft,
-    )) {
-      // An email two drafts both cover is a candidate once: the first draft's reading.
-      if (!seen.has(row.id)) {
-        seen.add(row.id);
-        found.push(row);
-      }
-    }
-  }
-  return found;
+/** One stored email read with one draft: its link value, or null when it holds none. */
+interface DraftReading {
+  linkKey: string | null;
+  row: ComponentRow | null;
 }
 
-async function readOneDraft(
-  m: EntityManager,
-  userId: string,
-  settlement: { id: string; effectiveDate: string },
-  wanted: ReadonlySet<string>,
-  search: ComponentSearch,
-  draft: ComponentDraft,
-): Promise<ComponentRow[]> {
-  const { from, to } = componentWindow(settlement.effectiveDate, search);
-  const rows = returnedRows<{
-    id: string;
-    subject: string;
-    body_text: string;
-    body_html: string | null;
-    effective_date: string;
-  }>(
-    await m.query(
-      `SELECT r.id, r.subject, r.body_text, r.body_html,
-              TO_CHAR((COALESCE(r.original_sent_at, r.received_at) AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS effective_date
-         FROM email_receipts r
-        WHERE r.user_id = $1
-          AND r.status <> 'skipped'
-          AND r.id <> $2
-          AND EXISTS (
-                SELECT 1 FROM unnest($3::text[]) AS d(domain)
-                 WHERE ${coveredByDomainSql("r", "d.domain")})
-          AND (COALESCE(r.original_sent_at, r.received_at) AT TIME ZONE 'UTC')::date
-                BETWEEN $4::date AND $5::date
-        ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id ASC
-        LIMIT ${MAX_DRAFT_COMPONENT_EMAILS}`,
-      [userId, settlement.id, draft.fromDomains, from, to],
-    ),
-  );
-  const found: ComponentRow[] = [];
-  for (const row of rows) {
-    const read = parseReceiptLinesTraced(
-      draft.definition,
-      row.subject,
-      new ReceiptSourceLines({
-        bodyText: row.body_text,
-        bodyHtml: row.body_html,
-      }).forSource(draft.definition.source),
-      null,
-    );
-    const linkKey = read.parsed.linkKey ?? null;
-    if (read.outcome !== "read" || linkKey === null || !wanted.has(linkKey)) {
-      continue;
+/**
+ * Reads the user's stored emails with the component drafts of ONE `test` call,
+ * as the candidates a settlement's parts may join (spec 10a). Create one per
+ * call and pass it to every `dryRunReceipt` of that call. The emails are the
+ * user's, not `skipped`, from a sender the draft covers (the module's
+ * equal-or-subdomain rule), dated inside the settlement's component window (the
+ * one `loadLinkedComponents` uses), newest first; the settlement's own email is
+ * left out. Each is read with the draft over the lines of its `source`, once per
+ * draft for the whole call; a reading that the draft's guards turn aside, or that
+ * holds no link value among the parts' links, is not a candidate. At most
+ * `MAX_DRAFT_COMPONENT_READS` emails are read for the call; past that the reader
+ * reads no more and `exhausted` is true. Reads only: no write, no row lock.
+ */
+export class DraftComponentReader {
+  private readonly readings = new Map<string, DraftReading>();
+  private remaining = MAX_DRAFT_COMPONENT_READS;
+  /** True once the call wanted an email that the read limit left unread. */
+  exhausted = false;
+
+  constructor(readonly drafts: readonly ComponentDraft[]) {}
+
+  async read(
+    m: EntityManager,
+    userId: string,
+    settlement: { id: string; effectiveDate: string },
+    wanted: ReadonlySet<string>,
+    search: ComponentSearch,
+  ): Promise<ComponentRow[]> {
+    if (wanted.size === 0) return [];
+    const found: ComponentRow[] = [];
+    const seen = new Set<string>();
+    for (let index = 0; index < this.drafts.length; index++) {
+      const ids = await this.candidateIds(
+        m,
+        userId,
+        settlement,
+        search,
+        this.drafts[index],
+      );
+      await this.readMissing(m, userId, index, ids);
+      for (const id of ids) {
+        const reading = this.readings.get(`${index}:${id}`);
+        // An email two drafts both cover is a candidate once: the first draft's reading.
+        if (
+          reading?.row &&
+          reading.linkKey !== null &&
+          wanted.has(reading.linkKey) &&
+          !seen.has(id)
+        ) {
+          seen.add(id);
+          found.push(reading.row);
+        }
+      }
     }
-    found.push({
-      id: row.id,
-      linkKey,
-      subject: row.subject,
-      effectiveDate: row.effective_date,
-      parsed: read.parsed,
-      parserId: null,
-    });
+    return found;
   }
-  return found;
+
+  /** The ids of the emails one draft covers for this settlement, newest first (no bodies). */
+  private async candidateIds(
+    m: EntityManager,
+    userId: string,
+    settlement: { id: string; effectiveDate: string },
+    search: ComponentSearch,
+    draft: ComponentDraft,
+  ): Promise<string[]> {
+    const { from, to } = componentWindow(settlement.effectiveDate, search);
+    const rows = returnedRows<{ id: string }>(
+      await m.query(
+        `SELECT r.id
+           FROM email_receipts r
+          WHERE r.user_id = $1
+            AND r.status <> 'skipped'
+            AND r.id <> $2
+            AND EXISTS (
+                  SELECT 1 FROM unnest($3::text[]) AS d(domain)
+                   WHERE ${coveredByDomainSql("r", "d.domain")})
+            AND (COALESCE(r.original_sent_at, r.received_at) AT TIME ZONE 'UTC')::date
+                  BETWEEN $4::date AND $5::date
+          ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id ASC
+          LIMIT ${MAX_DRAFT_COMPONENT_READS}`,
+        [userId, settlement.id, draft.fromDomains, from, to],
+      ),
+    );
+    return rows.map((row) => row.id);
+  }
+
+  /** Read, with draft `index`, the emails among `ids` it has not read yet, within the call's limit. */
+  private async readMissing(
+    m: EntityManager,
+    userId: string,
+    index: number,
+    ids: readonly string[],
+  ): Promise<void> {
+    const missing = ids.filter((id) => !this.readings.has(`${index}:${id}`));
+    if (missing.length === 0) return;
+    const batch = missing.slice(0, this.remaining);
+    if (batch.length < missing.length) this.exhausted = true;
+    if (batch.length === 0) return;
+    this.remaining -= batch.length;
+    const draft = this.drafts[index];
+    const rows = returnedRows<{
+      id: string;
+      subject: string;
+      body_text: string;
+      body_html: string | null;
+      effective_date: string;
+    }>(
+      await m.query(
+        `SELECT r.id, r.subject, r.body_text, r.body_html,
+                TO_CHAR((COALESCE(r.original_sent_at, r.received_at) AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS effective_date
+           FROM email_receipts r
+          WHERE r.user_id = $1
+            AND r.id = ANY($2::uuid[])`,
+        [userId, batch],
+      ),
+    );
+    for (const row of rows) {
+      const read = parseReceiptLinesTraced(
+        draft.definition,
+        row.subject,
+        new ReceiptSourceLines({
+          bodyText: row.body_text,
+          bodyHtml: row.body_html,
+        }).forSource(draft.definition.source),
+        null,
+      );
+      const linkKey =
+        read.outcome === "read" ? (read.parsed.linkKey ?? null) : null;
+      this.readings.set(`${index}:${row.id}`, {
+        linkKey,
+        row:
+          linkKey === null
+            ? null
+            : {
+                id: row.id,
+                linkKey,
+                subject: row.subject,
+                effectiveDate: row.effective_date,
+                parsed: read.parsed,
+                parserId: null,
+              },
+      });
+    }
+  }
 }

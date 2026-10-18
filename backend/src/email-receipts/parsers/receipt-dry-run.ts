@@ -36,7 +36,7 @@ import {
 import { loadReceiptCandidates } from "../pipeline/receipt-candidates";
 import { ReceiptSourceLines } from "../pipeline/receipt-source-lines";
 import { readTradeEmail } from "../pipeline/trade-reading";
-import { readDraftComponents, type ComponentDraft } from "./component-draft";
+import type { DraftComponentReader } from "./component-draft";
 
 const MONEY_UNITS = 10_000;
 
@@ -157,8 +157,9 @@ const EMPTY_TRACE: ReceiptTrace = {
  * assistant's `test` operation and the preview, so a preview computes what the
  * commit will do through the same code. Reads only.
  *
- * `componentDrafts` (a settlement only, already checked by `checkComponentDrafts`)
- * add candidates to the component search: the user's stored emails read with the
+ * `componentDrafts` (a settlement only, drafts already checked by
+ * `checkComponentDrafts`; ONE reader for every email of a test call) add
+ * candidates to the component search: the user's stored emails read with the
  * unsaved component profiles, which replace the stored component of the same email
  * and are chosen among exactly as stored ones are (linked receipts spec 10a).
  */
@@ -168,7 +169,7 @@ export async function dryRunReceipt(
   definition: ReceiptParserDefinition,
   receipt: DryRunReceipt,
   payee: DryRunPayee | null,
-  componentDrafts?: readonly ComponentDraft[],
+  componentDrafts?: DraftComponentReader,
 ): Promise<ReceiptDryRun> {
   if (definition.trade) {
     return dryRunTrade(m, userId, definition, definition.trade, receipt);
@@ -216,13 +217,12 @@ export async function dryRunReceipt(
     const settlement = { id: receipt.id, effectiveDate: purchaseDate };
     const partLinks = parsed.items.map((item) => item.link ?? null);
     const drafts = componentDrafts
-      ? await readDraftComponents(
+      ? await componentDrafts.read(
           m,
           userId,
           settlement,
           new Set(partLinks.filter((link): link is string => link !== null)),
           definition.link ?? {},
-          componentDrafts,
         )
       : [];
     const draftIds = new Set(drafts.map((draft) => draft.id));

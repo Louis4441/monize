@@ -29,7 +29,11 @@ import {
 } from "../linking/component-reread";
 import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "../receipts/dto/email-receipts.dto";
 import { dryRunReceipt, type DryRunLink } from "./receipt-dry-run";
-import { checkComponentDrafts, type ComponentDraft } from "./component-draft";
+import {
+  checkComponentDrafts,
+  DraftComponentReader,
+  type ComponentDraft,
+} from "./component-draft";
 import type { WaitingSettlement } from "../linking/waiting-settlements";
 import type {
   ParsedReceipt,
@@ -138,6 +142,12 @@ export interface EmailReceiptParserTestResult {
    * `parsed` is then the JOINED reading, which `match` is computed from.
    */
   links?: DryRunLink[];
+  /**
+   * Present when the test carried `componentDrafts`: true when the read limit
+   * (`MAX_DRAFT_COMPONENT_READS` stored emails) left emails the drafts cover
+   * unread, so a part reported `not_found` may still have a component.
+   */
+  componentDraftsExhausted?: boolean;
 }
 
 /**
@@ -458,16 +468,22 @@ export class EmailReceiptParsersService {
         if (!checked.ok) throw invalidDefinitionError(checked.errors);
         componentDrafts = checked.drafts;
       }
+      const draftReader = componentDrafts
+        ? new DraftComponentReader(componentDrafts)
+        : undefined;
       const run = await dryRunReceipt(
         m,
         userId,
         definition,
         receipt,
         payee,
-        componentDrafts,
+        draftReader,
       );
       const { parsed, trace, outcome, match, candidates, hit } = run;
       return {
+        ...(draftReader
+          ? { componentDraftsExhausted: draftReader.exhausted }
+          : {}),
         ...(run.trade ? { trade: run.trade } : {}),
         ...(run.component ? { component: run.component } : {}),
         ...(run.links ? { links: run.links } : {}),

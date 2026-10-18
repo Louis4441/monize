@@ -1624,6 +1624,7 @@ describe("EmailReceiptParserToolsService.testDefinition of linked receipts", () 
   it("joins the settlement's parts with a drafted component when none is stored, in decimals, with source draft", async () => {
     const { service, receiptRepo, manager } = setup();
     receiptRepo.find.mockResolvedValue([repaymentReceipt()]);
+    // The draft reader searches ids first, then reads the bodies of those it needs.
     manager.query.mockImplementation(async (sql: string) =>
       String(sql).includes("r.body_text")
         ? [
@@ -1635,7 +1636,9 @@ describe("EmailReceiptParserToolsService.testDefinition of linked receipts", () 
               effective_date: "2025-12-15",
             },
           ]
-        : [],
+        : String(sql).includes("r.status <> 'skipped'")
+          ? [{ id: "component-1" }]
+          : [],
     );
 
     const result = await service.testDefinition(USER, {
@@ -1655,6 +1658,7 @@ describe("EmailReceiptParserToolsService.testDefinition of linked receipts", () 
     });
     expect(result.emails[0].links?.[0].component).toBeNull();
     expect(result.unknownCategoryIds).toEqual([]);
+    expect(result.componentDraftsExhausted).toBe(false);
   });
 
   it("returns valid:false with the code, not a throw, for a draft beside a definition that is not a settlement", async () => {

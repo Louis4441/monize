@@ -28,7 +28,11 @@ import {
   EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS,
   EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS,
 } from "./parser-tool.guide";
-import { checkComponentDrafts, type ComponentDraft } from "./component-draft";
+import {
+  checkComponentDrafts,
+  DraftComponentReader,
+  type ComponentDraft,
+} from "./component-draft";
 import { effectiveMatchDefinition } from "../parsing/receipt-match-config";
 import { resolveParserCategoryNames } from "./parser-category-names.util";
 import type {
@@ -254,6 +258,12 @@ export interface ParserToolTestResult {
   /** Account ids a trade profile names that are not an open brokerage account of the user's. */
   unknownAccountIds: string[];
   emails: ParserToolTestEmail[];
+  /**
+   * Present when the call carried `componentDrafts`: true when the call's read
+   * limit (`MAX_DRAFT_COMPONENT_READS` stored emails) left emails the drafts
+   * cover unread, so a part reported `not_found` may still have a component.
+   */
+  componentDraftsExhausted?: boolean;
   /** True only when the definition is valid and every email reads complete. */
   allComplete: boolean;
   /**
@@ -604,6 +614,11 @@ export class EmailReceiptParserToolsService {
       ? await this.payees.resolveByName(userId, input.payeeName)
       : null;
 
+    // One reader for every email of this call: each stored email is read once per
+    // draft, and the call reads at most MAX_DRAFT_COMPONENT_READS emails in all.
+    const draftReader = componentDrafts
+      ? new DraftComponentReader(componentDrafts)
+      : undefined;
     return withScopedDb(this.dataSource, async (m) => {
       const receipts = await m.getRepository(EmailReceipt).find({
         where: { userId, id: In(samples.map((sample) => sample.receiptId)) },
@@ -647,7 +662,7 @@ export class EmailReceiptParserToolsService {
           definition,
           receipt,
           payee,
-          componentDrafts,
+          draftReader,
         );
         const { parsed, trace, outcome, match: matched, hit } = run;
         emails.push({
@@ -757,6 +772,9 @@ export class EmailReceiptParserToolsService {
         unknownCategoryIds,
         unknownAccountIds,
         emails,
+        ...(draftReader
+          ? { componentDraftsExhausted: draftReader.exhausted }
+          : {}),
         allComplete:
           unknownCategoryIds.length === 0 &&
           unknownAccountIds.length === 0 &&
