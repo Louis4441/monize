@@ -333,6 +333,47 @@ profile. It writes nothing and takes no row lock.
   {receiptId, subject} | null` (a `review_conflict` with reason
   `enriched_by_other`: the email whose applied request is on the candidate).
 
+## 10a. Drafting a pair of profiles with AI
+
+"Draft parser with AI" on the list takes emails from **one or two sender
+domains**: at most 5 emails per domain (`MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN`)
+and at most 2 domains (`MAX_PARSER_DRAFT_DOMAINS`), so at most 10 emails
+(`ai_review_requests.email_receipt_ids`, CHECK widened from 5 to 10). A
+selection over either bound is refused (400) before anything is written. A
+trade-profile draft takes one domain only.
+
+| Domains in the request | Instruction | Drafts the request accepts |
+|---|---|---|
+| 1 | as today: one profile for that sender | 1 |
+| 2 | decide whether one sender's emails are purchases and the other's repayments that pay for them with a shared key; if so, a `component` profile for the purchase sender and a `settlement` profile for the repayment sender, the settlement tested with `componentDraft`; if not, one `standalone` profile per sender | 1 per domain, at most 2 |
+
+The request is filed under the domain with the most emails (ties: the first
+selected), as today. A two-domain request:
+
+- `save_draft` with its `requestId` is accepted while it is `claimed` and,
+  once one draft is saved, while it is `proposed`, by the same claimant, for a
+  draft whose `fromDomains` cover the other domain of the request. A save for a
+  domain that already has a draft updates that draft. `proposal` keeps
+  `parserId` (the first draft) and adds `parserIds` (every draft, in save
+  order).
+- It is `applied` when every parser in `parserIds` is approved, and `rejected`
+  (dismissed) when none of them exists any more. Approving or deleting one of
+  two leaves it `proposed`.
+
+### `componentDraft` in `test`
+
+`test` on a `settlement` definition may carry `componentDraft: {definition,
+fromDomains}` (the definition must validate with `role: "component"`;
+`fromDomains` 1 to 10 domains). Besides the stored components, the dry run
+reads, without writing anything, the user's stored emails (not `skipped`) whose
+sender is covered by those domains and whose date is inside the settlement's
+`link` window, newest first, at most 200 (`MAX_DRAFT_COMPONENT_EMAILS`), with
+that definition. Each reading with a link value is a component candidate,
+`source: "draft"`; it replaces a stored component of the same email. The
+choice per link, `taken` and the join are exactly sections 3 and 4. Each found
+component in the result says `source: "stored"` or `"draft"`. `componentDraft`
+on any other role is refused (`component_draft_requires_settlement`).
+
 ## 11. Concurrency
 
 Lock order in a settlement's transaction: its own receipt row, then the found
@@ -369,3 +410,6 @@ one component (instalments) compute `taken` one after the other.
 | 13 | Each validation code of 2.3 | refused with that code |
 | 14 | A joined proposal with auto-apply on | not applied |
 | 15 | `test` on a component and on a settlement | the shapes of section 10 |
+| 16 | A draft request with more than 2 domains, or more than 5 emails of one domain | refused, nothing written |
+| 17 | A two-domain request, both drafts saved, one approved | `proposed`; both approved: `applied` |
+| 18 | `test` of a settlement with `componentDraft` and no stored component | the parts join with `source: "draft"` |
