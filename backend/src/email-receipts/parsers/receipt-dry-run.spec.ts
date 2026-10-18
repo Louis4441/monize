@@ -23,7 +23,7 @@ import {
   summarizeTransaction,
 } from "./receipt-dry-run";
 import {
-  DraftComponentReader,
+  createDraftComponentReader,
   MAX_DRAFT_COMPONENT_READS,
 } from "./component-draft";
 
@@ -602,7 +602,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([draft()]),
+      createDraftComponentReader([draft()]),
     );
 
     expect(partOf(run)).toMatchObject({
@@ -633,7 +633,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([draft()]),
+      createDraftComponentReader([draft()]),
     );
 
     const [sql, params] = query.mock.calls.find(([text]) =>
@@ -676,7 +676,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([draft()]),
+      createDraftComponentReader([draft()]),
     );
 
     expect(partOf(run)).toMatchObject({
@@ -697,7 +697,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([draft()]),
+      createDraftComponentReader([draft()]),
     );
 
     // two emails carry the key: the newest date is chosen (the draft), and the count says two
@@ -711,7 +711,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([draft()]),
+      createDraftComponentReader([draft()]),
     );
     expect(partOf(stored)).toMatchObject({
       component: { id: "component-1", source: "stored" },
@@ -725,7 +725,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([
+      createDraftComponentReader([
         draft({
           ...ALLEGRO_PAY_COMPONENT_DEFINITION,
           requireLine: ["never present"],
@@ -755,7 +755,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([draft()]),
+      createDraftComponentReader([draft()]),
     );
     expect(partOf(otherKey)).toMatchObject({ outcome: "not_found" });
   });
@@ -768,7 +768,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       repayment,
       null,
-      new DraftComponentReader([
+      createDraftComponentReader([
         draft(),
         { ...draft(), fromDomains: ["other.example.com"] },
       ]),
@@ -793,7 +793,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       ALLEGRO_PAY_SETTLEMENT_DEFINITION,
       { ...repayment, bodyText: "Nothing to see" },
       null,
-      new DraftComponentReader([draft()]),
+      createDraftComponentReader([draft()]),
     );
     expect(query.mock.calls.some(([sql]) => sql.includes("r.body_text"))).toBe(
       false,
@@ -802,7 +802,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
 
   it("reads each email once per draft for the whole call when one reader serves several emails", async () => {
     const query = world([], [draftRow()]);
-    const reader = new DraftComponentReader([draft()]);
+    const reader = createDraftComponentReader([draft()]);
     for (let i = 0; i < 3; i++) {
       const run = await dryRunReceipt(
         { query } as never,
@@ -825,7 +825,7 @@ describe("dryRunReceipt of a settlement with componentDrafts", () => {
       draftRow({ id: `component-${i}` }),
     );
     const query = world([], many);
-    const reader = new DraftComponentReader([
+    const reader = createDraftComponentReader([
       draft(),
       { ...draft(), fromDomains: ["other.example.com"] },
     ]);

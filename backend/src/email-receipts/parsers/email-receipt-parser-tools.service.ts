@@ -30,7 +30,7 @@ import {
 } from "./parser-tool.guide";
 import {
   checkComponentDrafts,
-  DraftComponentReader,
+  createDraftComponentReader,
   type ComponentDraft,
 } from "./component-draft";
 import { effectiveMatchDefinition } from "../parsing/receipt-match-config";
@@ -617,7 +617,7 @@ export class EmailReceiptParserToolsService {
     // One reader for every email of this call: each stored email is read once per
     // draft, and the call reads at most MAX_DRAFT_COMPONENT_READS emails in all.
     const draftReader = componentDrafts
-      ? new DraftComponentReader(componentDrafts)
+      ? createDraftComponentReader(componentDrafts)
       : undefined;
     return withScopedDb(this.dataSource, async (m) => {
       const receipts = await m.getRepository(EmailReceipt).find({

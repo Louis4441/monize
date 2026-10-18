@@ -152,58 +152,39 @@ interface DraftReading {
  * `MAX_DRAFT_COMPONENT_READS` emails are read for the call; past that the reader
  * reads no more and `exhausted` is true. Reads only: no write, no row lock.
  */
-export class DraftComponentReader {
-  private readonly readings = new Map<string, DraftReading>();
-  private remaining = MAX_DRAFT_COMPONENT_READS;
+export interface DraftComponentReader {
+  readonly drafts: readonly ComponentDraft[];
   /** True once the call wanted an email that the read limit left unread. */
-  exhausted = false;
-
-  constructor(readonly drafts: readonly ComponentDraft[]) {}
-
-  async read(
+  readonly exhausted: boolean;
+  read(
     m: EntityManager,
     userId: string,
     settlement: { id: string; effectiveDate: string },
     wanted: ReadonlySet<string>,
     search: ComponentSearch,
-  ): Promise<ComponentRow[]> {
-    if (wanted.size === 0) return [];
-    const found: ComponentRow[] = [];
-    const seen = new Set<string>();
-    for (let index = 0; index < this.drafts.length; index++) {
-      const ids = await this.candidateIds(
-        m,
-        userId,
-        settlement,
-        search,
-        this.drafts[index],
-      );
-      await this.readMissing(m, userId, index, ids);
-      for (const id of ids) {
-        const reading = this.readings.get(`${index}:${id}`);
-        // An email two drafts both cover is a candidate once: the first draft's reading.
-        if (
-          reading?.row &&
-          reading.linkKey !== null &&
-          wanted.has(reading.linkKey) &&
-          !seen.has(id)
-        ) {
-          seen.add(id);
-          found.push(reading.row);
-        }
-      }
-    }
-    return found;
-  }
+  ): Promise<ComponentRow[]>;
+}
+
+/**
+ * One reader per `test` call. Its cache and its read budget are locals of this
+ * call (a closure), never state of the process: the reader is discarded with
+ * the call.
+ */
+export function createDraftComponentReader(
+  drafts: readonly ComponentDraft[],
+): DraftComponentReader {
+  const readings = new Map<string, DraftReading>();
+  let remaining = MAX_DRAFT_COMPONENT_READS;
+  let exhausted = false;
 
   /** The ids of the emails one draft covers for this settlement, newest first (no bodies). */
-  private async candidateIds(
+  const candidateIds = async (
     m: EntityManager,
     userId: string,
     settlement: { id: string; effectiveDate: string },
     search: ComponentSearch,
     draft: ComponentDraft,
-  ): Promise<string[]> {
+  ): Promise<string[]> => {
     const { from, to } = componentWindow(settlement.effectiveDate, search);
     const rows = returnedRows<{ id: string }>(
       await m.query(
@@ -223,22 +204,22 @@ export class DraftComponentReader {
       ),
     );
     return rows.map((row) => row.id);
-  }
+  };
 
   /** Read, with draft `index`, the emails among `ids` it has not read yet, within the call's limit. */
-  private async readMissing(
+  const readMissing = async (
     m: EntityManager,
     userId: string,
     index: number,
     ids: readonly string[],
-  ): Promise<void> {
-    const missing = ids.filter((id) => !this.readings.has(`${index}:${id}`));
+  ): Promise<void> => {
+    const missing = ids.filter((id) => !readings.has(`${index}:${id}`));
     if (missing.length === 0) return;
-    const batch = missing.slice(0, this.remaining);
-    if (batch.length < missing.length) this.exhausted = true;
+    const batch = missing.slice(0, remaining);
+    if (batch.length < missing.length) exhausted = true;
     if (batch.length === 0) return;
-    this.remaining -= batch.length;
-    const draft = this.drafts[index];
+    remaining -= batch.length;
+    const draft = drafts[index];
     const rows = returnedRows<{
       id: string;
       subject: string;
@@ -267,7 +248,7 @@ export class DraftComponentReader {
       );
       const linkKey =
         read.outcome === "read" ? (read.parsed.linkKey ?? null) : null;
-      this.readings.set(`${index}:${row.id}`, {
+      readings.set(`${index}:${row.id}`, {
         linkKey,
         row:
           linkKey === null
@@ -282,5 +263,41 @@ export class DraftComponentReader {
               },
       });
     }
-  }
+  };
+
+  return {
+    drafts,
+    get exhausted() {
+      return exhausted;
+    },
+    async read(m, userId, settlement, wanted, search) {
+      if (wanted.size === 0) return [];
+      const found: ComponentRow[] = [];
+      const seen = new Set<string>();
+      for (let index = 0; index < drafts.length; index++) {
+        const ids = await candidateIds(
+          m,
+          userId,
+          settlement,
+          search,
+          drafts[index],
+        );
+        await readMissing(m, userId, index, ids);
+        for (const id of ids) {
+          const reading = readings.get(`${index}:${id}`);
+          // An email two drafts both cover is a candidate once: the first draft's reading.
+          if (
+            reading?.row &&
+            reading.linkKey !== null &&
+            wanted.has(reading.linkKey) &&
+            !seen.has(id)
+          ) {
+            seen.add(id);
+            found.push(reading.row);
+          }
+        }
+      }
+      return found;
+    },
+  };
 }

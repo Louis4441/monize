@@ -31,7 +31,7 @@ import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "../receipts/dto/email-receip
 import { dryRunReceipt, type DryRunLink } from "./receipt-dry-run";
 import {
   checkComponentDrafts,
-  DraftComponentReader,
+  createDraftComponentReader,
   type ComponentDraft,
 } from "./component-draft";
 import type { WaitingSettlement } from "../linking/waiting-settlements";
@@ -469,7 +469,7 @@ export class EmailReceiptParsersService {
         componentDrafts = checked.drafts;
       }
       const draftReader = componentDrafts
-        ? new DraftComponentReader(componentDrafts)
+        ? createDraftComponentReader(componentDrafts)
         : undefined;
       const run = await dryRunReceipt(
         m,
