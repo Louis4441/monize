@@ -16,6 +16,6 @@
 | L6 | Backend: the `test` operation for components and settlements | L4 | done |
 | L7 | Frontend: status `component`, reasons, parts and components on the receipt page, the conflict | L4 | done |
 | L8 | i18n: English, pseudo-locale, every other locale | L2, L7 | done |
-| L9 | Backend: draft requests over two domains (5 emails per domain), two-domain instruction, a request that holds two drafts (spec 10a) | L6 | open |
-| L10 | Backend: `componentDraft` in the parser `test` (spec 10a) | L9 | open |
-| L11 | Frontend and i18n: selecting up to 5 emails per domain over two domains, a request with two drafts; every locale | L9 | open |
+| L9 | Backend: draft requests over up to 5 domains (5 emails per domain), the multi-domain instruction, a request that holds one draft per domain (spec 10a) | L6 | open |
+| L10 | Backend: `componentDrafts` in the parser `test` (spec 10a) | L9 | open |
+| L11 | Frontend and i18n: selecting up to 5 emails per domain over up to 5 domains, a request with several drafts; every locale | L9 | open |
