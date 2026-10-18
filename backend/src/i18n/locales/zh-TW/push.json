@@ -43,6 +43,10 @@
     "bonds": {
       "title": "債券通知",
       "body": "您的某檔債券有新消息。開啟 Monize 查看詳細資料。"
+    },
+    "ai_review": {
+      "title": "AI 審核提案",
+      "body": "部分 AI 審核提案正在等待您的決定。開啟 Monize 查看詳細資料。"
     }
   },
   "actions": {

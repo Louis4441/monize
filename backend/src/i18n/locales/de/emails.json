@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "E-Mail-Belege benötigen Aufmerksamkeit",
       "message": "Ihr Belegepostfach enthält {{ noParser }} ohne Profil und {{ parseFailed }}, die ihr Profil nicht erkannt hat. Öffnen Sie zur Prüfung."
+    },
+    "aiReview": {
+      "readyTitle": "KI-Prüfvorschläge warten auf Sie",
+      "readyMessage": "Vorschläge, die auf Ihre Entscheidung warten: {{ count }}. Neu seit der letzten Benachrichtigung: {{ added }}. Öffnen Sie sie zur Prüfung.",
+      "expiringTitle": "KI-Prüfvorschläge laufen bald ab",
+      "expiringMessage": "Vorschläge, die innerhalb von 3 Tagen ablaufen: {{ count }}. Der erste läuft am {{ date }} ab. Öffnen Sie sie zur Prüfung."
     }
   },
   "backupOffsite": {

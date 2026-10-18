@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Aviso de obrigações",
       "body": "Uma das suas obrigações tem novidades. Abra o Monize para ver os detalhes."
+    },
+    "ai_review": {
+      "title": "Propostas de revisão de IA",
+      "body": "Algumas propostas de revisão de IA aguardam sua decisão. Abra o Monize para ver os detalhes."
     }
   },
   "actions": {

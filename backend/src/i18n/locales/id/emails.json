@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "Tanda terima email memerlukan perhatian",
       "message": "Kotak masuk tanda terima Anda berisi {{ noParser }} tanpa profil dan {{ parseFailed }} yang profilnya tidak dikenali. Buka untuk ditinjau."
+    },
+    "aiReview": {
+      "readyTitle": "Usulan tinjauan AI menunggu Anda",
+      "readyMessage": "Usulan yang menunggu keputusan Anda: {{ count }}. Baru sejak pemberitahuan terakhir: {{ added }}. Buka untuk meninjau.",
+      "expiringTitle": "Usulan tinjauan AI segera kedaluwarsa",
+      "expiringMessage": "Usulan yang kedaluwarsa dalam 3 hari: {{ count }}. Yang pertama kedaluwarsa pada {{ date }}. Buka untuk meninjau."
     }
   },
   "backupOffsite": {

@@ -35,6 +35,7 @@ export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[]
     NotificationCategory.BANK_SYNC_ACTIVITY,
     NotificationCategory.EMAIL_RECEIPTS,
     NotificationCategory.BONDS,
+    NotificationCategory.AI_REVIEW,
   ];
 
 /**
@@ -156,6 +157,15 @@ export const NOTIFICATION_CATEGORY_CHANNELS: Record<
     push: true,
     unifiedpush: true,
   },
+  // AI review proposals waiting for approval or about to expire: user-facing,
+  // so every channel is a live control (the producer goes through the dispatch
+  // seam).
+  [NotificationCategory.AI_REVIEW]: {
+    email: true,
+    emailNotification: true,
+    push: true,
+    unifiedpush: true,
+  },
 };
 
 /** A category's channel state when the user has stored no row for it. */
@@ -207,6 +217,8 @@ export const NOTIFICATION_CATEGORY_DEFAULTS: Readonly<
   // the report email, nothing interrupting until the user turns it on.
   [NotificationCategory.EMAIL_RECEIPTS]: GLOBAL_DEFAULTS,
   [NotificationCategory.BONDS]: GLOBAL_DEFAULTS,
+  // Proposals waiting for approval keep the global rule, like receipts.
+  [NotificationCategory.AI_REVIEW]: GLOBAL_DEFAULTS,
 };
 
 /**

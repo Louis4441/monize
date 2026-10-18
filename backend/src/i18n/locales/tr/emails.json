@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "E-posta makbuzları ilgilenilmesi gerekiyor",
       "message": "Makbuz gelen kutunuz {{ noParser }} profil olmadan ve {{ parseFailed }} ki profili tanımadığı içeriyor. Gözden geçirmek için açın."
+    },
+    "aiReview": {
+      "readyTitle": "Yapay zeka inceleme önerileri sizi bekliyor",
+      "readyMessage": "Kararınızı bekleyen öneri sayısı: {{ count }}. Son bildirimden bu yana yeni: {{ added }}. İncelemek için açın.",
+      "expiringTitle": "Yapay zeka inceleme önerilerinin süresi yakında doluyor",
+      "expiringMessage": "3 gün içinde süresi dolacak öneri sayısı: {{ count }}. İlkinin süresi {{ date }} tarihinde doluyor. İncelemek için açın."
     }
   },
   "backupOffsite": {

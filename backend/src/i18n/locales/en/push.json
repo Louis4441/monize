@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Bond notice",
       "body": "One of your bonds has news. Open Monize for the details."
+    },
+    "ai_review": {
+      "title": "AI review proposals",
+      "body": "Some AI review proposals wait for your decision. Open Monize for the details."
     }
   },
   "actions": {

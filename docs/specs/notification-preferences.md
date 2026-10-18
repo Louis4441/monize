@@ -94,6 +94,7 @@ Proposed default matrix (a preference-less user):
 | goals        |   on   |  off  | off  |     off     |   0 min  |
 | bank_sync    |   on   |  on   |  on  |     off     |   0 min  |
 | bank_sync_activity | on |  off  | off  |     off     |   0 min  |
+| ai_review    |   on   |  off  | off  |     off     |   0 min  |
 
 The two bank sync groups (`docs/specs/bank-sync-notifications.md`, proposed)
 are the first with their own defaults: `NOTIFICATION_CATEGORY_DEFAULTS`, read
@@ -102,6 +103,12 @@ defaults and gives `bank_sync` immediate email and push, because a consent
 about to end or a failed sync needs the user's action. A preference-less
 user's first matrix write starts from these defaults. Push still needs a
 device enabled first.
+
+`ai_review` (`AI_REVIEW`, `docs/specs/ai-review-notifications.md`) is a user-facing
+group with every channel a live control (`NOTIFICATION_CATEGORY_CHANNELS`) and
+the global defaults, as `email_receipts` has them. Its two types
+(`AI_REVIEW_PROPOSALS_READY`, `AI_REVIEW_PROPOSALS_EXPIRING`) send to
+`/ai-reviews`, and the push copy names the category only.
 
 Rationale: in-app is always the record (a user opts a group *out* of the bell
 deliberately, which is allowed but off the default path). email defaults on only

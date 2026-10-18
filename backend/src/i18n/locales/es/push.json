@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Aviso de bonos",
       "body": "Uno de sus bonos tiene novedades. Abra Monize para ver los detalles."
+    },
+    "ai_review": {
+      "title": "Propuestas de revisión de IA",
+      "body": "Algunas propuestas de revisión de IA esperan su decisión. Abra Monize para ver los detalles."
     }
   },
   "actions": {

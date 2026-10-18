@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "Le ricevute email richiedono attenzione",
       "message": "La cartella ricevute contiene {{ noParser }} senza profilo e {{ parseFailed }} che il loro profilo non ha riconosciuto. Apri per rivedere."
+    },
+    "aiReview": {
+      "readyTitle": "Proposte di revisione IA in attesa",
+      "readyMessage": "Proposte in attesa della tua decisione: {{ count }}. Nuove dall'ultima notifica: {{ added }}. Apri per esaminarle.",
+      "expiringTitle": "Proposte di revisione IA in scadenza",
+      "expiringMessage": "Proposte che scadono entro 3 giorni: {{ count }}. La prima scade il {{ date }}. Apri per esaminarle."
     }
   },
   "backupOffsite": {

@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Anleihen-Hinweis",
       "body": "Zu einer Ihrer Anleihen gibt es Neuigkeiten. Öffnen Sie Monize für die Details."
+    },
+    "ai_review": {
+      "title": "KI-Prüfvorschläge",
+      "body": "Einige KI-Prüfvorschläge warten auf Ihre Entscheidung. Öffnen Sie Monize für die Details."
     }
   },
   "actions": {

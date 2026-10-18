@@ -244,6 +244,12 @@
       "title": "Email receipts need attention",
       "message": "Your receipts inbox holds {{ noParser }} without a profile and {{ parseFailed }} that their profile did not recognize. Open to review."
     },
+    "aiReview": {
+      "readyTitle": "AI review proposals wait for you",
+      "readyMessage": "Proposals waiting for your decision: {{ count }}. New since the last notice: {{ added }}. Open to review.",
+      "expiringTitle": "AI review proposals expire soon",
+      "expiringMessage": "Proposals that expire within 3 days: {{ count }}. The first one expires on {{ date }}. Open to review."
+    },
     "portfolioMovement": {
       "titleUp": "Investments up {{ percent }}%",
       "titleDown": "Investments down {{ percent }}%",

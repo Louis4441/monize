@@ -1,6 +1,6 @@
 # Spec: AI review proposal notifications
 
-Status: **proposed, awaiting maintainer approval.** The product decisions were
+Status: **approved by the maintainer on 2026-10-18.** The product decisions were
 made by the feature's requester on 2026-10-18: notify when new proposals wait
 for approval, and remind before they expire; the channels are set in the
 notification matrix like every other category.
@@ -23,8 +23,7 @@ nothing tells the person that a proposal waits, so most of them expire unseen.
 
 Two producers write Notification Center rows:
 
-1. **Proposals ready.** The number of open proposals grew since the last
-   notice.
+1. **Proposals ready.** Open proposals arrived since the last notice.
 2. **Proposals expiring.** One or more open proposals expire within 3 days.
 
 Only `proposed` requests count. A `pending` or `claimed` request waits for an
@@ -34,7 +33,7 @@ agent, not for the person, and needs no notice.
 
 | Type | Category | Severity | When |
 |---|---|---|---|
-| `AI_REVIEW_PROPOSALS_READY` | `AI_REVIEW` | `info` | the count of open proposals grew |
+| `AI_REVIEW_PROPOSALS_READY` | `AI_REVIEW` | `info` | open proposals arrived since the last ready notice |
 | `AI_REVIEW_PROPOSALS_EXPIRING` | `AI_REVIEW` | `warning` | proposals reached the 3-day mark before expiry |
 
 A new category, so the person can switch it off without touching another
@@ -52,21 +51,34 @@ holds the length bound).
 step, so an expired request is never counted.
 
 - The fan-out (`withSystemContext`) lists the users with at least one
-  `proposed` request whose `expires_at > CURRENT_TIMESTAMP`, with the count.
-- Per user, under `withUserContext`: read `data.count` of the user's newest
-  `AI_REVIEW_PROPOSALS_READY` row that is not dismissed (none means 0). Notify
-  only when the current count is greater. A count that fell (approved,
-  dismissed, expired) raises nothing.
-- **Idempotency:** `dedupeKey = air:ready:<UTC date>:<count>`. A replica that
-  loses the insert gets `null` from `create` and sends nothing. The date lets
-  the same count notify again on a later day after it fell and grew back.
-- `data = { count, added }`, where `added` is the count minus the previous
-  one.
+  `proposed` request whose `expires_at > CURRENT_TIMESTAMP`.
+- Per user, under `withUserContext`, one query reads `count` (all live
+  `proposed` requests) and `added`: the live `proposed` requests whose
+  `updated_at` is later than `created_at` of the user's newest
+  `AI_REVIEW_PROPOSALS_READY` notification, **dismissed or not** (none means
+  every live proposal counts). Both timestamps are the database clock. Notify
+  when `added > 0`. Approving, dismissing or expiring proposals raises nothing
+  by itself, and an old notice that was never dismissed does not hide later
+  proposals: the baseline is a time, not a count.
+- **Why `updated_at` marks arrival:** the `update_ai_review_requests_updated_at`
+  trigger sets it on every UPDATE, and every UPDATE of a `proposed` row moves
+  it out of `proposed` (`applied`, `rejected`, `expired`). The one exception is
+  a foreign key action (`email_receipt_id` or `rule_id` set to NULL when the
+  email or the rule is deleted), which fires the trigger and so counts that
+  proposal as new once, at the next run. Accepted.
+- **Idempotency:** `dedupeKey = air:ready:<UTC date>T<UTC hour>` (for example
+  `air:ready:2026-10-18T10`), taken from the run's clock. Replicas firing the
+  same hourly sweep collapse on it: a replica that loses the insert gets `null`
+  from `create` and sends nothing. A later hour has a new key, so new
+  proposals notify again the same day.
+- `data = { count, added }`.
 
 Example: 09:20 no proposals. An agent proposes 3 at 10:05: the 10:20 run
-notifies "3 proposals wait" (`added = 3`). The person approves 2 at 11:00: the
-11:20 run raises nothing (1 < 3). An agent proposes 4 more at 13:10: the 13:20
-run sees 5 > 3 and notifies (`added = 2`).
+notifies "3 proposals wait" (`count = 3`, `added = 3`). The person approves all
+3 at 11:00 and leaves the notice: the 11:20 run raises nothing (no live
+proposal). An agent proposes 2 a week later: that run notifies (`count = 2`,
+`added = 2`), although 2 is less than 3. One more arrives at 13:10 while those
+2 are still open: the 13:20 run notifies (`count = 3`, `added = 1`).
 
 ## 4. Proposals expiring
 
@@ -124,9 +136,11 @@ Copy keys (English first, then every locale):
 
 | Case | Kind |
 |---|---|
-| Count grows from 0: notify with `count` and `added` | unit |
-| Count unchanged or lower: nothing | unit |
-| Previous notice dismissed: compare against 0 | unit |
+| No previous notice: `added` is the whole count | unit |
+| Old notice never dismissed, all its proposals since approved, new ones arrive: notify | unit |
+| No proposal newer than the last notice: nothing | unit |
+| Baseline is the newest ready notice, dismissed or not | unit (query text) |
+| Hourly dedupe key; a later hour notifies again | unit |
 | Expired and `pending`/`claimed` requests are not counted | unit + integration (query) |
 | Expiring window: a request 2 days 23 hours ahead counts, 3 days ahead and 1 day 23 hours ahead do not | unit (window bounds) |
 | One expiring notice per user per day across two concurrent runs | integration (dedupe index) |

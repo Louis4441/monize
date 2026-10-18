@@ -14,6 +14,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 import {
+  AI_REVIEW_NOTIFICATION_TYPES,
   BALANCE_NOTIFICATION_TYPES,
   BOND_NOTIFICATION_TYPES,
   BANK_SYNC_ACTIVITY_NOTIFICATION_TYPES,
@@ -163,6 +164,9 @@ describe("notification type partition", () => {
     expect(byCategory[NotificationCategory.BONDS].sort()).toEqual(
       [...BOND_NOTIFICATION_TYPES].sort(),
     );
+    expect(byCategory[NotificationCategory.AI_REVIEW].sort()).toEqual(
+      [...AI_REVIEW_NOTIFICATION_TYPES].sort(),
+    );
     // BUDGETS is the remainder: everything not in one of the explicit sets
     // above -- never a second list, so this arm proves the partition is total.
     expect(byCategory[NotificationCategory.BUDGETS].sort()).toEqual(
@@ -177,7 +181,8 @@ describe("notification type partition", () => {
           !BANK_SYNC_NOTIFICATION_TYPES.includes(t) &&
           !BANK_SYNC_ACTIVITY_NOTIFICATION_TYPES.includes(t) &&
           !EMAIL_RECEIPT_NOTIFICATION_TYPES.includes(t) &&
-          !BOND_NOTIFICATION_TYPES.includes(t),
+          !BOND_NOTIFICATION_TYPES.includes(t) &&
+          !AI_REVIEW_NOTIFICATION_TYPES.includes(t),
       ).sort(),
     );
   });

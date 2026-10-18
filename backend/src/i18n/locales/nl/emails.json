@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "E-mailkwitanties vereisen aandacht",
       "message": "Uw kwitantiemap bevat {{ noParser }} zonder profiel en {{ parseFailed }} die het profiel niet herkende. Open om te controleren."
+    },
+    "aiReview": {
+      "readyTitle": "AI-beoordelingsvoorstellen wachten op je",
+      "readyMessage": "Voorstellen die op je beslissing wachten: {{ count }}. Nieuw sinds de laatste melding: {{ added }}. Open om te beoordelen.",
+      "expiringTitle": "AI-beoordelingsvoorstellen verlopen binnenkort",
+      "expiringMessage": "Voorstellen die binnen 3 dagen verlopen: {{ count }}. Het eerste verloopt op {{ date }}. Open om te beoordelen."
     }
   },
   "backupOffsite": {

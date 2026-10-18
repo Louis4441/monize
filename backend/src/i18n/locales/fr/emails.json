@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "Les reçus par courrier nécessitent attention",
       "message": "Votre boîte de réception des reçus contient {{ noParser }} sans profil et {{ parseFailed }} que votre profil n'a pas reconnus. Ouvrez pour vérifier."
+    },
+    "aiReview": {
+      "readyTitle": "Des propositions de revue IA vous attendent",
+      "readyMessage": "Propositions en attente de votre décision : {{ count }}. Nouvelles depuis la dernière notification : {{ added }}. Ouvrez pour les examiner.",
+      "expiringTitle": "Des propositions de revue IA expirent bientôt",
+      "expiringMessage": "Propositions qui expirent dans 3 jours : {{ count }}. La première expire le {{ date }}. Ouvrez pour les examiner."
     }
   },
   "backupOffsite": {

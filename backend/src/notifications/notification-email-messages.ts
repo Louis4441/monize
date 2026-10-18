@@ -50,6 +50,12 @@ export const NOTIFICATION_EMAIL_MESSAGES = {
   "emailReceiptsAttention.title": "Email receipts need attention",
   "emailReceiptsAttention.message":
     "Your receipts inbox holds {{ noParser }} without a profile and {{ parseFailed }} that their profile did not recognize. Open to review.",
+  "aiReview.readyTitle": "AI review proposals wait for you",
+  "aiReview.readyMessage":
+    "Proposals waiting for your decision: {{ count }}. New since the last notice: {{ added }}. Open to review.",
+  "aiReview.expiringTitle": "AI review proposals expire soon",
+  "aiReview.expiringMessage":
+    "Proposals that expire within 3 days: {{ count }}. The first one expires on {{ date }}. Open to review.",
   "portfolioMovement.titleUp": "Investments up {{ percent }}%",
   "portfolioMovement.titleDown": "Investments down {{ percent }}%",
   "portfolioMovement.messageUp":
