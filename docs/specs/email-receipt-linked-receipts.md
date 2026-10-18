@@ -373,6 +373,17 @@ limit shows which limit it breaks and cannot be sent. Selecting every email of
 the page is no shortcut: "select all" never turns into a multi-domain draft
 without that confirmation.
 
+**Where the app tells it.** The possibility is described where a person
+starts a profile, not only after a selection:
+
+- the Emails tab, beside "Draft parser with AI": a short hint, always shown,
+  "One bank transaction described by emails from several senders (for
+  example a shop and its deferred-payment provider)? Select up to 5 emails
+  from each of those senders together and draft linked profiles.";
+- the Profiles tab, beside "Create a profile for a domain": the same fact,
+  and that the per-domain wizard drafts one sender, so linked profiles start
+  from a selection on the Emails tab (a link that opens that tab).
+
 ### `componentDrafts` in `test`
 
 `test` on a `settlement` definition may carry `componentDrafts: [{definition,
