@@ -2,9 +2,9 @@ import type { EntityManager } from "typeorm";
 import { returnedRows } from "../common/db/query-result";
 import { todayInTimezone } from "../common/date-utils";
 import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
-import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
 import { escapeLikePattern } from "../transactions/transaction-search.util";
 import type { AiReviewTradeInput } from "./ai-review-work.types";
+import { tradeInvestmentAction, tradeMatchesOnQuantity } from "./trade-action";
 
 /** What the ledger already holds of one trade. */
 export interface TradeLedgerMatch {
@@ -22,10 +22,11 @@ export interface TradeLedgerMatch {
 }
 
 /**
- * The investment transactions with this trade's account, direction, day and
- * share count whose security is the given one, or the ticker or one of its
- * listings (`XCNS`, `XCNS.TO`), a VOID one excepted -- and which of them no email other than
- * `receiptId` accounts for (`email_receipts.investment_transaction_id`).
+ * The investment transactions with this trade's account, action, day and
+ * share count (a cash dividend's amount, as it moves no shares) whose security
+ * is the given one, or the ticker or one of its listings (`XCNS`, `XCNS.TO`),
+ * a VOID one excepted -- and which of them no email other than `receiptId`
+ * accounts for (`email_receipts.investment_transaction_id`).
  *
  * One function for every surface that asks "is this trade already booked": the
  * pipeline before it proposes, the card before it is shown or approved, the
@@ -36,12 +37,13 @@ export async function findTradeInLedger(
   userId: string,
   trade: Pick<
     AiReviewTradeInput,
-    "accountId" | "action" | "quantity" | "date"
+    "accountId" | "action" | "quantity" | "totalAmount" | "date"
   > &
     ({ symbol: string } | { securityId: string }),
   receiptId: string | null,
 ): Promise<TradeLedgerMatch> {
   const bySecurity = "securityId" in trade;
+  const byQuantity = tradeMatchesOnQuantity(trade.action);
   const rows = returnedRows<{ id: string; claimed: boolean }>(
     await m.query(
       `SELECT it.id,
@@ -58,7 +60,9 @@ export async function findTradeInLedger(
           AND it.action = $3
           AND it.transaction_date = $4::date
           AND it.status != 'VOID'
-          AND it.quantity = $5::numeric
+          AND (CASE WHEN $10::boolean
+                    THEN it.quantity = $5::numeric
+                    ELSE it.total_amount = $11::numeric END)
           AND (it.security_id = $9::uuid
                OR ($9::uuid IS NULL
                    AND (LOWER(s.symbol) = LOWER($6::text)
@@ -68,13 +72,15 @@ export async function findTradeInLedger(
       [
         userId,
         trade.accountId,
-        trade.action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL,
+        tradeInvestmentAction(trade.action),
         trade.date,
-        String(trade.quantity),
+        byQuantity && trade.quantity !== null ? String(trade.quantity) : null,
         bySecurity ? null : trade.symbol,
         bySecurity ? null : `${escapeLikePattern(trade.symbol)}.%`,
         receiptId,
         bySecurity ? trade.securityId : null,
+        byQuantity,
+        String(trade.totalAmount),
       ],
     ),
   );

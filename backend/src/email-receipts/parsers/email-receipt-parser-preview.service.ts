@@ -20,6 +20,7 @@ import { tradeExecutedTotalUnits } from "../parsing/parse-trade";
 import type {
   ParsedReceiptReason,
   ParsedTrade,
+  ParsedTradeAction,
   ParsedTradeReason,
 } from "../parsing/receipt-parser.types";
 import { validateReceiptParserDefinition } from "../parsing/receipt-parser.validation";
@@ -82,7 +83,7 @@ export interface ParserPreviewItem {
   } | null;
   /** For a trade profile: the trade it read (shares, ticker, direction); null for a receipt or when a guard stopped the read. */
   trade: {
-    action: "BUY" | "SELL" | null;
+    action: ParsedTradeAction | null;
     symbol: string | null;
     quantity: number | null;
     /** Shares times price agrees with the total; null when the email states no price. */
@@ -330,9 +331,12 @@ export class EmailReceiptParserPreviewService {
       userId,
       {
         accountId: trade.accountId as string,
-        action: trade.action as "BUY" | "SELL",
+        action: trade.action as ParsedTradeAction,
         symbol: trade.symbol as string,
-        quantity: trade.quantity as number,
+        quantity: trade.quantity,
+        totalAmount: roundMoney(
+          (tradeExecutedTotalUnits(trade) as number) / MONEY_UNITS,
+        ),
         date,
       },
       row.id,

@@ -31,7 +31,7 @@ import {
   EMAIL_RECEIPTS_MAX_LIST_OFFSET,
 } from "./dto/email-receipts.dto";
 import { describeFailure } from "../pipeline/receipt-failure";
-import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
+import { RECEIPT_TRADE_CHAT_INSTRUCTIONS } from "../pipeline/receipt-instructions";
 import { readTradeProposal } from "./email-receipt-trade-proposal";
 import { bulkActOnReceipts, refuseTooManyIds } from "./receipt-bulk";
 import {
@@ -1001,12 +1001,12 @@ export class EmailReceiptsService {
                 -- own request, or the one "Recognize as a trade" queued for
                 -- the AI (told apart by its fixed instruction).
                 CASE WHEN rq.kind = 'email_trade'
-                     THEN CASE WHEN rq.instruction = $3 THEN 'ai' ELSE 'profile' END
+                     THEN CASE WHEN rq.instruction = ANY($3::text[]) THEN 'ai' ELSE 'profile' END
                 END AS trade_request_source
            ${ITEM_JOINS}
           WHERE r.user_id = $1
             AND r.id = $2`,
-        [userId, id, RECEIPT_TRADE_CHAT_INSTRUCTION],
+        [userId, id, [...RECEIPT_TRADE_CHAT_INSTRUCTIONS]],
       ),
     );
     const row = rows[0];

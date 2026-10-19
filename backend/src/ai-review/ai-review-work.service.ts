@@ -17,7 +17,6 @@ import type {
 } from "../ai/actions/ai-action.types";
 import { AccountsService } from "../accounts/accounts.service";
 import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
-import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { SecuritiesService } from "../securities/securities.service";
 import { TransactionsService } from "../transactions/transactions.service";
@@ -28,6 +27,7 @@ import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
 import { receiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
 import { AiReviewRequest } from "./ai-review-request.entity";
 import { AiReviewRequestsService } from "./ai-review-requests.service";
+import { tradeInvestmentAction } from "./trade-action";
 import { emailDayOfUser, findTradeInLedger } from "./trade-ledger";
 import {
   AI_REVIEW_EMAIL_TEXT_MAX_CHARS,
@@ -647,8 +647,7 @@ export class AiReviewWorkService {
         ),
       );
     }
-    const action =
-      trade.action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL;
+    const action = tradeInvestmentAction(trade.action);
     // A scheduled bill or deposit this trade pays is marked paid by approving
     // it. Looked up each time the card is built, so the inbox shows the
     // schedule as it is now; an unsure match (none, or several) is no match.
@@ -673,7 +672,7 @@ export class AiReviewWorkService {
           action,
           transactionDate: trade.date,
           securityQuery: resolved.match.symbol,
-          quantity: trade.quantity,
+          quantity: trade.quantity ?? undefined,
           totalAmount: trade.totalAmount,
           commission: trade.commission,
           ...(scheduled?.fundingAccountId
@@ -711,7 +710,7 @@ export class AiReviewWorkService {
       throw new BadRequestException(
         tr(
           "errors.aiReview.tradeInvalid",
-          "The trade needs accountName, action (BUY or SELL), symbol, quantity, totalAmount and, optionally, commission and date (YYYY-MM-DD).",
+          "The trade needs accountName, action (BUY, SELL, DIVIDEND or REINVEST), symbol, quantity (optional for a DIVIDEND), totalAmount and, optionally, commission and date (YYYY-MM-DD).",
         ),
       );
     }
@@ -751,7 +750,7 @@ export class AiReviewWorkService {
       accountId: resolved.match.id,
       action: agent.action,
       symbol: agent.symbol.trim(),
-      quantity: agent.quantity,
+      quantity: agent.quantity ?? null,
       totalAmount: agent.totalAmount,
       commission: agent.commission ?? 0,
       date,
@@ -1042,7 +1041,8 @@ export class AiReviewWorkService {
       const stored =
         request.proposal as Partial<StoredAiReviewTradeProposal> | null;
       const before = stored?.action?.descriptor as
-        Partial<CreateInvestmentTransactionDescriptor> | undefined;
+        | Partial<CreateInvestmentTransactionDescriptor>
+        | undefined;
       const after = action.descriptor as CreateInvestmentTransactionDescriptor;
       if (
         typeof before?.scheduledTransactionId === "string" &&

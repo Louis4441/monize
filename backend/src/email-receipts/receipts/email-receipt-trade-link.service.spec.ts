@@ -293,4 +293,33 @@ describe("EmailReceiptTradeLinkService.candidates", () => {
     ).toEqual([]);
     expect(manager.query).not.toHaveBeenCalled();
   });
+
+  it("offers the ledger's dividends and reinvestments for a dividend email, and nothing for an action no trade email reports", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([]);
+    for (const action of ["DIVIDEND", "REINVEST"]) {
+      await service.candidates(
+        manager as never,
+        USER,
+        { accountId: "acc-1", symbol: "XEQT", action, date: "2026-10-15" },
+        "2026-10-16T00:00:00.000Z",
+        RECEIPT,
+      );
+      const search = manager.query.mock.calls.find((c) =>
+        String(c[0]).includes("FROM investment_transactions"),
+      );
+      expect(search?.[1][2]).toBe(action);
+      manager.query.mockClear();
+    }
+    expect(
+      await service.candidates(
+        manager as never,
+        USER,
+        { accountId: "acc-1", symbol: "XEQT", action: "INTEREST" },
+        "2026-10-16T00:00:00Z",
+        RECEIPT,
+      ),
+    ).toEqual([]);
+    expect(manager.query).not.toHaveBeenCalled();
+  });
 });

@@ -1657,10 +1657,15 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
         { ...agentTrade, quantity: 1.123456789 },
         { ...agentTrade, totalAmount: 2000.00001 },
         { accountName: "RRSP" },
+        // Only a cash dividend may leave the shares out.
+        { ...agentTrade, quantity: undefined },
+        { ...agentTrade, action: "REINVEST", quantity: null },
       ]) {
         await expect(
           h.service.submit(USER, "agent-1", REQ, { trade: bad }),
-        ).rejects.toThrow(/accountName, action \(BUY or SELL\)/);
+        ).rejects.toThrow(
+          /accountName, action \(BUY, SELL, DIVIDEND or REINVEST\)/,
+        );
       }
       expect(h.accounts.resolveBrokerageByNameOrId).not.toHaveBeenCalled();
       expect(h.requests.submitProposal).not.toHaveBeenCalled();
@@ -1686,6 +1691,38 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       ).toHaveBeenCalledWith(
         USER,
         expect.objectContaining({ quantity: 75.9878, totalAmount: 2000 }),
+      );
+    });
+
+    it("previews an agent's cash dividend without shares, as a DIVIDEND", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: {
+          ...agentTrade,
+          action: "DIVIDEND",
+          quantity: null,
+          totalAmount: 12.34,
+        },
+      });
+      expect(
+        h.investments.previewCreateInvestmentTransaction,
+      ).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({
+          action: "DIVIDEND",
+          quantity: undefined,
+          totalAmount: 12.34,
+        }),
       );
     });
 

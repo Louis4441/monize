@@ -7,11 +7,14 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
+import {
+  tradeActionOf,
+  tradeInvestmentAction,
+} from "../../ai-review/trade-action";
 import { emailDayOfUser } from "../../ai-review/trade-ledger";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { tr } from "../../i18n/translate";
-import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
 import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import { EmailReceipt } from "../entities/email-receipt.entity";
@@ -70,11 +73,11 @@ export class EmailReceiptTradeLinkService {
   ): Promise<EmailReceiptCandidateSummary[]> {
     const accountId = trade.accountId;
     const symbol = trade.symbol;
-    const action = trade.action;
+    const action = tradeActionOf(trade.action);
     if (
       typeof accountId !== "string" ||
       typeof symbol !== "string" ||
-      (action !== "BUY" && action !== "SELL")
+      action === null
     ) {
       return [];
     }
@@ -115,7 +118,7 @@ export class EmailReceiptTradeLinkService {
         [
           userId,
           accountId,
-          action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL,
+          tradeInvestmentAction(action),
           day,
           CANDIDATE_WINDOW_DAYS,
           symbol,
@@ -275,11 +278,7 @@ export class EmailReceiptTradeLinkService {
         },
       );
 
-      if (
-        linked.security_id &&
-        (linked.action === InvestmentAction.BUY ||
-          linked.action === InvestmentAction.SELL)
-      ) {
+      if (linked.security_id && tradeActionOf(linked.action) !== null) {
         const occurrence =
           await this.scheduled.findInvestmentOccurrenceForTrade(userId, {
             accountId: linked.account_id,

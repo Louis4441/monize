@@ -1,3 +1,4 @@
+import { tradeActionOf } from "../../ai-review/trade-action";
 import type { EmailReceiptTradeProposal } from "./email-receipt.view";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -13,7 +14,8 @@ const text = (value: unknown): string | null =>
  * The trade an `email_trade` request's stored proposal (`StoredAiReviewTradeProposal`)
  * holds, read from the card's preview, the figures the confirmation shows and
  * the commit writes. Null when the proposal is absent or any figure the reader
- * needs is missing or malformed: a partial trade is not shown as a trade.
+ * needs is missing or malformed: a partial trade is not shown as a trade. A cash
+ * dividend may carry no share count and no price (it was paid as one amount).
  */
 export function readTradeProposal(
   proposal: unknown,
@@ -21,8 +23,8 @@ export function readTradeProposal(
   if (!isRecord(proposal) || !isRecord(proposal.action)) return null;
   const preview = proposal.action.preview;
   if (!isRecord(preview)) return null;
-  const action = preview.investmentAction;
-  if (action !== "BUY" && action !== "SELL") return null;
+  const action = tradeActionOf(preview.investmentAction);
+  if (action === null) return null;
   const accountName = text(preview.accountName);
   const date = text(preview.transactionDate);
   const symbol = text(preview.symbol);
@@ -36,8 +38,7 @@ export function readTradeProposal(
     date === null ||
     symbol === null ||
     currencyCode === null ||
-    quantity === null ||
-    price === null ||
+    (action !== "DIVIDEND" && (quantity === null || price === null)) ||
     totalAmount === null ||
     commission === null
   ) {

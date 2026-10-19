@@ -11,6 +11,11 @@ import {
   WEALTHSIMPLE_RRSP_ACCOUNT_ID,
   WEALTHSIMPLE_TRADE_DEFINITION,
 } from "../parsing/fixtures/wealthsimple-trade";
+import {
+  WEALTHSIMPLE_DIVIDEND_BODY,
+  WEALTHSIMPLE_DIVIDEND_DEFINITION,
+  WEALTHSIMPLE_DRIP_BODY,
+} from "../parsing/fixtures/wealthsimple-dividend";
 import { normalizeReceiptLines } from "../parsing/receipt-lines";
 import type { ReceiptTradeDefinition } from "../parsing/receipt-parser.types";
 import {
@@ -90,11 +95,15 @@ function setup(
 const run = (
   h: ReturnType<typeof setup>,
   body = WEALTHSIMPLE_BUY_BODY,
-  context: { autoApply?: boolean; status?: "approved" | "draft" } = {},
+  context: {
+    autoApply?: boolean;
+    status?: "approved" | "draft";
+    definition?: ReceiptTradeDefinition;
+  } = {},
 ) =>
   h.service.process(h.manager as never, USER, receipt(), {
     parser: parser(context.status),
-    definition,
+    definition: context.definition ?? definition,
     lines: normalizeReceiptLines(body),
     mailboxAutoApply: context.autoApply ?? false,
   });
@@ -317,6 +326,95 @@ describe("EmailReceiptTradeService.process", () => {
       const outcome = await run(h, body, context);
       expect(outcome.status).toBe("review");
       expect(outcome.autoApply).toBeNull();
+    });
+
+    const dividends =
+      WEALTHSIMPLE_DIVIDEND_DEFINITION.trade as ReceiptTradeDefinition;
+
+    it("passes a complete cash dividend on: it states nothing to cross-check", async () => {
+      const h = setup();
+      const outcome = await run(h, WEALTHSIMPLE_DIVIDEND_BODY, {
+        autoApply: true,
+        definition: dividends,
+      });
+      expect(outcome.trade.consistent).toBeNull();
+      expect(outcome.autoApply).toBe(card);
+    });
+
+    it("holds a cash dividend whose shares times amount per share disagrees with its amount", async () => {
+      const h = setup();
+      const outcome = await run(
+        h,
+        WEALTHSIMPLE_DIVIDEND_BODY.replace(
+          "Amount: $12.34",
+          "Shares: 100\nPrice: $0.1234\nAmount: $123.40",
+        ),
+        { autoApply: true, definition: dividends },
+      );
+      expect(outcome.trade.consistent).toBe(false);
+      expect(outcome.autoApply).toBeNull();
+    });
+
+    it("passes a cross-checked reinvested dividend on, as a buy", async () => {
+      const h = setup();
+      const outcome = await run(h, WEALTHSIMPLE_DRIP_BODY, {
+        autoApply: true,
+        definition: dividends,
+      });
+      expect(outcome.trade.consistent).toBe(true);
+      expect(outcome.autoApply).toBe(card);
+    });
+  });
+
+  describe("dividends", () => {
+    const dividends =
+      WEALTHSIMPLE_DIVIDEND_DEFINITION.trade as ReceiptTradeDefinition;
+
+    it("proposes a cash dividend as its amount, with no share count", async () => {
+      const h = setup();
+      await run(h, WEALTHSIMPLE_DIVIDEND_BODY, { definition: dividends });
+      expect(h.work.submitTrade).toHaveBeenCalledWith(
+        USER,
+        EMAIL_RECEIPTS_CLAIM_KEY,
+        "rq-trade",
+        expect.objectContaining({
+          action: "DIVIDEND",
+          symbol: "XEQT",
+          quantity: null,
+          totalAmount: 12.34,
+          date: "2026-10-15",
+        }),
+      );
+    });
+
+    it("asks the ledger for the same dividend by its amount, not a share count", async () => {
+      const h = setup({ booked: "unclaimed" });
+      const outcome = await run(h, WEALTHSIMPLE_DIVIDEND_BODY, {
+        definition: dividends,
+      });
+      expect(outcome.status).toBe("ignored");
+      const ledgerCall = h.manager.query.mock.calls.find(([sql]) =>
+        String(sql).includes("FROM investment_transactions"),
+      ) as unknown as [string, unknown[]];
+      expect(ledgerCall[1]).toEqual(
+        expect.arrayContaining(["DIVIDEND", false, "12.34"]),
+      );
+      expect(h.work.submitTrade).not.toHaveBeenCalled();
+    });
+
+    it("proposes a reinvested dividend with its shares", async () => {
+      const h = setup();
+      await run(h, WEALTHSIMPLE_DRIP_BODY, { definition: dividends });
+      expect(h.work.submitTrade).toHaveBeenCalledWith(
+        USER,
+        EMAIL_RECEIPTS_CLAIM_KEY,
+        "rq-trade",
+        expect.objectContaining({
+          action: "REINVEST",
+          quantity: 0.3721,
+          totalAmount: 12.34,
+        }),
+      );
     });
   });
 });

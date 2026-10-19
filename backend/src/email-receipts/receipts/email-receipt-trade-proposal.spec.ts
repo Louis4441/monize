@@ -49,7 +49,7 @@ describe("readTradeProposal", () => {
   );
 
   it.each([
-    ["investmentAction", "REINVEST"],
+    ["investmentAction", "INTEREST"],
     ["accountName", ""],
     ["transactionDate", null],
     ["symbol", 5],
@@ -60,5 +60,32 @@ describe("readTradeProposal", () => {
     ["commission", undefined],
   ])("is null when %s is %p: a partial trade is no trade", (field, value) => {
     expect(readTradeProposal(stored({ [field]: value }))).toBeNull();
+  });
+
+  it("reads a reinvested dividend like a buy", () => {
+    expect(
+      readTradeProposal(stored({ investmentAction: "REINVEST" }))?.action,
+    ).toBe("REINVEST");
+    expect(
+      readTradeProposal(stored({ investmentAction: "REINVEST", price: null })),
+    ).toBeNull();
+  });
+
+  it("reads a cash dividend paid as one amount, with no shares and no price", () => {
+    expect(
+      readTradeProposal(
+        stored({
+          investmentAction: "DIVIDEND",
+          quantity: null,
+          price: null,
+          totalAmount: 12.34,
+        }),
+      ),
+    ).toMatchObject({
+      action: "DIVIDEND",
+      quantity: null,
+      price: null,
+      totalAmount: 12.34,
+    });
   });
 });

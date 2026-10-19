@@ -89,8 +89,11 @@ import {
   findTradeInLedger,
   recordTradeBooking,
 } from "../../ai-review/trade-ledger";
+import {
+  tradeActionOf,
+  tradeMatchesOnQuantity,
+} from "../../ai-review/trade-action";
 import type { EntityManager } from "typeorm";
-import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
 
 export interface ConfirmActionResult {
   type: AiActionDescriptor["type"];
@@ -1098,16 +1101,22 @@ export class AiActionsService {
         userId,
         reviewRequestId,
       );
-      if (descriptor.securityId && descriptor.quantity !== null) {
+      const tradeAction = tradeActionOf(descriptor.action);
+      const comparable =
+        tradeAction !== null &&
+        (tradeMatchesOnQuantity(tradeAction)
+          ? descriptor.quantity !== null
+          : descriptor.totalAmount !== undefined);
+      if (descriptor.securityId && tradeAction !== null && comparable) {
         const ledger = await findTradeInLedger(
           m,
           userId,
           {
             accountId: descriptor.accountId,
-            action:
-              descriptor.action === InvestmentAction.SELL ? "SELL" : "BUY",
+            action: tradeAction,
             securityId: descriptor.securityId,
             quantity: descriptor.quantity,
+            totalAmount: descriptor.totalAmount ?? 0,
             date: descriptor.transactionDate,
           },
           emailReceiptId,
