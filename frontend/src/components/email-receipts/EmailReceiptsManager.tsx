@@ -11,6 +11,7 @@ import { LinkedDraftDialog } from '@/components/email-receipts/LinkedDraftDialog
 import { LinkedProfilesHint } from '@/components/email-receipts/LinkedProfilesHint';
 import { EmailReceiptDetailDialog } from '@/components/email-receipts/EmailReceiptDetailDialog';
 import { ReceiptBulkBar } from '@/components/email-receipts/ReceiptBulkBar';
+import { ReceiptSearchBar } from '@/components/email-receipts/ReceiptSearchBar';
 import { RetryFailedEmailsButton } from '@/components/email-receipts/RetryFailedEmailsButton';
 import { SelectAllCheckbox } from '@/components/email-receipts/SelectAllCheckbox';
 import { SenderDomainCloud } from '@/components/email-receipts/SenderDomainCloud';
@@ -23,6 +24,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useReceiptBulkActions } from '@/components/email-receipts/useReceiptBulkActions';
 import { useReceiptBulkProcessing } from '@/components/email-receipts/useReceiptBulkProcessing';
 import { useReceiptNarrowing } from '@/components/email-receipts/useReceiptNarrowing';
+import { useReceiptSearch } from '@/components/email-receipts/useReceiptSearch';
 import { Button, buttonClassName } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -51,12 +53,14 @@ import {
 import { getErrorMessage } from '@/lib/errors';
 import { leadActionKey, orderActionsForCard, type ReceiptActionKey } from '@/lib/receipt-row-actions';
 import { createLogger } from '@/lib/logger';
+import { isReceiptSearchActive, receiptSearchKey } from '@/lib/receipt-search';
 import { deselects, isBulkApprovable, isTradeProposal, type Deselection } from '@/lib/receipt-selection';
 import {
   EMAIL_RECEIPT_STATUSES,
   type EmailReceiptBulkScope,
   type EmailReceiptDomainCount,
   type EmailReceiptListItem,
+  type EmailReceiptSearch,
   type EmailReceiptStatus,
   type EmailReceiptStatusCounts,
 } from '@/types/email-receipts';
@@ -75,19 +79,35 @@ type ReceiptFilter = (typeof FILTERS)[number];
 /** States from which the detail dialog can link the email to a transaction. */
 const LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['ambiguous', 'unmatched', 'no_parser', 'parse_failed'];
 
-/** The list answers one pair of filters (state and sender domain, `''` for all) and one page of it; `items === null` is a request that failed. */
+/**
+ * The search goes to the server only when it narrows the list, and as one extra
+ * argument, so a call without a search is the call it always was.
+ */
+function searchArgs(search: EmailReceiptSearch): readonly [EmailReceiptSearch] | readonly [] {
+  return isReceiptSearchActive(search) ? [search] : [];
+}
+
+/** The list answers one set of filters (state, sender domain, `''` for all, and the search's key) and one page of it; `items === null` is a request that failed. */
 interface LoadedList {
   filter: ReceiptFilter;
   domain: string;
+  searchKey: string;
   page: number;
   items: EmailReceiptListItem[] | null;
 }
 
-/** How many emails match one pair of filters, as the server counts them (the same answer the state buttons read). */
+/** How many emails match one set of filters, as the server counts them (the same answer the state buttons read). */
 interface MatchingCount {
   filter: ReceiptFilter;
   domain: string;
+  searchKey: string;
   total: number;
+}
+
+/** A count or domain list the server gave for one search; read only while that search is the one on screen. */
+interface ForSearch<T> {
+  searchKey: string;
+  items: T;
 }
 
 /** Whether the user has a mailbox, as far as it is known: `none` is a loaded answer of "no mailbox". */
@@ -98,6 +118,7 @@ type Confirmation = { kind: 'ignore' | 'delete'; receipt: EmailReceiptListItem }
 /** The sender domains counted within one state (`filter`), the answer for that state only. */
 interface DomainCloudState {
   filter: ReceiptFilter;
+  searchKey: string;
   items: EmailReceiptDomainCount[];
 }
 
@@ -112,8 +133,9 @@ interface Notice {
  * The receipts page body: every stored order-confirmation email with its state
  * and the actions on it.
  *
- * A list belongs to the filters that asked for it (`LoadedList.filter` and
- * `.domain`), so a slow answer for a filter the reader has left is never drawn
+ * A list belongs to the filters that asked for it (`LoadedList.filter`,
+ * `.domain` and `.searchKey`; the counts and the domain lists carry the search
+ * key too), so a slow answer for a filter the reader has left is never drawn
  * under the new one
  * and no action can be aimed at a row of the other list. `null` is loading or
  * failed, never an empty list; only a loaded, empty answer says "nothing here".
@@ -145,12 +167,16 @@ export function EmailReceiptsManager() {
   const [domain, setDomain] = useState<string>(() => normalizeDomainFilter(searchParams.get('domain')));
   // The page of the list (1-based). It belongs to the filters: every handler that changes one returns to page 1.
   const [page, setPage] = useState(1);
+  // The free-text search and date range. Its applied value is part of every request key below.
+  const receiptSearch = useReceiptSearch();
+  const search = receiptSearch.search;
+  const searchKey = receiptSearch.key;
   // The sender domains with their counts for the filter; null while unknown or failed (the select then offers only "All" and the current one).
-  const [domains, setDomains] = useState<EmailReceiptDomainCount[] | null>(null);
+  const [domains, setDomains] = useState<ForSearch<EmailReceiptDomainCount[]> | null>(null);
   // The same counts within the state the reader is on, for every state but "All"; null while unknown or failed.
   const [cloud, setCloud] = useState<DomainCloudState | null>(null);
   // How many emails are in each state, printed on the filter buttons; null while unknown or failed (no number is shown then).
-  const [counts, setCounts] = useState<EmailReceiptStatusCounts | null>(null);
+  const [counts, setCounts] = useState<ForSearch<EmailReceiptStatusCounts> | null>(null);
   const [loaded, setLoaded] = useState<LoadedList | null>(null);
   const [mailbox, setMailbox] = useState<MailboxState>({ status: 'loading' });
   // The emails ticked, by id, each as last seen. A tick outlives a change of state, sender or page, so
@@ -159,6 +185,15 @@ export function EmailReceiptsManager() {
   // How many emails match the filter (null while unknown or failed), and whether the selection is all of them (the count it was chosen with) rather than the ticked rows.
   const [matching, setMatching] = useState<MatchingCount | null>(null);
   const [allMatching, setAllMatching] = useState<number | null>(null);
+  // A new search starts at the first page with nothing ticked, as a new domain does. The search applies
+  // when the typed text has rested, not in a handler, so the reset happens as the new key is first rendered.
+  const [seenSearchKey, setSeenSearchKey] = useState(searchKey);
+  if (seenSearchKey !== searchKey) {
+    setSeenSearchKey(searchKey);
+    setPage(1);
+    setSelectedRows(new Map());
+    setAllMatching(null);
+  }
   const [drafting, setDrafting] = useState(false);
   // A draft over several sender domains waits here for the person's confirmation.
   const [linkedDraftFor, setLinkedDraftFor] = useState<readonly EmailReceiptListItem[] | null>(null);
@@ -177,23 +212,24 @@ export function EmailReceiptsManager() {
   const latestCloud = useRef(0);
   const latestCounts = useRef(0);
   const latestMatching = useRef(0);
-  const currentFilters = useRef({ filter, domain, page });
+  const currentFilters = useRef({ filter, domain, page, search });
   useEffect(() => {
-    currentFilters.current = { filter, domain, page };
-  }, [filter, domain, page]);
+    currentFilters.current = { filter, domain, page, search };
+  }, [filter, domain, page, search]);
 
-  const load = useCallback(async (forFilter: ReceiptFilter, forDomain: string, forPage: number) => {
+  const load = useCallback(async (forFilter: ReceiptFilter, forDomain: string, forPage: number, forSearch: EmailReceiptSearch) => {
     const request = ++latestLoad.current;
+    const forKey = receiptSearchKey(forSearch);
     const status = forFilter === 'all' ? undefined : forFilter;
     const sender = forDomain === '' ? undefined : forDomain;
     try {
-      const items = await emailReceiptsApi.receipts.list(status, undefined, sender, (forPage - 1) * PAGE_SIZE);
+      const items = await emailReceiptsApi.receipts.list(status, undefined, sender, (forPage - 1) * PAGE_SIZE, ...searchArgs(forSearch));
       if (request !== latestLoad.current) return;
       if (items.length === 0 && forPage > 1) {
         // The page no longer exists (its emails were deleted or left the filter): go to the last one that does.
         let lastPage = forPage - 1;
         try {
-          const total = await emailReceiptsApi.receipts.countMatching(status, sender);
+          const total = await emailReceiptsApi.receipts.countMatching(status, sender, ...searchArgs(forSearch));
           lastPage = Math.max(1, Math.min(lastPage, Math.ceil(total / PAGE_SIZE)));
         } catch (error) {
           logger.error(error);
@@ -202,21 +238,23 @@ export function EmailReceiptsManager() {
         setPage(lastPage);
         return;
       }
-      setLoaded({ filter: forFilter, domain: forDomain, page: forPage, items });
+      setLoaded({ filter: forFilter, domain: forDomain, searchKey: forKey, page: forPage, items });
     } catch (error) {
       if (request !== latestLoad.current) return;
       logger.error(error);
-      setLoaded({ filter: forFilter, domain: forDomain, page: forPage, items: null });
+      setLoaded({ filter: forFilter, domain: forDomain, searchKey: forKey, page: forPage, items: null });
     }
   }, []);
 
   /** The domains the filter offers; a failed read leaves them unknown, never an empty list. */
-  const loadDomains = useCallback(async () => {
+  const loadDomains = useCallback(async (forSearch: EmailReceiptSearch) => {
     const request = ++latestDomains.current;
     try {
-      const found = await emailReceiptsApi.receipts.listDomains();
+      const found = isReceiptSearchActive(forSearch)
+        ? await emailReceiptsApi.receipts.listDomains(undefined, forSearch)
+        : await emailReceiptsApi.receipts.listDomains();
       if (request !== latestDomains.current) return;
-      setDomains(found);
+      setDomains({ searchKey: receiptSearchKey(forSearch), items: found });
     } catch (error) {
       if (request !== latestDomains.current) return;
       logger.error(error);
@@ -225,13 +263,13 @@ export function EmailReceiptsManager() {
   }, []);
 
   /** The sender domains of one state's emails; a failed read leaves them unknown. */
-  const loadCloud = useCallback(async (forFilter: ReceiptFilter) => {
+  const loadCloud = useCallback(async (forFilter: ReceiptFilter, forSearch: EmailReceiptSearch) => {
     if (forFilter === 'all') return;
     const request = ++latestCloud.current;
     try {
-      const items = await emailReceiptsApi.receipts.listDomains(forFilter);
+      const items = await emailReceiptsApi.receipts.listDomains(forFilter, ...searchArgs(forSearch));
       if (request !== latestCloud.current) return;
-      setCloud({ filter: forFilter, items });
+      setCloud({ filter: forFilter, searchKey: receiptSearchKey(forSearch), items });
     } catch (error) {
       if (request !== latestCloud.current) return;
       logger.error(error);
@@ -240,12 +278,12 @@ export function EmailReceiptsManager() {
   }, []);
 
   /** The per-state counts; a failed read leaves them unknown, never zero. */
-  const loadCounts = useCallback(async () => {
+  const loadCounts = useCallback(async (forSearch: EmailReceiptSearch) => {
     const request = ++latestCounts.current;
     try {
-      const found = await emailReceiptsApi.receipts.getStatusCounts();
+      const found = await emailReceiptsApi.receipts.getStatusCounts(...searchArgs(forSearch));
       if (request !== latestCounts.current) return;
-      setCounts(found);
+      setCounts({ searchKey: receiptSearchKey(forSearch), items: found });
     } catch (error) {
       if (request !== latestCounts.current) return;
       logger.error(error);
@@ -254,15 +292,16 @@ export function EmailReceiptsManager() {
   }, []);
 
   /** How many emails match the filter; a failed read leaves it unknown, so no "select all N" is offered. */
-  const loadMatching = useCallback(async (forFilter: ReceiptFilter, forDomain: string) => {
+  const loadMatching = useCallback(async (forFilter: ReceiptFilter, forDomain: string, forSearch: EmailReceiptSearch) => {
     const request = ++latestMatching.current;
     try {
       const total = await emailReceiptsApi.receipts.countMatching(
         forFilter === 'all' ? undefined : forFilter,
         forDomain === '' ? undefined : forDomain,
+        ...searchArgs(forSearch),
       );
       if (request !== latestMatching.current) return;
-      setMatching({ filter: forFilter, domain: forDomain, total });
+      setMatching({ filter: forFilter, domain: forDomain, searchKey: receiptSearchKey(forSearch), total });
     } catch (error) {
       if (request !== latestMatching.current) return;
       logger.error(error);
@@ -272,40 +311,42 @@ export function EmailReceiptsManager() {
 
   // After a command or a change the list, the state counts and the domain counts are read again.
   const reload = useCallback(async () => {
-    void loadDomains();
-    void loadCounts();
-    void loadMatching(currentFilters.current.filter, currentFilters.current.domain);
-    void loadCloud(currentFilters.current.filter);
-    await load(currentFilters.current.filter, currentFilters.current.domain, currentFilters.current.page);
+    const now = currentFilters.current;
+    void loadDomains(now.search);
+    void loadCounts(now.search);
+    void loadMatching(now.filter, now.domain, now.search);
+    void loadCloud(now.filter, now.search);
+    await load(now.filter, now.domain, now.page, now.search);
   }, [load, loadDomains, loadCounts, loadCloud, loadMatching]);
   // A profile made here that ignores or deletes its emails offers to do so to the stored ones it matches.
   const discardOffer = useProfileDiscardOffer(() => void reload());
 
   useEffect(() => {
-    void load(filter, domain, page);
-  }, [filter, domain, page, load]);
+    void load(filter, domain, page, search);
+  }, [filter, domain, page, search, load]);
 
   // The total belongs to the filters alone, so turning a page does not count again.
   useEffect(() => {
-    void loadMatching(filter, domain);
-  }, [filter, domain, loadMatching]);
+    void loadMatching(filter, domain, search);
+  }, [filter, domain, search, loadMatching]);
 
   useEffect(() => {
-    void loadDomains();
-    void loadCounts();
-  }, [loadDomains, loadCounts]);
+    void loadDomains(search);
+    void loadCounts(search);
+  }, [search, loadDomains, loadCounts]);
 
   useEffect(() => {
-    void loadCloud(filter);
-  }, [filter, loadCloud]);
+    void loadCloud(filter, search);
+  }, [filter, search, loadCloud]);
 
   // What was taken out of an "every email matching" selection, and the number it leaves.
   const narrowBase = useMemo(
-    () => ({ ...(filter === 'all' ? {} : { status: filter }), ...(domain === '' ? {} : { domain }) }),
-    [filter, domain],
+    () => ({ ...(filter === 'all' ? {} : { status: filter }), ...(domain === '' ? {} : { domain }), ...search }),
+    [filter, domain, search],
   );
   const narrowing = useReceiptNarrowing({
     base: narrowBase,
+    resetKey: searchKey,
     onEmpty: () => {
       setSelectedRows(new Map());
       setAllMatching(null);
@@ -598,7 +639,16 @@ export function EmailReceiptsManager() {
   };
 
   const current =
-    loaded !== null && loaded.filter === filter && loaded.domain === domain && loaded.page === page ? loaded : null;
+    loaded !== null &&
+    loaded.filter === filter &&
+    loaded.domain === domain &&
+    loaded.searchKey === searchKey &&
+    loaded.page === page
+      ? loaded
+      : null;
+  // Counts and domain lists of another search are not these emails' numbers: unknown until theirs arrive.
+  const countsNow = counts !== null && counts.searchKey === searchKey ? counts.items : null;
+  const domainsNow = domains !== null && domains.searchKey === searchKey ? domains.items : null;
   const pageItems = current?.items ?? [];
   // Every ticked email: the rows on screen in list order, as loaded now, then the ones on other pages or lists as last seen.
   const pageIds = new Set(pageItems.map((receipt) => receipt.id));
@@ -606,7 +656,10 @@ export function EmailReceiptsManager() {
   const selected = [...shownSelected, ...[...selectedRows.values()].filter((receipt) => !pageIds.has(receipt.id))];
   const hiddenSelectedCount = selected.length - shownSelected.length;
   const selectedDomains = distinctSenderDomains(selected);
-  const matchingTotal = matching !== null && matching.filter === filter && matching.domain === domain ? matching.total : null;
+  const matchingTotal =
+    matching !== null && matching.filter === filter && matching.domain === domain && matching.searchKey === searchKey
+      ? matching.total
+      : null;
   // The narrowed number once exclusions are on; until its count arrives the unnarrowed one stands in and the commands wait (`narrowing.pending`).
   const allMatchingCount =
     allMatching !== null ? ((narrowing.active ? narrowing.count : null) ?? matchingTotal ?? allMatching) : null;
@@ -619,7 +672,12 @@ export function EmailReceiptsManager() {
       : null;
 
   // The tag cloud counts within the state on screen; "All" reads the unfiltered list.
-  const cloudDomains = filter === 'all' ? domains : cloud !== null && cloud.filter === filter ? cloud.items : null;
+  const cloudDomains =
+    filter === 'all'
+      ? domainsNow
+      : cloud !== null && cloud.filter === filter && cloud.searchKey === searchKey
+        ? cloud.items
+        : null;
 
   // The header checkbox covers every row of the page.
   const isChecked = (receipt: EmailReceiptListItem) => allMatching !== null || selectedRows.has(receipt.id);
@@ -680,9 +738,9 @@ export function EmailReceiptsManager() {
   const statusOptions: EmailReceiptStatus[] =
     allMatching === null
       ? EMAIL_RECEIPT_STATUSES.filter((status) => selected.some((receipt) => receipt.status === status))
-      : filter !== 'all' || counts === null
+      : filter !== 'all' || countsNow === null
         ? []
-        : EMAIL_RECEIPT_STATUSES.filter((status) => (counts[status] ?? 0) > 0 && !excludedStatuses.includes(status));
+        : EMAIL_RECEIPT_STATUSES.filter((status) => (countsNow[status] ?? 0) > 0 && !excludedStatuses.includes(status));
   const excludedDomains = narrowing.exclusions.domains;
   const domainOptions: string[] =
     allMatching === null
@@ -697,16 +755,17 @@ export function EmailReceiptsManager() {
   /** The label of a state's button: its name with how many emails are in it, when that is known. */
   const filterLabel = (option: ReceiptFilter) => {
     const label = t(`filter.${option}`);
-    if (counts === null) return label;
+    if (countsNow === null) return label;
     const count =
       option === 'all'
-        ? EMAIL_RECEIPT_STATUSES.reduce((sum, status) => sum + (counts[status] ?? 0), 0)
-        : (counts[option] ?? 0);
+        ? EMAIL_RECEIPT_STATUSES.reduce((sum, status) => sum + (countsNow[status] ?? 0), 0)
+        : (countsNow[option] ?? 0);
     return t('filter.option', { label, count: formatNumber(count, 0) });
   };
 
-  // "Retry failed emails" is offered only while the counts say some email could not be read.
-  const failedCount = counts?.parse_failed ?? 0;
+  // "Retry failed emails" is offered only while the counts say some email could not be read. It retries
+  // every such email, so under a search (whose counts are narrowed) it is withheld rather than show a number it does not act on.
+  const failedCount = receiptSearch.active ? 0 : (countsNow?.parse_failed ?? 0);
 
   let body;
   if (current !== null && current.items === null) {
@@ -723,15 +782,28 @@ export function EmailReceiptsManager() {
   } else if (current === null) {
     body = <LoadingSpinner text={t('loading')} />;
   } else if (current.items === null || current.items.length === 0) {
-    const unfiltered = filter === 'all' && domain === '';
+    const searching = receiptSearch.active;
+    const unfiltered = filter === 'all' && domain === '' && !searching;
     const noMailbox = mailbox.status === 'none' && unfiltered;
     body = (
       <EmptyState
         icon={<EnvelopeIcon />}
-        title={unfiltered ? t('empty.title') : t('empty.filteredTitle')}
-        description={noMailbox ? t('empty.noMailboxBody') : unfiltered ? t('empty.body') : t('empty.filteredBody')}
+        title={searching ? t('empty.searchTitle') : unfiltered ? t('empty.title') : t('empty.filteredTitle')}
+        description={
+          searching
+            ? t('empty.searchBody')
+            : noMailbox
+              ? t('empty.noMailboxBody')
+              : unfiltered
+                ? t('empty.body')
+                : t('empty.filteredBody')
+        }
         action={
-          noMailbox ? (
+          searching ? (
+            <Button variant="outline" onClick={receiptSearch.clear}>
+              {t('search.clear')}
+            </Button>
+          ) : noMailbox ? (
             <Link href="/email-receipts?tab=mailbox" className={buttonClassName('primary', 'md')}>
               {t('empty.connectButton')}
             </Link>
@@ -880,6 +952,13 @@ export function EmailReceiptsManager() {
         <SenderDomainCloud domains={cloudDomains} selected={domain} onSelect={changeDomain} />
       </div>
       {domain !== '' && <p className="text-xs text-gray-500 dark:text-gray-400">{t('domainFilter.help', { domain })}</p>}
+      <ReceiptSearchBar
+        input={receiptSearch.input}
+        onChange={receiptSearch.change}
+        onClear={receiptSearch.clear}
+        canClear={receiptSearch.hasInput}
+        rangeBackwards={receiptSearch.rangeBackwards}
+      />
 
       {failedCount > 0 && (
         <RetryFailedEmailsButton

@@ -50,6 +50,10 @@ function targetOf(dto: {
           excludeDomains: dto.filter?.excludeDomains,
           receivedFrom: dto.filter?.receivedFrom,
           receivedTo: dto.filter?.receivedTo,
+          search: dto.filter?.search,
+          searchIn: dto.filter?.searchIn,
+          dateFrom: dto.filter?.dateFrom,
+          dateTo: dto.filter?.dateTo,
         },
       };
 }
@@ -88,6 +92,10 @@ export class EmailReceiptsController {
       domain: query.domain,
       limit: query.limit,
       offset: query.offset,
+      search: query.search,
+      searchIn: query.searchIn,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
     });
   }
 
@@ -101,7 +109,13 @@ export class EmailReceiptsController {
     @Request() req: { user: { id: string } },
     @Query() query: ListEmailReceiptDomainsDto,
   ) {
-    return this.receipts.listDomains(req.user.id, { status: query.status });
+    return this.receipts.listDomains(req.user.id, {
+      status: query.status,
+      search: query.search,
+      searchIn: query.searchIn,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    });
   }
 
   // Declared before `:id`, so the literal segment is matched first.
@@ -124,7 +138,13 @@ export class EmailReceiptsController {
     @Request() req: { user: { id: string } },
     @Query() query: EmailReceiptStatusCountsDto,
   ) {
-    return this.receipts.statusCounts(req.user.id, { domain: query.domain });
+    return this.receipts.statusCounts(req.user.id, {
+      domain: query.domain,
+      search: query.search,
+      searchIn: query.searchIn,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    });
   }
 
   // Declared before `:id`, so the literal segment is matched first.

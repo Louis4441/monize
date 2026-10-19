@@ -11,8 +11,10 @@ import {
   IsISO8601,
   IsObject,
   IsOptional,
+  IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   registerDecorator,
   ValidateIf,
@@ -22,6 +24,7 @@ import {
   IsCalendarDate,
   isCalendarDate,
 } from "../../../common/validators/is-calendar-date.validator";
+import { IsNoControlCharacters } from "../../mailbox/no-control-characters.validator";
 import {
   IsReceiptDomain,
   normalizeReceiptDomain,
@@ -53,8 +56,95 @@ export type EmailReceiptProcessableStatus =
 export const EMAIL_RECEIPTS_DEFAULT_BATCH_LIMIT = 100;
 export const EMAIL_RECEIPTS_MAX_BATCH_LIMIT = 200;
 
+/** Longest search text a request may carry, after trimming. */
+export const EMAIL_RECEIPTS_MAX_SEARCH_CHARS = 200;
+
+/** Where a search looks: everywhere, the subject, the sender or the body text. */
+export const EMAIL_RECEIPT_SEARCH_FIELDS = [
+  "all",
+  "subject",
+  "sender",
+  "body",
+] as const;
+export type EmailReceiptSearchField =
+  (typeof EMAIL_RECEIPT_SEARCH_FIELDS)[number];
+
+/** A `YYYY-MM-DD` that is not before the one named by `other` (checked only when both are real dates). */
+function IsNotBefore(other: string) {
+  return function decorate(object: object, propertyName: string): void {
+    registerDecorator({
+      name: "isNotBefore",
+      target: object.constructor,
+      propertyName,
+      validator: {
+        validate: (value: unknown, args) => {
+          const from = (args?.object as Record<string, unknown>)[other];
+          return (
+            !isCalendarDate(value) || !isCalendarDate(from) || from <= value
+          );
+        },
+        defaultMessage: () => `${propertyName} must not be before ${other}`,
+      },
+    });
+  };
+}
+
+/**
+ * The search and the date range of the receipts page, one set of fields for the
+ * list, its counts, the sender domains and the bulk filter, so each reads the
+ * same emails (`receipt-filter.ts` holds the one predicate).
+ */
+export abstract class ReceiptSearchDto {
+  @ApiPropertyOptional({
+    maxLength: EMAIL_RECEIPTS_MAX_SEARCH_CHARS,
+    description:
+      "Text to find in the emails (case-insensitive substring). Trimmed; blank means no search.",
+    example: "invoice",
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.trim() || undefined : value,
+  )
+  @IsString()
+  @MaxLength(EMAIL_RECEIPTS_MAX_SEARCH_CHARS)
+  @IsNoControlCharacters()
+  search?: string;
+
+  @ApiPropertyOptional({
+    enum: EMAIL_RECEIPT_SEARCH_FIELDS,
+    default: "all",
+    description:
+      "Where `search` looks: the subject, the sender (address, domain, forwarding user), the body text, or all of them. Ignored without `search`.",
+  })
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null && v !== "")
+  @IsIn(EMAIL_RECEIPT_SEARCH_FIELDS)
+  searchIn?: EmailReceiptSearchField;
+
+  @ApiPropertyOptional({
+    example: "2026-01-31",
+    description:
+      "Only emails dated on or after this UTC day (YYYY-MM-DD): the date the list shows, `original_sent_at` else `received_at`.",
+  })
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null && v !== "")
+  @IsCalendarDate()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({
+    example: "2026-12-31",
+    description:
+      "Only emails dated on or before this UTC day (YYYY-MM-DD); not before `dateFrom`.",
+  })
+  @IsOptional()
+  @ValidateIf((_o, v) => v !== null && v !== "")
+  @IsCalendarDate()
+  @IsNotBefore("dateFrom")
+  dateTo?: string;
+}
+
 /** Query of `GET /email-receipts`. */
-export class ListEmailReceiptsDto {
+export class ListEmailReceiptsDto extends ReceiptSearchDto {
   @ApiPropertyOptional({ enum: EMAIL_RECEIPT_STATUSES })
   @IsOptional()
   @IsIn(EMAIL_RECEIPT_STATUSES)
@@ -97,7 +187,7 @@ export class ListEmailReceiptsDto {
 }
 
 /** Query of `GET /email-receipts/domains`. */
-export class ListEmailReceiptDomainsDto {
+export class ListEmailReceiptDomainsDto extends ReceiptSearchDto {
   @ApiPropertyOptional({
     enum: EMAIL_RECEIPT_STATUSES,
     description: "Count only the emails in this state.",
@@ -108,7 +198,7 @@ export class ListEmailReceiptDomainsDto {
 }
 
 /** Query of `GET /email-receipts/status-counts`. */
-export class EmailReceiptStatusCountsDto {
+export class EmailReceiptStatusCountsDto extends ReceiptSearchDto {
   @ApiPropertyOptional({
     description:
       "Count only emails from exactly this domain or one of its sub-domains. Lower-cased and trimmed.",
@@ -246,28 +336,8 @@ export const EMAIL_RECEIPTS_APPROVABLE_MAX = 2000;
 export const EMAIL_RECEIPTS_BULK_REPROCESS_MAX_LIMIT = 25;
 export const EMAIL_RECEIPTS_BULK_REPROCESS_DEFAULT_LIMIT = 10;
 
-/** A `YYYY-MM-DD` that is not before the one named by `other` (checked only when both are real dates). */
-function IsNotBefore(other: string) {
-  return function decorate(object: object, propertyName: string): void {
-    registerDecorator({
-      name: "isNotBefore",
-      target: object.constructor,
-      propertyName,
-      validator: {
-        validate: (value: unknown, args) => {
-          const from = (args?.object as Record<string, unknown>)[other];
-          return (
-            !isCalendarDate(value) || !isCalendarDate(from) || from <= value
-          );
-        },
-        defaultMessage: () => `${propertyName} must not be before ${other}`,
-      },
-    });
-  };
-}
-
 /** The state and sender domain of the list, as one bulk request names them, and what is taken out of it. */
-export class BulkEmailReceiptFilterDto {
+export class BulkEmailReceiptFilterDto extends ReceiptSearchDto {
   @ApiPropertyOptional({ enum: EMAIL_RECEIPT_STATUSES })
   @IsOptional()
   @IsIn(EMAIL_RECEIPT_STATUSES)
