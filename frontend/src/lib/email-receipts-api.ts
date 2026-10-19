@@ -1,5 +1,6 @@
 import apiClient from './api';
 import { clearAllCache } from './apiCache';
+import { receiptSearchParams } from './receipt-search';
 import { AI_REVIEW_APPROVE_BATCH_MAX } from '@/types/email-receipts';
 import type {
   EmailReceiptApproveResult,
@@ -16,6 +17,7 @@ import type {
   EmailReceiptDetail,
   EmailReceiptImportResult,
   EmailReceiptListItem,
+  EmailReceiptSearch,
   EmailReceiptMailbox,
   EmailReceiptMailboxTestResult,
   EmailReceiptParserDraftRequestResult,
@@ -146,16 +148,21 @@ export const emailReceiptsApi = {
   },
 
   receipts: {
-    /** `domain` keeps the emails from that sender domain or one of its sub-domains; it combines with `status`. */
+    /**
+     * `domain` keeps the emails from that sender domain or one of its sub-domains; it combines with `status`
+     * and with `search` (text and dates; only the fields that are set are sent).
+     */
     list: async (
       status?: EmailReceiptStatus,
       limit?: number,
       domain?: string,
       offset?: number,
+      search?: EmailReceiptSearch,
     ): Promise<EmailReceiptListItem[]> => {
       const params = {
         ...(status ? { status } : {}),
         ...(domain ? { domain } : {}),
+        ...receiptSearchParams(search),
         ...(limit ? { limit } : {}),
         ...(offset ? { offset } : {}),
       };
@@ -167,11 +174,13 @@ export const emailReceiptsApi = {
 
     /**
      * The sender domains of the stored emails with their counts, most first (at
-     * most 200). With `status` the counts are those of the emails in that state.
+     * most 200). With `status` the counts are those of the emails in that state;
+     * with `search` only the emails that match it are counted.
      */
-    listDomains: async (status?: EmailReceiptStatus): Promise<EmailReceiptDomainCount[]> => {
+    listDomains: async (status?: EmailReceiptStatus, search?: EmailReceiptSearch): Promise<EmailReceiptDomainCount[]> => {
+      const params = { ...(status ? { status } : {}), ...receiptSearchParams(search) };
       const response = await apiClient.get<EmailReceiptDomainCount[]>(`${RECEIPTS}/domains`, {
-        params: status ? { status } : undefined,
+        params: Object.keys(params).length > 0 ? params : undefined,
       });
       return response.data;
     },
@@ -185,12 +194,14 @@ export const emailReceiptsApi = {
       return response.data;
     },
 
-    /** How many stored emails are in each state; the filter bar prints them. */
-    getStatusCounts: async (): Promise<EmailReceiptStatusCounts> => {
-      const response = await apiClient.get<{
-        total: number;
-        byStatus: EmailReceiptStatusCounts;
-      }>(`${RECEIPTS}/status-counts`);
+    /** How many stored emails are in each state (those matching `search`, when given); the filter bar prints them. */
+    getStatusCounts: async (search?: EmailReceiptSearch): Promise<EmailReceiptStatusCounts> => {
+      const params = receiptSearchParams(search);
+      const url = `${RECEIPTS}/status-counts`;
+      const response =
+        Object.keys(params).length > 0
+          ? await apiClient.get<{ total: number; byStatus: EmailReceiptStatusCounts }>(url, { params })
+          : await apiClient.get<{ total: number; byStatus: EmailReceiptStatusCounts }>(url);
       return response.data.byStatus;
     },
 
@@ -198,13 +209,14 @@ export const emailReceiptsApi = {
      * How many stored emails match a filter (state and sender domain, as the
      * list reads them): the same `status-counts` answer the state buttons print,
      * so a bulk command's number and the page's number come from one place.
-     * Without `status` it is every state.
+     * Without `status` it is every state. `search` narrows it as it narrows the list.
      */
-    countMatching: async (status?: EmailReceiptStatus, domain?: string): Promise<number> => {
+    countMatching: async (status?: EmailReceiptStatus, domain?: string, search?: EmailReceiptSearch): Promise<number> => {
+      const params = { ...(domain ? { domain } : {}), ...receiptSearchParams(search) };
       const response = await apiClient.get<{
         total: number;
         byStatus: EmailReceiptStatusCounts;
-      }>(`${RECEIPTS}/status-counts`, { params: domain ? { domain } : undefined });
+      }>(`${RECEIPTS}/status-counts`, { params: Object.keys(params).length > 0 ? params : undefined });
       return status ? (response.data.byStatus[status] ?? 0) : response.data.total;
     },
 

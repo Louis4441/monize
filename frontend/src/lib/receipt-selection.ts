@@ -52,9 +52,9 @@ export function addExclusion(exclusions: SelectionExclusions, deselection: Desel
   }
 }
 
-/** The list's filter with the exclusions written into it; empty exclusions add no field. */
+/** The list's filter (state, sender domain and search) with the exclusions written into it; empty exclusions add no field. */
 export function selectionFilter(
-  base: Pick<EmailReceiptBulkFilter, 'status' | 'domain'>,
+  base: Pick<EmailReceiptBulkFilter, 'status' | 'domain' | 'search' | 'searchIn' | 'dateFrom' | 'dateTo'>,
   exclusions: SelectionExclusions,
 ): EmailReceiptBulkFilter {
   return {

@@ -761,6 +761,22 @@
       "ignored": "Ignoré",
       "component": "En attente de remboursement"
     },
+    "search": {
+      "label": "Rechercher des e-mails",
+      "text": "Rechercher",
+      "placeholder": "Objet, expéditeur ou contenu",
+      "in": "Rechercher dans",
+      "fields": {
+        "all": "Tous les champs",
+        "subject": "Objet",
+        "sender": "Expéditeur",
+        "body": "Contenu"
+      },
+      "from": "Date de début",
+      "to": "Date de fin",
+      "rangeBackwards": "La date de fin est antérieure à la date de début. La période n'est pas appliquée.",
+      "clear": "Effacer la recherche"
+    },
     "domainFilter": {
       "label": "Domaine de l'expéditeur",
       "all": "Tous les expéditeurs",
@@ -791,7 +807,9 @@
       "filteredTitle": "Aucun e-mail avec ce statut",
       "filteredBody": "Choisissez un autre statut pour voir les autres.",
       "noMailboxBody": "Aucune boîte mail n'est encore connectée. Connectez-en une pour commencer à lire les confirmations de commande.",
-      "connectButton": "Connecter une boîte mail"
+      "connectButton": "Connecter une boîte mail",
+      "searchTitle": "Aucun e-mail ne correspond à la recherche",
+      "searchBody": "Modifiez les mots ou les dates, ou effacez la recherche pour voir tous les e-mails."
     },
     "actions": {
       "view": "Voir",
@@ -907,6 +925,7 @@
         "trades": "{count, plural, one {# e-mail d'opération est laissé de côté. Approuvez-le sur sa carte dans la boîte de revue IA.} other {# e-mails d'opérations sont laissés de côté. Approuvez-les sur leurs cartes dans la boîte de revue IA.}}",
         "confirm": "Approuver"
       },
+      "searchNote": "Seuls les e-mails correspondant à la recherche sont inclus.",
       "narrowedNote": "Les e-mails exclus de la sélection ne sont pas modifiés."
     },
     "bulk": {

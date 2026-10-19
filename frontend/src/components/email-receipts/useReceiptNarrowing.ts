@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { emailReceiptsApi } from '@/lib/email-receipts-api';
@@ -25,16 +25,34 @@ const logger = createLogger('EmailReceiptsNarrowing');
  * `filter` is what every command sends. `reset` clears it with the selection.
  */
 export function useReceiptNarrowing(options: {
-  base: Pick<EmailReceiptBulkFilter, 'status' | 'domain'>;
+  base: Pick<EmailReceiptBulkFilter, 'status' | 'domain' | 'search' | 'searchIn' | 'dateFrom' | 'dateTo'>;
   /** The exclusions left no email: the selection is over. */
   onEmpty: () => void;
+  /**
+   * Names what `base` was chosen by where the change is not a handler of the
+   * list (the search applies after the text has rested): a new value drops the
+   * exclusions and the count, and a count still on its way is never adopted.
+   */
+  resetKey?: string;
 }) {
   const t = useTranslations('emailReceipts.receipts.bulk');
-  const { base, onEmpty } = options;
+  const { base, onEmpty, resetKey } = options;
   const [exclusions, setExclusions] = useState<SelectionExclusions>(NO_EXCLUSIONS);
   const [count, setCount] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const latest = useRef(0);
+
+  // A new reset key starts over (state is reset while rendering, the way a prop change resets a child).
+  const [seenKey, setSeenKey] = useState(resetKey);
+  if (seenKey !== resetKey) {
+    setSeenKey(resetKey);
+    setExclusions(NO_EXCLUSIONS);
+    setCount(null);
+    setPending(false);
+  }
+  useEffect(() => {
+    latest.current += 1;
+  }, [resetKey]);
 
   const reset = useCallback(() => {
     latest.current += 1;

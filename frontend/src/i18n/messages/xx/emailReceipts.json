@@ -761,6 +761,22 @@
       "ignored": "[XX-Ignored-XX]",
       "component": "[XX-Waiting for repayment-XX]"
     },
+    "search": {
+      "label": "[XX-Search emails-XX]",
+      "text": "[XX-Search-XX]",
+      "placeholder": "[XX-Subject, sender or content-XX]",
+      "in": "[XX-Search in-XX]",
+      "fields": {
+        "all": "[XX-All fields-XX]",
+        "subject": "[XX-Subject-XX]",
+        "sender": "[XX-Sender-XX]",
+        "body": "[XX-Content-XX]"
+      },
+      "from": "[XX-From date-XX]",
+      "to": "[XX-To date-XX]",
+      "rangeBackwards": "[XX-The end date is before the start date. The date range is not applied.-XX]",
+      "clear": "[XX-Clear search-XX]"
+    },
     "domainFilter": {
       "label": "[XX-Sender domain-XX]",
       "all": "[XX-All senders-XX]",
@@ -790,6 +806,8 @@
       "body": "[XX-Order confirmations appear here once the mailbox has been read.-XX]",
       "filteredTitle": "[XX-No emails in this state-XX]",
       "filteredBody": "[XX-Choose another state to see the rest.-XX]",
+      "searchTitle": "[XX-No email matches the search-XX]",
+      "searchBody": "[XX-Change the words or the dates, or clear the search to see every email.-XX]",
       "noMailboxBody": "[XX-No mailbox is connected yet. Connect one to start reading order confirmations.-XX]",
       "connectButton": "[XX-Connect a mailbox-XX]"
     },
@@ -907,6 +925,7 @@
         "trades": "[XX-{count, plural, one {# trade email is left out. Approve it on its card in the AI review inbox.} other {# trade emails are left out. Approve them on their cards in the AI review inbox.}}-XX]",
         "confirm": "[XX-Approve-XX]"
       },
+      "searchNote": "[XX-Only the emails that match the search are included.-XX]",
       "narrowedNote": "[XX-Emails taken out of the selection are not touched.-XX]"
     },
     "bulk": {

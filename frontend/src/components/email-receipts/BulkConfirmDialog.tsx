@@ -44,6 +44,11 @@ export function BulkConfirmDialog({ request, running, onConfirm, onCancel }: Bul
     (request?.filter?.excludeDomains?.length ?? 0) > 0 ||
     request?.filter?.receivedFrom !== undefined ||
     request?.filter?.receivedTo !== undefined;
+  // A search or a date range narrows the filter as well: the command acts on the searched emails only.
+  const searched =
+    request?.filter?.search !== undefined ||
+    request?.filter?.dateFrom !== undefined ||
+    request?.filter?.dateTo !== undefined;
   const scope = domain && status ? 'both' : domain ? 'domain' : status ? 'status' : 'other';
 
   return (
@@ -87,6 +92,7 @@ export function BulkConfirmDialog({ request, running, onConfirm, onCancel }: Bul
               status: status ? tf(`filter.${status}`) : '',
             })}
           </p>
+          {searched && <p>{t('searchNote')}</p>}
           {narrowed && <p>{t('narrowedNote')}</p>}
         </div>
       )}

@@ -761,6 +761,22 @@
       "ignored": "Yoksayıldı",
       "component": "Geri ödeme bekliyor"
     },
+    "search": {
+      "label": "E-postalarda ara",
+      "text": "Ara",
+      "placeholder": "Konu, gönderen veya içerik",
+      "in": "Şurada ara",
+      "fields": {
+        "all": "Tüm alanlar",
+        "subject": "Konu",
+        "sender": "Gönderen",
+        "body": "İçerik"
+      },
+      "from": "Başlangıç tarihi",
+      "to": "Bitiş tarihi",
+      "rangeBackwards": "Bitiş tarihi başlangıç tarihinden önce. Tarih aralığı uygulanmadı.",
+      "clear": "Aramayı temizle"
+    },
     "domainFilter": {
       "label": "Gönderen alan adı",
       "all": "Tüm göndericiler",
@@ -791,7 +807,9 @@
       "filteredTitle": "Bu durumda e-posta yok",
       "filteredBody": "Geri kalanları görmek için başka bir durum seçin.",
       "noMailboxBody": "Henüz bağlı bir posta kutusu yok. Sipariş onaylarını okumaya başlamak için bir tane bağlayın.",
-      "connectButton": "Posta kutusu bağla"
+      "connectButton": "Posta kutusu bağla",
+      "searchTitle": "Aramayla eşleşen e-posta yok",
+      "searchBody": "Tüm e-postaları görmek için kelimeleri veya tarihleri değiştirin ya da aramayı temizleyin."
     },
     "actions": {
       "view": "Görüntüle",
@@ -907,6 +925,7 @@
         "trades": "{count, plural, one {# işlem e-postası dışarıda bırakıldı. Yapay zekâ inceleme gelen kutusunda kendi kartından onaylayın.} other {# işlem e-postası dışarıda bırakıldı. Yapay zekâ inceleme gelen kutusunda kendi kartlarından onaylayın.}}",
         "confirm": "Onayla"
       },
+      "searchNote": "Yalnızca aramayla eşleşen e-postalar dahil edilir.",
       "narrowedNote": "Seçimden çıkarılan e-postalar değiştirilmez."
     },
     "bulk": {

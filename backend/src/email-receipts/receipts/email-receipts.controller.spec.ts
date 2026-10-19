@@ -8,9 +8,11 @@ import { ALLOW_DELEGATE_KEY } from "../../delegation/decorators/delegate-access.
 import {
   ApprovableEmailReceiptsDto,
   AskAiEmailReceiptDto,
+  BulkEmailReceiptFilterDto,
   BulkEmailReceiptsDto,
   BulkReprocessEmailReceiptsDto,
   CountEmailReceiptsDto,
+  EMAIL_RECEIPTS_MAX_SEARCH_CHARS,
   EmailReceiptStatusCountsDto,
   ListEmailReceiptDomainsDto,
   ListEmailReceiptsDto,
@@ -80,6 +82,143 @@ describe("EmailReceiptsController", () => {
       domain: "shop.example.com",
       limit: undefined,
       offset: undefined,
+    });
+  });
+
+  const SEARCH = {
+    search: "invoice",
+    searchIn: "subject",
+    dateFrom: "2026-01-01",
+    dateTo: "2026-01-31",
+  } as const;
+
+  it("forwards the search and the dates of the list, domains and status-counts queries", async () => {
+    receipts.list.mockResolvedValue([]);
+    receipts.listDomains.mockResolvedValue([]);
+    receipts.statusCounts.mockResolvedValue({});
+    await controller.list(req, { status: "review", ...SEARCH } as never);
+    await controller.domains(req, { status: "review", ...SEARCH } as never);
+    await controller.statusCounts(req, {
+      domain: "shop.example.com",
+      ...SEARCH,
+    } as never);
+    expect(receipts.list).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining(SEARCH),
+    );
+    expect(receipts.listDomains).toHaveBeenCalledWith("user-1", {
+      status: "review",
+      ...SEARCH,
+    });
+    expect(receipts.statusCounts).toHaveBeenCalledWith("user-1", {
+      domain: "shop.example.com",
+      ...SEARCH,
+    });
+  });
+
+  it("forwards the search and the dates of a bulk filter, beside receivedFrom", async () => {
+    receipts.bulk.mockResolvedValue({});
+    await controller.bulk(req, {
+      action: "ignore",
+      expectedCount: 3,
+      filter: { receivedFrom: "2026-02-01", ...SEARCH },
+    } as never);
+    expect(receipts.bulk).toHaveBeenCalledWith(
+      "user-1",
+      "ignore",
+      {
+        filter: expect.objectContaining({
+          receivedFrom: "2026-02-01",
+          ...SEARCH,
+        }),
+      },
+      3,
+    );
+  });
+
+  describe("the search fields", () => {
+    const opts = { whitelist: true, forbidNonWhitelisted: true };
+    const errorsOf = async (
+      cls: new () => object,
+      query: object,
+    ): Promise<number> =>
+      (await validate(plainToInstance(cls, query), opts)).length;
+
+    it.each([
+      ListEmailReceiptsDto,
+      ListEmailReceiptDomainsDto,
+      EmailReceiptStatusCountsDto,
+      BulkEmailReceiptFilterDto,
+    ])("%p accepts a search, a field and a date range", async (cls) => {
+      expect(await errorsOf(cls, SEARCH)).toBe(0);
+      expect(
+        await errorsOf(cls, { dateFrom: "2026-01-31", dateTo: "2026-01-31" }),
+      ).toBe(0);
+    });
+
+    it("trims the search and reads a blank one as none", async () => {
+      expect(
+        plainToInstance(ListEmailReceiptsDto, { search: "  a b " }).search,
+      ).toBe("a b");
+      const blank = plainToInstance(ListEmailReceiptsDto, { search: "   " });
+      expect(blank.search).toBeUndefined();
+      expect(await validate(blank, opts)).toHaveLength(0);
+      expect(await errorsOf(ListEmailReceiptsDto, { search: "" })).toBe(0);
+    });
+
+    it("limits the search to 200 characters after trimming", async () => {
+      expect(EMAIL_RECEIPTS_MAX_SEARCH_CHARS).toBe(200);
+      const max = "x".repeat(200);
+      expect(await errorsOf(ListEmailReceiptsDto, { search: ` ${max} ` })).toBe(
+        0,
+      );
+      expect(await errorsOf(ListEmailReceiptsDto, { search: max + "x" })).toBe(
+        1,
+      );
+    });
+
+    it.each(["a\u0000b", "a\u001bb", "a\u007fb", 5, ["a", "b"]])(
+      "refuses the search %j",
+      async (search) => {
+        expect(await errorsOf(ListEmailReceiptsDto, { search })).toBe(1);
+      },
+    );
+
+    it("refuses a search field that is not all, subject, sender or body", async () => {
+      expect(await errorsOf(ListEmailReceiptsDto, { searchIn: "title" })).toBe(
+        1,
+      );
+      for (const searchIn of ["all", "subject", "sender", "body"]) {
+        expect(await errorsOf(ListEmailReceiptsDto, { searchIn })).toBe(0);
+      }
+    });
+
+    it.each(["2026-13-01", "2026-02-30", "01/02/2026", "2026-1-1"])(
+      "refuses the date %j",
+      async (dateFrom) => {
+        expect(await errorsOf(ListEmailReceiptsDto, { dateFrom })).toBe(1);
+        expect(await errorsOf(ListEmailReceiptsDto, { dateTo: dateFrom })).toBe(
+          1,
+        );
+      },
+    );
+
+    it("refuses an end date before the start date, on every query", async () => {
+      const range = { dateFrom: "2026-02-01", dateTo: "2026-01-31" };
+      for (const cls of [
+        ListEmailReceiptsDto,
+        ListEmailReceiptDomainsDto,
+        EmailReceiptStatusCountsDto,
+        BulkEmailReceiptFilterDto,
+      ]) {
+        expect(await errorsOf(cls, range)).toBe(1);
+      }
+    });
+
+    it("accepts blank dates, as the other optional fields of the module do", async () => {
+      expect(
+        await errorsOf(ListEmailReceiptsDto, { dateFrom: "", dateTo: "" }),
+      ).toBe(0);
     });
   });
 

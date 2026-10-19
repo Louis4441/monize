@@ -49,9 +49,12 @@ describe('AiReviewRow', () => {
     expect(screen.queryByText(/^Rule:/)).not.toBeInTheDocument();
   });
 
-  it('links to the receipts page from an email receipt row', () => {
+  it('links to the email\'s own detail from an email receipt row', () => {
     renderRow(emailReceiptItem());
-    expect(screen.getByRole('link', { name: 'View email receipts' })).toHaveAttribute('href', '/email-receipts?tab=emails');
+    expect(screen.getByRole('link', { name: 'View email receipts' })).toHaveAttribute(
+      'href',
+      '/email-receipts?tab=emails&email=r-1',
+    );
   });
 
   it('shows the email as it is, as plain text', () => {
@@ -67,7 +70,7 @@ describe('AiReviewRow', () => {
   it('says the email was deleted when the request outlived it, and still links to the receipts page', () => {
     renderRow(emailReceiptItem({ emailReceipt: null }));
     expect(screen.getByText(/Email receipt \(the email was deleted\)/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'View email receipts' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View email receipts' })).toHaveAttribute('href', '/email-receipts?tab=emails');
   });
 
   it('keeps the transaction link and the instruction on an email receipt row', () => {
@@ -300,7 +303,10 @@ describe('AiReviewRow', () => {
       expect(screen.getByText(/Email receipt: Your order has been filled from notifications@o\.wealthsimple\.com/)).toBeInTheDocument();
       expect(screen.queryByText('This transaction no longer exists')).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'View transaction' })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'View email receipts' })).toHaveAttribute('href', '/email-receipts?tab=emails');
+      expect(screen.getByRole('link', { name: 'View email receipts' })).toHaveAttribute(
+        'href',
+        '/email-receipts?tab=emails&email=rcpt-1',
+      );
     });
 
     it('reads a sell as a sell', () => {

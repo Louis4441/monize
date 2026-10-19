@@ -761,6 +761,22 @@
       "ignored": "Genegeerd",
       "component": "Wacht op terugbetaling"
     },
+    "search": {
+      "label": "E-mails zoeken",
+      "text": "Zoeken",
+      "placeholder": "Onderwerp, afzender of inhoud",
+      "in": "Zoeken in",
+      "fields": {
+        "all": "Alle velden",
+        "subject": "Onderwerp",
+        "sender": "Afzender",
+        "body": "Inhoud"
+      },
+      "from": "Vanaf datum",
+      "to": "Tot datum",
+      "rangeBackwards": "De einddatum ligt voor de begindatum. De periode wordt niet toegepast.",
+      "clear": "Zoekopdracht wissen"
+    },
     "domainFilter": {
       "label": "Afzenderdomein",
       "all": "Alle afzenders",
@@ -791,7 +807,9 @@
       "filteredTitle": "Geen e-mails met deze status",
       "filteredBody": "Kies een andere status om de rest te zien.",
       "noMailboxBody": "Er is nog geen mailbox gekoppeld. Koppel er een om bestelbevestigingen te gaan lezen.",
-      "connectButton": "Een mailbox koppelen"
+      "connectButton": "Een mailbox koppelen",
+      "searchTitle": "Geen e-mail komt overeen met de zoekopdracht",
+      "searchBody": "Wijzig de woorden of de datums, of wis de zoekopdracht om alle e-mails te zien."
     },
     "actions": {
       "view": "Bekijken",
@@ -907,6 +925,7 @@
         "trades": "{count, plural, one {# handels-e-mail wordt overgeslagen. Keur hem goed op zijn kaart in de AI-beoordelingsinbox.} other {# handels-e-mails worden overgeslagen. Keur ze goed op hun kaarten in de AI-beoordelingsinbox.}}",
         "confirm": "Goedkeuren"
       },
+      "searchNote": "Alleen de e-mails die overeenkomen met de zoekopdracht worden meegenomen.",
       "narrowedNote": "E-mails die uit de selectie zijn gehaald, blijven ongewijzigd."
     },
     "bulk": {

@@ -761,6 +761,22 @@
       "ignored": "Ignorado",
       "component": "Esperando el pago"
     },
+    "search": {
+      "label": "Buscar correos",
+      "text": "Buscar",
+      "placeholder": "Asunto, remitente o contenido",
+      "in": "Buscar en",
+      "fields": {
+        "all": "Todos los campos",
+        "subject": "Asunto",
+        "sender": "Remitente",
+        "body": "Contenido"
+      },
+      "from": "Desde la fecha",
+      "to": "Hasta la fecha",
+      "rangeBackwards": "La fecha final es anterior a la inicial. El rango de fechas no se aplica.",
+      "clear": "Borrar búsqueda"
+    },
     "domainFilter": {
       "label": "Dominio del remitente",
       "all": "Todos los remitentes",
@@ -791,7 +807,9 @@
       "filteredTitle": "No hay correos con este estado",
       "filteredBody": "Elige otro estado para ver el resto.",
       "noMailboxBody": "Todavía no hay ningún buzón conectado. Conecta uno para empezar a leer confirmaciones de pedido.",
-      "connectButton": "Conectar un buzón"
+      "connectButton": "Conectar un buzón",
+      "searchTitle": "Ningún correo coincide con la búsqueda",
+      "searchBody": "Cambie las palabras o las fechas, o borre la búsqueda para ver todos los correos."
     },
     "actions": {
       "view": "Ver",
@@ -907,6 +925,7 @@
         "trades": "{count, plural, one {# correo de operación queda fuera. Apruébelo en su tarjeta de la bandeja de revisión de IA.} other {# correos de operaciones quedan fuera. Apruébelos en sus tarjetas de la bandeja de revisión de IA.}}",
         "confirm": "Aprobar"
       },
+      "searchNote": "Solo se incluyen los correos que coinciden con la búsqueda.",
       "narrowedNote": "Los correos excluidos de la selección no se modifican."
     },
     "bulk": {

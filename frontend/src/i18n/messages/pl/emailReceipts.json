@@ -761,6 +761,22 @@
       "ignored": "Zignorowana",
       "component": "Czeka na spłatę"
     },
+    "search": {
+      "label": "Szukaj e-maili",
+      "text": "Szukaj",
+      "placeholder": "Temat, nadawca lub treść",
+      "in": "Szukaj w",
+      "fields": {
+        "all": "Wszystkie pola",
+        "subject": "Temat",
+        "sender": "Nadawca",
+        "body": "Treść"
+      },
+      "from": "Data od",
+      "to": "Data do",
+      "rangeBackwards": "Data końcowa jest przed datą początkową. Zakres dat nie jest zastosowany.",
+      "clear": "Wyczyść wyszukiwanie"
+    },
     "domainFilter": {
       "label": "Domena nadawcy",
       "all": "Wszyscy nadawcy",
@@ -791,7 +807,9 @@
       "filteredTitle": "Brak wiadomości o tym statusie",
       "filteredBody": "Wybierz inny status, aby zobaczyć pozostałe.",
       "noMailboxBody": "Nie połączono jeszcze żadnej skrzynki pocztowej. Połącz ją, aby zacząć odczytywać potwierdzenia zamówień.",
-      "connectButton": "Połącz skrzynkę pocztową"
+      "connectButton": "Połącz skrzynkę pocztową",
+      "searchTitle": "Żaden e-mail nie pasuje do wyszukiwania",
+      "searchBody": "Zmień słowa lub daty albo wyczyść wyszukiwanie, aby zobaczyć wszystkie e-maile."
     },
     "actions": {
       "view": "Zobacz",
@@ -907,6 +925,7 @@
         "trades": "{count, plural, one {# wiadomość o transakcji giełdowej jest pominięta. Zatwierdź ją na jej karcie w skrzynce przeglądu AI.} few {# wiadomości o transakcjach giełdowych są pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.} many {# wiadomości o transakcjach giełdowych jest pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.} other {# wiadomości o transakcjach giełdowych jest pominięte. Zatwierdź je na ich kartach w skrzynce przeglądu AI.}}",
         "confirm": "Zatwierdź"
       },
+      "searchNote": "Uwzględnione są tylko e-maile, które pasują do wyszukiwania.",
       "narrowedNote": "Wiadomości wyłączone z zaznaczenia pozostają bez zmian."
     },
     "bulk": {

@@ -23,6 +23,8 @@ jest.mock("../../common/db/scoped-db", () =>
 );
 
 const USER = "user-1";
+/** The four search bind values of a request with no search and no dates. */
+const NO_SEARCH = [null, "all", null, null];
 const ID = "receipt-1";
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -192,8 +194,11 @@ describe("EmailReceiptsService.list", () => {
     expect(sql).toContain(
       "ORDER BY COALESCE(r.original_sent_at, r.received_at) DESC, r.id DESC",
     );
-    expect(sql).not.toContain("body_text");
-    expect(params).toEqual([USER, "review", null, null, 20, 0]);
+    // The text is searched, never selected: look at the column list only.
+    expect(sql.slice(0, sql.indexOf("FROM email_receipts"))).not.toContain(
+      "body_text",
+    );
+    expect(params).toEqual([USER, "review", null, null, 20, 0, ...NO_SEARCH]);
     expect(items[0]).toEqual({
       id: ID,
       fromAddress: "orders@shop.example.com",
@@ -250,6 +255,7 @@ describe("EmailReceiptsService.list", () => {
         "%.shop.example.com",
         50,
         0,
+        ...NO_SEARCH,
       ]);
     });
 
@@ -293,6 +299,7 @@ describe("EmailReceiptsService.list", () => {
         "%.shop.example.com",
         7,
         0,
+        ...NO_SEARCH,
       ]);
     });
   });
@@ -335,6 +342,7 @@ describe("EmailReceiptsService.list", () => {
       null,
       50,
       0,
+      ...NO_SEARCH,
     ]);
     await service.list(USER, { limit: 9999 });
     expect(manager.query.mock.calls[1][1][4]).toBe(200);
@@ -370,6 +378,62 @@ describe("EmailReceiptsService.list", () => {
   });
 });
 
+describe("the search and the date range", () => {
+  const SEARCH = {
+    search: "  50%_off\\  ",
+    searchIn: "sender" as const,
+    dateFrom: "2026-01-01",
+    dateTo: "2026-01-31",
+  };
+  const BOUND = ["%50\\%\\_off\\\\%", "sender", "2026-01-01", "2026-01-31"];
+
+  it("lists with the search bound after the paging values, never in the text", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([]);
+    await service.list(USER, { limit: 7, ...SEARCH });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(params).toEqual([USER, null, null, null, 7, 0, ...BOUND]);
+    expect(sql).toContain("r.subject ILIKE $7::varchar ESCAPE '\\'");
+    expect(sql).toContain("r.body_text ILIKE $7::varchar ESCAPE '\\'");
+    expect(sql).toContain("$9::date");
+    expect(sql).toContain("$10::date");
+    expect(sql).not.toContain("50%");
+    expect(sql).not.toContain("2026-01");
+  });
+
+  it("counts the states of the emails the search keeps", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([]);
+    await service.statusCounts(USER, { domain: "shop.example.com", ...SEARCH });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(params).toEqual([
+      USER,
+      "shop.example.com",
+      "%.shop.example.com",
+      ...BOUND,
+    ]);
+    expect(sql).toContain("r.from_address ILIKE $4::varchar");
+    expect(sql).toContain("$6::date");
+  });
+
+  it("lists the sender domains of the emails the search keeps", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([]);
+    await service.listDomains(USER, { status: "review", ...SEARCH });
+    const [sql, params] = manager.query.mock.calls[0];
+    expect(params.slice(3)).toEqual(["review", ...BOUND]);
+    expect(sql).toContain("r.forwarded_by ILIKE $5::varchar");
+    expect(sql).toContain("$7::date");
+  });
+
+  it("treats a blank search and blank dates as none", async () => {
+    const { service, manager } = setup();
+    manager.query.mockResolvedValue([]);
+    await service.list(USER, { search: "   ", dateFrom: "", dateTo: "" });
+    expect(manager.query.mock.calls[0][1].slice(6)).toEqual(NO_SEARCH);
+  });
+});
+
 describe("EmailReceiptsService.listDomains", () => {
   it("lists the user's sender domains with counts, most first then by name, at most 200", async () => {
     const { service, manager } = setup();
@@ -401,6 +465,7 @@ describe("EmailReceiptsService.listDomains", () => {
         "review_conflict",
       ],
       null,
+      ...NO_SEARCH,
     ]);
     expect(EMAIL_RECEIPTS_MAX_DOMAINS).toBe(200);
   });
@@ -496,7 +561,7 @@ describe("EmailReceiptsService.statusCounts", () => {
     const [sql, params] = manager.query.mock.calls[0];
     expect(sql).toContain("r.user_id = $1");
     expect(sql).toContain("GROUP BY r.status");
-    expect(params).toEqual([USER, null, null]);
+    expect(params).toEqual([USER, null, null, ...NO_SEARCH]);
   });
 
   it("limits the count to a domain and its sub-domains, escaped", async () => {
@@ -509,6 +574,7 @@ describe("EmailReceiptsService.statusCounts", () => {
       USER,
       "shop_x.example.com",
       "%.shop\\_x.example.com",
+      ...NO_SEARCH,
     ]);
   });
 });
@@ -1729,6 +1795,7 @@ describe("EmailReceiptsService.bulk", () => {
       [],
       null,
       null,
+      ...NO_SEARCH,
     ]);
   });
 
@@ -1760,6 +1827,7 @@ describe("EmailReceiptsService.bulk", () => {
       ["%.gmail.com"],
       "2026-01-01",
       "2026-01-31",
+      ...NO_SEARCH,
     ]);
   });
 
@@ -1777,6 +1845,7 @@ describe("EmailReceiptsService.bulk", () => {
       [],
       null,
       null,
+      ...NO_SEARCH,
     ]);
   });
 
@@ -1959,6 +2028,7 @@ describe("EmailReceiptsService.countSelection", () => {
       ["%.gmail.com"],
       "2026-01-01",
       null,
+      ...NO_SEARCH,
     ]);
   });
 
