@@ -73,7 +73,9 @@ export function useInvestmentData() {
   const [cashFilters, setCashFiltersState] = useState<CashFilterValues>(EMPTY_CASH_FILTERS);
   const [cashPayees, setCashPayees] = useState<Payee[]>([]);
   const [cashCategories, setCashCategories] = useState<Category[]>([]);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  // Set once the first load has settled and the automatic price refresh has
+  // been started for it. A ref: nothing renders from it.
+  const initialLoadCompleteRef = useRef(false);
 
   // Cash transaction form modal
   const {
@@ -83,22 +85,32 @@ export function useInvestmentData() {
     unsavedChangesDialog: cashUnsavedChangesDialog, formSubmitRef: cashFormSubmitRef,
   } = useFormModal<Transaction>();
 
-  const loadInvestmentAccounts = useCallback(async () => {
-    try {
-      const accountsData = await investmentsApi.getInvestmentAccounts();
-      setAccounts(accountsData);
-    } catch (error) {
-      logger.error('Failed to load investment accounts:', error);
-    }
+  // The loaders the effects below call keep their state writes in an inner
+  // async function. Every write follows the `await`, and holding them there
+  // rather than in the loader itself is what lets an effect call the loader
+  // without being read as a synchronous setState.
+  const loadInvestmentAccounts = useCallback(() => {
+    const fetchAccounts = async () => {
+      try {
+        const accountsData = await investmentsApi.getInvestmentAccounts();
+        setAccounts(accountsData);
+      } catch (error) {
+        logger.error('Failed to load investment accounts:', error);
+      }
+    };
+    return fetchAccounts();
   }, []);
 
-  const loadAllAccounts = useCallback(async () => {
-    try {
-      const accountsData = await accountsApi.getAll();
-      setAllAccounts(accountsData);
-    } catch (error) {
-      logger.error('Failed to load all accounts:', error);
-    }
+  const loadAllAccounts = useCallback(() => {
+    const fetchAccounts = async () => {
+      try {
+        const accountsData = await accountsApi.getAll();
+        setAllAccounts(accountsData);
+      } catch (error) {
+        logger.error('Failed to load all accounts:', error);
+      }
+    };
+    return fetchAccounts();
   }, []);
 
   const loadCashFilterData = useCallback(async () => {
@@ -114,13 +126,16 @@ export function useInvestmentData() {
     }
   }, []);
 
-  const loadPriceStatus = useCallback(async () => {
-    try {
-      const status = await investmentsApi.getPriceStatus();
-      setLastPriceUpdate(status.lastUpdated);
-    } catch (error) {
-      logger.error('Failed to load price status:', error);
-    }
+  const loadPriceStatus = useCallback(() => {
+    const fetchStatus = async () => {
+      try {
+        const status = await investmentsApi.getPriceStatus();
+        setLastPriceUpdate(status.lastUpdated);
+      } catch (error) {
+        logger.error('Failed to load price status:', error);
+      }
+    };
+    return fetchStatus();
   }, []);
 
   // Track whether the initial load has completed so subsequent reloads
@@ -204,48 +219,54 @@ export function useInvestmentData() {
     },
   });
 
-  const loadPortfolioSummary = useCallback(async (accountIds: string[]) => {
-    const seq = ++summarySeqRef.current;
-    try {
-      const ids = accountIds.length > 0 ? accountIds : undefined;
-      const summaryData = await investmentsApi.getPortfolioSummary(ids);
-      if (summarySeqRef.current !== seq) return;
-      setPortfolioSummary(summaryData);
-    } catch (error) {
-      logger.error('Failed to load portfolio summary:', error);
-      if (summarySeqRef.current !== seq) return;
-      setPortfolioSummary(null);
-    }
+  const loadPortfolioSummary = useCallback((accountIds: string[]) => {
+    const fetchSummary = async () => {
+      const seq = ++summarySeqRef.current;
+      try {
+        const ids = accountIds.length > 0 ? accountIds : undefined;
+        const summaryData = await investmentsApi.getPortfolioSummary(ids);
+        if (summarySeqRef.current !== seq) return;
+        setPortfolioSummary(summaryData);
+      } catch (error) {
+        logger.error('Failed to load portfolio summary:', error);
+        if (summarySeqRef.current !== seq) return;
+        setPortfolioSummary(null);
+      }
+    };
+    return fetchSummary();
   }, []);
 
-  const loadTransactions = useCallback(async (
+  const loadTransactions = useCallback((
     accountIds: string[],
     page: number = 1,
     filters: TransactionFilters = {},
   ) => {
-    const seq = ++transactionsSeqRef.current;
-    try {
-      const ids = accountIds.length > 0 ? accountIds : undefined;
-      const txResponse = await investmentsApi.getTransactions({
-        accountIds: ids ? ids.join(',') : undefined,
-        page,
-        limit: PAGE_SIZE,
-        symbol: filters.symbol,
-        action: filters.action,
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-      });
-      if (transactionsSeqRef.current !== seq) return;
-      setTransactions(txResponse.data || []);
-      setPagination(txResponse.pagination);
-    } catch (error) {
-      logger.error('Failed to load transactions:', error);
-      if (transactionsSeqRef.current !== seq) return;
-      setTransactions([]);
-      setPagination(null);
-    } finally {
-      setIsLoading(false);
-    }
+    const fetchTransactions = async () => {
+      const seq = ++transactionsSeqRef.current;
+      try {
+        const ids = accountIds.length > 0 ? accountIds : undefined;
+        const txResponse = await investmentsApi.getTransactions({
+          accountIds: ids ? ids.join(',') : undefined,
+          page,
+          limit: PAGE_SIZE,
+          symbol: filters.symbol,
+          action: filters.action,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+        });
+        if (transactionsSeqRef.current !== seq) return;
+        setTransactions(txResponse.data || []);
+        setPagination(txResponse.pagination);
+      } catch (error) {
+        logger.error('Failed to load transactions:', error);
+        if (transactionsSeqRef.current !== seq) return;
+        setTransactions([]);
+        setPagination(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    return fetchTransactions();
   }, []);
 
   // Derive cash account IDs from selected brokerage accounts
@@ -398,11 +419,11 @@ export function useInvestmentData() {
   ]);
 
   useEffect(() => {
-    if (!isLoading && !initialLoadComplete) {
-      setInitialLoadComplete(true);
+    if (!isLoading && !initialLoadCompleteRef.current) {
+      initialLoadCompleteRef.current = true;
       triggerAutoRefresh();
     }
-  }, [isLoading, initialLoadComplete, triggerAutoRefresh]);
+  }, [isLoading, triggerAutoRefresh]);
 
   // Track which edit ID we have already handled
   const editHandledRef = useRef<string | null>(null);

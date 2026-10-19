@@ -506,7 +506,6 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
   // load does: drop the existing filters (so the target is not hidden by them),
   // then flash/scroll to the row. The deferred load reads targetTransactionIdRef
   // and lets the backend resolve which page the row is on.
-  /* eslint-disable react-hooks/set-state-in-effect -- apply deep link from URL */
   useEffect(() => {
     if (!filtersInitialized) return;
     const targetId = searchParams.get('targetTransactionId');
@@ -549,7 +548,6 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
     targetTransactionIdRef.current = targetId;
     setHighlightTransactionId(targetId);
   }, [searchParams, filtersInitialized]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Honour a single-entity deep link (`?accountId=`/`?categoryId=`/`?payeeId=`,
   // singular) that arrives while this page is already mounted -- e.g. an AI

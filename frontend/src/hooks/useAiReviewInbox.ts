@@ -67,20 +67,26 @@ export function useAiReviewInbox(initialKind: AiReviewKindFilter = 'all') {
   // Only the newest request may write the list.
   const latestLoad = useRef(0);
 
-  const load = useCallback(async () => {
-    const request = ++latestLoad.current;
-    try {
-      const data = await aiReviewApi.list(filter);
-      if (request !== latestLoad.current) return;
-      setItems(data);
-      setLoadFailed(false);
-    } catch (error) {
-      if (request !== latestLoad.current) return;
-      // A list that could not be refreshed is not shown as if it were current.
-      setItems(null);
-      setLoadFailed(true);
-      logger.error(error);
-    }
+  const load = useCallback(() => {
+    // Every state write here follows the `await`. Keeping them in this inner
+    // function rather than in `load` itself is what lets the effect below call
+    // `load` without being read as a synchronous setState.
+    const fetchList = async () => {
+      const request = ++latestLoad.current;
+      try {
+        const data = await aiReviewApi.list(filter);
+        if (request !== latestLoad.current) return;
+        setItems(data);
+        setLoadFailed(false);
+      } catch (error) {
+        if (request !== latestLoad.current) return;
+        // A list that could not be refreshed is not shown as if it were current.
+        setItems(null);
+        setLoadFailed(true);
+        logger.error(error);
+      }
+    };
+    return fetchList();
   }, [filter]);
 
   useEffect(() => {
