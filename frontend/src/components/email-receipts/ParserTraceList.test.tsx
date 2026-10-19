@@ -131,4 +131,13 @@ describe('ParserTraceList', () => {
     expect(document.querySelector('img')).toBeNull();
     expect(within(screen.getByRole('listitem')).getByText(/<img src=x/)).toBeInTheDocument();
   });
+
+  it('lists the line a component link key was read from, and nothing for a trace without one', () => {
+    render(
+      <ParserTraceList
+        trace={{ ...empty, linkKey: { entry: 0, pattern: 'Order {value}', line: { line: 3, text: 'Order KEY-9' } } }}
+      />,
+    );
+    expect(screen.getByRole('listitem')).toHaveTextContent('Link key entry 1 (Order {value}), line 3: Order KEY-9');
+  });
 });

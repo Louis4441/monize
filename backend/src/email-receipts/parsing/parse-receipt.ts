@@ -7,6 +7,7 @@ import {
   type ReceiptLinesMatch,
 } from "./receipt-glob";
 import { readItems, type RawItem } from "./receipt-items";
+import { normalizeLinkValue } from "./receipt-link";
 import { parseToleranceUnits } from "./receipt-match-config";
 import {
   normalizeLine,
@@ -191,17 +192,25 @@ const hasOrderId = (captures: GlobCaptures): boolean =>
 const hasReference = (captures: GlobCaptures): boolean =>
   identifierToken(captures, "reference") !== "";
 
+const hasLink = (captures: GlobCaptures): boolean =>
+  identifierToken(captures, "link") !== "";
+
 const hasPayee = (captures: GlobCaptures): boolean =>
   (captures.payee ?? "") !== "";
 
 /**
  * An order number or a bank reference has no spaces: only the first
- * whitespace-delimited token of the capture is kept.
+ * whitespace-delimited token of the capture is kept. A link value may hold
+ * spaces ("1000 000 002"): the whole capture is kept, normalized (empty when
+ * the capture holds no usable link value).
  */
 const identifierToken = (
   captures: GlobCaptures,
-  name: "orderid" | "reference",
-): string => captures[name]?.trim().split(/\s+/)[0] ?? "";
+  name: "orderid" | "reference" | "link",
+): string =>
+  name === "link"
+    ? (normalizeLinkValue(captures.link ?? "") ?? "")
+    : (captures[name]?.trim().split(/\s+/)[0] ?? "");
 
 interface Read<T> {
   value: T;
@@ -268,10 +277,15 @@ function readIdentifier(
   entries: readonly ReceiptFieldEntry[] | undefined,
   subject: string,
   lines: readonly string[],
-  capture: "orderid" | "reference",
+  capture: "orderid" | "reference" | "link",
 ): Read<string> | null {
   if (!Array.isArray(entries)) return null;
-  const accept = capture === "orderid" ? hasOrderId : hasReference;
+  const accept =
+    capture === "orderid"
+      ? hasOrderId
+      : capture === "link"
+        ? hasLink
+        : hasReference;
   for (let index = 0; index < entries.length; index++) {
     const entry = entries[index];
     if (typeof entry === "string") {
@@ -449,11 +463,19 @@ export function completeness(
   if (total === null && paid === null) return "no_total";
   if (itemsUnresolved) return "item_amount_missing";
   if (items.length === 0) return "no_items";
+  // A `discount`-kind line (a joined component's discount) is subtracted like `discount`.
+  const discountLines = items.reduce(
+    (sum, item) => sum + (item.kind === "discount" ? item.amount : 0),
+    0,
+  );
   const gross =
-    items.reduce((sum, item) => sum + item.amount, 0) +
+    items.reduce(
+      (sum, item) => sum + (item.kind === "discount" ? 0 : item.amount),
+      0,
+    ) +
     (shipping ?? 0) +
     fees.reduce((sum, fee) => sum + fee, 0);
-  const net = gross - (discount ?? 0);
+  const net = gross - (discount ?? 0) - discountLines;
   const within = (stated: number, computed: number): boolean =>
     Math.abs(stated - computed) <= tolerance;
   if (
@@ -523,6 +545,11 @@ export function parseReceiptLinesTraced(
     lines,
     "reference",
   );
+  // Only a component reads a link key; any other receipt leaves the key absent.
+  const component = def.role === "component";
+  const linkKey = component
+    ? readIdentifier(def.linkKey, subjectLine, lines, "link")
+    : null;
   const total = readAmount(def.total, lines);
   const paid = readAmount(def.paid, lines);
   const shipping = readAmount(def.shipping, lines);
@@ -555,10 +582,13 @@ export function parseReceiptLinesTraced(
     qty: item.qty,
     amount: item.amount,
     categoryId: itemCategory(def, item.name, fallbackCategoryId, ctx),
+    ...(item.link === undefined ? {} : { link: item.link }),
+    ...(item.instalment === undefined ? {} : { instalment: item.instalment }),
   }));
   const parsed = {
     orderId: orderId?.value ?? null,
     reference: reference?.value ?? null,
+    ...(component ? { linkKey: linkKey?.value ?? null } : {}),
     total: total?.value ?? null,
     paid: paid?.value ?? null,
     payee: payee?.value ?? null,
@@ -579,6 +609,7 @@ export function parseReceiptLinesTraced(
   const trace: ReceiptTrace = {
     orderId: orderId?.hit ?? null,
     reference: reference?.hit ?? null,
+    ...(component ? { linkKey: linkKey?.hit ?? null } : {}),
     total: total?.hit ?? null,
     paid: paid?.hit ?? null,
     shipping: shipping?.hit ?? null,

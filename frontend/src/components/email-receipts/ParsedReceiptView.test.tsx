@@ -117,3 +117,60 @@ describe('ParsedReceiptView', () => {
     expect(screen.queryByText('AI')).not.toBeInTheDocument();
   });
 });
+
+describe('ParsedReceiptView linked receipts', () => {
+  const joined: ParsedReceipt = {
+    ...parsed,
+    items: [
+      { name: 'Laptop', qty: 1, amount: 300_000, categoryId: 'cat-1' },
+      { name: 'Delivery', qty: 1, amount: 50_000, categoryId: null, kind: 'shipping' },
+      { name: 'Coupon', qty: 1, amount: 20_000, categoryId: null, kind: 'discount' },
+      { name: 'Rate', qty: 1, amount: 100_000, categoryId: null, instalment: '2/10' },
+    ],
+    links: [
+      { partIndex: 0, link: 'abc-1', partAmount: 100_000, outcome: 'scaled', componentReceiptId: 'r-1', componentNet: 330_000, taken: 100_000 },
+      { partIndex: 1, link: null, partAmount: 20_000, outcome: 'no_link', componentReceiptId: null },
+      {
+        partIndex: 2,
+        link: 'abc-2',
+        partAmount: 30_000,
+        outcome: 'component_incomplete',
+        componentReceiptId: 'r-2',
+        componentReason: 'no_total',
+      },
+    ],
+  };
+
+  it('labels shipping and discount lines, shows a discount as negative and an instalment in parentheses', () => {
+    render(<ParsedReceiptView parsed={joined} currencyCode="USD" categoryLabels={labels} />);
+    const delivery = screen.getByRole('row', { name: /Delivery/ });
+    expect(within(delivery).getByText('Shipping')).toBeInTheDocument();
+    expect(within(delivery).getByText('$5.00')).toBeInTheDocument();
+    const coupon = screen.getByRole('row', { name: /Coupon/ });
+    expect(within(coupon).getByText('Discount')).toBeInTheDocument();
+    expect(within(coupon).getByText('-$2.00')).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Rate \(2\/10\)/ })).toBeInTheDocument();
+    expect(within(screen.getByRole('row', { name: /Laptop/ })).queryByText('Shipping')).not.toBeInTheDocument();
+  });
+
+  it('lists the parts with their link, amount and result', () => {
+    render(<ParsedReceiptView parsed={joined} currencyCode="USD" categoryLabels={labels} />);
+    expect(screen.getByText('Parts')).toBeInTheDocument();
+    const scaled = screen.getByRole('row', { name: /abc-1/ });
+    expect(within(scaled).getByText('$10.00')).toBeInTheDocument();
+    expect(within(scaled).getByText('Replaced by the lines of the purchase email, scaled to this part.')).toBeInTheDocument();
+    expect(within(scaled).getByText(/Purchase total: \$33\.00\. Already used: \$10\.00\./)).toBeInTheDocument();
+    const noLink = screen.getByRole('row', { name: /No link/ });
+    expect(within(noLink).getByText('The part has no link, so it stays one line.')).toBeInTheDocument();
+    const incomplete = screen.getByRole('row', { name: /abc-2/ });
+    expect(within(incomplete).getByText('The email states no total.')).toBeInTheDocument();
+  });
+
+  it('shows no parts section for a receipt without reports, and the link key of a component', () => {
+    const { rerender } = render(<ParsedReceiptView parsed={parsed} currencyCode="USD" categoryLabels={labels} />);
+    expect(screen.queryByText('Parts')).not.toBeInTheDocument();
+    expect(screen.queryByText('Link key')).not.toBeInTheDocument();
+    rerender(<ParsedReceiptView parsed={{ ...parsed, linkKey: 'abc-1' }} currencyCode="USD" categoryLabels={labels} />);
+    expect(screen.getByText('Link key').nextElementSibling).toHaveTextContent('abc-1');
+  });
+});

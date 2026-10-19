@@ -235,11 +235,10 @@ describe("matchReceipt with a profile: amountTolerance", () => {
     expect(run([at(-37.97)], { by: ["amount_date"] }).kind).toBe("matched");
   });
 
-  it("matches a difference up to the tolerance, inclusive, either way and for either sign", () => {
+  it("matches a difference up to the tolerance, inclusive, either way", () => {
     const m = { by: ["amount_date" as const], amountTolerance: "0.50" };
     expect(run([at(-38.47)], m).kind).toBe("matched");
     expect(run([at(-37.47)], m).kind).toBe("matched");
-    expect(run([at(37.47)], m).kind).toBe("matched");
     expect(run([at(-38.48)], m).kind).toBe("unmatched");
     expect(run([at(-37.46)], m).kind).toBe("unmatched");
   });

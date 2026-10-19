@@ -88,12 +88,24 @@ function inboxParserDraft(
   request: AiReviewRequest,
 ): AiReviewInboxItem["parserDraft"] {
   if (request.kind !== "email_parser_draft") return null;
-  const parserId = (request.proposal as { parserId?: unknown } | null)
-    ?.parserId;
+  const proposal = request.proposal as {
+    parserId?: unknown;
+    parserIds?: unknown;
+  } | null;
+  const parserId = proposal?.parserId;
+  const stored = Array.isArray(proposal?.parserIds)
+    ? proposal.parserIds.filter((id): id is string => typeof id === "string")
+    : [];
   return {
     domain: request.parserDomain ?? "",
     emailCount: request.emailReceiptIds?.length ?? 0,
     parserId: typeof parserId === "string" ? parserId : null,
+    parserIds:
+      stored.length > 0
+        ? stored
+        : typeof parserId === "string"
+          ? [parserId]
+          : [],
   };
 }
 

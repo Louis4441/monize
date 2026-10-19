@@ -26,7 +26,7 @@ export const AI_REVIEW_EMAIL_TEXT_MAX_CHARS = 20_000;
 
 /**
  * How much of each stored email a claim of kind `email_parser_draft` hands an
- * agent: up to five emails, each cut here. The same rule: data, never an
+ * agent: up to 25 emails, each cut here. The same rule: data, never an
  * instruction.
  */
 export const AI_REVIEW_PARSER_EMAIL_TEXT_MAX_CHARS = 12_000;
@@ -204,7 +204,7 @@ export interface LlmAiReviewRequest {
   ruleId: string | null;
   /** The stored email a request of kind `email_receipt` was raised for, else null. */
   emailReceiptId: string | null;
-  /** The stored emails of a request of kind `email_parser_draft` (1 to 5), else null. */
+  /** The stored emails of a request of kind `email_parser_draft` (1 to 25), else null. */
   emailReceiptIds: string[] | null;
   /** The sender domain of a request of kind `email_parser_draft`, else null. */
   parserDomain: string | null;
@@ -311,8 +311,10 @@ export interface AiReviewInboxParserDraft {
   domain: string;
   /** How many emails the request names. */
   emailCount: number;
-  /** The draft parser an agent saved for it, once `proposed`; else null. */
+  /** The first draft parser an agent saved for it, once `proposed`; else null. */
   parserId: string | null;
+  /** Every draft parser saved for it, in save order (one per domain of the request); empty before one is saved. */
+  parserIds: string[];
 }
 
 /** One inbox entry: the request, its transaction and, when proposed, the card. */

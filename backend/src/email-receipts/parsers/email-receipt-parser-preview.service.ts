@@ -44,7 +44,8 @@ const MONEY_UNITS = 10_000;
  * What the commit would do with one email: the guard that stops the pipeline
  * reading it (`not_applicable`, `skip_line`, `wait_line`, `no_html`), a read
  * that is not complete (`parse_failed`, with `statusReason`), or, for a
- * complete read, what the matcher found. A trade profile's complete read is
+ * complete read, what the matcher found. A component email read with a link
+ * value is `component` (and `parse_failed` with `no_link_key` without one). A trade profile's complete read is
  * `trade`: it creates an investment transaction, so there is nothing to match.
  */
 export type ParserPreviewOutcome =
@@ -53,6 +54,8 @@ export type ParserPreviewOutcome =
   | "matched"
   | "ambiguous"
   | "unmatched"
+  /** A component profile's email (linked receipts spec 2.1): stored, never matched to a transaction. */
+  | "component"
   | "trade"
   /** A complete trade the ledger already holds: the pipeline ignores the email (`trade_exists`). */
   | "trade_exists";
@@ -65,8 +68,8 @@ export interface ParserPreviewItem {
   /** ISO timestamp to show: when the shop sent the email if a forward carried it (`original_sent_at`), else `receivedAt`. */
   effectiveDate: string;
   outcome: ParserPreviewOutcome;
-  /** Why a read is incomplete (`ParsedReceiptReason`, or `ParsedTradeReason` for a trade profile); null otherwise. */
-  statusReason: ParsedReceiptReason | ParsedTradeReason | null;
+  /** Why a read is incomplete (`ParsedReceiptReason`, `ParsedTradeReason` for a trade profile, or `no_link_key` for a component that read no link value); null otherwise. */
+  statusReason: ParsedReceiptReason | ParsedTradeReason | "no_link_key" | null;
   /** What was read, in decimal units; null when a guard stopped the read. */
   parsed: {
     /** `YYYY-MM-DD`: the day the shop sent the order, or the day the email arrived. */
@@ -369,6 +372,9 @@ export class EmailReceiptParserPreviewService {
         : (await this.tradeAlreadyBooked(m, userId, run.trade.parsed, row))
           ? "trade_exists"
           : "trade";
+    } else if (run.component) {
+      itemOutcome =
+        run.component.linkKey === null ? "parse_failed" : "component";
     } else if (!parsed.complete) itemOutcome = "parse_failed";
     else itemOutcome = run.match.kind;
     return {
@@ -381,9 +387,13 @@ export class EmailReceiptParserPreviewService {
         ? null
         : run.trade
           ? run.trade.parsed.reason
-          : !parsed.complete
-            ? parsed.reason
-            : null,
+          : run.component
+            ? run.component.linkKey === null
+              ? "no_link_key"
+              : null
+            : !parsed.complete
+              ? parsed.reason
+              : null,
       parsed: read
         ? {
             date: tradeDay ?? run.purchaseDate,

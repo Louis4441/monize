@@ -21,6 +21,7 @@ import {
 } from "../../ai-review/ai-review-work.types";
 import {
   EMAIL_RECEIPT_PARSER_OPERATIONS,
+  EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS,
   EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS,
 } from "../../email-receipts/parsers/parser-tool.guide";
 import { TRANSACTION_SORT_FIELDS } from "../../transactions/register-order";
@@ -991,6 +992,15 @@ export const emailReceiptParsersFields = z.object({
     .optional()
     .describe("save_draft: the subject must contain one."),
   payeeName: z.string().max(100).optional(),
+  componentDrafts: z
+    .array(
+      z.object({
+        definition: z.record(z.string(), z.unknown()),
+        fromDomains: z.array(z.string()).max(10),
+      }),
+    )
+    .max(EMAIL_RECEIPT_PARSER_TOOL_MAX_DRAFTS)
+    .optional(),
 });
 
 /**
@@ -1026,7 +1036,10 @@ export const emailReceiptParsersSchema =
         need("definition", "definition is required.");
       }
       if (value.receiptIds === undefined && value.samples === undefined) {
-        need("receiptIds", "receiptIds is required: name 1 to 5 emails.");
+        need(
+          "receiptIds",
+          `receiptIds is required: name 1 to ${EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS} emails.`,
+        );
       }
     }
     if (value.operation === "save_draft") {

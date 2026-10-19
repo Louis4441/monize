@@ -5,6 +5,7 @@ import {
   canReprocessReceipt,
   distinctSenderDomains,
   draftBlock,
+  senderDomainCounts,
   dominantSenderDomain,
   fromReceiptUnits,
   looksLikeHtml,
@@ -98,6 +99,8 @@ describe('isReceiptActionable', () => {
     ['review', 'applied', false],
     ['review', 'proposed', true],
     ['unmatched', null, true],
+    // A component is read again after its profile changes (the server allows it).
+    ['component', null, true],
   ] as const)('%s / %s is %s', (status, displayState, expected) => {
     expect(isReceiptActionable({ status, displayState })).toBe(expected);
   });
@@ -120,6 +123,7 @@ describe('canRecognizeWithAi', () => {
     ['ignored', null, false],
     ['skipped', null, false],
     ['pending', null, false],
+    ['component', null, false],
   ] as const)('%s / %s is %s', (status, displayState, expected) => {
     expect(canRecognizeWithAi({ status, displayState })).toBe(expected);
   });
@@ -135,10 +139,44 @@ describe('readParsedReceipt source', () => {
   });
 });
 
+describe('readParsedReceipt linked receipts', () => {
+  it('keeps a line kind, a link, an instalment, the link key and the part reports', () => {
+    const read = readParsedReceipt({
+      items: [
+        { name: 'Part', amount: 100000, link: 'abc-1', instalment: '2/10' },
+        { name: 'Delivery', amount: 50000, kind: 'shipping' },
+        { name: 'Odd', amount: 1, kind: 'gift' },
+      ],
+      linkKey: 'abc-1',
+      links: [
+        { partIndex: 0, link: 'abc-1', partAmount: 100000, outcome: 'scaled', componentReceiptId: 'r-1', componentNet: 300000, taken: 100000 },
+        { partIndex: 1, link: null, partAmount: 5, outcome: 'no_link', componentReceiptId: null },
+        { partIndex: 2, link: 'x', partAmount: 5, outcome: 'invented', componentReceiptId: null },
+      ],
+    });
+    expect(read?.items[0]).toMatchObject({ link: 'abc-1', instalment: '2/10' });
+    expect(read?.items[0]).not.toHaveProperty('kind');
+    expect(read?.items[1].kind).toBe('shipping');
+    expect(read?.items[2]).not.toHaveProperty('kind');
+    expect(read?.linkKey).toBe('abc-1');
+    expect(read?.links).toHaveLength(2);
+    expect(read?.links?.[0]).toMatchObject({ outcome: 'scaled', componentNet: 300000, taken: 100000 });
+    expect(read?.links?.[1]).toMatchObject({ link: null, componentReceiptId: null });
+  });
+
+  it('leaves them absent on a receipt that has none, and keeps a component without a key as null', () => {
+    const plain = readParsedReceipt({ items: [] });
+    expect(plain).not.toHaveProperty('linkKey');
+    expect(plain).not.toHaveProperty('links');
+    expect(readParsedReceipt({ items: [], linkKey: null })?.linkKey).toBeNull();
+  });
+});
+
 describe('canDraftParser', () => {
   it.each([
     ['no_parser', null, true],
     ['parse_failed', null, true],
+    ['component', null, true],
     ['unmatched', null, false],
     ['ambiguous', null, false],
     ['skipped', null, false],
@@ -342,29 +380,53 @@ describe('draftBlock', () => {
   });
 
   it('is off for a mix of trade confirmations and order emails', () => {
-    expect(draftBlock([mail('a.com'), mail('a.com', 'no_parser', true)], 5, false)).toBe('mixedKinds');
-    expect(draftBlock([mail('a.com', 'no_parser', true)], 5, false)).toBeNull();
+    expect(draftBlock([mail('a.com'), mail('a.com', 'no_parser', true)], false)).toBe('mixedKinds');
+    expect(draftBlock([mail('a.com', 'no_parser', true)], false)).toBeNull();
   });
 
-  it('is on for one to five emails of one sender', () => {
-    expect(draftBlock([mail('a.com')], 5, false)).toBeNull();
-    expect(draftBlock([1, 2, 3, 4, 5].map(() => mail('a.com')), 5, false)).toBeNull();
+  it('is on for one to five emails of each of one to five senders', () => {
+    expect(draftBlock([mail('a.com')], false)).toBeNull();
+    expect(draftBlock([1, 2, 3, 4, 5].map(() => mail('a.com')), false)).toBeNull();
+    expect(draftBlock([mail('a.com'), mail('b.com')], false)).toBeNull();
+    const fiveByFive = [1, 2, 3, 4, 5].flatMap((d) => [1, 2, 3, 4, 5].map(() => mail(`d${d}.com`)));
+    expect(fiveByFive).toHaveLength(25);
+    expect(draftBlock(fiveByFive, false)).toBeNull();
   });
 
-  it('is off above the limit', () => {
-    expect(draftBlock([1, 2, 3, 4, 5, 6].map(() => mail('a.com')), 5, false)).toBe('tooMany');
+  it('is off above five emails of one sender, even when other senders are within the limit', () => {
+    expect(draftBlock([1, 2, 3, 4, 5, 6].map(() => mail('a.com')), false)).toBe('tooManyPerDomain');
+    expect(draftBlock([...[1, 2, 3, 4, 5, 6].map(() => mail('a.com')), mail('b.com')], false)).toBe('tooManyPerDomain');
   });
 
-  it('is off for several senders and for an unreadable email', () => {
-    expect(draftBlock([mail('a.com'), mail('b.com')], 5, false)).toBe('differentSenders');
-    expect(draftBlock([mail('a.com'), mail('a.com', 'skipped')], 5, false)).toBe('skipped');
+  it('is off above five senders', () => {
+    expect(draftBlock([1, 2, 3, 4, 5, 6].map((n) => mail(`d${n}.com`)), false)).toBe('tooManyDomains');
+  });
+
+  it('is off for trade confirmations of more than one sender', () => {
+    expect(draftBlock([mail('a.com', 'no_parser', true), mail('b.com', 'no_parser', true)], false)).toBe('tradeOneDomain');
+    expect(draftBlock([mail('a.com', 'no_parser', true), mail('a.com', 'no_parser', true)], false)).toBeNull();
+  });
+
+  it('is off for an unreadable email', () => {
+    expect(draftBlock([mail('a.com'), mail('a.com', 'skipped')], false)).toBe('skipped');
   });
 
   it('is off for a selection by filter, whatever its size', () => {
-    expect(draftBlock([mail('a.com')], 5, true)).toBe('allMatching');
+    expect(draftBlock([mail('a.com')], true)).toBe('allMatching');
   });
+});
 
-  it('names the limit before the sender when both apply', () => {
-    expect(draftBlock([1, 2, 3, 4, 5, 6].map((n) => mail(`d${n}.com`)), 5, false)).toBe('tooMany');
+describe('senderDomainCounts', () => {
+  it('counts emails per sender domain in first-seen order, falling back to the address', () => {
+    expect(
+      senderDomainCounts([
+        { fromDomain: 'a.com', fromAddress: 'x@a.com' },
+        { fromDomain: '', fromAddress: 'y@b.com' },
+        { fromDomain: 'a.com', fromAddress: 'z@a.com' },
+      ]),
+    ).toEqual([
+      { domain: 'a.com', count: 2 },
+      { domain: 'b.com', count: 1 },
+    ]);
   });
 });

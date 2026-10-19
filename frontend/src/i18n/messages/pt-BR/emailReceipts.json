@@ -524,7 +524,12 @@
       "currencyMarkers": "Marcadores de moeda",
       "defaultAccount": "Conta padrão",
       "ruleAccount": "conta",
-      "ruleCurrency": "moeda"
+      "ruleCurrency": "moeda",
+      "role": "Função do perfil",
+      "link": "A seção «link»",
+      "linkDaysBefore": "Dias antes do pagamento",
+      "linkFromDomains": "Domínios do remetente dos e-mails de compra",
+      "linkKey": "Padrões da chave de vínculo"
     },
     "codes": {
       "not_object": "não é uma definição válida",
@@ -560,7 +565,15 @@
       "invalid_currency": "não é um código de moeda de 3 letras, como USD",
       "too_many_lines": "abrange linhas demais (no máximo {max})",
       "line_break_not_allowed": "é comparado com um único texto (o nome de um item, o comerciante ou uma conta), então não pode abranger várias linhas",
-      "invalid_uuid_account": "não é uma conta válida"
+      "invalid_uuid_account": "não é uma conta válida",
+      "role_invalid": "deve ser standalone, component ou settlement",
+      "link_key_requires_component": "só pode ser usado quando a função é component",
+      "link_key_missing": "é necessário quando a função é component",
+      "link_capture_requires_settlement": "usa uma captura de link ou instalment, que só um perfil settlement aceita",
+      "link_requires_settlement": "só pode ser usado quando a função é settlement",
+      "link_domain_invalid": "não é um domínio de remetente válido (no máximo {max} domínios)",
+      "link_days_invalid": "deve ser um número inteiro de 0 a {max}",
+      "role_trade_conflict": "não pode ser component nem settlement em um perfil de negociação em bolsa, que lê apenas a negociação"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transação corresponde} other {# transações correspondem}} igualmente bem, então nenhuma seria vinculada até você escolher.",
     "unmatched": "Nenhuma transação corresponde, entre {count, plural, one {# candidata} other {# candidatas}}.",
     "jsonInvalid": "O JSON não é válido, então ainda não há nada para testar.",
+    "component": {
+      "heading": "E-mail de compra (component): chave de vínculo {linkKey}",
+      "noLinkKey": "E-mail de compra (component): nenhuma chave de vínculo foi lida, então nenhum e-mail de pagamento consegue encontrá-lo.",
+      "noneWaiting": "Nenhum e-mail de pagamento está aguardando esta chave de vínculo.",
+      "waiting": "{count, plural, one {# e-mail de pagamento está aguardando} other {# e-mails de pagamento estão aguardando}} esta chave de vínculo:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Este analisador não leria este e-mail: nenhuma de suas linhas obrigatórias está nele, então o próximo analisador do remetente seria tentado.",
       "skip_line": "Este analisador deixaria este e-mail de lado: ele contém uma linha que faz o analisador ignorá-lo.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Linha de exclusão",
         "waitIfLine": "Linha de espera",
         "reference": "Referência",
+        "linkKey": "Chave de vínculo",
         "action": "Compra ou venda",
         "symbol": "Código",
         "quantity": "Ações",
@@ -674,7 +695,33 @@
     "paid": "Pago",
     "payee": "Comerciante",
     "reference": "Referência",
-    "categoryByAi": "IA"
+    "categoryByAi": "IA",
+    "linkKey": "Chave de vínculo",
+    "kinds": {
+      "shipping": "Frete",
+      "fee": "Taxa",
+      "discount": "Desconto"
+    },
+    "parts": {
+      "heading": "Partes",
+      "part": "Parte",
+      "link": "Vínculo",
+      "outcome": "Resultado",
+      "noLink": "Sem vínculo",
+      "component": "E-mail de compra: {subject} ({date}).",
+      "componentProfile": "Perfil: {name}.",
+      "componentNet": "Total da compra: {amount}.",
+      "taken": "Já utilizado: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "A parte não tem vínculo, então continua sendo uma linha.",
+      "not_found": "Nenhum e-mail de compra foi encontrado para este vínculo, então a parte continua sendo uma linha.",
+      "component_incomplete": "O e-mail de compra não foi lido por completo, então a parte continua sendo uma linha.",
+      "component_used": "Outros pagamentos já usaram toda a compra, então a parte continua sendo uma linha.",
+      "joined": "Substituída pelas linhas do e-mail de compra.",
+      "scaled": "Substituída pelas linhas do e-mail de compra, ajustadas a esta parte.",
+      "amount_exceeds": "A parte excede o que resta da compra, então continua sendo uma linha."
+    }
   },
   "state": {
     "pending": "Aguardando leitura",
@@ -690,7 +737,8 @@
     "dismissed": "Dispensado",
     "expired": "Expirado",
     "pending_ai": "Aguardando a IA",
-    "request_missing": "Solicitação ausente"
+    "request_missing": "Solicitação ausente",
+    "component": "Aguardando o pagamento"
   },
   "receipts": {
     "loading": "Carregando os e-mails",
@@ -710,7 +758,8 @@
       "ambiguous": "Várias transações correspondem",
       "review_conflict": "Há outra solicitação aberta",
       "review": "Em revisão",
-      "ignored": "Ignorado"
+      "ignored": "Ignorado",
+      "component": "Aguardando pagamento"
     },
     "domainFilter": {
       "label": "Domínio do remetente",
@@ -787,6 +836,7 @@
       "pageSelected": "Todos os {count} e-mails desta página estão selecionados.",
       "selectAllMatching": "Selecionar todos os {total} e-mails que correspondem a este filtro.",
       "allMatchingSelected": "Todos os {total} e-mails que correspondem a este filtro estão selecionados.",
+      "hiddenSelected": "{hidden, plural, one {# dos e-mails selecionados não aparece nesta lista.} many {# dos e-mails selecionados não aparecem nesta lista.} other {# dos e-mails selecionados não aparecem nesta lista.}}",
       "reprocessButton": "Reprocessar ({count})",
       "restoreButton": "Restaurar ignorados ({count})",
       "restoreButtonAll": "Restaurar ignorados",
@@ -816,11 +866,12 @@
         "remove": "Recolocar: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Um analisador é preparado com no máximo {max} e-mails. Selecione {max} e-mails ou menos.",
-        "differentSenders": "Os e-mails selecionados vêm de remetentes diferentes ({domains}). Um analisador lê os e-mails de um só remetente, então selecione e-mails de um único remetente.",
         "skipped": "Um e-mail que não pôde ser lido não tem texto para preparar um analisador. Remova-o da seleção.",
         "allMatching": "Um analisador é preparado com e-mails que você mesmo seleciona, no máximo {max}. Limpe esta seleção e selecione até {max} e-mails.",
-        "mixedKinds": "Os e-mails selecionados misturam confirmações de negociação e e-mails de pedido. Um perfil lê um só tipo, então selecione apenas confirmações de negociação ou apenas e-mails de pedido."
+        "mixedKinds": "Os e-mails selecionados misturam confirmações de negociação e e-mails de pedido. Um perfil lê um só tipo, então selecione apenas confirmações de negociação ou apenas e-mails de pedido.",
+        "tooManyPerDomain": "Só é possível usar no máximo {perDomain} e-mails de um remetente. Selecione {perDomain} e-mails ou menos de cada remetente ({domains}).",
+        "tooManyDomains": "Só é possível usar juntos no máximo {maxDomains} remetentes ({domains}). Selecione e-mails de {maxDomains} remetentes ou menos.",
+        "tradeOneDomain": "Um perfil de negociação lê os e-mails de um só remetente ({domains}). Selecione confirmações de negociação de um só remetente."
       }
     },
     "pager": {
@@ -879,6 +930,12 @@
       "approveFailed": "Não foi possível aprovar as propostas",
       "noApprovable": "Nenhuma proposta desta seleção pode ser aprovada.",
       "narrowFailed": "Não foi possível contar os e-mails. A alteração não foi aplicada."
+    },
+    "linkedDraftDialog": {
+      "title": "Redigir perfis vinculados?",
+      "message": "Você selecionou e-mails de vários remetentes: {domains}. Use isto apenas quando os dados de uma transação bancária estão distribuídos em e-mails de vários remetentes, por exemplo uma loja e o seu fornecedor de pagamento parcelado, ou uma loja e um gateway de pagamento. Para lojas sem relação, cancele e redija um domínio de cada vez. Uma solicitação aceita no máximo {perDomain} e-mails por remetente e {maxDomains} remetentes.",
+      "domainEntry": "{domain} ({count, plural, one {# e-mail} other {# e-mails}})",
+      "confirm": "Redigir perfis vinculados"
     }
   },
   "detail": {
@@ -939,7 +996,13 @@
       "trade_no_account": "O analisador não conseguiu identificar a qual conta esta negociação pertence.",
       "trade_exists": "Suas contas já têm esta negociação, então nada foi proposto.",
       "trade_linked": "Vinculado à transação que ele informa, então nada foi proposto.",
-      "trade_no_currency": "O perfil não conseguiu identificar a moeda desta negociação, então não pôde escolher a conta."
+      "trade_no_currency": "O perfil não conseguiu identificar a moeda desta negociação, então não pôde escolher a conta.",
+      "awaiting_settlement": "E-mail de compra salvo. Ele aguarda o e-mail de pagamento que o quita.",
+      "settled": "E-mail de compra salvo. Os e-mails de pagamento associados a ele quitam o valor total.",
+      "instalment": "E-mail de compra salvo. Os pagamentos quitaram uma parte; o resto ainda está por pagar.",
+      "partially_linked": "Algumas partes deste pagamento ainda não têm e-mail de compra. Elas são mostradas como uma linha cada.",
+      "enriched_by_other": "A transação correspondente já foi complementada por outro e-mail. Abra-a e use Vincular para substituir esse complemento, ou ignore este e-mail.",
+      "no_link_key": "Este e-mail de compra não contém nenhuma chave de vínculo, então nenhum pagamento consegue encontrá-lo."
     },
     "reasonUnknown": "Motivo: {reason}",
     "requestNote": "Solicitação de revisão ({state}): {note}",
@@ -986,6 +1049,15 @@
       "capped": "Só as primeiras {max} linhas são lidas.",
       "empty": "Sem linhas.",
       "listLabel": "Linhas numeradas do e-mail"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "E-mails de compra vinculados",
+      "component": "Parte {part}: {subject} ({date})",
+      "settlementsHeading": "Pago por",
+      "settlement": "{subject} ({date}), parte {amount}",
+      "enrichedBy": "Já complementada por: {subject}",
+      "openButton": "Abrir",
+      "open": "Abrir o e-mail {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venda}} de {quantity} {symbol} por {total} em {date}.",
     "noTradeTransaction": "Nenhuma ainda: a operação é lançada quando você aprovar a proposta, ou vinculada a uma que já esteja no seu registro.",
@@ -1314,7 +1386,8 @@
         "discard_delete": "Excluído por este analisador",
         "no_html": "Sem parte HTML",
         "trade": "Propõe uma negociação",
-        "trade_exists": "Já está no seu registro"
+        "trade_exists": "Já está no seu registro",
+        "component": "E-mail de compra (aguarda pagamento)"
       },
       "parsedTradeAccount": "Conta: {account}",
       "accountWithCurrency": "{name} ({currency})",
@@ -1344,5 +1417,10 @@
     "bookTo": "Registrada em: {account}",
     "bookToNotTradable": "Registrada em {account}, que não é uma conta de corretagem aberta, então a operação não pode ser registrada lá.",
     "bookToUnknown": "Registrada em uma conta que não está na sua lista, então a operação não pode ser registrada lá."
+  },
+  "linkedHint": {
+    "emails": "Uma transação bancária descrita em e-mails de vários remetentes (por exemplo, uma loja e o seu fornecedor de pagamento parcelado)? Selecione juntos até {max} e-mails de cada um desses remetentes e redija perfis vinculados.",
+    "profiles": "O guia abaixo redige um perfil para um só remetente. Uma transação bancária descrita em e-mails de vários remetentes (por exemplo, uma loja e o seu fornecedor de pagamento parcelado)? Selecione na aba E-mails até {max} e-mails de cada um desses remetentes e redija perfis vinculados.",
+    "openEmails": "Abrir a aba E-mails"
   }
 }

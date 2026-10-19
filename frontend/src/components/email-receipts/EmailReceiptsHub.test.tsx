@@ -16,13 +16,24 @@ vi.mock('@/components/email-receipts/EmailReceiptsManager', () => ({
   EmailReceiptsManager: () => <div data-testid="emails" />,
 }));
 vi.mock('@/components/email-receipts/ParsersSection', () => ({
-  ParsersSection: ({ wizardDomain, onWizardDomainChange }: { wizardDomain?: string | null; onWizardDomainChange?: (d: string | null) => void }) => (
+  ParsersSection: ({
+    wizardDomain,
+    onWizardDomainChange,
+    onOpenEmails,
+  }: {
+    wizardDomain?: string | null;
+    onWizardDomainChange?: (d: string | null) => void;
+    onOpenEmails?: () => void;
+  }) => (
     <div data-testid="profiles" data-wizard={wizardDomain ?? ''}>
       <button type="button" onClick={() => onWizardDomainChange?.('shop.example.com')}>
         start wizard
       </button>
       <button type="button" onClick={() => onWizardDomainChange?.(null)}>
         close wizard
+      </button>
+      <button type="button" onClick={() => onOpenEmails?.()}>
+        open emails hint
       </button>
     </div>
   ),
@@ -59,6 +70,12 @@ describe('EmailReceiptsHub', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     demoMode = false;
+  });
+
+  it('switches to the Emails tab from the Profiles tab hint', async () => {
+    await renderHub('tab=profiles');
+    fireEvent.click(screen.getByRole('button', { name: 'open emails hint' }));
+    expect(nav.replace).toHaveBeenCalledWith('/email-receipts?tab=emails', { scroll: false });
   });
 
   it('opens on the Overview and mounts only that tab', async () => {

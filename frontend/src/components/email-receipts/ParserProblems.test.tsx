@@ -30,6 +30,42 @@ describe('ParserProblems', () => {
     expect(within(alert).getByText('The definition: is not a valid definition')).toBeInTheDocument();
   });
 
+  it('says where the linked receipts problems are and what is wrong', () => {
+    render(
+      <ParserProblems
+        problems={[
+          { path: 'role', code: 'role_invalid' },
+          { path: 'linkKey[0]', code: 'capture_missing' },
+          { path: 'linkKey', code: 'link_key_requires_component' },
+          { path: '', code: 'link_key_missing' },
+          { path: 'link', code: 'link_requires_settlement' },
+          { path: 'link.fromDomains[1]', code: 'link_domain_invalid' },
+          { path: 'link.fromDomains', code: 'too_many' },
+          { path: 'link.daysBefore', code: 'link_days_invalid' },
+          { path: 'items.patterns[0]', code: 'link_capture_requires_settlement' },
+          { path: 'role', code: 'role_trade_conflict' },
+        ]}
+      />,
+    );
+    const alert = screen.getByRole('alert');
+    expect(within(alert).getByText('Profile role: must be standalone, component or settlement')).toBeInTheDocument();
+    expect(within(alert).getByText('Link key patterns, line 1: is missing a capture this field needs')).toBeInTheDocument();
+    expect(within(alert).getByText('Link key patterns: can only be used when the role is component')).toBeInTheDocument();
+    expect(within(alert).getByText('The definition: is needed when the role is component')).toBeInTheDocument();
+    expect(within(alert).getByText('The link section: can only be used when the role is settlement')).toBeInTheDocument();
+    expect(
+      within(alert).getByText('Sender domains of the purchase emails, line 2: is not a valid sender domain (at most 10 domains)'),
+    ).toBeInTheDocument();
+    expect(within(alert).getByText('Sender domains of the purchase emails: has too many entries (at most 10)')).toBeInTheDocument();
+    expect(within(alert).getByText('Days before the repayment: must be a whole number from 0 to 365')).toBeInTheDocument();
+    expect(
+      within(alert).getByText('Item patterns, line 1: uses a link or instalment capture, which only a settlement profile accepts'),
+    ).toBeInTheDocument();
+    expect(
+      within(alert).getByText('Profile role: cannot be component or settlement in a brokerage trade profile, which reads only the trade'),
+    ).toBeInTheDocument();
+  });
+
   it('says where a labelled entry, a record step and a skip line are', () => {
     render(
       <ParserProblems

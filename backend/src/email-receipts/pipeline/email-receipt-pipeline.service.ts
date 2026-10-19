@@ -15,10 +15,12 @@ import {
   EMAIL_RECEIPTS_CLAIM_KEY,
 } from "../../ai-review/ai-review-work.types";
 import { loadQualifiedCategoryNames } from "../../categories/category-name.util";
+import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { tr } from "../../i18n/translate";
 import { Payee } from "../../payees/entities/payee.entity";
 import { PayeesService } from "../../payees/payees.service";
+import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import {
   EmailReceiptMailbox,
   type EmailReceiptAiMode,
@@ -41,10 +43,27 @@ import {
 import { matchReceipt } from "../matching/match-receipt";
 import { completeness, parseReceiptLines } from "../parsing/parse-receipt";
 import { resolveMatchConfig } from "../parsing/receipt-match-config";
-import type {
-  ParsedReceipt,
-  ParsedTrade,
+import {
+  isItemLine,
+  type ParsedReceipt,
+  type ReceiptLinkOutcome,
+  type ReceiptLinkReport,
+  type ParsedTrade,
 } from "../parsing/receipt-parser.types";
+import { componentReason } from "../linking/component-reason";
+import { loadLinkedComponents } from "../linking/component-lookup";
+import { waitingSettlements } from "../linking/waiting-settlements";
+import {
+  componentNet,
+  hasJoinedPart,
+  joinSettlement,
+  type JoinedSettlement,
+} from "../linking/join-settlement";
+import {
+  linkRowsOf,
+  replaceLinkRows,
+  type LinkRowInput,
+} from "../linking/link-rows";
 import {
   applyCategoryHistory,
   loadItemCategoryHistory,
@@ -62,7 +81,10 @@ import {
 } from "./email-receipt-trade.service";
 import { deleteLockedReceipt } from "../receipts/receipt-disposal";
 import { loadApprovedParsers } from "./approved-parsers";
-import { chooseReceiptParser } from "./choose-receipt-parser";
+import {
+  chooseReceiptParser,
+  type ReceiptParserChoice,
+} from "./choose-receipt-parser";
 import { describeFailure, isRefusal, refusalNote } from "./receipt-failure";
 import { loadLinkableTransaction } from "./linkable-transaction";
 import { loadReceiptCandidates } from "./receipt-candidates";
@@ -102,6 +124,12 @@ export const RECEIPT_NO_HTML_REASON = "no_html";
  * `items_uncategorized`, ...), which `parsed.source` records either way.
  */
 export const RECEIPT_SCHEMA_ORG_REASON = "schema_org";
+/** The `parse_failed` reason of a component email that holds no link value (linked receipts spec 2.1). */
+export const RECEIPT_NO_LINK_KEY_REASON = "no_link_key";
+/** The reason of a settlement some linked part of which stayed one line (spec 4.4 and 12). */
+export const RECEIPT_PARTIALLY_LINKED_REASON = "partially_linked";
+/** The `review_conflict` reason of a settlement whose transaction another email enriched (spec 6). */
+export const RECEIPT_ENRICHED_BY_OTHER_REASON = "enriched_by_other";
 
 /** What `process` does and refuses, by who asked. */
 export interface ProcessReceiptOptions {
@@ -130,7 +158,26 @@ export interface ProcessReceiptOptions {
    * person pressed the button for one email).
    */
   readonly aiCategoryBudget?: { remaining: number };
+  /**
+   * Internal, set by the re-join of linked receipts spec 8: read a settlement
+   * whose request was applied again against its own transaction (no new match),
+   * and propose a new card only when a part now joins that did not. Anything
+   * else leaves the row as it is.
+   */
+  readonly rejoin?: boolean;
 }
+
+/** The most settlements one component re-joins after it is stored (linked receipts spec 8). */
+export const MAX_REJOINED_SETTLEMENTS = 20;
+
+/** The statuses an ordinary reprocess of a settlement that waits for a component may start from. */
+const REJOIN_REPROCESS_STATUSES = [
+  "unmatched",
+  "ambiguous",
+  "review",
+  "review_conflict",
+  "parse_failed",
+] as const satisfies readonly EmailReceiptStatus[];
 
 /** A category the AI chose for item `index` of a reading; `name` guards against a reading that changed since. */
 export interface CategoryHint {
@@ -169,6 +216,12 @@ interface Stored {
   candidateIds: string[];
   matchKind: EmailReceiptMatchKind | null;
   requestId: string | null;
+  /** A `component` receipt's link value; every other outcome stores null. */
+  linkKey?: string | null;
+  /** The link rows of a settlement after the join; absent leaves it with none. */
+  links?: LinkRowInput[];
+  /** What the joined components now hold; written with the settlement, never on a pass that writes nothing. */
+  componentReasons?: JoinedSettlement["componentReasons"];
 }
 
 interface TransactionFacts extends ReceiptProposalTransaction {
@@ -189,6 +242,12 @@ interface Committed {
     items: CategoryQuestionItem[];
     categories: ReadonlyMap<string, string>;
   };
+  /**
+   * Present when a component was stored: the settlements (newest first, at most
+   * `MAX_REJOINED_SETTLEMENTS`) that wait for its link value. `process` reads
+   * each again after the commit; a settlement's own pass never sets it.
+   */
+  rejoin?: string[];
 }
 
 export { describeFailure };
@@ -249,9 +308,55 @@ export class EmailReceiptPipelineService {
         }),
       );
     }
-    if (committed.autoApply === null) return committed.result;
-    const applied = await this.autoApply(userId, committed.autoApply);
-    return { ...committed.result, autoApplied: applied };
+    let result = committed.result;
+    if (committed.autoApply !== null) {
+      const applied = await this.autoApply(userId, committed.autoApply);
+      result = { ...result, autoApplied: applied };
+    }
+    // A component just stored: the settlements that wait for it read it now,
+    // each in its own transaction, never inside the component's (spec 8).
+    for (const settlementId of committed.rejoin ?? []) {
+      await this.rejoinSettlement(userId, settlementId);
+    }
+    return result;
+  }
+
+  /**
+   * One settlement that waits for the component just stored. Not applied: an
+   * ordinary automatic reprocess (matched again, joined, a new card). Applied:
+   * a re-join on its own transaction. An error is logged and never fails the
+   * component's result.
+   */
+  private async rejoinSettlement(
+    userId: string,
+    settlementId: string,
+  ): Promise<void> {
+    try {
+      const rows = returnedRows<{ status: string | null }>(
+        await withScopedDb(this.dataSource, (m) =>
+          m.query(
+            `SELECT q.status
+               FROM email_receipts r
+               LEFT JOIN ai_review_requests q
+                      ON q.id = r.ai_review_request_id AND q.user_id = r.user_id
+              WHERE r.id = $1 AND r.user_id = $2`,
+            [settlementId, userId],
+          ),
+        ),
+      );
+      if (rows.length === 0) return;
+      if (rows[0].status === "applied") {
+        await this.process(userId, settlementId, { rejoin: true });
+      } else {
+        await this.process(userId, settlementId, {
+          onlyWhenStatusIn: REJOIN_REPROCESS_STATUSES,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(
+        `A waiting settlement could not be read again (${describeFailure(error)})`,
+      );
+    }
   }
 
   /**
@@ -315,8 +420,40 @@ export class EmailReceiptPipelineService {
       receipt.aiReviewRequestId,
     );
     const requestStatus = current?.status ?? null;
-    if (requestStatus === "applied" && options.onlyWhenStatusIn) {
+    // A re-join (spec 8) acts only on a settlement whose card was applied, on
+    // the transaction it holds; in every other case it leaves the row alone.
+    if (
+      options.rejoin &&
+      (receipt.status !== "review" ||
+        requestStatus !== "applied" ||
+        current?.kind !== "email_receipt" ||
+        !receipt.transactionId ||
+        !receipt.matchKind)
+    ) {
       return { result: unchanged(receipt), autoApply: null };
+    }
+    // An applied email is read again only as a component (spec 9): a component
+    // reading never writes the ledger and never opens a request. Decided on the
+    // row as stored, before the forwarded identity is healed, so that an applied
+    // email read any other way writes nothing on an automatic pass.
+    let appliedComponent = false;
+    let parsers: EmailReceiptParser[] | null = null;
+    if (requestStatus === "applied" && !options.rejoin) {
+      parsers = await loadApprovedParsers(m, userId);
+      appliedComponent =
+        !options.link &&
+        !receipt.investmentTransactionId &&
+        receipt.status !== "skipped" &&
+        readsAsComponent(
+          chooseReceiptParser(
+            parsers,
+            receipt,
+            new ReceiptSourceLines(receipt),
+          ),
+        );
+      if (!appliedComponent && options.onlyWhenStatusIn) {
+        return { result: unchanged(receipt), autoApply: null };
+      }
     }
     // An automatic pass (the poll's rematch, a bulk run) never replaces a trade
     // proposal: one waiting for approval would be swapped for a new card the
@@ -329,8 +466,14 @@ export class EmailReceiptPipelineService {
     ) {
       return { result: unchanged(receipt), autoApply: null };
     }
-    this.refuseUnprocessable(receipt, requestStatus, options);
-    await this.healForwardedIdentity(m, userId, receipt);
+    if (!options.rejoin) {
+      this.refuseUnprocessable(
+        receipt,
+        appliedComponent ? null : requestStatus,
+        options,
+      );
+      await this.healForwardedIdentity(m, userId, receipt);
+    }
 
     const link = options.link
       ? await loadLinkableTransaction(m, userId, options.link.transactionId)
@@ -342,7 +485,7 @@ export class EmailReceiptPipelineService {
     const aiMode: EmailReceiptAiMode = mailbox?.aiMode ?? "off";
     const autoApplyOn = mailbox?.autoApply ?? false;
 
-    const parsers = await loadApprovedParsers(m, userId);
+    parsers ??= await loadApprovedParsers(m, userId);
     const keptLink = {
       transactionId: link?.id ?? null,
       candidateIds: [],
@@ -353,6 +496,18 @@ export class EmailReceiptPipelineService {
     // lines of each parser's own source, an invalid definition stops the read).
     const sources = new ReceiptSourceLines(receipt);
     const choice = chooseReceiptParser(parsers, receipt, sources);
+    // After the heal the email may no longer read as a component: an applied
+    // one is then left alone (a person's reprocess is refused, as it always was),
+    // as is a re-join of a settlement the profile no longer reads as one.
+    if (
+      (appliedComponent && !readsAsComponent(choice)) ||
+      (options.rejoin && !readsAsSettlement(choice))
+    ) {
+      if (options.onlyWhenStatusIn || options.rejoin) {
+        return { result: unchanged(receipt), autoApply: null };
+      }
+      throw appliedConflict();
+    }
     if (choice.kind === "invalid") {
       return this.finish(m, userId, receipt, {
         status: "parse_failed",
@@ -484,6 +639,55 @@ export class EmailReceiptPipelineService {
         sources.forSource(definition.source),
         payee?.defaultCategoryId ?? null,
       );
+      // A component never looks for a bank transaction and never opens a
+      // request (linked receipts spec 2.1); a person's own link is a command
+      // and reads the email as a standalone one, like the guards above.
+      if (!link && definition.role === "component") {
+        // An applied email keeps its transaction and the applied request: the
+        // receipt page still shows the earlier enrichment (spec 9).
+        const base = {
+          parserId: choice.parser.id,
+          parsed,
+          requestId: appliedComponent ? receipt.aiReviewRequestId : null,
+          transactionId: appliedComponent ? receipt.transactionId : null,
+          candidateIds: [],
+          matchKind: appliedComponent ? receipt.matchKind : null,
+        };
+        if (!parsed.linkKey) {
+          return this.finish(m, userId, receipt, {
+            ...base,
+            status: "parse_failed",
+            reason: RECEIPT_NO_LINK_KEY_REASON,
+          });
+        }
+        const stored = await this.finish(m, userId, receipt, {
+          ...base,
+          status: "component",
+          reason: await componentReason(
+            m,
+            userId,
+            receipt.id,
+            componentNet(parsed),
+          ),
+          linkKey: parsed.linkKey,
+        });
+        return {
+          ...stored,
+          rejoin: (
+            await waitingSettlements(
+              m,
+              userId,
+              receipt.id,
+              parsed.linkKey,
+              MAX_REJOINED_SETTLEMENTS,
+            )
+          ).map((settlement) => settlement.id),
+        };
+      }
+      // A re-join leaves an email that read no amount alone.
+      if (options.rejoin && parsed.total === null && parsed.paid === null) {
+        return { result: unchanged(receipt), autoApply: null };
+      }
       if (parsed.total === null && parsed.paid === null) {
         structured = await this.readStructured(userId, sources);
         if (structured) parsed = structured;
@@ -502,15 +706,30 @@ export class EmailReceiptPipelineService {
       }
       parsed = structured;
     }
-    // The reason slot a schema.org reading fills when the outcome has none of its own.
+    // Some linked part of a settlement stayed one line (set by the join below).
+    let partiallyLinked = false;
+    // The reason slot a schema.org reading, or a partly linked settlement,
+    // fills when the outcome has none of its own.
     const reasonOf = (reason: string | null): string | null =>
-      reason ?? (structured ? RECEIPT_SCHEMA_ORG_REASON : null);
+      reason ??
+      (partiallyLinked ? RECEIPT_PARTIALLY_LINKED_REASON : null) ??
+      (structured ? RECEIPT_SCHEMA_ORG_REASON : null);
     // What the profile says about matching (spec 3a); the defaults when no
     // parser read the email (schema.org, no parser).
     const matchConfig = resolveMatchConfig(
       choice.kind === "chosen" ? choice.definition.match : undefined,
     );
-    let stored = { parserId: parser?.id ?? null, parsed };
+    let stored: {
+      parserId: string | null;
+      parsed: ParsedReceipt;
+      links?: LinkRowInput[];
+      componentReasons?: JoinedSettlement["componentReasons"];
+    } = { parserId: parser?.id ?? null, parsed };
+    // The day the shop sent the order when a forward carried it, else the day
+    // the email arrived (spec "Matching" section 3).
+    const purchaseDate = effectiveReceiptDate(receipt)
+      .toISOString()
+      .slice(0, 10);
 
     if (
       !link &&
@@ -528,23 +747,81 @@ export class EmailReceiptPipelineService {
       });
     }
 
+    // A settlement (linked receipts spec 4): each part is replaced by the lines
+    // of the purchase email it pays for. A reading that came from schema.org
+    // does not join. The component rows are locked here, after the receipt's
+    // own row and before the advisory lock on the matched transaction (spec 11).
+    const isSettlement =
+      structured === null &&
+      choice.kind === "chosen" &&
+      choice.definition.role === "settlement";
+    let joinedTagNames: string[] = [];
+    const joinedComponentIds = new Set<string>();
+    if (isSettlement && choice.kind === "chosen") {
+      const parts = await loadLinkedComponents(
+        m,
+        userId,
+        { id: receipt.id, effectiveDate: purchaseDate },
+        parsed.items.map((item) => item.link ?? null),
+        choice.definition.link ?? {},
+        true,
+      );
+      const joined = joinSettlement(parsed, parts);
+      // A re-join writes only when a part that was not joined now is (spec 8).
+      if (
+        options.rejoin &&
+        !joinImproved(receipt.parsed as ParsedReceipt | null, joined.reports)
+      ) {
+        return { result: unchanged(receipt), autoApply: null };
+      }
+      parsed = joined.parsed;
+      joinedTagNames = joined.tagNames;
+      for (const report of joined.reports) {
+        if (
+          (report.outcome === "joined" || report.outcome === "scaled") &&
+          report.componentReceiptId !== null
+        ) {
+          joinedComponentIds.add(report.componentReceiptId);
+        }
+      }
+      partiallyLinked = joined.reports.some(
+        (report) =>
+          report.link !== null &&
+          report.outcome !== "joined" &&
+          report.outcome !== "scaled",
+      );
+      stored = {
+        ...stored,
+        parsed,
+        links: linkRowsOf(joined.reports),
+        componentReasons: joined.componentReasons,
+      };
+    }
+
     let transaction: TransactionFacts;
     let matchKind: EmailReceiptMatchKind;
     if (link) {
       transaction = link;
       matchKind = "manual";
+    } else if (options.rejoin) {
+      // No new match: the settlement's own transaction, under the refusals of a
+      // link; the match kind it was stored with (checked above).
+      transaction = await loadLinkableTransaction(
+        m,
+        userId,
+        receipt.transactionId as string,
+      );
+      matchKind = receipt.matchKind as EmailReceiptMatchKind;
     } else {
-      // The window is centred on the day the shop sent the order when a forward
-      // carried it, else on the day the email arrived (spec section 3).
-      const purchaseDate = effectiveReceiptDate(receipt)
-        .toISOString()
-        .slice(0, 10);
+      // The window is centred on `purchaseDate` (spec section 3). A settlement
+      // also sees the transactions another email enriched (linked receipts 6).
       const candidates = await loadReceiptCandidates(
         m,
         userId,
         purchaseDate,
         receipt.id,
         matchConfig,
+        isSettlement,
       );
       const match = matchReceipt(
         parsed,
@@ -577,6 +854,25 @@ export class EmailReceiptPipelineService {
       }
       const hit = candidates.find((c) => c.id === match.transactionId);
       if (!hit) throw new Error("A matched candidate is not in the candidates");
+      // The transaction was enriched by an email this settlement does not join:
+      // a person decides (the Link action proposes over it). One enriched by a
+      // component this settlement joins is replaced by the new card.
+      if (
+        isSettlement &&
+        hit.enrichedByReceiptId &&
+        hit.enrichedByReceiptId !== receipt.id &&
+        !joinedComponentIds.has(hit.enrichedByReceiptId)
+      ) {
+        return this.finish(m, userId, receipt, {
+          status: "review_conflict",
+          reason: RECEIPT_ENRICHED_BY_OTHER_REASON,
+          transactionId: null,
+          candidateIds: [hit.id],
+          matchKind: null,
+          requestId: null,
+          ...stored,
+        });
+      }
       transaction = {
         id: hit.id,
         amount: hit.amount,
@@ -594,7 +890,7 @@ export class EmailReceiptPipelineService {
     const history = await loadItemCategoryHistory(
       m,
       userId,
-      parsed.items.map((item) => item.name),
+      parsed.items.filter(isItemLine).map((item) => item.name),
     );
     const withHistory = applyCategoryHistory(parsed, history, categoryNames);
     if (withHistory !== parsed) {
@@ -612,7 +908,7 @@ export class EmailReceiptPipelineService {
       choice.kind === "chosen" &&
       choice.definition.aiCategories === true &&
       parsed.reason === "items_uncategorized" &&
-      parsed.items.some((item) => item.categoryId === null)
+      parsed.items.some((item) => isItemLine(item) && item.categoryId === null)
     ) {
       const hints = options.categoryHints;
       if (hints === undefined) {
@@ -623,7 +919,7 @@ export class EmailReceiptPipelineService {
             aiMode,
             categories: categoryNames,
             items: parsed.items.flatMap((item, index) =>
-              item.categoryId === null
+              isItemLine(item) && item.categoryId === null
                 ? [
                     {
                       index,
@@ -664,6 +960,8 @@ export class EmailReceiptPipelineService {
         structured === null && choice.kind === "chosen"
           ? (choice.definition.tag ?? null)
           : null,
+      // The tags of the profiles of the joined components (spec 7).
+      ...(isSettlement ? { extraTagNames: joinedTagNames } : {}),
     };
     const proposal = buildReceiptProposal(parsed, transaction, context);
     const askAi = aiMode === "automatic" && !parsed.complete;
@@ -781,6 +1079,7 @@ export class EmailReceiptPipelineService {
       proposalKind: proposal.kind,
       usedFallback: submitted.usedFallback,
       cardBuilt: true,
+      linked: hasJoinedPart(parsed),
     };
     const committed = await this.finish(m, userId, receipt, {
       status: "review",
@@ -930,14 +1229,7 @@ export class EmailReceiptPipelineService {
         ),
       );
     }
-    if (requestStatus === "applied") {
-      throw new ConflictException(
-        tr(
-          "errors.emailReceipts.receiptApplied",
-          "This email's proposal has already been applied to a transaction.",
-        ),
-      );
-    }
+    if (requestStatus === "applied") throw appliedConflict();
     // A trade email linked to the ledger row it reports, or whose approval
     // booked one, accounts for that row: read again, it would propose the same
     // trade a second time.
@@ -985,12 +1277,23 @@ export class EmailReceiptPipelineService {
         trade: (stored.trade ??
           null) as unknown as QueryDeepPartialEntity<EmailReceipt>["trade"],
         investmentTransactionId: stored.investmentTransactionId ?? null,
+        linkKey: stored.linkKey ?? null,
         transactionId: stored.transactionId,
         candidateTransactionIds: stored.candidateIds,
         matchKind: stored.matchKind,
         aiReviewRequestId: stored.requestId,
       },
     );
+    // The settlement's link rows are replaced every time it is stored (spec 5).
+    await replaceLinkRows(m, userId, receipt.id, stored.links);
+    // The component rows are locked since the join (spec 11).
+    for (const { receiptId, reason } of stored.componentReasons ?? []) {
+      await m.query(
+        `UPDATE email_receipts SET status_reason = $1
+          WHERE id = $2 AND user_id = $3 AND status = 'component'`,
+        [reason, receiptId, userId],
+      );
+    }
     return {
       result: {
         status: stored.status,
@@ -1056,6 +1359,63 @@ export function applyCategoryHints(
   const next = { ...parsed, items };
   const reason = completeness(next);
   return { ...next, complete: reason === null, reason };
+}
+
+function appliedConflict(): ConflictException {
+  return new ConflictException(
+    tr(
+      "errors.emailReceipts.receiptApplied",
+      "This email's proposal has already been applied to a transaction.",
+    ),
+  );
+}
+
+/**
+ * Whether the chosen profile reads the email as a component: an approved
+ * `component` profile that no guard, discard or trade section turns into
+ * another outcome first. The one question an applied email is asked (spec 9).
+ */
+function readsAsComponent(choice: ReceiptParserChoice): boolean {
+  return (
+    choice.kind === "chosen" &&
+    choice.definition.role === "component" &&
+    !choice.definition.discard &&
+    !choice.definition.trade &&
+    choice.guards.skipIfLine === null &&
+    choice.guards.waitIfLine === null
+  );
+}
+
+/** The mirror for a re-join (spec 8): a settlement profile no guard turns aside. */
+function readsAsSettlement(choice: ReceiptParserChoice): boolean {
+  return (
+    choice.kind === "chosen" &&
+    choice.definition.role === "settlement" &&
+    !choice.definition.discard &&
+    !choice.definition.trade &&
+    choice.guards.skipIfLine === null &&
+    choice.guards.waitIfLine === null
+  );
+}
+
+/**
+ * Spec 8: some part that the stored reading did not join (`joined` or `scaled`)
+ * is joined by the new one. A part the stored reading has no entry for does not
+ * count.
+ */
+function joinImproved(
+  stored: ParsedReceipt | null,
+  reports: readonly ReceiptLinkReport[],
+): boolean {
+  const isJoin = (outcome: ReceiptLinkOutcome): boolean =>
+    outcome === "joined" || outcome === "scaled";
+  const before = new Map(
+    (stored?.links ?? []).map((report) => [report.partIndex, report.outcome]),
+  );
+  return reports.some((report) => {
+    const was = before.get(report.partIndex);
+    return was !== undefined && !isJoin(was) && isJoin(report.outcome);
+  });
 }
 
 function unchanged(receipt: EmailReceipt): ProcessReceiptResult {

@@ -1,12 +1,17 @@
 import {
   EMAIL_RECEIPT_DISPLAY_STATES,
   EMAIL_RECEIPT_STATUSES,
+  MAX_PARSER_DRAFT_DOMAINS,
+  MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
   PARSED_RECEIPT_REASONS,
+  RECEIPT_LINE_KINDS,
+  RECEIPT_LINK_OUTCOMES,
   type EmailReceiptDomainCount,
   type EmailReceiptListItem,
   type ParsedReceipt,
   type ParsedReceiptItem,
   type ParsedReceiptReason,
+  type ReceiptLinkReport,
 } from '@/types/email-receipts';
 
 /** A parsed receipt's amounts are integers in 1/10000 units (`decimal(20,4)`'s scale). */
@@ -41,6 +46,31 @@ function readItem(value: unknown): ParsedReceiptItem | null {
     amount,
     categoryId: readText(value.categoryId),
     ...(value.categorySource === 'ai' ? { categorySource: 'ai' as const } : {}),
+    ...(RECEIPT_LINE_KINDS.find((kind) => kind === value.kind) ? { kind: value.kind as ParsedReceiptItem['kind'] } : {}),
+    ...(readText(value.link) !== null ? { link: readText(value.link) as string } : {}),
+    ...(readText(value.instalment) !== null ? { instalment: readText(value.instalment) as string } : {}),
+  };
+}
+
+function readLinkReport(value: unknown): ReceiptLinkReport | null {
+  if (!isRecord(value)) return null;
+  const outcome = RECEIPT_LINK_OUTCOMES.find((o) => o === value.outcome);
+  const partAmount = readAmount(value.partAmount);
+  if (!outcome || partAmount === null) return null;
+  const componentNet = readAmount(value.componentNet);
+  const taken = readAmount(value.taken);
+  const several = readAmount(value.several);
+  const componentReason = PARSED_RECEIPT_REASONS.find((r) => r === value.componentReason);
+  return {
+    partIndex: readAmount(value.partIndex) ?? 0,
+    link: readText(value.link),
+    partAmount,
+    outcome,
+    componentReceiptId: readText(value.componentReceiptId),
+    ...(componentNet !== null ? { componentNet } : {}),
+    ...(taken !== null ? { taken } : {}),
+    ...(several !== null ? { several } : {}),
+    ...(componentReason ? { componentReason } : {}),
   };
 }
 
@@ -66,6 +96,11 @@ export function readParsedReceipt(value: unknown): ParsedReceipt | null {
       : [],
     shippingCategoryId: readText(value.shippingCategoryId),
     discountCategoryId: readText(value.discountCategoryId),
+    // Absent is "not a component / not a joined settlement"; an empty text is no key.
+    ...(value.linkKey === null || typeof value.linkKey === 'string' ? { linkKey: readText(value.linkKey) } : {}),
+    ...(Array.isArray(value.links)
+      ? { links: value.links.map(readLinkReport).filter((link): link is ReceiptLinkReport => link !== null) }
+      : {}),
     complete: value.complete === true,
     reason: reason ?? null,
     ...(value.source === 'ai' || value.source === 'parser' || value.source === 'schema_org' ? { source: value.source } : {}),
@@ -159,8 +194,8 @@ export function canRecognizeWithAi(receipt: Pick<EmailReceiptListItem, 'status' 
   return RECOGNIZABLE_STATES.includes(shownReceiptState(receipt));
 }
 
-/** States whose email "Draft parser with AI" is offered for: no parser read it, or the one that did could not. */
-const DRAFTABLE_STATES: readonly EmailReceiptShownState[] = ['no_parser', 'parse_failed'];
+/** States whose email "Draft parser with AI" is offered for: no parser read it, the one that did could not, or it is a component (a profile can be edited). */
+const DRAFTABLE_STATES: readonly EmailReceiptShownState[] = ['no_parser', 'parse_failed', 'component'];
 
 /** Whether the row's own "Draft parser with AI" action is offered for an email. */
 export function canDraftParser(receipt: Pick<EmailReceiptListItem, 'status' | 'displayState'>): boolean {
@@ -194,26 +229,49 @@ export function distinctSenderDomains(receipts: ReadonlyArray<Pick<EmailReceiptL
   return [...seen];
 }
 
+/** How many of some emails come from each sender domain, in the order the domains first appear. */
+export function senderDomainCounts(
+  receipts: ReadonlyArray<Pick<EmailReceiptListItem, 'fromDomain' | 'fromAddress'>>,
+): { domain: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const receipt of receipts) {
+    const domain = receipt.fromDomain || senderDomain(receipt.fromAddress);
+    if (domain !== '') counts.set(domain, (counts.get(domain) ?? 0) + 1);
+  }
+  return [...counts].map(([domain, count]) => ({ domain, count }));
+}
+
 /** Why "Prepare a profile with AI" is off for a selection, or `null` when it is on. */
-export type DraftBlock = 'tooMany' | 'differentSenders' | 'skipped' | 'mixedKinds' | 'allMatching';
+export type DraftBlock =
+  | 'tooManyPerDomain'
+  | 'tooManyDomains'
+  | 'tradeOneDomain'
+  | 'skipped'
+  | 'mixedKinds'
+  | 'allMatching';
 
 /**
- * Whether a selection can be drafted from: one to `max` emails, all from one
- * sender, none of them unreadable (a skipped email has no text to write a profile
- * from). `allMatching` is a selection by filter, not a list of emails a profile
- * could be read from. The first reason that applies is the one returned.
+ * Whether a selection can be drafted from: one to `MAX_PARSER_DRAFT_DOMAINS` sender
+ * domains with one to `MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN` emails each (the server's
+ * bounds), none of them unreadable (a skipped email has no text to write a profile
+ * from). A trade draft takes one domain. `allMatching` is a selection by filter, not
+ * a list of emails a profile could be read from. The first reason that applies is
+ * the one returned. A selection over several domains is allowed, but the caller
+ * confirms it first (`distinctSenderDomains(selected).length > 1`).
  */
 export function draftBlock(
   selected: ReadonlyArray<Pick<EmailReceiptListItem, 'status' | 'fromDomain' | 'fromAddress' | 'isTrade'>>,
-  max: number,
   allMatching: boolean,
 ): DraftBlock | null {
   if (allMatching) return 'allMatching';
-  if (selected.length > max) return 'tooMany';
+  const domains = senderDomainCounts(selected);
+  if (domains.some((entry) => entry.count > MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN)) return 'tooManyPerDomain';
+  if (domains.length > MAX_PARSER_DRAFT_DOMAINS) return 'tooManyDomains';
   if (selected.some((receipt) => receipt.status === 'skipped')) return 'skipped';
   // One profile reads one kind of email: trade confirmations and order emails are never drafted together.
-  if (parserDraftKind(selected) === 'mixed') return 'mixedKinds';
-  if (distinctSenderDomains(selected).length > 1) return 'differentSenders';
+  const kind = parserDraftKind(selected);
+  if (kind === 'mixed') return 'mixedKinds';
+  if (kind === 'trade' && domains.length > 1) return 'tradeOneDomain';
   return null;
 }
 

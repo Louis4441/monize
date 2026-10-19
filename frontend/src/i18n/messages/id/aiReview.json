@@ -57,7 +57,8 @@
     "waitingForAgent": "Menunggu agen AI. <link>Hubungkan penyedia AI di Pengaturan</link>, atau biarkan klien MCP mengambilnya.",
     "parserDraftReady": "Draf profil siap. <link>Uji dan setujui di pengaturan profil</link>.",
     "tradePending": "Transaksi dari email, belum dibaca",
-    "tradeEmail": "Surel konfirmasi perdagangan"
+    "tradeEmail": "Surel konfirmasi perdagangan",
+    "parserDraftIds": "ID draf profil: {ids}"
   },
   "actions": {
     "dismiss": "Abaikan"
