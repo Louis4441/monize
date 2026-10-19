@@ -65,31 +65,36 @@ export function ParsersSection({ wizardDomain = null, onWizardDomainChange, onOp
   // The approved profile and how many stored emails of its senders could be processed now.
   const [processOffer, setProcessOffer] = useState<{ parser: EmailReceiptParser; count: number } | null>(null);
   const { state: processState, run: runProcess, cancel: cancelProcess, dismiss: dismissProcess } = useProcessStoredEmails();
-  // A profile that ignores or deletes its emails offers to do so to the stored ones it matches.
-  const discardOffer = useProfileDiscardOffer(() => void load());
   // Only the newest load may write the list (a reload after a 409 must not be
   // overwritten by a slower answer to an earlier request).
   const latestLoad = useRef(0);
   // Bumped when the wizard finishes, so the cloud of uncovered domains is read again.
   const [uncoveredAttempt, setUncoveredAttempt] = useState(0);
 
-  const load = useCallback(async () => {
-    const request = ++latestLoad.current;
-    try {
-      const data = await emailReceiptsApi.parsers.list();
-      if (request !== latestLoad.current) return;
-      setParsers(data);
-      setLoadFailed(false);
-    } catch (error) {
-      if (request !== latestLoad.current) return;
-      logger.error(error);
-      setLoadFailed(true);
-    }
+  // The writes live in the inner `run`, so they happen after the request, not during the effect.
+  const load = useCallback(() => {
+    const run = async () => {
+      const request = ++latestLoad.current;
+      try {
+        const data = await emailReceiptsApi.parsers.list();
+        if (request !== latestLoad.current) return;
+        setParsers(data);
+        setLoadFailed(false);
+      } catch (error) {
+        if (request !== latestLoad.current) return;
+        logger.error(error);
+        setLoadFailed(true);
+      }
+    };
+    return run();
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // A profile that ignores or deletes its emails offers to do so to the stored ones it matches.
+  const discardOffer = useProfileDiscardOffer(() => void load());
 
   const payeeNames = useMemo(
     () => (lookups.status === 'ready' ? new Map(lookups.lookups.payees.map((p) => [p.value, p.label])) : null),

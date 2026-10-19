@@ -70,19 +70,23 @@ export function RulesManager() {
   // be overwritten by a slower answer to an earlier one.
   const latestLoad = useRef(0);
 
-  const load = useCallback(async () => {
-    const request = ++latestLoad.current;
-    try {
-      const data = await transactionRulesApi.getAll();
-      if (request !== latestLoad.current) return;
-      setRules(data);
-      setLoadFailed(false);
-    } catch (error) {
-      if (request !== latestLoad.current) return;
-      setLoadFailed(true);
-      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
-      logger.error(error);
-    }
+  // The writes live in the inner `run`, so they happen after the request, not during the effect.
+  const load = useCallback(() => {
+    const run = async () => {
+      const request = ++latestLoad.current;
+      try {
+        const data = await transactionRulesApi.getAll();
+        if (request !== latestLoad.current) return;
+        setRules(data);
+        setLoadFailed(false);
+      } catch (error) {
+        if (request !== latestLoad.current) return;
+        setLoadFailed(true);
+        toast.error(getErrorMessage(error, t('toasts.loadFailed')));
+        logger.error(error);
+      }
+    };
+    return run();
   }, [t]);
 
   useEffect(() => {

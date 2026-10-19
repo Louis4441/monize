@@ -94,13 +94,17 @@ export function NotificationPreferencesMatrix({
     };
   }, []);
 
-  const refreshDevices = useCallback(async () => {
-    const [rowsFromServer, fingerprint] = await Promise.all([
-      pushApi.listDevices(),
-      currentDeviceFingerprint().catch(() => null),
-    ]);
-    setDevices(rowsFromServer);
-    setThisDevice(fingerprint);
+  // The writes live in the inner `run`, so they happen after the request, not during the effect.
+  const refreshDevices = useCallback(() => {
+    const run = async () => {
+      const [rowsFromServer, fingerprint] = await Promise.all([
+        pushApi.listDevices(),
+        currentDeviceFingerprint().catch(() => null),
+      ]);
+      setDevices(rowsFromServer);
+      setThisDevice(fingerprint);
+    };
+    return run();
   }, []);
 
   useEffect(() => {
