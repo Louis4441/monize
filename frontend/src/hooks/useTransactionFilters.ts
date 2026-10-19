@@ -265,6 +265,11 @@ export function useTransactionFilters({ accounts, categories, payees, tags, week
 
     const queryString = params.toString();
     const newUrl = queryString ? `/transactions?${queryString}` : '/transactions';
+    // The page re-syncs on every load and data refresh, mostly to the URL it is
+    // already on. That is a server round trip for nothing, and when a full-page
+    // navigation cancels it Next falls back to a hard load of this page,
+    // aborting the navigation away.
+    if (newUrl === `${window.location.pathname}${window.location.search}`) return;
     if (push) {
       router.push(newUrl, { scroll: false });
     } else {
