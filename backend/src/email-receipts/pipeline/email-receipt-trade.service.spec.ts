@@ -244,6 +244,9 @@ describe("EmailReceiptTradeService.process", () => {
       "XCNS.%",
       "receipt-1",
       null,
+      // A buy is told apart by its shares; the amount is carried for a dividend.
+      true,
+      "2000",
     ]);
   });
 
