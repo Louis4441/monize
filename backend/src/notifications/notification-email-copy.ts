@@ -375,6 +375,39 @@ export function composeLocalizedNotificationCopy(
         },
         locale,
       });
+    case NotificationType.AI_REVIEW_PROPOSALS_READY: {
+      // Counts only: never the instruction, a payee, an amount or email text.
+      if (
+        !numbers(data, "count", "added") ||
+        !Number.isInteger(data.count) ||
+        !Number.isInteger(data.added) ||
+        data.count < 1 ||
+        data.added < 1
+      )
+        return null;
+      return pair("aiReview.readyTitle", "aiReview.readyMessage", {
+        count: number(data.count, 0),
+        added: number(data.added, 0),
+      });
+    }
+    case NotificationType.AI_REVIEW_PROPOSALS_EXPIRING: {
+      const earliest =
+        typeof data.earliestExpiresAt === "string"
+          ? new Date(data.earliestExpiresAt)
+          : null;
+      if (
+        !numbers(data, "count") ||
+        !Number.isInteger(data.count) ||
+        data.count < 1 ||
+        earliest === null ||
+        !Number.isFinite(earliest.getTime())
+      )
+        return null;
+      return pair("aiReview.expiringTitle", "aiReview.expiringMessage", {
+        count: number(data.count, 0),
+        date: dateLabel(earliest),
+      });
+    }
     case NotificationType.BILL_DUE: {
       const due = calendarDate(data.dueDate);
       if (

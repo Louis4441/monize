@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { isoToDatetimeLocal, resolveTimezone } from '@/lib/utils';
 import { benchmarkLabel } from '@/components/securities/detail/bond-labels';
 
 /** Shared display copy for bell rows and reminder templates, including legacy fallback. */
@@ -108,7 +109,7 @@ export function useNotificationCopy() {
   const t = useTranslations('notifications');
   const locale = useLocale();
   const { formatCurrency, formatNumber, formatPercent } = useNumberFormat();
-  const { formatDate } = useDateFormat();
+  const { formatDate, timezone } = useDateFormat();
   /**
    * A bill-due notification's headline, in the reader's language. `null` for anything
    * else -- and for an older row whose data predates these fields -- so the
@@ -723,6 +724,37 @@ export function useNotificationCopy() {
     }
   };
 
+  /**
+   * The AI review rows, composed from the producer's counts. The expiry date is an
+   * instant: it is shown as a calendar date in the reader's own timezone. A row
+   * without valid facts falls back to the stored English.
+   */
+  const aiReviewCopy = (notification: Notification, part: 'title' | 'message'): string | null => {
+    const data = notification.data ?? {};
+    const count = data.count;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) return null;
+    if (notification.type === 'AI_REVIEW_PROPOSALS_READY') {
+      const added = data.added;
+      if (typeof added !== 'number' || !Number.isInteger(added) || added < 1) return null;
+      return part === 'title' ? t('aiReview.readyTitle') : t('aiReview.readyMessage', { count, added });
+    }
+    if (notification.type === 'AI_REVIEW_PROPOSALS_EXPIRING') {
+      const expiresAt = data.earliestExpiresAt;
+      if (typeof expiresAt !== 'string') return null;
+      let day: string;
+      try {
+        day = isoToDatetimeLocal(expiresAt, resolveTimezone(timezone)).slice(0, 10);
+      } catch {
+        return null;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+      return part === 'title'
+        ? t('aiReview.expiringTitle')
+        : t('aiReview.expiringMessage', { count, date: formatDate(day) });
+    }
+    return null;
+  };
+
   return (notification: Notification) => ({
     title:
       priceCopy(notification, 'title') ??
@@ -733,6 +765,7 @@ export function useNotificationCopy() {
       balanceThresholdTitle(notification) ??
       bankSyncCopy(notification, 'title') ??
       emailReceiptsAttentionTitle(notification) ??
+      aiReviewCopy(notification, 'title') ??
       bondCopy(notification, 'title') ??
       notification.title,
     message:
@@ -744,6 +777,7 @@ export function useNotificationCopy() {
       balanceThresholdMessage(notification) ??
       bankSyncCopy(notification, 'message') ??
       emailReceiptsAttentionMessage(notification) ??
+      aiReviewCopy(notification, 'message') ??
       bondCopy(notification, 'message') ??
       notification.message,
   });

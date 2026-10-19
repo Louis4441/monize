@@ -385,7 +385,8 @@
         "BANK_SYNC": "Bank connections",
         "BANK_SYNC_ACTIVITY": "Bank sync results",
         "EMAIL_RECEIPTS": "Email receipts",
-        "BONDS": "Bonds"
+        "BONDS": "Bonds",
+        "AI_REVIEW": "AI review proposals"
       },
       "channelNotApplicable": "Not applicable for this notification type",
       "emailToggleLabel": "Report email for {category}",

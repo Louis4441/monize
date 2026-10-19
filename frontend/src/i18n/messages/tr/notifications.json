@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "E-posta makbuzları ilgilenilmesi gerekiyor",
     "message": "Makbuz gelen kutunuz {noParser} profil olmadan ve {parseFailed} ki profili tanımadığı içeriyor. Gözden geçirmek için açın."
+  },
+  "aiReview": {
+    "readyTitle": "Yapay zeka önerileri onayınızı bekliyor",
+    "readyMessage": "{count, plural, one {# yapay zeka önerisi} other {# yapay zeka önerisi}} onayınızı bekliyor, bunların {added} tanesi yeni. Onaylamak veya reddetmek için yapay zeka inceleme gelen kutusunu açın.",
+    "expiringTitle": "Yapay zeka önerilerinin süresi yakında doluyor",
+    "expiringMessage": "{count, plural, one {# yapay zeka önerisinin} other {# yapay zeka önerisinin}} süresi yakında doluyor. İlkinin süresi {date} tarihinde doluyor. Onaylamak veya reddetmek için yapay zeka inceleme gelen kutusunu açın."
   }
 }

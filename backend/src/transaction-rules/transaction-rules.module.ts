@@ -22,7 +22,9 @@ import { TransactionsModule } from "../transactions/transactions.module";
     TypeOrmModule.forFeature([TransactionRule, TransactionRuleApplication]),
     // forwardRef: TagsModule reaches back here through DelegationModule.
     forwardRef(() => TagsModule),
-    AiReviewModule,
+    // forwardRef: AiReviewModule imports NotificationsModule, which reaches
+    // this module back through ScheduledTransactionsModule.
+    forwardRef(() => AiReviewModule),
     ActionHistoryModule,
     // Name resolution for the assistant and MCP rule tools. forwardRef: both
     // modules reach this one back through TransactionsModule.

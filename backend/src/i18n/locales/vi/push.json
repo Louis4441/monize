@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Thông báo trái phiếu",
       "body": "Một trong các trái phiếu của bạn có tin mới. Mở Monize để xem chi tiết."
+    },
+    "ai_review": {
+      "title": "Đề xuất xem xét của AI",
+      "body": "Một số đề xuất xem xét của AI đang chờ quyết định của bạn. Mở Monize để xem chi tiết."
     }
   },
   "actions": {

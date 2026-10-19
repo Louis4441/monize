@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Tahvil bildirimi",
       "body": "Tahvillerinizden biriyle ilgili yeni bir gelişme var. Ayrıntılar için Monize uygulamasını açın."
+    },
+    "ai_review": {
+      "title": "Yapay zeka inceleme önerileri",
+      "body": "Bazı yapay zeka inceleme önerileri kararınızı bekliyor. Ayrıntılar için Monize'i açın."
     }
   },
   "actions": {

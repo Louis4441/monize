@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Obligatiemelding",
       "body": "Er is nieuws over een van je obligaties. Open Monize voor de details."
+    },
+    "ai_review": {
+      "title": "AI-beoordelingsvoorstellen",
+      "body": "Enkele AI-beoordelingsvoorstellen wachten op je beslissing. Open Monize voor de details."
     }
   },
   "actions": {

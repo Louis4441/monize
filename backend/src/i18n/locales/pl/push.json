@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Powiadomienie o obligacjach",
       "body": "Co najmniej jedna z Twoich obligacji ma nowe informacje. Otwórz Monize, aby zobaczyć szczegóły."
+    },
+    "ai_review": {
+      "title": "Propozycje przeglądu AI",
+      "body": "Część propozycji przeglądu AI czeka na Twoją decyzję. Otwórz Monize, aby zobaczyć szczegóły."
     }
   },
   "actions": {

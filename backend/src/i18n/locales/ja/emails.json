@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "メール領収書に注意が必要です",
       "message": "受信トレイには、プロファイルなしの{{ noParser }}とそのプロファイルが認識できなかった{{ parseFailed }}があります。確認のために開いてください。"
+    },
+    "aiReview": {
+      "readyTitle": "AIレビューの提案があなたを待っています",
+      "readyMessage": "判断待ちの提案: {{ count }}件。前回の通知以降の新規: {{ added }}件。開いて確認してください。",
+      "expiringTitle": "AIレビューの提案がまもなく期限切れになります",
+      "expiringMessage": "3日以内に期限切れになる提案: {{ count }}件。最初の期限は{{ date }}です。開いて確認してください。"
     }
   },
   "backupOffsite": {

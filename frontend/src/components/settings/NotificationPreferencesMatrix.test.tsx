@@ -173,6 +173,19 @@ describe('NotificationPreferencesMatrix', () => {
     );
   });
 
+  it('renders the AI_REVIEW row with all four channels', async () => {
+    list.mockResolvedValue([
+      { category: 'AI_REVIEW', email: true, emailNotification: true, push: true, unifiedpush: false, throttleMinutes: 0, supportedChannels: allChannels },
+    ]);
+    await renderMatrix();
+    expect(screen.getByText('AI review proposals')).toBeInTheDocument();
+    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    await act(async () => fireEvent.click(screen.getAllByRole('switch')[2]));
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith('AI_REVIEW', { push: false }),
+    );
+  });
+
   it('enables the UnifiedPush column only when a UnifiedPush device is live', async () => {
     listDevices.mockResolvedValue([liveDevice, liveUnifiedDevice]);
     await renderMatrix();

@@ -54,7 +54,11 @@ export type NotificationType =
   | 'BOND_RATE_RESET'
   | 'BOND_REDEMPTION_UNBOOKED'
   | 'BOND_BENCHMARK_PUBLISHED'
-  | 'BOND_DATA_MISSING';
+  | 'BOND_DATA_MISSING'
+  // AI review proposals waiting for approval (AI_REVIEW): counts and a date only,
+  // never the person's instruction.
+  | 'AI_REVIEW_PROPOSALS_READY'
+  | 'AI_REVIEW_PROPOSALS_EXPIRING';
 
 /** How urgent, and how it is drawn. */
 export type NotificationSeverity = 'info' | 'warning' | 'critical' | 'success';
@@ -96,7 +100,8 @@ export type NotificationCategory =
   | 'BANK_SYNC'
   | 'BANK_SYNC_ACTIVITY'
   | 'EMAIL_RECEIPTS'
-  | 'BONDS';
+  | 'BONDS'
+  | 'AI_REVIEW';
 
 export interface Notification {
   id: string;

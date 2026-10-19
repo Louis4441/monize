@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "Biên lai email cần chú ý",
       "message": "Hộp inbox biên lai của bạn chứa {{ noParser }} không có profil và {{ parseFailed }} mà profil của họ không nhận dạng được. Mở để xem xét."
+    },
+    "aiReview": {
+      "readyTitle": "Đề xuất xem xét của AI đang chờ bạn",
+      "readyMessage": "Số đề xuất đang chờ quyết định của bạn: {{ count }}. Mới kể từ thông báo trước: {{ added }}. Mở để xem xét.",
+      "expiringTitle": "Đề xuất xem xét của AI sắp hết hạn",
+      "expiringMessage": "Số đề xuất hết hạn trong vòng 3 ngày: {{ count }}. Đề xuất đầu tiên hết hạn vào {{ date }}. Mở để xem xét."
     }
   },
   "backupOffsite": {

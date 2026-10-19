@@ -52,6 +52,8 @@ const PINNED_DEFAULTS: Record<
   // Waiting receipts: the global rule until the user opts in to interruptions.
   [NotificationCategory.EMAIL_RECEIPTS]: GLOBAL_DEFAULT,
   [NotificationCategory.BONDS]: GLOBAL_DEFAULT,
+  // Proposals waiting for approval: the global rule.
+  [NotificationCategory.AI_REVIEW]: GLOBAL_DEFAULT,
 };
 
 describe("NotificationPreferenceService", () => {

@@ -79,6 +79,10 @@ export const PUSH_CATEGORY_COPY: Readonly<
     title: "Bond notice",
     body: "One of your bonds has news. Open Monize for the details.",
   },
+  [NotificationCategory.AI_REVIEW]: {
+    title: "AI review proposals",
+    body: "Some AI review proposals wait for your decision. Open Monize for the details.",
+  },
 };
 
 export interface NotifyOptions {

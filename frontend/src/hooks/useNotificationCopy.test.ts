@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { renderHook } from '@/test/render';
+import { describe, it, expect, afterEach } from 'vitest';
+import { cleanup, renderHook } from '@/test/render';
+import { usePreferencesStore } from '@/store/preferencesStore';
 import { useNotificationCopy } from './useNotificationCopy';
 
 type Row = { type: string; title: string; message: string; data: Record<string, unknown> };
@@ -236,5 +237,56 @@ describe('useNotificationCopy: bond notifications', () => {
     const copy = copyOf(row('BOND_INTEREST_PAYMENT', { seriesCode: 'COI1029' }));
     expect(copy.title).toBe('stored title');
     expect(copy.message).toBe('stored message');
+  });
+});
+
+describe('useNotificationCopy: AI review notifications', () => {
+  afterEach(() => {
+    // Unmount first: a store write re-renders a mounted hook outside act().
+    cleanup();
+    usePreferencesStore.setState({ preferences: null });
+  });
+
+  it.each([
+    ['Pacific/Auckland', '2026-11-06'],
+    ['UTC', '2026-11-05'],
+  ])('renders the expiry date in the reader timezone %s, not the server one', (timezone, day) => {
+    usePreferencesStore.setState({ preferences: { dateFormat: 'YYYY-MM-DD', timezone } as any });
+    const copy = copyOf(
+      row('AI_REVIEW_PROPOSALS_EXPIRING', { count: 1, earliestExpiresAt: '2026-11-05T23:30:00.000Z' }),
+    );
+    expect(copy.message).toContain(`expires on ${day}`);
+  });
+
+  it('AI_REVIEW_PROPOSALS_READY states the counts', () => {
+    const copy = copyOf(row('AI_REVIEW_PROPOSALS_READY', { count: 1, added: 1 }));
+    expect(copy.title).toBe('AI proposals wait for your approval');
+    expect(copy.message).toContain('1 AI proposal waits for your approval (1 new)');
+    const many = copyOf(row('AI_REVIEW_PROPOSALS_READY', { count: 1200, added: 2 }));
+    expect(many.message).toContain('1,200 AI proposals wait');
+  });
+
+  it('AI_REVIEW_PROPOSALS_EXPIRING states the count and the earliest date', () => {
+    const copy = copyOf(
+      row('AI_REVIEW_PROPOSALS_EXPIRING', { count: 2, earliestExpiresAt: '2026-11-05T12:00:00.000Z' }),
+    );
+    expect(copy.title).toBe('AI proposals expire soon');
+    expect(copy.message).toContain('2 AI proposals expire soon');
+    expect(copy.message).toMatch(/expires on .*2026/);
+  });
+
+  it('falls back to the stored English when the facts are missing or invalid', () => {
+    for (const [type, data] of [
+      ['AI_REVIEW_PROPOSALS_READY', {}],
+      ['AI_REVIEW_PROPOSALS_READY', { count: 3 }],
+      ['AI_REVIEW_PROPOSALS_READY', { count: 0, added: 0 }],
+      ['AI_REVIEW_PROPOSALS_EXPIRING', { count: 2 }],
+      ['AI_REVIEW_PROPOSALS_EXPIRING', { count: 2, earliestExpiresAt: 'not a date' }],
+      ['AI_REVIEW_PROPOSALS_EXPIRING', { count: '2', earliestExpiresAt: '2026-11-05T12:00:00.000Z' }],
+    ] as const) {
+      const copy = copyOf(row(type, { ...data }));
+      expect(copy.title).toBe('stored title');
+      expect(copy.message).toBe('stored message');
+    }
   });
 });

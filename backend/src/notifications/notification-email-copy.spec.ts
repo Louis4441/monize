@@ -155,6 +155,11 @@ const examples = {
     accounts: 2,
   },
   EMAIL_RECEIPTS_ATTENTION: { noParser: 3, parseFailed: 2 },
+  AI_REVIEW_PROPOSALS_READY: { count: 5, added: 2 },
+  AI_REVIEW_PROPOSALS_EXPIRING: {
+    count: 2,
+    earliestExpiresAt: "2026-10-21T08:15:00.000Z",
+  },
   BOND_MATURITY_SOON: {
     ...bondFacts,
     maturityDate: "2026-10-25",
@@ -270,6 +275,33 @@ describe("notification email copy", () => {
       expect(JSON.stringify(xx)).not.toMatch(/\{\{|undefined|NaN/);
     },
   );
+
+  describe("AI review notifications", () => {
+    const english = (type: NotificationType, data: Record<string, unknown>) =>
+      notificationEmailCopy(source(type, data), englishEmailT, "en", { now });
+
+    it("carries counts and the date only, never request text", () => {
+      const ready = english(NotificationType.AI_REVIEW_PROPOSALS_READY, {
+        ...examples.AI_REVIEW_PROPOSALS_READY,
+        instruction: "Pay Secret Payee 99.99 from the email",
+        payee: "Secret Payee",
+        amount: 99.99,
+        emailText: "Dear customer",
+      });
+      expect(ready.message).toContain("5");
+      expect(ready.message).toContain("2");
+      const expiring = english(NotificationType.AI_REVIEW_PROPOSALS_EXPIRING, {
+        ...examples.AI_REVIEW_PROPOSALS_EXPIRING,
+        instruction: "Pay Secret Payee 99.99 from the email",
+        payee: "Secret Payee",
+      });
+      expect(expiring.message).toContain("Oct 21, 2026");
+      const all = JSON.stringify([ready, expiring]);
+      expect(all).not.toMatch(
+        /Secret Payee|99\.99|Dear customer|Pay Secret|instruction/,
+      );
+    });
+  });
 
   describe("bond notifications", () => {
     const english = (type: NotificationType, data: Record<string, unknown>) =>
@@ -694,6 +726,16 @@ describe("notification email copy", () => {
     [
       NotificationType.EMAIL_RECEIPTS_ATTENTION,
       { noParser: 3, parseFailed: "2" },
+    ],
+    [NotificationType.AI_REVIEW_PROPOSALS_READY, { count: 5, added: "2" }],
+    [NotificationType.AI_REVIEW_PROPOSALS_READY, { count: 0, added: 0 }],
+    [
+      NotificationType.AI_REVIEW_PROPOSALS_EXPIRING,
+      { count: 2, earliestExpiresAt: "not a date" },
+    ],
+    [
+      NotificationType.AI_REVIEW_PROPOSALS_EXPIRING,
+      { count: 1.5, earliestExpiresAt: "2026-10-21T08:15:00.000Z" },
     ],
     [
       NotificationType.GEM_SIGNAL_CHANGED,

@@ -25,6 +25,11 @@ const WITH_CONTEXT_ALLOWLIST = [
   // belong to every user at once, from a cron with no request to inherit an
   // identity from -- system context by construction (task R4).
   "src/ai/relay/relay-sweeper.service.ts",
+  // AI review proposal notices: a system-context fan-out over users with open
+  // proposals (the hourly sweep's ready step, the daily expiring cron), then a
+  // per-user body (withUserContext) that dispatches. No request behind it
+  // (docs/specs/ai-review-notifications.md).
+  "src/ai-review/ai-review-notification.service.ts",
   // The AI review queue's hourly upkeep: expires open requests past expires_at
   // and releases stale claims, across every user's rows, from a cron with no
   // request to inherit an identity from -- system context by construction.

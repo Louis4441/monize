@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "이메일 영수증에 주의가 필요합니다",
       "message": "수신함에는 프로필이 없는 {{ noParser }}개와 프로필이 인식하지 못한 {{ parseFailed }}개가 있습니다. 검토하기 위해 열어주세요."
+    },
+    "aiReview": {
+      "readyTitle": "AI 검토 제안이 기다리고 있습니다",
+      "readyMessage": "결정을 기다리는 제안: {{ count }}건. 지난 알림 이후 새 제안: {{ added }}건. 열어서 검토하세요.",
+      "expiringTitle": "AI 검토 제안이 곧 만료됩니다",
+      "expiringMessage": "3일 이내에 만료되는 제안: {{ count }}건. 첫 번째 제안은 {{ date }}에 만료됩니다. 열어서 검토하세요."
     }
   },
   "backupOffsite": {

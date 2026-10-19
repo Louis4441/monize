@@ -22,6 +22,7 @@ export const NOTIFICATION_PREFERENCE_CATEGORIES: readonly NotificationCategory[]
     'BANK_SYNC_ACTIVITY',
     'EMAIL_RECEIPTS',
     'BONDS',
+    'AI_REVIEW',
   ];
 
 /**
@@ -63,6 +64,7 @@ export const NOTIFICATION_CATEGORY_CHANNELS: Record<
   BANK_SYNC_ACTIVITY: { email: false, emailNotification: true, push: true, unifiedpush: true },
   EMAIL_RECEIPTS: { email: true, emailNotification: true, push: true, unifiedpush: true },
   BONDS: { email: true, emailNotification: true, push: true, unifiedpush: true },
+  AI_REVIEW: { email: true, emailNotification: true, push: true, unifiedpush: true },
 };
 
 /**

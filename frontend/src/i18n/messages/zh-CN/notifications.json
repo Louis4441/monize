@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "电子邮件收据需要关注",
     "message": "您的收据收件箱包含 {noParser} 个没有个人资料的邮件和 {parseFailed} 个其个人资料未识别的邮件。打开以查看。"
+  },
+  "aiReview": {
+    "readyTitle": "AI 提案正在等待您的批准",
+    "readyMessage": "{count, plural, other {#条}} AI 提案正在等待您的批准，其中 {added} 条为新提案。打开 AI 审核收件箱以批准或忽略。",
+    "expiringTitle": "AI 提案即将到期",
+    "expiringMessage": "{count, plural, other {#条}} AI 提案即将到期。最早的一条将于 {date} 到期。打开 AI 审核收件箱以批准或忽略。"
   }
 }

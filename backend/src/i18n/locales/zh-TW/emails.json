@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "電子郵件收據需要關注",
       "message": "您的收據收件箱包含 {{ noParser }} 個沒有個人檔案的郵件和 {{ parseFailed }} 個其個人檔案未識別的郵件。打開以查閱。"
+    },
+    "aiReview": {
+      "readyTitle": "AI 審核提案正在等待您",
+      "readyMessage": "等待您決定的提案：{{ count }} 項。自上次通知以來新增：{{ added }} 項。開啟以審核。",
+      "expiringTitle": "AI 審核提案即將到期",
+      "expiringMessage": "3 天內到期的提案：{{ count }} 項。最早的一項於 {{ date }} 到期。開啟以審核。"
     }
   },
   "backupOffsite": {

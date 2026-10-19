@@ -82,6 +82,11 @@ export enum NotificationType {
   BOND_REDEMPTION_UNBOOKED = "BOND_REDEMPTION_UNBOOKED",
   BOND_BENCHMARK_PUBLISHED = "BOND_BENCHMARK_PUBLISHED",
   BOND_DATA_MISSING = "BOND_DATA_MISSING",
+  // Open AI review proposals wait for the person (AI_REVIEW category): the
+  // count grew (`air:ready:...` dedupe key), or proposals are 3 days from
+  // expiry (`air:exp:...`). See `docs/specs/ai-review-notifications.md`.
+  AI_REVIEW_PROPOSALS_READY = "AI_REVIEW_PROPOSALS_READY",
+  AI_REVIEW_PROPOSALS_EXPIRING = "AI_REVIEW_PROPOSALS_EXPIRING",
 }
 
 /**
@@ -145,6 +150,7 @@ export enum NotificationCategory {
   BANK_SYNC_ACTIVITY = "BANK_SYNC_ACTIVITY",
   EMAIL_RECEIPTS = "EMAIL_RECEIPTS",
   BONDS = "BONDS",
+  AI_REVIEW = "AI_REVIEW",
 }
 
 /**
@@ -182,6 +188,10 @@ export const BOND_NOTIFICATION_TYPES: readonly NotificationType[] = [
   NotificationType.BOND_REDEMPTION_UNBOOKED,
   NotificationType.BOND_BENCHMARK_PUBLISHED,
   NotificationType.BOND_DATA_MISSING,
+];
+export const AI_REVIEW_NOTIFICATION_TYPES: readonly NotificationType[] = [
+  NotificationType.AI_REVIEW_PROPOSALS_READY,
+  NotificationType.AI_REVIEW_PROPOSALS_EXPIRING,
 ];
 
 /**
@@ -232,6 +242,9 @@ export function notificationCategoryOf(
   }
   if (BOND_NOTIFICATION_TYPES.includes(type)) {
     return NotificationCategory.BONDS;
+  }
+  if (AI_REVIEW_NOTIFICATION_TYPES.includes(type)) {
+    return NotificationCategory.AI_REVIEW;
   }
   return NotificationCategory.BUDGETS;
 }

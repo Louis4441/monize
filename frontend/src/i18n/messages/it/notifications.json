@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "Le ricevute email richiedono attenzione",
     "message": "La cartella ricevute contiene {noParser} senza profilo e {parseFailed} che il loro profilo non ha riconosciuto. Apri per rivedere."
+  },
+  "aiReview": {
+    "readyTitle": "Proposte IA in attesa di approvazione",
+    "readyMessage": "{count, plural, one {# proposta IA attende} other {# proposte IA attendono}} la tua approvazione, di cui {added} nuove. Apri la casella di revisione IA per approvarle o rifiutarle.",
+    "expiringTitle": "Proposte IA in scadenza",
+    "expiringMessage": "{count, plural, one {# proposta IA scade} other {# proposte IA scadono}} a breve. La prima scade il {date}. Apri la casella di revisione IA per approvarle o rifiutarle."
   }
 }

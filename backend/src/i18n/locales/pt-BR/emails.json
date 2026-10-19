@@ -377,6 +377,12 @@
     "emailReceiptsAttention": {
       "title": "Recibos de e-mail precisam de atenção",
       "message": "Sua caixa de entrada de recibos contém {{ noParser }} sem perfil e {{ parseFailed }} que seu perfil não reconheceu. Abra para revisar."
+    },
+    "aiReview": {
+      "readyTitle": "Propostas de revisão de IA aguardam você",
+      "readyMessage": "Propostas aguardando sua decisão: {{ count }}. Novas desde o último aviso: {{ added }}. Abra para revisar.",
+      "expiringTitle": "Propostas de revisão de IA expiram em breve",
+      "expiringMessage": "Propostas que expiram em 3 dias: {{ count }}. A primeira expira em {{ date }}. Abra para revisar."
     }
   },
   "backupOffsite": {

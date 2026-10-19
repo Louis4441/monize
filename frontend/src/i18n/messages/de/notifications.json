@@ -191,5 +191,11 @@
   "emailReceiptsAttention": {
     "title": "E-Mail-Belege benötigen Aufmerksamkeit",
     "message": "Ihr Belegepostfach enthält {noParser} ohne Profil und {parseFailed}, die ihr Profil nicht erkannt hat. Öffnen Sie zur Prüfung."
+  },
+  "aiReview": {
+    "readyTitle": "KI-Vorschläge warten auf Ihre Freigabe",
+    "readyMessage": "{count, plural, one {# KI-Vorschlag wartet} other {# KI-Vorschläge warten}} auf Ihre Freigabe, davon {added} neu. Öffnen Sie den KI-Prüfeingang, um sie freizugeben oder abzulehnen.",
+    "expiringTitle": "KI-Vorschläge laufen bald ab",
+    "expiringMessage": "{count, plural, one {# KI-Vorschlag läuft} other {# KI-Vorschläge laufen}} bald ab. Der erste läuft am {date} ab. Öffnen Sie den KI-Prüfeingang, um sie freizugeben oder abzulehnen."
   }
 }

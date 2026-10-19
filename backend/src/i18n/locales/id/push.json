@@ -43,6 +43,10 @@
     "bonds": {
       "title": "Pemberitahuan obligasi",
       "body": "Salah satu obligasi Anda memiliki kabar baru. Buka Monize untuk melihat detailnya."
+    },
+    "ai_review": {
+      "title": "Usulan tinjauan AI",
+      "body": "Beberapa usulan tinjauan AI menunggu keputusan Anda. Buka Monize untuk melihat detailnya."
     }
   },
   "actions": {
