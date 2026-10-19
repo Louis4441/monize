@@ -124,6 +124,27 @@ const DATE_CELL = 'p-0 text-right text-xs whitespace-nowrap sm:table-cell sm:px-
  */
 type ExportSurface = 'csv' | 'pdf';
 
+interface BillPaymentTooltipProps {
+  active?: boolean;
+  payload?: Array<{ value: number }>;
+  label?: string;
+  formatCurrency: (value: number) => string;
+}
+
+function BillPaymentTooltip({ active, payload, label, formatCurrency }: BillPaymentTooltipProps) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100">{label}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {formatCurrency(payload[0].value)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function BillPaymentHistoryReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -274,20 +295,6 @@ export function BillPaymentHistoryReport() {
     });
   };
 
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100">{label}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {formatCurrency(payload[0].value)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (error) {
     return <ReportError onRetry={reload} />;
   }
@@ -396,7 +403,7 @@ export function BillPaymentHistoryReport() {
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={formatCurrencyAxis} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<BillPaymentTooltip formatCurrency={formatCurrency} />} />
                 <Bar dataKey="total" fill={chartColors.primary} name={t('billPaymentHistory.totalPaid')} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

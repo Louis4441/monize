@@ -77,11 +77,13 @@ vi.mock('recharts', () => ({
   YAxis: ({ tickFormatter }: any) => <div>{tickFormatter ? tickFormatter(1000) : ''}</div>,
   CartesianGrid: () => null,
   Tooltip: ({ content, formatter }: any) => {
-    // `content` is a React element (e.g. <CustomTooltip />); invoke its function
-    // component so the tooltip's render branches are exercised in tests.
+    // `content` is a React element (e.g. <NetWorthTooltip formatCurrency={...} />);
+    // invoke its function component with the element's own props, as Recharts
+    // does, so the tooltip's render branches are exercised in tests.
     const fn = typeof content === 'function' ? content : content?.type;
     if (typeof fn === 'function') {
-      try { fn({ active: true, payload: [{ value: 100, name: 'NetWorth', color: '#000', payload: { name: 'Jan', NetWorth: 100, Assets: 200, Liabilities: 100 } }] }); fn({ active: false, payload: [] }); } catch {}
+      const props = typeof content === 'function' ? {} : content?.props;
+      try { fn({ ...props, active: true, payload: [{ value: 100, name: 'NetWorth', color: '#000', payload: { name: 'Jan', NetWorth: 100, Assets: 200, Liabilities: 100 } }] }); fn({ ...props, active: false, payload: [] }); } catch {}
     }
     if (formatter) {
       try { formatter(100, 'NetWorth'); } catch {}

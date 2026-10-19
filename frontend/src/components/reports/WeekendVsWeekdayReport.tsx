@@ -39,6 +39,29 @@ interface DaySpendingDisplay {
   isWeekend: boolean;
 }
 
+interface WeekendVsWeekdayTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+  formatCurrency: (value: number) => string;
+}
+
+function WeekendVsWeekdayTooltip({ active, payload, label, formatCurrency }: WeekendVsWeekdayTooltipProps) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {formatCurrency(entry.value)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
+
 export function WeekendVsWeekdayReport() {
   const t = useTranslations('reports');
   const tc = useTranslations('common');
@@ -121,22 +144,6 @@ export function WeekendVsWeekdayReport() {
     { name: t('weekendVsWeekday.weekendLabel'), value: weekendTotal, color: WEEKEND_COLOR },
     { name: t('weekendVsWeekday.weekdayLabel'), value: weekdayTotal, color: WEEKDAY_COLOR },
   ];
-
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -336,7 +343,7 @@ export function WeekendVsWeekdayReport() {
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="day" />
                 <YAxis tickFormatter={formatCurrencyAxis} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<WeekendVsWeekdayTooltip formatCurrency={formatCurrency} />} />
                 <Bar dataKey="total" name={t('weekendVsWeekday.barTotalSpent')}>
                   {dayData.map((entry, index) => (
                     <Cell
@@ -378,7 +385,7 @@ export function WeekendVsWeekdayReport() {
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis type="number" tickFormatter={formatCurrencyAxis} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<WeekendVsWeekdayTooltip formatCurrency={formatCurrency} />} />
                 <Legend />
                 <Bar dataKey="weekendTotal" fill={WEEKEND_COLOR} name={t('weekendVsWeekday.barWeekend')} />
                 <Bar dataKey="weekdayTotal" fill={WEEKDAY_COLOR} name={t('weekendVsWeekday.barWeekday')} />

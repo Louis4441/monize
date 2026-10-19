@@ -82,6 +82,37 @@ interface ChartDataItem {
   monthEnd: string;
 }
 
+interface IncomeVsExpensesTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    color: string;
+    payload: { fullName: string; SavingsRate: number };
+  }>;
+  label?: string;
+  formatCurrency: (value: number) => string;
+  t: ReturnType<typeof useTranslations<'reports'>>;
+}
+
+function IncomeVsExpensesTooltip({ active, payload, formatCurrency, t }: IncomeVsExpensesTooltipProps) {
+  const data = payload?.[0]?.payload;
+  return (
+    <ChartTooltip
+      active={active}
+      label={data?.fullName}
+      payload={payload}
+      formatValue={(v) => formatCurrency(v)}
+    >
+      {data && (
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          {t('incomeVsExpenses.savingsRateTooltip', { rate: data.SavingsRate })}
+        </p>
+      )}
+    </ChartTooltip>
+  );
+}
+
 export function IncomeVsExpensesReport() {
   const t = useTranslations('reports');
   const formatChartDate = useChartDateFormat();
@@ -279,36 +310,6 @@ export function IncomeVsExpensesReport() {
         `/transactions?startDate=${item.monthStart}&endDate=${item.monthEnd}`,
       );
     }
-  };
-
-  const CustomTooltip = ({
-    active,
-    payload,
-  }: {
-    active?: boolean;
-    payload?: Array<{
-      name: string;
-      value: number;
-      color: string;
-      payload: { fullName: string; SavingsRate: number };
-    }>;
-    label?: string;
-  }) => {
-    const data = payload?.[0]?.payload;
-    return (
-      <ChartTooltip
-        active={active}
-        label={data?.fullName}
-        payload={payload}
-        formatValue={(v) => formatCurrency(v)}
-      >
-        {data && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {t('incomeVsExpenses.savingsRateTooltip', { rate: data.SavingsRate })}
-          </p>
-        )}
-      </ChartTooltip>
-    );
   };
 
   return (
@@ -520,7 +521,7 @@ export function IncomeVsExpensesReport() {
                     tickFormatter={formatCurrencyAxis}
                     tick={{ fontSize: 12 }}
                   />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<IncomeVsExpensesTooltip formatCurrency={formatCurrency} t={t} />} />
                   <Legend />
                   <ReferenceLine y={0} stroke={chartColors.axis} />
                   <Bar

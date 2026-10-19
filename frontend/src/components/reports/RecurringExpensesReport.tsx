@@ -205,6 +205,38 @@ function frequencyRank(frequency: string): number {
     : RECURRING_EXPENSE_FREQUENCIES.length;
 }
 
+interface RecurringExpenseTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: RecurringExpenseItem & { color: string } }>;
+  formatCurrency: (value: number) => string;
+  frequencyLabel: (frequency: string) => string;
+  t: ReturnType<typeof useTranslations<'reports'>>;
+}
+
+function RecurringExpenseTooltip({ active, payload, formatCurrency, frequencyLabel, t }: RecurringExpenseTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100">{data.payeeName}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {t('recurringExpenses.tooltipTransactions', {
+            count: data.occurrences,
+            frequency: frequencyLabel(data.frequency),
+          })}
+        </p>
+        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+          {t('recurringExpenses.tooltipTotal', { amount: formatCurrency(data.totalAmount) })}
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {t('recurringExpenses.tooltipAvg', { amount: formatCurrency(data.averageAmount) })}
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function RecurringExpensesReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -391,30 +423,6 @@ export function RecurringExpensesReport() {
     }
   };
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: RecurringExpenseItem & { color: string } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100">{data.payeeName}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {t('recurringExpenses.tooltipTransactions', {
-              count: data.occurrences,
-              frequency: frequencyLabel(data.frequency),
-            })}
-          </p>
-          <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-            {t('recurringExpenses.tooltipTotal', { amount: formatCurrency(data.totalAmount) })}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {t('recurringExpenses.tooltipAvg', { amount: formatCurrency(data.averageAmount) })}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (error) {
     return <ReportError onRetry={reload} />;
   }
@@ -531,7 +539,15 @@ export function RecurringExpensesReport() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip
+                    content={
+                      <RecurringExpenseTooltip
+                        formatCurrency={formatCurrency}
+                        frequencyLabel={frequencyLabel}
+                        t={t}
+                      />
+                    }
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

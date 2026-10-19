@@ -34,6 +34,28 @@ type SpendingPayeeSortField = 'name' | 'value' | 'percentage';
 
 type ChartDataItem = ChartDatum & { id: string };
 
+interface SpendingPayeeTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { name: string; value: number } }>;
+  totalExpenses: number;
+  formatCurrency: (value: number) => string;
+  formatPercent: (value: number, decimals?: number) => string;
+}
+
+function SpendingPayeeTooltip({ active, payload, totalExpenses, formatCurrency, formatPercent }: SpendingPayeeTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const percentage = totalExpenses > 0 ? (data.value / totalExpenses) * 100 : 0;
+  return (
+    <ChartTooltipPanel>
+      <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
+      <p className="text-gray-600 dark:text-gray-400">
+        {formatCurrency(data.value)} ({formatPercent(percentage, 1)})
+      </p>
+    </ChartTooltipPanel>
+  );
+}
+
 export function SpendingByPayeeReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -122,20 +144,6 @@ export function SpendingByPayeeReport() {
       const { start, end } = resolvedRange;
       router.push(`/transactions?payeeId=${payeeId}&startDate=${start}&endDate=${end}`);
     }
-  };
-
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number } }> }) => {
-    if (!active || !payload || !payload.length) return null;
-    const data = payload[0].payload;
-    const percentage = totalExpenses > 0 ? (data.value / totalExpenses) * 100 : 0;
-    return (
-      <ChartTooltipPanel>
-        <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
-        <p className="text-gray-600 dark:text-gray-400">
-          {formatCurrency(data.value)} ({formatPercent(percentage, 1)})
-        </p>
-      </ChartTooltipPanel>
-    );
   };
 
   return (
@@ -273,7 +281,7 @@ export function SpendingByPayeeReport() {
                     tickFormatter={formatCurrencyAxis}
                   />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<SpendingPayeeTooltip totalExpenses={totalExpenses} formatCurrency={formatCurrency} formatPercent={formatPercent} />} />
                   <Bar
                     dataKey="value"
                     cursor="pointer"

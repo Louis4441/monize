@@ -46,6 +46,28 @@ interface ChartDataItem {
   monthEnd: string;
 }
 
+interface CashFlowTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    color: string;
+    payload: { fullName: string };
+  }>;
+  formatCurrency: (value: number) => string;
+}
+
+function CashFlowTooltip({ active, payload, formatCurrency }: CashFlowTooltipProps) {
+  return (
+    <ChartTooltip
+      active={active}
+      label={payload?.[0]?.payload?.fullName}
+      payload={payload}
+      formatValue={(v) => formatCurrency(v)}
+    />
+  );
+}
+
 export function CashFlowReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -180,26 +202,6 @@ export function CashFlowReport() {
     router.push(`/transactions?${params.toString()}`);
   };
 
-  const CustomTooltip = ({
-    active,
-    payload,
-  }: {
-    active?: boolean;
-    payload?: Array<{
-      name: string;
-      value: number;
-      color: string;
-      payload: { fullName: string };
-    }>;
-  }) => (
-    <ChartTooltip
-      active={active}
-      label={payload?.[0]?.payload?.fullName}
-      payload={payload}
-      formatValue={(v) => formatCurrency(v)}
-    />
-  );
-
   // Loading and error render inside this tree, never as an early return: a
   // second tree unmounts the controls block and ejects focus from the date
   // field being typed into (issue #1201).
@@ -319,7 +321,7 @@ export function CashFlowReport() {
                 tickFormatter={formatCurrencyAxis}
                 tick={{ fontSize: 12 }}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CashFlowTooltip formatCurrency={formatCurrency} />} />
               <Legend />
               <ReferenceLine y={0} stroke={chartColors.axis} />
               <Bar

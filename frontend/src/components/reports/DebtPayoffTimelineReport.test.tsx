@@ -44,8 +44,8 @@ vi.mock('recharts', () => ({
       const C = content.type;
       return (
         <div data-testid="tooltip">
-          <C active={true} payload={[{ name: 'Remaining Balance', value: 100, color: '#000', dataKey: 'historicalBalance' }, { name: 'Remaining Balance', value: 100, color: '#000', dataKey: 'historicalBalance' }, { name: 'Other', value: undefined, color: '#000', dataKey: 'projectedBalance' }]} label="Jan 2024" />
-          <C active={false} payload={[]} label="" />
+          <C {...content.props} active={true} payload={[{ name: 'Remaining Balance', value: 100, color: '#000', dataKey: 'historicalBalance' }, { name: 'Remaining Balance', value: 100, color: '#000', dataKey: 'historicalBalance' }, { name: 'Other', value: undefined, color: '#000', dataKey: 'projectedBalance' }]} label="Jan 2024" />
+          <C {...content.props} active={false} payload={[]} label="" />
         </div>
       );
     }

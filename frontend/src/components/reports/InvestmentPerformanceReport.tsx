@@ -66,6 +66,28 @@ const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-performance-accounts';
 // largest holdings by market value, and a note says so.
 const PERFORMANCE_CHART_MAX_SECURITIES = 20;
 
+interface AllocationTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { name: string; value: number; percentage: number } }>;
+  formatCurrencyFull: (value: number) => string;
+  formatPlainPercent: (value: number, decimals?: number) => string;
+}
+
+function AllocationTooltip({ active, payload, formatCurrencyFull, formatPlainPercent }: AllocationTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {formatCurrencyFull(data.value)} ({formatPlainPercent(data.percentage, 1)})
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function InvestmentPerformanceReport() {
   const t = useTranslations('reports');
   const mainAccountName = useMainAccountName();
@@ -312,21 +334,6 @@ export function InvestmentPerformanceReport() {
       tableData: rows.length > 0 ? { headers, rows } : undefined,
       filename: 'investment-performance',
     });
-  };
-
-  const AllocationTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number; percentage: number } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {formatCurrencyFull(data.value)} ({formatPlainPercent(data.percentage, 1)})
-          </p>
-        </div>
-      );
-    }
-    return null;
   };
 
   if (error) {
@@ -646,7 +653,14 @@ export function InvestmentPerformanceReport() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip content={<AllocationTooltip />} />
+                  <Tooltip
+                    content={
+                      <AllocationTooltip
+                        formatCurrencyFull={formatCurrencyFull}
+                        formatPlainPercent={formatPlainPercent}
+                      />
+                    }
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
