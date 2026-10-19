@@ -19,7 +19,7 @@ approves it in the review inbox like any other proposal; an opt-in switch can
 apply it unattended, under a stricter gate than a receipt's.
 
 Cash dividends and reinvested dividends are read too, as `DIVIDEND` and
-`REINVEST` rows: [`../specs/email-receipt-dividend-trades.md`](../specs/email-receipt-dividend-trades.md).
+`REINVEST` rows: [`docs/specs/email-receipt-dividend-trades.md`](../specs/email-receipt-dividend-trades.md).
 Out of scope: splits, transfers, option and crypto confirmations; several fills
 in one email. A trade profile is written in the profile editor's form (a kind switch
 shows the trade fields, the account rules with their currency and the
