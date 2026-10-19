@@ -18,9 +18,10 @@ create**: account, buy or sell, security, shares, executed total, date. A person
 approves it in the review inbox like any other proposal; an opt-in switch can
 apply it unattended, under a stricter gate than a receipt's.
 
-Out of scope: dividends, reinvestments, splits, transfers, option and crypto
-confirmations (the reader knows `buy` and `sell` only); several fills in one
-email. A trade profile is written in the profile editor's form (a kind switch
+Cash dividends and reinvested dividends are read too, as `DIVIDEND` and
+`REINVEST` rows: [`../specs/email-receipt-dividend-trades.md`](../specs/email-receipt-dividend-trades.md).
+Out of scope: splits, transfers, option and crypto confirmations; several fills
+in one email. A trade profile is written in the profile editor's form (a kind switch
 shows the trade fields, the account rules with their currency and the
 currency markers), in its JSON mode, by the wizard or by the assistant.
 
@@ -94,9 +95,9 @@ only). The capture each takes: `action`, `symbol`, `quantity`, `date`, `account`
 
 | Field | Required | Meaning |
 |---|---|---|
-| `action` | yes | Text that names the direction: a word `buy`/`bought`/`achat` or `sell`/`sold`/`vente`/`vendu` (case-insensitive); both or neither is no reading |
+| `action` | yes | Text that names the direction: a word `buy`/`bought`/`achat` or `sell`/`sold`/`vente`/`vendu` (case-insensitive); both or neither is no reading. A reinvestment word (`reinvest`, `drip`, `réinvesti`...) reads `REINVEST`, else a dividend word (`dividend`, `distribution`, `dividende`) reads `DIVIDEND` (the dividend spec) |
 | `symbol` | yes | The ticker as the broker prints it |
-| `quantity` | yes | Shares, at most 8 decimals, in either decimal convention (`75.9878`, `75,9878`, `1,234.5`, `1.234,5`); a `,` followed by exactly three digits groups thousands |
+| `quantity` | no; a buy, a sell or a reinvestment reads none without it (`trade_no_quantity`) | Shares, at most 8 decimals, in either decimal convention (`75.9878`, `75,9878`, `1,234.5`, `1.234,5`); a `,` followed by exactly three digits groups thousands |
 | `total` or `price` | one of them | The executed total (commission included for a buy), or the average price per share (up to 8 decimals); a sign or parentheses on a total are dropped (a debit is still the total) |
 | `commission` | no | Commission; a buy's total includes it, a sell's proceeds are net of it |
 | `date` | no | `YYYY-MM-DD` (also of an ISO timestamp, or `YYYY/MM/DD`), `Month D, YYYY` or `D Month YYYY` in English or French, or a numeric day and month only when which is the day is certain; time and zone are ignored (the broker's own day). Without it, the day the email was sent (the shop's day for a forward) in the user's timezone |
@@ -113,8 +114,8 @@ rule's or a marker's `currency` that is not a 3-letter upper-case code); plus th
 
 ### 3.1 Reading and completeness
 
-`complete` is true only when the action, symbol, quantity and an amount were read
-and an account was decided. The first missing thing is the reason
+`complete` is true only when the action, symbol, quantity (none for a cash
+dividend) and an amount were read and an account was decided. The first missing thing is the reason
 (`trade_no_action`, `trade_no_symbol`, `trade_no_quantity`, `trade_no_amount`,
 `trade_no_account`, `trade_no_currency`), and the email is `parse_failed` with it.
 
@@ -293,7 +294,8 @@ agent can answer it.
 
 The mailbox switch (`auto_apply`) applies a trade only when ALL hold: the switch
 is on; the profile is `approved`; the reading is complete; `consistent` is
-`true` (a price was stated and agrees with the shares and the total); the card
+`true` (a price was stated and agrees with the shares and the total), or, for a
+cash dividend only, `null` (`tradeMayAutoApply`, the dividend spec section 6); the card
 was built (account and security resolved, preview valid); no trade of that
 description exists, accounted for or not. It then calls the same `/ai/actions/confirm` a person's
 approval calls. Anything else waits in the inbox. The daily AI write limit counts
