@@ -281,12 +281,13 @@ export class EmailReceiptTradeLinkService {
         },
       );
 
-      if (linked.security_id && tradeActionOf(linked.action) !== null) {
+      const linkedAction = tradeActionOf(linked.action);
+      if (linked.security_id && linkedAction !== null) {
         const occurrence =
           await this.scheduled.findInvestmentOccurrenceForTrade(userId, {
             accountId: linked.account_id,
             securityId: linked.security_id,
-            action: linked.action,
+            action: tradeInvestmentAction(linkedAction),
             date: linked.date,
             commission: Number(linked.commission ?? 0),
           });
