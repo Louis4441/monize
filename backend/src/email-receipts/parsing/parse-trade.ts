@@ -125,22 +125,24 @@ const DIVIDEND_WORDS = [
 
 /**
  * What the text says the trade is (English or French): a reinvested dividend
- * when it names a reinvestment ("Dividend reinvested", "DRIP purchase"), else a
- * cash dividend when it names a dividend or a distribution, else a buy or a
- * sell; null when it names none of them, or both a buy and a sell.
+ * when it names a reinvestment ("Dividend reinvested", "DRIP buy"); else a buy
+ * or a sell when it names exactly one of them, even beside a dividend word (a
+ * fund's name: "Bought 10 Vanguard High Dividend Yield"); else a cash dividend
+ * when it names a dividend or a distribution. Null when it names none of them,
+ * or both a buy and a sell.
  */
 export function parseTradeAction(text: string): ParsedTradeAction | null {
   const words = text.toLowerCase().split(/[^a-zà-ÿ]+/);
   if (REINVEST_WORDS.some((w) => words.includes(w))) return "REINVEST";
-  if (DIVIDEND_WORDS.some((w) => words.includes(w))) return "DIVIDEND";
   const buy = ["buy", "bought", "achat", "acheté", "achete"].some((w) =>
     words.includes(w),
   );
   const sell = ["sell", "sold", "vente", "vendu"].some((w) =>
     words.includes(w),
   );
-  if (buy === sell) return null;
-  return buy ? "BUY" : "SELL";
+  if (buy !== sell) return buy ? "BUY" : "SELL";
+  if (buy) return null;
+  return DIVIDEND_WORDS.some((w) => words.includes(w)) ? "DIVIDEND" : null;
 }
 
 /**
@@ -562,9 +564,9 @@ export function tradeExecutedTotalUnits(trade: ParsedTrade): number | null {
     (quantity8 * BigInt(trade.price) + 50_000_000n) / QUANTITY_UNITS;
   const commission = BigInt(trade.commission ?? 0);
   const total =
-    trade.action === "SELL" || trade.action === "DIVIDEND"
-      ? gross - commission
-      : gross + commission;
+    trade.action === null || commissionIsAdded(trade.action)
+      ? gross + commission
+      : gross - commission;
   return total < 0n ? null : Number(total);
 }
 
@@ -579,7 +581,11 @@ export function tradeExecutedTotalUnits(trade: ParsedTrade): number | null {
 export function tradeMayAutoApply(trade: ParsedTrade): boolean {
   if (!trade.complete) return false;
   if (trade.consistent === true) return true;
-  return trade.consistent === null && trade.action === "DIVIDEND";
+  return (
+    trade.consistent === null &&
+    trade.action !== null &&
+    !tradeActionMovesShares(trade.action)
+  );
 }
 
 /** The executed total as a decimal for the proposal: 1/10000 units to a number with at most 4 decimals. */

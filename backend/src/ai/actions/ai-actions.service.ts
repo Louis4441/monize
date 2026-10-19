@@ -1150,7 +1150,15 @@ export class AiActionsService {
         {
           transactionDate: descriptor.transactionDate,
           investmentQuantity: descriptor.quantity ?? undefined,
-          investmentPrice: descriptor.price ?? undefined,
+          // A card with no shares (a cash dividend that states only its
+          // amount) has no price per share either: its price is the whole
+          // amount. Beside the schedule's own shares it would store a row of
+          // shares times the amount, so the schedule's price stands and the
+          // total below is the fact.
+          investmentPrice:
+            descriptor.quantity === null
+              ? undefined
+              : (descriptor.price ?? undefined),
           description: descriptor.description ?? undefined,
         },
         {

@@ -3,6 +3,7 @@ import { isCalendarDate } from "../common/validators/is-calendar-date.validator"
 import type { PendingAiAction } from "../ai/actions/ai-action.types";
 import type { LlmTransactionRow } from "../transactions/transactions.service";
 import type { ReceiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
+import { tradeActionMovesShares } from "../email-receipts/parsing/receipt-parser.types";
 import { TRADE_ACTIONS, type TradeAction } from "./trade-action";
 import type {
   AiReviewRequestKind,
@@ -144,7 +145,7 @@ export const aiReviewAgentTradeSchema = z
     symbol: z.string().trim().min(1).max(30),
     quantity: z.coerce
       .number()
-      .min(1e-8)
+      .min(0)
       .max(1e12)
       .refine(hasAtMostDecimals(8))
       .nullish(),
@@ -172,9 +173,13 @@ export const aiReviewAgentTradeSchema = z
     description: z.string().trim().min(1).max(200).optional(),
   })
   .refine(
+    // Shares are required, and above zero, unless the trade moves none (a
+    // cash dividend, whose missing shares an agent may write as 0 or null).
     (trade) =>
-      trade.action === "DIVIDEND" ||
-      (trade.quantity !== undefined && trade.quantity !== null),
+      !tradeActionMovesShares(trade.action) ||
+      (trade.quantity !== undefined &&
+        trade.quantity !== null &&
+        trade.quantity >= 1e-8),
     {
       path: ["quantity"],
     },

@@ -62,13 +62,48 @@ describe("readTradeProposal", () => {
     expect(readTradeProposal(stored({ [field]: value }))).toBeNull();
   });
 
-  it("reads a reinvested dividend like a buy", () => {
+  it("reads a reinvested dividend like a buy, its total what its shares cost: its row stores none", () => {
     expect(
-      readTradeProposal(stored({ investmentAction: "REINVEST" }))?.action,
-    ).toBe("REINVEST");
+      readTradeProposal(
+        stored({
+          investmentAction: "REINVEST",
+          quantity: 0.3721,
+          price: 33.1631282,
+          commission: 0,
+          totalAmount: 0,
+        }),
+      ),
+    ).toMatchObject({
+      action: "REINVEST",
+      quantity: 0.3721,
+      totalAmount: 12.34,
+    });
     expect(
       readTradeProposal(stored({ investmentAction: "REINVEST", price: null })),
     ).toBeNull();
+  });
+
+  it("has no amount per share for a cash dividend with no shares, though the preview divides its amount by one", () => {
+    expect(
+      readTradeProposal(
+        stored({
+          investmentAction: "DIVIDEND",
+          quantity: null,
+          price: 12.34,
+          totalAmount: 12.34,
+        }),
+      ),
+    ).toMatchObject({ quantity: null, price: null, totalAmount: 12.34 });
+    expect(
+      readTradeProposal(
+        stored({
+          investmentAction: "DIVIDEND",
+          quantity: 100,
+          price: 0.1234,
+          totalAmount: 12.34,
+        }),
+      ),
+    ).toMatchObject({ quantity: 100, price: 0.1234 });
   });
 
   it("reads a cash dividend paid as one amount, with no shares and no price", () => {

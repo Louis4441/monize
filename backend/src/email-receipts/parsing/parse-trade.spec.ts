@@ -397,6 +397,13 @@ describe("trade value readers", () => {
     expect(parseTradeAction("Réinvestissement de dividendes")).toBe("REINVEST");
     // A word that merely starts like one is not it.
     expect(parseTradeAction("Dividendary")).toBeNull();
+    // A buy or a sell of a fund whose name holds a dividend word is that buy
+    // or sell, never a dividend an approved buy profile starts to book.
+    expect(
+      parseTradeAction("Bought 10 shares of Vanguard High Dividend Yield ETF"),
+    ).toBe("BUY");
+    expect(parseTradeAction("Sold Monthly Distribution Fund")).toBe("SELL");
+    expect(parseTradeAction("Dividend buy sell")).toBeNull();
   });
 
   it("reads the broker's local day and ignores the time", () => {

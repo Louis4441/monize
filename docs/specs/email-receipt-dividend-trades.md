@@ -38,10 +38,14 @@ the `{action}` capture into words and looks for them in this order:
    French `réinvesti`, `réinvestissement`, and the unaccented forms) gives
    `REINVEST`, even when the text also says "dividend" or "buy" ("Dividend
    reinvested", "DRIP buy").
-2. A dividend word (`dividend`, `dividends`, `distribution`, `distributions`,
-   `dividende`, `dividendes`) gives `DIVIDEND`.
-3. Otherwise buy and sell work as before. Both or neither is no reading
-   (`trade_no_action`).
+2. Exactly one of a buy word and a sell word gives `BUY` or `SELL`, as before,
+   even beside a dividend word. A fund's name can hold one ("Bought 10 Vanguard
+   High Dividend Yield ETF"), and an approved buy profile must not start
+   booking such buys as dividend income. Both a buy and a sell word give no
+   reading.
+3. Otherwise a dividend word (`dividend`, `dividends`, `distribution`,
+   `distributions`, `dividende`, `dividendes`) gives `DIVIDEND`. None of them is
+   no reading (`trade_no_action`).
 
 A word has to match exactly, so "Dividendary" is not a dividend.
 
@@ -105,6 +109,27 @@ the amount.
 
 `tradeMatchesOnQuantity` in `backend/src/ai-review/trade-action.ts` decides
 which comparison an action uses.
+
+A broker on a DRIP may send one email for the payout and one for the shares it
+bought. So when a `DIVIDEND` or `REINVEST` email finds no match of its own
+action, a same-day row of the other action for that account and security sets
+`anyMatch`. The email is still proposed, but it never auto-applies.
+
+## 5.1 A reinvestment's figures
+
+A `REINVEST` row carries no cash total: `deriveInvestmentTotal` gives 0 and a
+supplied total is ignored. `create()` also refuses it without a price above
+zero. So the card is previewed with the price the email's total implies,
+`(total - commission) / shares` at ten decimals (`tradeCardAmounts`), and with
+no total. The receipt detail and the booked-row summary show what it cost, its
+shares at its price plus the commission (`TRADE_ROW_AMOUNT_SQL` in
+`trade-ledger.ts`).
+
+A cash dividend with no share count is previewed with price = total, because
+`derivePriceFromTotal` divides by `quantity || 1`. `readTradeProposal` therefore
+reports its price as `null`, so no amount per share is shown. When such a card
+posts a matched dividend schedule, it leaves the schedule's own shares and price
+in place, and its total is the fact.
 
 ## 6. The auto-apply gate
 

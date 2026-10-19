@@ -1726,6 +1726,64 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
       );
     });
 
+    it("previews a reinvestment at the price its total implies, as its row carries no cash total", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: {
+          ...agentTrade,
+          action: "REINVEST",
+          quantity: 0.5,
+          totalAmount: 12.34,
+          commission: 0.34,
+        },
+      });
+      const [, input] =
+        h.investments.previewCreateInvestmentTransaction.mock.calls[0];
+      expect(input).toMatchObject({
+        action: "REINVEST",
+        quantity: 0.5,
+        price: 24,
+        commission: 0.34,
+      });
+      expect(input.totalAmount).toBeUndefined();
+    });
+
+    it("takes an agent's 0 shares of a cash dividend as none", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: {
+          ...agentTrade,
+          action: "DIVIDEND",
+          quantity: 0,
+          totalAmount: 5,
+        },
+      });
+      const [, input] =
+        h.investments.previewCreateInvestmentTransaction.mock.calls[0];
+      expect(input.quantity).toBeUndefined();
+      expect(input.totalAmount).toBe(5);
+    });
+
     it("refuses the trade field on an ordinary request", async () => {
       const h = tradeSetup();
       h.requests.getForUser.mockResolvedValue(request());

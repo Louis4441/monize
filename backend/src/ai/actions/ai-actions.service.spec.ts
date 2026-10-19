@@ -1201,6 +1201,28 @@ describe("AiActionsService", () => {
       );
     });
 
+    it("posts a dividend schedule from a card with no shares without the card's price, which is the whole amount", async () => {
+      const SCHEDULE = "80000000-0000-4000-8000-000000000001";
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({
+            aiReviewRequestId: TRADE_REQUEST,
+            action: InvestmentAction.DIVIDEND,
+            quantity: null,
+            price: 12.34,
+            totalAmount: 12.34,
+            scheduledTransactionId: SCHEDULE,
+            scheduledDueDate: "2026-10-16",
+          }),
+        ),
+      );
+      const [, , postDto, options] = scheduled.post.mock.calls[0];
+      expect(postDto.investmentQuantity).toBeUndefined();
+      expect(postDto.investmentPrice).toBeUndefined();
+      expect(options.investmentFigures.totalAmount).toBe(12.34);
+    });
+
     it("posts the schedule with the card's executed total and rate, and returns the row the post created", async () => {
       const SCHEDULE = "80000000-0000-4000-8000-000000000001";
       scheduled.post.mockImplementation(

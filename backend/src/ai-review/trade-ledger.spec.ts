@@ -130,6 +130,43 @@ describe("findTradeInLedger", () => {
     ]);
   });
 
+  it("counts the same day's reinvestment of a dividend as a match, so a DRIP's payout email never auto-applies beside it", async () => {
+    const m = {
+      query: jest.fn(async (sql: string) =>
+        String(sql).includes("claimed") ? [] : [{ id: "it-drip" }],
+      ),
+    };
+    await expect(
+      findTradeInLedger(
+        m as never,
+        USER,
+        { ...trade, action: "DIVIDEND", quantity: null, securityId: "sec-1" },
+        "r-1",
+      ),
+    ).resolves.toEqual({ unclaimedId: null, anyMatch: true });
+    const [, params] = m.query.mock.calls[1] as unknown as [string, unknown[]];
+    expect(params).toEqual([
+      USER,
+      "acc-1",
+      "REINVEST",
+      "2026-10-15",
+      null,
+      null,
+      "sec-1",
+    ]);
+  });
+
+  it("asks for no payout twin of a buy", async () => {
+    const m = manager();
+    await findTradeInLedger(
+      m as never,
+      USER,
+      { ...trade, symbol: "XCNS" },
+      null,
+    );
+    expect(m.query).toHaveBeenCalledTimes(1);
+  });
+
   it("a dividend email stating the shares still compares the amount, not a share count the ledger may not hold", async () => {
     const m = manager();
     await findTradeInLedger(

@@ -32,6 +32,7 @@ import {
 } from "./dto/email-receipts.dto";
 import { describeFailure } from "../pipeline/receipt-failure";
 import { RECEIPT_TRADE_CHAT_INSTRUCTIONS } from "../pipeline/receipt-instructions";
+import { TRADE_ROW_AMOUNT_SQL } from "../../ai-review/trade-ledger";
 import { readTradeProposal } from "./email-receipt-trade-proposal";
 import { bulkActOnReceipts, refuseTooManyIds } from "./receipt-bulk";
 import {
@@ -205,7 +206,7 @@ const ITEM_COLUMNS = `r.id, r.from_address, r.from_domain, r.subject, r.received
        it.id AS inv_id,
        TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS inv_date,
        it.action AS inv_action, its.symbol AS inv_symbol,
-       it.quantity AS inv_quantity, it.total_amount AS inv_total,
+       it.quantity AS inv_quantity, ${TRADE_ROW_AMOUNT_SQL} AS inv_total,
        its.currency_code AS inv_currency`;
 
 const ITEM_JOINS = `FROM email_receipts r

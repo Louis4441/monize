@@ -11,7 +11,10 @@ import {
   tradeActionOf,
   tradeInvestmentAction,
 } from "../../ai-review/trade-action";
-import { emailDayOfUser } from "../../ai-review/trade-ledger";
+import {
+  emailDayOfUser,
+  TRADE_ROW_AMOUNT_SQL,
+} from "../../ai-review/trade-ledger";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { tr } from "../../i18n/translate";
@@ -97,7 +100,7 @@ export class EmailReceiptTradeLinkService {
     }>(
       await m.query(
         `SELECT it.id, TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS date,
-                it.total_amount, s.currency_code, s.symbol, it.quantity,
+                ${TRADE_ROW_AMOUNT_SQL} AS total_amount, s.currency_code, s.symbol, it.quantity,
                 it.description
            FROM investment_transactions it
            JOIN securities s ON s.id = it.security_id

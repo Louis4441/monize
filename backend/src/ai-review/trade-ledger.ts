@@ -4,7 +4,21 @@ import { todayInTimezone } from "../common/date-utils";
 import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
 import { escapeLikePattern } from "../transactions/transaction-search.util";
 import type { AiReviewTradeInput } from "./ai-review-work.types";
-import { tradeInvestmentAction, tradeMatchesOnQuantity } from "./trade-action";
+import {
+  tradeInvestmentAction,
+  tradeMatchesOnQuantity,
+  type TradeAction,
+} from "./trade-action";
+
+/**
+ * What an investment transaction row `it` came to, as a trade email states it:
+ * its total, except a reinvestment's, whose row carries no cash total, so its
+ * shares at its price plus the commission.
+ */
+export const TRADE_ROW_AMOUNT_SQL = `CASE WHEN it.action = 'REINVEST'
+            THEN ROUND(COALESCE(it.quantity, 0) * COALESCE(it.price, 0)
+                       + COALESCE(it.commission, 0), 4)
+            ELSE it.total_amount END`;
 
 /** What the ledger already holds of one trade. */
 export interface TradeLedgerMatch {
@@ -16,10 +30,18 @@ export interface TradeLedgerMatch {
   /**
    * Whether any matching row exists, accounted for or not. A second identical
    * fill on the same day is proposed, but only a person approves it: the
-   * auto-apply gate requires none.
+   * auto-apply gate requires none. A dividend counts the same day's
+   * reinvestment of that security too, and the other way round: a broker on a
+   * DRIP may send one email for the payout and one for the shares it bought.
    */
   anyMatch: boolean;
 }
+
+/** The other way a broker reports one dividend payout. */
+const PAYOUT_COUNTERPART: Partial<Record<TradeAction, TradeAction>> = {
+  DIVIDEND: "REINVEST",
+  REINVEST: "DIVIDEND",
+};
 
 /**
  * The investment transactions with this trade's account, action, day and
@@ -84,9 +106,39 @@ export async function findTradeInLedger(
       ],
     ),
   );
+  const counterpart = PAYOUT_COUNTERPART[trade.action];
+  const payoutTwin =
+    rows.length === 0 && counterpart !== undefined
+      ? returnedRows<{ id: string }>(
+          await m.query(
+            `SELECT it.id
+               FROM investment_transactions it
+               JOIN securities s ON s.id = it.security_id
+              WHERE it.user_id = $1
+                AND it.account_id = $2
+                AND it.action = $3
+                AND it.transaction_date = $4::date
+                AND it.status != 'VOID'
+                AND (it.security_id = $7::uuid
+                     OR ($7::uuid IS NULL
+                         AND (LOWER(s.symbol) = LOWER($5::text)
+                              OR LOWER(s.symbol) LIKE LOWER($6::text))))
+              LIMIT 1`,
+            [
+              userId,
+              trade.accountId,
+              tradeInvestmentAction(counterpart),
+              trade.date,
+              bySecurity ? null : trade.symbol,
+              bySecurity ? null : `${escapeLikePattern(trade.symbol)}.%`,
+              bySecurity ? trade.securityId : null,
+            ],
+          ),
+        ).length > 0
+      : false;
   return {
     unclaimedId: rows.find((row) => !row.claimed)?.id ?? null,
-    anyMatch: rows.length > 0,
+    anyMatch: rows.length > 0 || payoutTwin,
   };
 }
 

@@ -154,7 +154,7 @@ function buildTradePrompt(
       .join(
         ", ",
       )}]. Each email reports its trade (complete, and consistent when it states the shares, the price and the total; a cash dividend that states only its amount is complete with consistent null). Map the account text the emails print (for example RRSP) to the matching investment account id with accountRules; when two accounts share that text in different currencies (an RRSP in CAD and one in USD), give each its own rule with its currency, and add currencyMarkers when the emails name the currency only in words. If the emails print no account, use defaultAccountId and say so in your answer.`,
-    "3. Fix the definition and test again until every sample is complete and none is inconsistent (allComplete true). Add requireLine with a line the confirmations always hold so the profile does not read other mail from the sender.",
+    "3. Fix the definition and test again until every sample is complete (allComplete true) and none reads consistent false (allComplete does not check it). Add requireLine with a line the confirmations always hold so the profile does not read other mail from the sender.",
     revision
       ? `4. Then operation save_draft with parserId "${revision.parserId}" and expectedRevision ${revision.revision}, so the existing draft is UPDATED. fromDomains: ["${domain}"].`
       : `4. Then operation save_draft once (a name, fromDomains ["${domain}"], the definition). It stores a DRAFT the person reviews and approves; never say it was applied.`,

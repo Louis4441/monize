@@ -27,7 +27,7 @@ import { EmailReceipt } from "../email-receipts/entities/email-receipt.entity";
 import { receiptInstructionKey } from "../email-receipts/pipeline/receipt-instructions";
 import { AiReviewRequest } from "./ai-review-request.entity";
 import { AiReviewRequestsService } from "./ai-review-requests.service";
-import { tradeInvestmentAction } from "./trade-action";
+import { tradeCardAmounts, tradeInvestmentAction } from "./trade-action";
 import { emailDayOfUser, findTradeInLedger } from "./trade-ledger";
 import {
   AI_REVIEW_EMAIL_TEXT_MAX_CHARS,
@@ -672,8 +672,7 @@ export class AiReviewWorkService {
           action,
           transactionDate: trade.date,
           securityQuery: resolved.match.symbol,
-          quantity: trade.quantity ?? undefined,
-          totalAmount: trade.totalAmount,
+          ...tradeCardAmounts(trade),
           commission: trade.commission,
           ...(scheduled?.fundingAccountId
             ? { fundingAccountId: scheduled.fundingAccountId }
@@ -750,7 +749,13 @@ export class AiReviewWorkService {
       accountId: resolved.match.id,
       action: agent.action,
       symbol: agent.symbol.trim(),
-      quantity: agent.quantity ?? null,
+      // An agent may write a cash dividend's missing shares as 0.
+      quantity:
+        agent.quantity !== undefined &&
+        agent.quantity !== null &&
+        agent.quantity > 0
+          ? agent.quantity
+          : null,
       totalAmount: agent.totalAmount,
       commission: agent.commission ?? 0,
       date,

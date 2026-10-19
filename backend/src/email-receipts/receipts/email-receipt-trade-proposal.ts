@@ -1,4 +1,6 @@
 import { tradeActionOf } from "../../ai-review/trade-action";
+import { roundMoney } from "../../common/round.util";
+import { tradeActionMovesShares } from "../parsing/receipt-parser.types";
 import type { EmailReceiptTradeProposal } from "./email-receipt.view";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -15,7 +17,11 @@ const text = (value: unknown): string | null =>
  * holds, read from the card's preview, the figures the confirmation shows and
  * the commit writes. Null when the proposal is absent or any figure the reader
  * needs is missing or malformed: a partial trade is not shown as a trade. A cash
- * dividend may carry no share count and no price (it was paid as one amount).
+ * dividend may carry no share count and no price (it was paid as one amount);
+ * one with no shares has no amount per share either, though the preview's
+ * price is then the whole amount (`derivePriceFromTotal` divides by 1). A
+ * reinvestment's row carries no cash total, so its total is what it cost: its
+ * shares at its price plus the commission.
  */
 export function readTradeProposal(
   proposal: unknown,
@@ -38,22 +44,26 @@ export function readTradeProposal(
     date === null ||
     symbol === null ||
     currencyCode === null ||
-    (action !== "DIVIDEND" && (quantity === null || price === null)) ||
+    (tradeActionMovesShares(action) && (quantity === null || price === null)) ||
     totalAmount === null ||
     commission === null
   ) {
     return null;
   }
+  const shares = quantity !== null && quantity > 0 ? quantity : null;
   return {
     accountName,
     date,
     action,
     symbol,
     securityName: text(preview.securityName),
-    quantity,
-    price,
+    quantity: tradeActionMovesShares(action) ? quantity : shares,
+    price: tradeActionMovesShares(action) || shares !== null ? price : null,
     commission,
-    totalAmount,
+    totalAmount:
+      action === "REINVEST" && quantity !== null && price !== null
+        ? roundMoney(quantity * price + commission)
+        : totalAmount,
     currencyCode,
   };
 }
