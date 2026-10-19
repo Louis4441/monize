@@ -19,6 +19,7 @@ const request = (over: Record<string, unknown> = {}) => ({
 describe("McpAiReviewTools", () => {
   let tool: McpAiReviewTools;
   let work: Record<string, jest.Mock>;
+  let relayService: { emitPendingAction: jest.Mock };
   let ctx: McpTestContext;
   let config: any;
   let handler: (...args: any[]) => any;
@@ -34,7 +35,8 @@ describe("McpAiReviewTools", () => {
       submit: jest.fn(),
       reject: jest.fn(),
     };
-    tool = new McpAiReviewTools(work as never);
+    relayService = { emitPendingAction: jest.fn().mockResolvedValue(false) };
+    tool = new McpAiReviewTools(work as never, relayService as never);
     const server = {
       registerTool: jest.fn((_name, opts, h) => {
         config = opts;
@@ -208,6 +210,74 @@ describe("McpAiReviewTools", () => {
       expect(out.proposal.splits).toEqual(lines);
       // The signed descriptor never reaches the model.
       expect(JSON.stringify(out)).not.toContain("signature");
+    });
+
+    describe("web chat relay", () => {
+      const action = {
+        preview: { splits: lines },
+        descriptor: { signature: "no" },
+      };
+      beforeEach(() => {
+        work.submit.mockResolvedValue({
+          request: request({ status: "proposed" }),
+          action,
+        });
+      });
+
+      it("offers the card to the web chat on a relay turn and says so", async () => {
+        relayService.emitPendingAction.mockResolvedValue(true);
+
+        const result = await call({
+          operation: "submit",
+          requestId: REQ,
+          splits: lines,
+        });
+
+        expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
+        expect(relayService.emitPendingAction).toHaveBeenCalledWith(
+          "u1",
+          action,
+          // The ambient caller key is seeded by the transport, not this spec.
+          undefined,
+        );
+        const out = result.structuredContent;
+        expect(out.status).toBe("proposed");
+        expect(out.request.id).toBe(REQ);
+        expect(out.proposal.splits).toEqual(lines);
+        expect(out.message).toMatch(/web chat/);
+        expect(out.message).toMatch(/review inbox/);
+        expect(JSON.stringify(out)).not.toContain("signature");
+      });
+
+      it("keeps the plain result when this is not a relay turn", async () => {
+        relayService.emitPendingAction.mockResolvedValue(false);
+
+        const result = await call({
+          operation: "submit",
+          requestId: REQ,
+          splits: lines,
+        });
+
+        expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
+        expect(result.structuredContent.message).toMatch(/Nothing was changed/);
+        expect(result.structuredContent.message).not.toMatch(/web chat/);
+      });
+
+      it("does not offer the card on a retry round", async () => {
+        relayService.emitPendingAction.mockResolvedValue(true);
+        ctx = mcpTestCtx(
+          { userId: "u1", scopes: "read,write" },
+          { requestState: { round: 2 } },
+        );
+
+        const result = await handler(
+          { operation: "submit", requestId: REQ, splits: lines },
+          ctx,
+        );
+
+        expect(relayService.emitPendingAction).not.toHaveBeenCalled();
+        expect(result.structuredContent.message).toMatch(/Nothing was changed/);
+      });
     });
 
     it("passes a trade answer on untouched and returns the investment card's preview", async () => {

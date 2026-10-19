@@ -130,7 +130,15 @@ export function AiReviewRow({
                 {item.emailReceipt
                   ? t('row.emailReceipt', { subject: item.emailReceipt.subject, sender: item.emailReceipt.fromAddress })
                   : t('row.emailReceiptMissing')}{' '}
-                <Link href="/email-receipts?tab=emails" className="text-blue-600 hover:underline dark:text-blue-400">
+                {/* The email's own detail when it still exists; the list when it was deleted. */}
+                <Link
+                  href={
+                    item.emailReceipt
+                      ? `/email-receipts?tab=emails&email=${encodeURIComponent(item.emailReceipt.id)}`
+                      : '/email-receipts?tab=emails'
+                  }
+                  className="text-blue-600 hover:underline dark:text-blue-400"
+                >
                   {t('row.viewEmailReceipts')}
                 </Link>
               </>
