@@ -246,6 +246,15 @@ export function PostTransactionDialog({
     [postFxFeePercent],
   );
 
+  // A new occurrence starts from the looked-up rate, not one the user derived
+  // for the last. Declared ahead of the lookup below so that lookup already
+  // sees the cleared flag when the dialog opens.
+  useEffect(() => {
+    if (isOpen) {
+      rateOverriddenRef.current = false;
+    }
+  }, [isOpen, scheduledTransaction]);
+
   // Re-fetch the rate whenever the posting date changes, debounced.
   //
   // The debounce is not cosmetic. Stepping the date with the arrow keys fires a
@@ -299,11 +308,19 @@ export function PostTransactionDialog({
   ]);
 
   // Keep the account-currency amount (what the balance preview and the split
-  // editor work in) in step with the foreign amount and the fetched rate.
-  useEffect(() => {
-    if (!isForeignPosting || postFxRate == null) return;
-    setAmount(convertForeign(foreignAmount, postFxRate).total);
-  }, [isForeignPosting, foreignAmount, postFxRate, convertForeign]);
+  // editor work in) in step with the foreign amount and the fetched rate. The
+  // "info from previous render" pattern rather than a setState in an effect.
+  const amountInputs = [isForeignPosting, foreignAmount, postFxRate, convertForeign] as const;
+  const [amountSyncedFor, setAmountSyncedFor] = useState<typeof amountInputs | null>(null);
+  if (
+    amountSyncedFor === null ||
+    amountInputs.some((value, index) => !Object.is(value, amountSyncedFor[index]))
+  ) {
+    setAmountSyncedFor(amountInputs);
+    if (isForeignPosting && postFxRate != null) {
+      setAmount(convertForeign(foreignAmount, postFxRate).total);
+    }
+  }
 
   const foreignConversion =
     isForeignPosting && postFxRate != null
@@ -392,7 +409,19 @@ export function PostTransactionDialog({
   }, [sourceAccount, transferAccount, transactionDate, effectivePostAmount, scheduledTransactions, futureTransactions, scheduledTransaction.id, accounts]);
 
   // Initialize form with transaction values (including override if exists)
-  useEffect(() => {
+  // Initialize the form whenever the dialog opens or the occurrence it posts
+  // changes. The "info from previous render" pattern rather than a setState in
+  // an effect.
+  const [initializedFor, setInitializedFor] = useState<{
+    isOpen: boolean;
+    scheduledTransaction: typeof scheduledTransaction;
+  } | null>(null);
+  if (
+    initializedFor === null ||
+    initializedFor.isOpen !== isOpen ||
+    initializedFor.scheduledTransaction !== scheduledTransaction
+  ) {
+    setInitializedFor({ isOpen, scheduledTransaction });
     if (isOpen) {
       const nextOverride = scheduledTransaction.nextOverride;
 
@@ -414,7 +443,6 @@ export function PostTransactionDialog({
       );
       setPostFxRate(null);
       setRateLookupFailed(false);
-      rateOverriddenRef.current = false;
       setCategoryId(nextOverride?.categoryId ?? scheduledTransaction.categoryId ?? '');
       setDescription(nextOverride?.description ?? scheduledTransaction.description ?? '');
       setIsSplit(nextOverride?.isSplit ?? scheduledTransaction.isSplit);
@@ -513,11 +541,11 @@ export function PostTransactionDialog({
       }
       setMarketPrice(null);
       // This dialog stays mounted across open/close, so reset the previous
-      // occurrence's "no history" verdict here too -- otherwise reopening for a
-      // different security paints the hint one frame before the fetch resets it.
+      // occurrence's "no history" verdict here, before the first frame --
+      // otherwise reopening for a different security paints the stale hint.
       setPriceHistoryEmpty(false);
     }
-  }, [isOpen, scheduledTransaction]);
+  }
 
   // Fetch the most recent close price for the security so we can auto-fill
   // the Price field (matching the new-scheduled-transaction form's behaviour).
@@ -526,9 +554,9 @@ export function PostTransactionDialog({
     const securityId = scheduledTransaction.investmentSecurityId;
     if (!securityId) return;
     let cancelled = false;
-    // Reset while the request is in flight: "no price history" is a
-    // completed-empty result, not the loading window and not a failed lookup.
-    setPriceHistoryEmpty(false);
+    // "No price history" is a completed-empty result, not the loading window and
+    // not a failed lookup: every input this request depends on also re-runs the
+    // initialization above, which has already cleared it for this request.
     investmentsApi
       .getSecurityPrices(securityId, { limit: 1 })
       .then((prices) => {

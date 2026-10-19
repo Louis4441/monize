@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -381,10 +382,11 @@ export function LoanDetailView({
   };
 
   // Published to the container so it can render the export button in its own
-  // control row. Assigned during render (not in an effect) so the latest
-  // closure -- with the current scenarios/schedule -- is always what fires on
-  // click.
-  exportPdfRef.current = handleExportPdf;
+  // control row. Reassigned after every commit so the latest closure -- with
+  // the current scenarios/schedule -- is always what fires on click.
+  useLayoutEffect(() => {
+    exportPdfRef.current = handleExportPdf;
+  });
 
   // Beside the Rate History panel, wherever that sits. Keyed by the loan, so
   // a Process history result never outlives the loan it ran on.

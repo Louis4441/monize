@@ -593,11 +593,9 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
   );
 
   // Clear the net worth filter if no accounts are excluded (e.g. user toggled the flag off)
-  useEffect(() => {
-    if (!hasExcludedAccounts && filterNetWorth) {
-      setFilterNetWorth('');
-    }
-  }, [hasExcludedAccounts, filterNetWorth]);
+  if (!hasExcludedAccounts && filterNetWorth) {
+    setFilterNetWorth('');
+  }
 
   // Only show the joint filter when at least one account is shared to the
   // caller; clear it when the last joint account disappears (revoke).
@@ -605,11 +603,9 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, unp
     () => accounts.some((a) => a.isJoint),
     [accounts],
   );
-  useEffect(() => {
-    if (!hasJointAccounts && filterJoint) {
-      setFilterJoint('');
-    }
-  }, [hasJointAccounts, filterJoint]);
+  if (!hasJointAccounts && filterJoint) {
+    setFilterJoint('');
+  }
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

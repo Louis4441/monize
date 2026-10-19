@@ -155,8 +155,24 @@ export function OverrideEditorDialog({
     investmentAction != null &&
     ['DIVIDEND', 'INTEREST', 'CAPITAL_GAIN'].includes(baseInvestmentAction(investmentAction));
 
-  // Initialize form with base transaction or existing override values
-  useEffect(() => {
+  // Initialize form with base transaction or existing override values, again
+  // whenever the dialog opens or what it edits changes. The "info from previous
+  // render" pattern rather than a setState in an effect.
+  const initInputs = [
+    isOpen,
+    existingOverride,
+    scheduledTransaction,
+    overrideDate,
+    prefillAmount,
+    loanOccurrence,
+    isInvestmentKind,
+  ] as const;
+  const [initializedFor, setInitializedFor] = useState<typeof initInputs | null>(null);
+  if (
+    initializedFor === null ||
+    initInputs.some((value, index) => !Object.is(value, initializedFor[index]))
+  ) {
+    setInitializedFor(initInputs);
     // Split lines are booked in the currency's smallest unit under a parent in
     // the same unit, the rounding difference on the loan's principal line:
     // a cents parent over a template's 4dp lines is what the server refused
@@ -303,7 +319,7 @@ export function OverrideEditorDialog({
       setMarketPriceDate(null);
       setPriceHistoryEmpty(false);
     }
-  }, [isOpen, existingOverride, scheduledTransaction, overrideDate, prefillAmount, loanOccurrence, isInvestmentKind]);
+  }
 
   // Fetch the most recent close price for the security so we can auto-fill
   // the Price field (matching the new-scheduled-transaction form behaviour).
@@ -312,9 +328,9 @@ export function OverrideEditorDialog({
     const securityId = scheduledTransaction.investmentSecurityId;
     if (!securityId) return;
     let cancelled = false;
-    // Reset while the request is in flight: "no price history" is a
-    // completed-empty result, not the loading window and not a failed lookup.
-    setPriceHistoryEmpty(false);
+    // "No price history" is a completed-empty result, not the loading window and
+    // not a failed lookup: every input this request depends on also re-runs the
+    // initialization above, which has already cleared it for this request.
     investmentsApi
       .getSecurityPrices(securityId, { limit: 1 })
       .then((prices) => {

@@ -183,19 +183,23 @@ export function MortgageFields({
   );
 
   // Sync local state when termMonths/amortizationMonths change externally (e.g. form reset)
-  useEffect(() => {
+  const [prevTermMonths, setPrevTermMonths] = useState(termMonths);
+  if (!Object.is(prevTermMonths, termMonths)) {
+    setPrevTermMonths(termMonths);
     if (termMonths != null && termMonths > 0) {
       setTermYears(Math.floor(termMonths / 12));
       setTermRemainder(termMonths % 12);
     }
-  }, [termMonths]);
+  }
 
-  useEffect(() => {
+  const [prevAmortizationMonths, setPrevAmortizationMonths] = useState(amortizationMonths);
+  if (!Object.is(prevAmortizationMonths, amortizationMonths)) {
+    setPrevAmortizationMonths(amortizationMonths);
     if (amortizationMonths != null && amortizationMonths > 0) {
       setAmortYears(Math.floor(amortizationMonths / 12));
       setAmortRemainder(amortizationMonths % 12);
     }
-  }, [amortizationMonths]);
+  }
 
   const updateTermMonths = (years: number | undefined, months: number | undefined) => {
     const total = (years ?? 0) * 12 + (months ?? 0);

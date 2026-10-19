@@ -116,27 +116,46 @@ export function SecurityPriceHistory({
   // until it is asked for.
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
 
-  const loadPrices = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await investmentsApi.getSecurityPrices(security.id, {
-        limit: SECURITY_PRICE_HISTORY_LIMIT,
-      });
-      setPrices(data);
-      // Open the newest year and month so recent prices need no click.
-      setOpenGroups(
-        new Set(defaultOpenPriceGroups(groupPricesByPeriod(data))),
-      );
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('priceHistory.toasts.loadFailed')));
-    } finally {
-      setIsLoading(false);
-    }
+  const fetchPrices = useCallback(() => {
+    // The writes live in the inner function so they run after the request,
+    // not during the effect that starts it.
+    const run = async () => {
+      try {
+        const data = await investmentsApi.getSecurityPrices(security.id, {
+          limit: SECURITY_PRICE_HISTORY_LIMIT,
+        });
+        setPrices(data);
+        // Open the newest year and month so recent prices need no click.
+        setOpenGroups(
+          new Set(defaultOpenPriceGroups(groupPricesByPeriod(data))),
+        );
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('priceHistory.toasts.loadFailed')));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    return run();
   }, [security.id, t]);
 
+  // Every reload after a change shows the spinner again.
+  const loadPrices = useCallback(() => {
+    setIsLoading(true);
+    return fetchPrices();
+  }, [fetchPrices]);
+
+  // A different security is a new request: it shows as loading from the
+  // render that asks for it (the "info from previous render" pattern). The
+  // first load needs nothing here, `isLoading` starts true.
+  const [loadingFor, setLoadingFor] = useState(security.id);
+  if (loadingFor !== security.id) {
+    setLoadingFor(security.id);
+    setIsLoading(true);
+  }
+
   useEffect(() => {
-    loadPrices();
-  }, [loadPrices]);
+    fetchPrices();
+  }, [fetchPrices]);
 
   const handleAdd = useCallback(async (data: CreateSecurityPriceData) => {
     try {

@@ -62,21 +62,42 @@ export function SecurityDocumentsTab({ security, refreshVersion = 0 }: SecurityD
   const [editing, setEditing] = useState<SecurityDocument | undefined>();
   const [deleting, setDeleting] = useState<SecurityDocument | undefined>();
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      setDocuments(await investmentsApi.getSecurityDocuments(security.id));
-    } catch (err) {
-      setError(getErrorMessage(err, t('documents.loadFailed')));
-    } finally {
-      setIsLoading(false);
-    }
+  const fetchDocuments = useCallback(() => {
+    // The writes live in the inner function so they run after the request,
+    // not during the effect that starts it.
+    const run = async () => {
+      try {
+        const loaded = await investmentsApi.getSecurityDocuments(security.id);
+        setDocuments(loaded);
+      } catch (err) {
+        setError(getErrorMessage(err, t('documents.loadFailed')));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    return run();
   }, [security.id, t]);
 
+  // Every reload after a change shows the spinner again.
+  const load = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    return fetchDocuments();
+  }, [fetchDocuments]);
+
+  // A different security is a new request: it shows as loading from the
+  // render that asks for it (the "info from previous render" pattern). The
+  // first load needs nothing here, `isLoading` starts true and `error` null.
+  const [loadingFor, setLoadingFor] = useState(security.id);
+  if (loadingFor !== security.id) {
+    setLoadingFor(security.id);
+    setIsLoading(true);
+    setError(null);
+  }
+
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   const openCreate = () => {
     setEditing(undefined);

@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Account } from '@/types/account';
 import { builtInReportsApi } from '@/lib/built-in-reports';
 import { CategorySpendingItem } from '@/types/built-in-reports';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useNumberFormat, type NumberFormatters } from '@/hooks/useNumberFormat';
 import { PartialTotal } from '@/components/ui/PartialTotal';
 import type { ConvertedTotal } from '@/lib/currency-total';
 import { DonutCenterTotal } from '@/components/ui/DonutCenterTotal';
@@ -45,6 +45,30 @@ interface CategorySlice {
 interface ExpensesPieChartProps {
   accounts: Account[];
   isLoading: boolean;
+}
+
+interface ExpensesPieTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { id: string; name: string; value: number; colour: string } }>;
+  totalExpenses: number;
+  formatCurrency: NumberFormatters['formatCurrency'];
+  formatPercent: NumberFormatters['formatPercent'];
+}
+
+function ExpensesPieTooltip({ active, payload, totalExpenses, formatCurrency, formatPercent }: ExpensesPieTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const percentage = (data.value / totalExpenses) * 100;
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
+        <p className="text-gray-600 dark:text-gray-400">
+          {formatCurrency(data.value)} ({formatPercent(percentage, 1)})
+        </p>
+      </div>
+    );
+  }
+  return null;
 }
 
 export function ExpensesPieChart({ accounts, isLoading }: ExpensesPieChartProps) {
@@ -164,22 +188,6 @@ export function ExpensesPieChart({ accounts, isLoading }: ExpensesPieChartProps)
     if (otherCategories.length > 0) setOtherExpanded((open) => !open);
   };
 
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { id: string; name: string; value: number; colour: string } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      const percentage = (data.value / totalExpenses) * 100;
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
-          <p className="text-gray-600 dark:text-gray-400">
-            {formatCurrency(data.value)} ({formatPercent(percentage, 1)})
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   const configControls = (
     <>
       <WidgetConfigRow label={t('widgets.timeframe')}>
@@ -255,7 +263,15 @@ export function ExpensesPieChart({ accounts, isLoading }: ExpensesPieChartProps)
                     <Cell key={`cell-${index}`} fill={entry.colour} />
                   ))}
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  content={
+                    <ExpensesPieTooltip
+                      totalExpenses={totalExpenses}
+                      formatCurrency={formatCurrency}
+                      formatPercent={formatPercent}
+                    />
+                  }
+                />
               </PieChart>
             </ResponsiveContainer>
             {/* The aggregate belongs in the donut's hole, not in a row beneath

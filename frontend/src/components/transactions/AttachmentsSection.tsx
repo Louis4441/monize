@@ -158,13 +158,18 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
    */
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const list = await attachmentsApi.list(transactionId);
-      setAttachments(list);
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('loadFailed')));
-    }
+  const load = useCallback(() => {
+    // The writes live in the inner function so they run after the request,
+    // not during the effect that starts it.
+    const run = async () => {
+      try {
+        const list = await attachmentsApi.list(transactionId);
+        setAttachments(list);
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('loadFailed')));
+      }
+    };
+    return run();
   }, [transactionId, t]);
 
   useEffect(() => {
