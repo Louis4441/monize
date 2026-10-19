@@ -310,4 +310,93 @@ describe('ParserTestPanel', () => {
     expect(screen.queryByText('Transaction match')).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
+
+  it('shows the link key and the settlements waiting for a component instead of a transaction match', async () => {
+    api.test.mockResolvedValue({
+      parsed: { ...PARSED_RECEIPT, linkKey: 'KEY-9' },
+      outcome: 'read',
+      component: {
+        linkKey: 'KEY-9',
+        waitingSettlements: [{ id: 's-1', subject: 'Card statement', effectiveDate: '2026-09-01' }],
+      },
+      match: { kind: 'unmatched', considered: 0, attempts: [] },
+      candidateCount: 0,
+      transaction: null,
+    });
+    await renderPanel();
+    await choose('r-1');
+    await runTest();
+    expect(screen.getByText('Purchase email (component): link key KEY-9')).toBeInTheDocument();
+    expect(screen.getByText('1 repayment email is waiting for this link key:')).toBeInTheDocument();
+    expect(screen.getByText(/Card statement \(/)).toBeInTheDocument();
+    expect(screen.queryByText('Transaction match')).not.toBeInTheDocument();
+    expect(screen.queryByText(/No transaction matches/)).not.toBeInTheDocument();
+  });
+
+  it('says when a component read no link key or nothing waits for it', async () => {
+    api.test.mockResolvedValueOnce({
+      parsed: PARSED_RECEIPT,
+      outcome: 'read',
+      component: { linkKey: null, waitingSettlements: [] },
+      match: { kind: 'unmatched', considered: 0, attempts: [] },
+      candidateCount: 0,
+      transaction: null,
+    });
+    await renderPanel();
+    await choose('r-1');
+    await runTest();
+    expect(screen.getByText(/no link key was read/)).toBeInTheDocument();
+
+    api.test.mockResolvedValueOnce({
+      parsed: PARSED_RECEIPT,
+      outcome: 'read',
+      component: { linkKey: 'KEY-9', waitingSettlements: [] },
+      match: { kind: 'unmatched', considered: 0, attempts: [] },
+      candidateCount: 0,
+      transaction: null,
+    });
+    await runTest();
+    expect(screen.getByText('No repayment email is waiting for this link key.')).toBeInTheDocument();
+  });
+
+  it('shows the parts of a settlement with the component each one found, and still the transaction match', async () => {
+    api.test.mockResolvedValue({
+      parsed: PARSED_RECEIPT,
+      outcome: 'read',
+      links: [
+        {
+          partIndex: 0,
+          link: 'KEY-9',
+          component: { id: 'c-1', subject: 'Order A', effectiveDate: '2026-08-01', profileName: 'Shop purchases' },
+          partAmount: 120_000,
+          componentNet: 240_000,
+          taken: 0,
+          outcome: 'scaled',
+          several: 1,
+        },
+        {
+          partIndex: 1,
+          link: null,
+          component: null,
+          partAmount: 50_000,
+          componentNet: null,
+          taken: null,
+          outcome: 'no_link',
+          several: 0,
+        },
+      ],
+      match: { kind: 'unmatched' },
+      candidateCount: 3,
+      transaction: null,
+    });
+    await renderPanel();
+    await choose('r-1');
+    await runTest();
+    const first = screen.getByRole('row', { name: /KEY-9/ });
+    expect(within(first).getByText(/Purchase email: Order A \(/)).toHaveTextContent('Profile: Shop purchases.');
+    expect(within(first).getByText(/^\$?12\.00$/)).toBeInTheDocument();
+    expect(within(first).getByText(/Purchase total: \$?24\.00\. Already used: \$?0\.00\./)).toBeInTheDocument();
+    expect(screen.getByText('The part has no link, so it stays one line.')).toBeInTheDocument();
+    expect(screen.getByText('No transaction matches, out of 3 candidates.')).toBeInTheDocument();
+  });
 });

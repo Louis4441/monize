@@ -524,7 +524,12 @@
       "currencyMarkers": "貨幣標記",
       "defaultAccount": "預設帳戶",
       "ruleAccount": "帳戶",
-      "ruleCurrency": "貨幣"
+      "ruleCurrency": "貨幣",
+      "role": "設定檔角色",
+      "link": "link 區段",
+      "linkDaysBefore": "還款前的天數",
+      "linkFromDomains": "購買郵件的寄件者網域",
+      "linkKey": "連結鍵模式"
     },
     "codes": {
       "not_object": "不是有效的定義",
@@ -560,7 +565,15 @@
       "invalid_currency": "不是 3 個字母的貨幣代碼，例如 USD",
       "too_many_lines": "跨越的行數過多（最多 {max} 行）",
       "line_break_not_allowed": "只與一段文字（商品名稱、商家或帳戶）比對，因此不能跨越多行",
-      "invalid_uuid_account": "不是有效的帳戶"
+      "invalid_uuid_account": "不是有效的帳戶",
+      "role_invalid": "必須是 standalone、component 或 settlement",
+      "link_key_requires_component": "僅在角色為 component 時才能使用",
+      "link_key_missing": "當角色為 component 時是必要的",
+      "link_capture_requires_settlement": "使用了 link 或 instalment 擷取，只有 settlement 設定檔才接受",
+      "link_requires_settlement": "僅在角色為 settlement 時才能使用",
+      "link_domain_invalid": "不是有效的寄件者網域（最多 {max} 個網域）",
+      "link_days_invalid": "必須是 0 到 {max} 之間的整數",
+      "role_trade_conflict": "在只讀取交易的證券交易設定檔中不能是 component 或 settlement"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# 筆交易} other {# 筆交易}}同樣相符，因此在您選擇之前不會連結任何一筆。",
     "unmatched": "在 {count, plural, one {# 個候選} other {# 個候選}}中沒有相符的交易。",
     "jsonInvalid": "JSON 無效，因此暫時沒有可測試的內容。",
+    "component": {
+      "heading": "購買郵件（component）：連結鍵 {linkKey}",
+      "noLinkKey": "購買郵件（component）：未讀取到連結鍵，因此任何還款郵件都找不到它。",
+      "noneWaiting": "沒有還款郵件在等待此連結鍵。",
+      "waiting": "{count, plural, one {# 封還款郵件} other {# 封還款郵件}}正在等待此連結鍵：",
+      "settlement": "{subject}（{date}）"
+    },
     "outcome": {
       "not_applicable": "此解析器不會讀取這封郵件：郵件中沒有任何必要的行，因此會嘗試該寄件者的下一個解析器。",
       "skip_line": "此解析器會將這封郵件排除在外：郵件中含有它要略過的行。",
@@ -609,6 +629,7 @@
         "skipIfLine": "略過行",
         "waitIfLine": "暫緩行",
         "reference": "參考號碼",
+        "linkKey": "連結鍵",
         "action": "買入或賣出",
         "symbol": "代碼",
         "quantity": "股數",
@@ -674,7 +695,33 @@
     "paid": "已付",
     "payee": "商家",
     "reference": "參考號碼",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "連結鍵",
+    "kinds": {
+      "shipping": "運費",
+      "fee": "費用",
+      "discount": "折扣"
+    },
+    "parts": {
+      "heading": "部分",
+      "part": "部分",
+      "link": "連結",
+      "outcome": "結果",
+      "noLink": "無連結",
+      "component": "購買郵件：{subject}（{date}）。",
+      "componentProfile": "設定檔：{name}。",
+      "componentNet": "購買合計：{amount}。",
+      "taken": "已使用：{amount}。"
+    },
+    "linkOutcomes": {
+      "no_link": "此部分沒有連結，因此仍為一行。",
+      "not_found": "找不到此連結對應的購買郵件，因此該部分仍為一行。",
+      "component_incomplete": "購買郵件未被完整讀取，因此該部分仍為一行。",
+      "component_used": "其他還款已用完整筆購買，因此該部分仍為一行。",
+      "joined": "已替換為購買郵件的各行。",
+      "scaled": "已替換為購買郵件的各行，並依此部分縮放。",
+      "amount_exceeds": "此部分超過了購買的剩餘金額，因此仍為一行。"
+    }
   },
   "state": {
     "pending": "等待讀取",
@@ -690,7 +737,8 @@
     "dismissed": "已駁回",
     "expired": "已過期",
     "pending_ai": "等待 AI",
-    "request_missing": "請求遺失"
+    "request_missing": "請求遺失",
+    "component": "等待其還款"
   },
   "receipts": {
     "loading": "正在載入郵件",
@@ -710,7 +758,8 @@
       "ambiguous": "多筆交易相符",
       "review_conflict": "已有其他請求未完成",
       "review": "審核中",
-      "ignored": "已忽略"
+      "ignored": "已忽略",
+      "component": "等待還款"
     },
     "domainFilter": {
       "label": "寄件者網域",
@@ -787,6 +836,7 @@
       "pageSelected": "此頁面上的 {count} 封郵件已全部選取。",
       "selectAllMatching": "選取符合此篩選條件的全部 {total} 封郵件。",
       "allMatchingSelected": "符合此篩選條件的全部 {total} 封郵件已選取。",
+      "hiddenSelected": "{hidden, plural, other {已選取的郵件中有 # 封未顯示在此列表中。}}",
       "reprocessButton": "重新處理({count})",
       "restoreButton": "還原已忽略({count})",
       "restoreButtonAll": "還原已忽略",
@@ -816,11 +866,12 @@
         "remove": "還原:{label}"
       },
       "draftBlocked": {
-        "tooMany": "最多可用 {max} 封郵件準備解析器。請選取不超過 {max} 封郵件。",
-        "differentSenders": "所選郵件來自不同的寄件者（{domains}）。解析器只讀取一個寄件者的郵件，請選取同一寄件者的郵件。",
         "skipped": "無法讀取的郵件沒有可用於準備解析器的文字。請將其從選取中移除。",
         "allMatching": "解析器需用您自己選取的郵件準備，最多 {max} 封。請清除目前的選取，再選取不超過 {max} 封郵件。",
-        "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。"
+        "mixedKinds": "所選郵件中混有交易確認郵件和訂單郵件。一個設定檔只讀取一種郵件，請只選擇交易確認郵件或只選擇訂單郵件。",
+        "tooManyPerDomain": "每個寄件者最多可使用 {perDomain} 封郵件。請為每個寄件者（{domains}）選取不超過 {perDomain} 封郵件。",
+        "tooManyDomains": "最多可同時使用 {maxDomains} 個寄件者（{domains}）。請選取不超過 {maxDomains} 個寄件者的郵件。",
+        "tradeOneDomain": "交易設定檔只讀取一個寄件者（{domains}）的郵件。請選取同一寄件者的交易確認郵件。"
       }
     },
     "pager": {
@@ -879,6 +930,12 @@
       "approveFailed": "無法核准這些提案",
       "noApprovable": "此選取中沒有可核准的提案。",
       "narrowFailed": "無法計算郵件數量。變更未套用。"
+    },
+    "linkedDraftDialog": {
+      "title": "起草關聯的設定檔？",
+      "message": "您選取了多個寄件者的郵件：{domains}。僅當一筆銀行交易的資訊分散在多個寄件者的郵件裡時才使用，例如商店及其延期付款服務商，或商店及支付閘道。要為互不相關的商店起草設定檔，請取消並每次處理一個網域。一次請求每個寄件者最多 {perDomain} 封郵件，最多 {maxDomains} 個寄件者。",
+      "domainEntry": "{domain}（{count, plural, one {# 封} other {# 封}}）",
+      "confirm": "起草關聯的設定檔"
     }
   },
   "detail": {
@@ -939,7 +996,13 @@
       "trade_no_account": "解析器無法判斷這筆交易屬於哪個帳戶。",
       "trade_exists": "你的帳戶中已有這筆交易，因此沒有提出任何建議。",
       "trade_linked": "已連結到它所回報的交易，因此沒有提出任何建議。",
-      "trade_no_currency": "設定檔無法判斷這筆交易的幣別，因此無法選擇其帳戶。"
+      "trade_no_currency": "設定檔無法判斷這筆交易的幣別，因此無法選擇其帳戶。",
+      "awaiting_settlement": "購買郵件已儲存。它在等待支付它的還款郵件。",
+      "settled": "購買郵件已儲存。與之關聯的還款郵件支付了它的全部金額。",
+      "instalment": "購買郵件已儲存。還款已支付其中一部分，其餘仍待支付。",
+      "partially_linked": "此還款的某些部分還沒有購買郵件。它們各顯示為一行。",
+      "enriched_by_other": "相符的交易已被另一封郵件完善。請開啟它，用「連結」取代該完善內容，或忽略這封郵件。",
+      "no_link_key": "此購買郵件不含連結鍵，因此任何還款都找不到它。"
     },
     "reasonUnknown": "原因：{reason}",
     "requestNote": "審核請求（{state}）：{note}",
@@ -986,6 +1049,15 @@
       "capped": "僅讀取前 {max} 行。",
       "empty": "沒有行。",
       "listLabel": "郵件的編號行"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "已連結的購買郵件",
+      "component": "第 {part} 部分：{subject}（{date}）",
+      "settlementsHeading": "支付方",
+      "settlement": "{subject}（{date}），金額 {amount}",
+      "enrichedBy": "已被以下郵件完善：{subject}",
+      "openButton": "開啟",
+      "open": "開啟郵件 {subject}"
     },
     "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {買入} other {賣出}} {quantity} 股 {symbol}。",
     "noTradeTransaction": "尚無：核准提議後會記帳這筆交易，或將其連結到帳本中已有的交易。",
@@ -1314,7 +1386,8 @@
         "discard_delete": "已被此解析器刪除",
         "no_html": "沒有 HTML 部分",
         "trade": "提出一筆交易",
-        "trade_exists": "已在帳本中"
+        "trade_exists": "已在帳本中",
+        "component": "購買郵件（等待還款）"
       },
       "parsedTradeAccount": "帳戶：{account}",
       "accountWithCurrency": "{name}（{currency}）",
@@ -1344,5 +1417,10 @@
     "bookTo": "記入：{account}",
     "bookToNotTradable": "記入 {account}，但它不是開放的證券帳戶，因此交易無法記入該帳戶。",
     "bookToUnknown": "記入不在您清單中的帳戶，因此交易無法記入該帳戶。"
+  },
+  "linkedHint": {
+    "emails": "一筆銀行交易的資訊分散在多個寄件者的郵件裡（例如商店及其延期付款服務商）？請同時選取這些寄件者各自最多 {max} 封郵件，並起草關聯的設定檔。",
+    "profiles": "下面的精靈只為一個寄件者起草設定檔。一筆銀行交易的資訊分散在多個寄件者的郵件裡（例如商店及其延期付款服務商）？請在「郵件」分頁選取這些寄件者各自最多 {max} 封郵件，並起草關聯的設定檔。",
+    "openEmails": "開啟「郵件」分頁"
   }
 }

@@ -26,7 +26,7 @@ const SAVED =
 /**
  * Write a receipt parser from stored order emails (email-receipts design
  * section 6) for an MCP agent: list the categories a parser may name, test a
- * definition on up to five emails, and save it as a DRAFT.
+ * definition on up to 25 emails, and save it as a DRAFT.
  *
  * It confirms nothing and spends none of the daily write cap, like
  * `ai_review_requests`, and for the same reason: nothing here writes the
@@ -89,13 +89,16 @@ export class McpEmailReceiptParserTools {
               return toolError("definition is required.");
             }
             if (!args.receiptIds) {
-              return toolError("receiptIds is required: name 1 to 5 emails.");
+              return toolError(
+                `receiptIds is required: name 1 to ${EMAIL_RECEIPT_PARSER_TOOL_MAX_RECEIPTS} emails.`,
+              );
             }
             return toolResult(
               await this.parsers.testDefinition(user.userId, {
                 definition: args.definition,
                 receiptIds: args.receiptIds,
                 payeeName: stripHtml(args.payeeName),
+                componentDrafts: args.componentDrafts,
               }),
             );
           }

@@ -29,6 +29,8 @@ const LEAD_ACTION: Record<EmailReceiptStatus, ReceiptActionKey> = {
   review_conflict: 'view',
   review: 'approve',
   ignored: 'view',
+  // Nothing to approve or link: it waits for the settlement that pays for it.
+  component: 'view',
 };
 
 /**

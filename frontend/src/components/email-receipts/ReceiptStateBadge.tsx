@@ -14,6 +14,7 @@ const STATE_VARIANT: Record<EmailReceiptShownState, BadgeVariant> = {
   ambiguous: 'amber',
   review_conflict: 'red',
   ignored: 'gray',
+  component: 'blue',
   proposed: 'purple',
   applied: 'green',
   dismissed: 'gray',

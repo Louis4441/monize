@@ -934,6 +934,13 @@ describe("AI review requests (integration)", () => {
         );
       expect(await applied(PARSER_B)).toBe(0);
       expect((await requests())[0].status).toBe("proposed");
+      // applied only once the parser it lists is an approved parser of the user's
+      expect(await applied(PARSER_A)).toBe(0);
+      await db.query(
+        `INSERT INTO email_receipt_parsers (id, user_id, name, from_domains, definition, status)
+         VALUES ($1, $2, 'A', ARRAY['shop.example.com'], '{}'::jsonb, 'approved')`,
+        [PARSER_A, aliceId],
+      );
       expect(await applied(PARSER_A)).toBe(1);
       expect((await requests())[0].status).toBe("applied");
     });

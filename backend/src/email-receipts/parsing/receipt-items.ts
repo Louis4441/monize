@@ -5,6 +5,7 @@ import {
   parseReceiptQty,
 } from "./receipt-amount";
 import { matchReceiptLines, matchReceiptPattern } from "./receipt-glob";
+import { normalizeInstalmentText, normalizeLinkValue } from "./receipt-link";
 import { itemSectionRange, traceLines } from "./receipt-lines";
 import {
   MAX_ITEMS,
@@ -26,6 +27,21 @@ interface ItemFields {
   name: string;
   qty: number;
   amount: number | null;
+  /** A settlement part's normalized link value and instalment text; absent when not captured or unusable. */
+  link?: string;
+  instalment?: string;
+}
+
+/** The `link` and `instalment` keys of an item, only those the captures hold a usable value for. */
+function linkFields(
+  captures: GlobCaptures,
+): Pick<ItemFields, "link" | "instalment"> {
+  const link = normalizeLinkValue(captures.link ?? "");
+  const instalment = normalizeInstalmentText(captures.instalment ?? "");
+  return {
+    ...(link === null ? {} : { link }),
+    ...(instalment === null ? {} : { instalment }),
+  };
 }
 
 /**
@@ -40,11 +56,12 @@ function readItemFields(captures: GlobCaptures): ItemFields | null {
   const qty = captures.qty === undefined ? 1 : parseReceiptQty(captures.qty);
   if (qty === null) return null;
   const money = captures.amount ?? captures.price;
-  if (money === undefined) return { name, qty, amount: null };
+  const extra = linkFields(captures);
+  if (money === undefined) return { name, qty, amount: null, ...extra };
   const units = parseReceiptAmount(money);
   if (units === null || !isStrictReceiptAmount(money)) return null;
   const amount = captures.amount === undefined ? units * qty : units;
-  return Number.isSafeInteger(amount) ? { name, qty, amount } : null;
+  return Number.isSafeInteger(amount) ? { name, qty, amount, ...extra } : null;
 }
 
 /** What an item looks like before its category is known. */

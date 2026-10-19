@@ -1,5 +1,6 @@
 import {
   AI_REVIEW_MAX_TAG_NAME_LENGTH,
+  AI_REVIEW_MAX_TAG_NAMES,
   type AiReviewProposalInput,
   type AiReviewSplitLine,
 } from "../../ai-review/ai-review-work.types";
@@ -7,10 +8,11 @@ import { roundMoney, sumMoney } from "../../common/round.util";
 import { stripHtml } from "../../common/sanitization.util";
 import { TRANSACTION_NOTE_MAX_LENGTH } from "../../common/transaction-note";
 import { composeDescription } from "../../transaction-rules/rule-template";
-import type {
-  ParsedReceipt,
-  ParsedReceiptItem,
-  ParsedReceiptReason,
+import {
+  isItemLine,
+  type ParsedReceipt,
+  type ParsedReceiptItem,
+  type ParsedReceiptReason,
 } from "../parsing/receipt-parser.types";
 
 /**
@@ -58,6 +60,11 @@ export interface ReceiptProposalContext {
    * one. Null or absent: none.
    */
   tagName?: string | null;
+  /**
+   * The tags of the profiles of the components a joined receipt took lines
+   * from: added after `tagName`, under the same rule, without duplicates.
+   */
+  extraTagNames?: readonly string[];
 }
 
 export interface ReceiptProposal {
@@ -87,13 +94,23 @@ function cut(text: string, max: number): string {
   return text.length > max ? text.slice(0, max).trim() : text;
 }
 
-/** `name` or `name x qty` (a quantity above one), as a split memo. */
+/** `name` or `name x qty` (a quantity above one), then ` (instalment)` when the item has one, as a split memo. */
 function itemMemo(item: ParsedReceiptItem): string {
   const name = clean(item.name);
+  const instalment = item.instalment ? clean(item.instalment) : "";
+  const text = item.qty > 1 ? `${name} x ${item.qty}` : name;
   return cut(
-    item.qty > 1 ? `${name} x ${item.qty}` : name,
+    instalment === "" ? text : `${text} (${instalment})`,
     TRANSACTION_NOTE_MAX_LENGTH,
   );
+}
+
+/** The memo of a shipping, fee or discount line: none, except the part's instalment. */
+function otherLineMemo(item: ParsedReceiptItem): string | undefined {
+  const instalment = item.instalment ? clean(item.instalment) : "";
+  return instalment === ""
+    ? undefined
+    : cut(`(${instalment})`, TRANSACTION_NOTE_MAX_LENGTH);
 }
 
 /**
@@ -138,6 +155,7 @@ function buildSummary(
     .filter((part) => part !== "")
     .join(" ");
   const items = parsed.items
+    .filter(isItemLine)
     .map((item) => {
       const name = clean(item.name);
       return item.qty > 1 ? `${name} x${item.qty}` : name;
@@ -176,13 +194,18 @@ export function buildDescription(
 
 /** The lines an itemized proposal is made of: items, shipping, each fee, then the discount. */
 function receiptLines(parsed: ParsedReceipt): ReceiptLine[] {
-  const lines: ReceiptLine[] = parsed.items.map((item) => ({
-    categoryId: item.categoryId,
-    units: item.amount,
-    direction: 1,
-    memo: itemMemo(item),
-    ...(item.categorySource === "ai" ? { categorySource: "ai" as const } : {}),
-  }));
+  const lines: ReceiptLine[] = parsed.items.map((item) => {
+    const memo = isItemLine(item) ? itemMemo(item) : otherLineMemo(item);
+    return {
+      categoryId: item.categoryId,
+      units: item.amount,
+      direction: item.kind === "discount" ? -1 : 1,
+      ...(memo === undefined ? {} : { memo }),
+      ...(item.categorySource === "ai"
+        ? { categorySource: "ai" as const }
+        : {}),
+    };
+  });
   if ((parsed.shipping ?? 0) > 0) {
     lines.push({
       categoryId: parsed.shippingCategoryId,
@@ -235,6 +258,23 @@ function proposedPayeeName(
     clean(ctx.payeeName) !== ""
     ? clean(ctx.payeeName)
     : undefined;
+}
+
+/**
+ * The profile's tag, then the tag of each joined component, cleaned, without
+ * duplicates (case-insensitive), each cut to the tag length, at most the
+ * number of tags a proposal may carry.
+ */
+function proposalTagNames(ctx: ReceiptProposalContext): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const raw of [ctx.tagName ?? "", ...(ctx.extraTagNames ?? [])]) {
+    const name = cut(clean(raw), AI_REVIEW_MAX_TAG_NAME_LENGTH);
+    if (name === "" || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    names.push(name);
+  }
+  return names.slice(0, AI_REVIEW_MAX_TAG_NAMES);
 }
 
 /** The amount the transaction must equal: what was paid, else the total. */
@@ -295,9 +335,8 @@ export function buildReceiptProposal(
     names.push(name);
   }
 
-  const tag = clean(ctx.tagName ?? "");
-  const tags: AiReviewProposalInput =
-    tag === "" ? {} : { tagNames: [cut(tag, AI_REVIEW_MAX_TAG_NAME_LENGTH)] };
+  const tagNames = proposalTagNames(ctx);
+  const tags: AiReviewProposalInput = tagNames.length === 0 ? {} : { tagNames };
 
   if (lines.length === 1) {
     return {

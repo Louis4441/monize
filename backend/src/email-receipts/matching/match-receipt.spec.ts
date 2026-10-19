@@ -6,6 +6,7 @@ import {
   matchReceipt,
   receiptCandidateWindow,
 } from "./match-receipt";
+import { DEFAULT_MATCH_CONFIG } from "../parsing/receipt-match-config";
 
 const RECEIVED = "2026-03-10";
 const PAYEE = "payee-shop";
@@ -220,11 +221,8 @@ describe("matchReceipt: the order id signal (O)", () => {
 });
 
 describe("matchReceipt: the amount signal (A)", () => {
-  it("compares the absolute value in units, for either sign", () => {
-    const debit = amount();
-    const credit = tx({ amount: 37.97 });
-    expect(match([debit])).toMatchObject({ matchKind: "amount_date" });
-    expect(match([credit])).toMatchObject({ matchKind: "amount_date" });
+  it("compares the absolute value in units of an expense", () => {
+    expect(match([amount()])).toMatchObject({ matchKind: "amount_date" });
   });
 
   it("is exact: one unit off is not a match", () => {
@@ -483,5 +481,68 @@ describe("matchReceipt: paid, and the merchant the email names", () => {
     expect(
       match([a, b], { orderId: null, total: PAID, payee: "Shop Xavier" }, null),
     ).toMatchObject({ kind: "ambiguous", candidateIds: [a.id, b.id] });
+  });
+});
+
+describe("matchReceipt: only an expense is a candidate", () => {
+  const INCOME = 249;
+  const PAID = 2490000;
+  const parsed = { orderId: "EX-20931", reference: "REF-77881", total: PAID };
+  const run = (
+    candidates: ReceiptMatchCandidate[],
+    by: ("reference" | "orderId" | "amount_payee" | "amount_date")[],
+  ) =>
+    matchReceipt(parsed, RECEIVED, candidates, PAYEE, {
+      ...DEFAULT_MATCH_CONFIG,
+      by,
+    });
+
+  it("never matches an income by amount_date", () => {
+    expect(run([tx({ amount: INCOME })], ["amount_date"]).kind).toBe(
+      "unmatched",
+    );
+  });
+
+  it("never matches an income by amount_payee", () => {
+    const income = tx({ amount: INCOME, payeeId: PAYEE });
+    expect(run([income], ["amount_payee"]).kind).toBe("unmatched");
+  });
+
+  it("never matches an income whose description holds the order id", () => {
+    const income = tx({ amount: INCOME, description: "order EX-20931" });
+    expect(run([income], ["orderId"]).kind).toBe("unmatched");
+  });
+
+  it("never matches an income whose description holds the reference", () => {
+    const income = tx({ amount: INCOME, description: "ref REF-77881" });
+    expect(run([income], ["reference"]).kind).toBe("unmatched");
+  });
+
+  it("matches the expense, not ambiguous, when an income has the same amount", () => {
+    const expense = tx({ amount: -INCOME });
+    const income = tx({ amount: INCOME });
+    expect(run([income, expense], ["amount_date"])).toMatchObject({
+      kind: "matched",
+      transactionId: expense.id,
+    });
+  });
+
+  it("does not match a zero amount", () => {
+    expect(
+      matchReceipt(
+        { orderId: "EX-20931", total: 0 },
+        RECEIVED,
+        [tx({ amount: 0 })],
+        PAYEE,
+      ).kind,
+    ).toBe("unmatched");
+  });
+
+  it("counts only expenses in the window as considered", () => {
+    const result = run(
+      [tx({ amount: -INCOME }), tx({ amount: INCOME }), tx({ amount: 0 })],
+      ["amount_date"],
+    );
+    expect(result.considered).toBe(1);
   });
 });

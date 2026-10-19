@@ -1,4 +1,4 @@
-import { parseReceipt } from "../parsing/parse-receipt";
+import { completeness, parseReceipt } from "../parsing/parse-receipt";
 import type {
   ParsedReceipt,
   ParsedReceiptReason,
@@ -918,5 +918,115 @@ describe("buildReceiptProposal: the order number and the Ref #", () => {
       CTX,
     );
     expect(proposal.input).not.toHaveProperty("referenceNumber");
+  });
+});
+
+describe("buildReceiptProposal with kinded lines (linked receipts)", () => {
+  const joined = (over: Partial<ParsedReceipt> = {}): ParsedReceipt => ({
+    orderId: null,
+    total: 450000,
+    paid: null,
+    payee: null,
+    shipping: null,
+    discount: null,
+    items: [
+      {
+        name: "Gadget",
+        qty: 2,
+        amount: 500000,
+        categoryId: CAT_CABLE,
+        kind: "item",
+      },
+      {
+        name: "shipping",
+        qty: 1,
+        amount: 50000,
+        categoryId: CAT_SHIPPING,
+        kind: "shipping",
+      },
+      {
+        name: "discount",
+        qty: 1,
+        amount: 100000,
+        categoryId: CAT_DEFAULT,
+        kind: "discount",
+      },
+    ],
+    shippingCategoryId: null,
+    discountCategoryId: null,
+    complete: true,
+    reason: null,
+    ...over,
+  });
+  const tx = { ...TX, amount: -45, referenceNumber: null };
+
+  it("completeness subtracts a discount line and the splits are signed against it", () => {
+    const parsed = joined();
+    expect(completeness(parsed)).toBeNull();
+    const out = buildReceiptProposal(parsed, tx, CTX);
+    expect(out.kind).toBe("itemized");
+    const splits = out.input?.splits ?? [];
+    expect(splits.map((s) => s.amount)).toEqual([-50, -5, 10]);
+    expect(splits.map((s) => s.memo)).toEqual([
+      "Gadget x 2",
+      undefined,
+      undefined,
+    ]);
+    expect(splits.reduce((n, s) => n + Math.round(s.amount * 10000), 0)).toBe(
+      -450000,
+    );
+  });
+
+  it("summary lists item names only", () => {
+    const out = buildReceiptProposal(joined(), tx, CTX);
+    expect(out.input?.description).toBe("Example Shop: Gadget x2");
+  });
+
+  it("memo carries the instalment on every kind", () => {
+    const parsed = joined({
+      items: joined().items.map((item) => ({
+        ...item,
+        instalment: "1. spłata z 3",
+      })),
+    });
+    const splits = buildReceiptProposal(parsed, tx, CTX).input?.splits ?? [];
+    expect(splits.map((s) => s.memo)).toEqual([
+      "Gadget x 2 (1. spłata z 3)",
+      "(1. spłata z 3)",
+      "(1. spłata z 3)",
+    ]);
+  });
+
+  it("a discount line without a category is items_uncategorized", () => {
+    const base = joined();
+    const parsed = {
+      ...base,
+      items: base.items.map((item) =>
+        item.kind === "discount" ? { ...item, categoryId: null } : item,
+      ),
+    };
+    expect(completeness(parsed)).toBe("items_uncategorized");
+  });
+
+  it("tags: the profile's and the components', deduped, capped at 5", () => {
+    const out = buildReceiptProposal(joined(), tx, {
+      ...CTX,
+      tagName: "Shop",
+      extraTagNames: ["shop", " Gift ", "t3", "t4", "t5", "t6", ""],
+    });
+    expect(out.input?.tagNames).toEqual(["Shop", "Gift", "t3", "t4", "t5"]);
+  });
+
+  it("tags are not added to a description-only proposal", () => {
+    const out = buildReceiptProposal(
+      joined({ complete: false, reason: "no_total" }),
+      tx,
+      {
+        ...CTX,
+        tagName: "Shop",
+        extraTagNames: ["Gift"],
+      },
+    );
+    expect(out.input?.tagNames).toBeUndefined();
   });
 });

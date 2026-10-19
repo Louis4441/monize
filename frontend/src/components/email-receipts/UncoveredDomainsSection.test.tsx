@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, within } from '@/test/render';
+import { render, screen, act, within, fireEvent } from '@/test/render';
 import { UncoveredDomainsSection } from './UncoveredDomainsSection';
 import { TOUR_ANCHORS, tourAnchorSelector } from '@/lib/tours/anchors';
 
@@ -38,6 +38,28 @@ describe('UncoveredDomainsSection', () => {
     const waiting = screen.getByRole('button', { name: /allegro\.pl/ });
     expect(within(waiting).getByText('Waiting for AI')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /shop\.example\.com/ })).queryByText('Waiting for AI')).not.toBeInTheDocument();
+  });
+
+  describe('the linked profiles hint', () => {
+    const HINT = /The wizard below drafts a profile for one sender\. One bank transaction described by emails from several senders/;
+
+    it('says the wizard drafts one sender and where linked profiles start, with a link that opens the Emails tab', async () => {
+      api.listUncovered.mockResolvedValue([entry('allegro.pl')]);
+      const onOpenEmails = vi.fn();
+      await act(async () => {
+        render(<UncoveredDomainsSection onSelect={vi.fn()} onOpenEmails={onOpenEmails} />);
+      });
+      expect(screen.getByText(HINT)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Open the Emails tab' }));
+      expect(onOpenEmails).toHaveBeenCalledTimes(1);
+    });
+
+    it('is shown while loading and draws no link without a tab switch', async () => {
+      api.listUncovered.mockReturnValue(new Promise(() => {}));
+      await renderSection();
+      expect(screen.getByText(HINT)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Open the Emails tab' })).not.toBeInTheDocument();
+    });
   });
 
   it('shows no badge when no request is waiting', async () => {

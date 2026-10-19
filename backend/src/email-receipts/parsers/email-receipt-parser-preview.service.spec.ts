@@ -4,6 +4,11 @@ import { Payee } from "../../payees/entities/payee.entity";
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import {
+  ALLEGRO_PAY_COMPONENT_DEFINITION,
+  ALLEGRO_PAY_PURCHASE_LINES,
+  ALLEGRO_PAY_PURCHASE_SUBJECT,
+} from "../parsing/fixtures/allegro-pay-mails";
+import {
   WEALTHSIMPLE_BUY_BODY,
   WEALTHSIMPLE_RRSP_ACCOUNT_ID,
   WEALTHSIMPLE_TRADE_DEFINITION,
@@ -472,5 +477,64 @@ describe("EmailReceiptParserPreviewService.preview of a trade profile", () => {
       selectedReceiptIds: [R1],
     });
     expect(result.selected[0].parsed?.total).toBe(1999.9989);
+  });
+});
+
+describe("EmailReceiptParserPreviewService.preview of a component profile", () => {
+  const componentParser = () =>
+    parserRow({
+      fromDomains: ["shop.example.com"],
+      definition: ALLEGRO_PAY_COMPONENT_DEFINITION as never,
+    });
+  const purchase = (id: string, over: Record<string, unknown> = {}) =>
+    mail(id, {
+      subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+      body_text: ALLEGRO_PAY_PURCHASE_LINES.join("\n"),
+      ...over,
+    });
+
+  it("reports an email read with a link value as `component`, matched to nothing, and looks up no bank transaction", async () => {
+    const { service, manager } = setup({
+      parser: componentParser(),
+      selected: [purchase(R1)],
+    });
+
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      outcome: "component",
+      statusReason: null,
+      match: null,
+      parsed: { total: 163, lineCount: 2 },
+    });
+    expect(
+      manager.query.mock.calls.some(([sql]) =>
+        String(sql).includes("JOIN accounts"),
+      ),
+    ).toBe(false);
+  });
+
+  it("reports a component email that read no link value as parse_failed with no_link_key", async () => {
+    const { service } = setup({
+      parser: componentParser(),
+      selected: [
+        purchase(R1, {
+          body_text: ALLEGRO_PAY_PURCHASE_LINES.filter(
+            (line) => !line.includes("Allegro Pay") && !line.includes("umowa"),
+          ).join("\n"),
+        }),
+      ],
+    });
+
+    const result = await service.preview(USER, PARSER, {
+      selectedReceiptIds: [R1],
+    });
+
+    expect(result.selected[0]).toMatchObject({
+      outcome: "parse_failed",
+      statusReason: "no_link_key",
+    });
   });
 });

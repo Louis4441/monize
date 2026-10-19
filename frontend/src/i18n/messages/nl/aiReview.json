@@ -57,7 +57,8 @@
     "waitingForAgent": "Wacht op een AI-agent. <link>Koppel een AI-provider in de Instellingen</link> of laat een MCP-client het verzoek oppakken.",
     "parserDraftReady": "Profielconcept klaar. <link>Test en keur het goed in de profielinstellingen</link>.",
     "tradePending": "Een transactie uit een e-mail, nog niet gelezen",
-    "tradeEmail": "E-mail met transactiebevestiging"
+    "tradeEmail": "E-mail met transactiebevestiging",
+    "parserDraftIds": "ID's van de profielconcepten: {ids}"
   },
   "actions": {
     "dismiss": "Negeren"
