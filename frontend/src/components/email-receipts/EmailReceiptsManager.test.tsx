@@ -452,12 +452,12 @@ describe('EmailReceiptsManager', () => {
       expect(screen.queryByRole('row', { name: /Order proposed/ })).not.toBeInTheDocument();
     });
 
-    it('clears the selection when the domain changes', async () => {
+    it('keeps the ticked rows when the domain changes', async () => {
       await renderManager();
       await click(within(rowOf('Order no profile')).getByRole('checkbox'));
       expect(screen.getByRole('region', { name: 'Selected emails' })).toBeInTheDocument();
       await choose(SHOP);
-      expect(screen.queryByRole('region', { name: 'Selected emails' })).not.toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Selected emails' })).toHaveTextContent('1 email selected');
     });
 
     it('reads the domain counts again after a command', async () => {

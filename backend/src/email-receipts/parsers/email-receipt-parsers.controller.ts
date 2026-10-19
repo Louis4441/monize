@@ -71,7 +71,7 @@ export class EmailReceiptParsersController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({
     summary:
-      "Queue a request for the assistant (or an MCP agent) to write a parser from 1 to 5 stored emails; no provider is called",
+      "Queue a request for the assistant (or an MCP agent) to write a parser from 1 to 25 stored emails of one to five senders (at most 5 per sender); no provider is called",
   })
   draftWithAi(
     @Request() req: { user: { id: string } },

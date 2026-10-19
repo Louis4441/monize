@@ -10,6 +10,7 @@ describe('leadActionKey', () => {
     ['ambiguous', 'link'],
     ['pending', 'reprocess'],
     ['ignored', 'view'],
+    ['component', 'view'],
   ] as const)('leads the %s card with %s', (status, lead) => {
     expect(leadActionKey(status, { status: 'pending' })).toBe(lead);
   });

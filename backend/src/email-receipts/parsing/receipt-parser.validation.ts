@@ -1,5 +1,9 @@
 import { UUID_REGEX } from "../../common/query-param-utils";
 import {
+  isReceiptDomain,
+  normalizeReceiptDomain,
+} from "../parsers/dto/receipt-domain.validator";
+import {
   MAX_CAPTURES_PER_PATTERN,
   parseGlob,
 } from "../../transaction-rules/rule-glob-capture";
@@ -14,6 +18,8 @@ import {
 } from "./receipt-match-config";
 import {
   MAX_CATEGORY_RULES,
+  MAX_LINK_DAYS_BEFORE,
+  MAX_LINK_DOMAINS,
   MAX_BALANCE_TOLERANCE_UNITS,
   MAX_PROFILE_CATEGORY_NAME_LENGTH,
   MAX_PROFILE_TAG_LENGTH,
@@ -31,6 +37,7 @@ import {
   RECEIPT_LINES_SOURCES,
   RECEIPT_MATCH_STRATEGIES,
   RECEIPT_MATCH_TEXT_FIELDS,
+  RECEIPT_PARSER_ROLES,
   RECEIPT_PARSER_VERSION,
   ReceiptBlockItemsDefinition,
   ReceiptCategoryRule,
@@ -39,11 +46,13 @@ import {
   ReceiptFieldEntry,
   ReceiptItemsDefinition,
   ReceiptLabelledPattern,
+  ReceiptLinkDefinition,
   ReceiptLinesSource,
   ReceiptMatchDefinition,
   ReceiptMatchStrategy,
   ReceiptMatchTextField,
   ReceiptParserDefinition,
+  ReceiptParserRole,
   ReceiptRecordStep,
   ReceiptSingleItemsDefinition,
   ReceiptTradeAccountRule,
@@ -82,6 +91,17 @@ export interface ReceiptParserValidationError {
    * none), `too_many_lines` (a multi-line pattern over `MAX_PATTERN_LINES`
    * parts), `line_break_not_allowed` (a multi-line pattern where one text is
    * matched: a category rule's item name or payee, a trade account rule).
+   *
+   * Linked receipts: `role_invalid` (`role` is not one of the three),
+   * `link_key_requires_component` (`linkKey` without `role: "component"`),
+   * `link_key_missing` (a component without `linkKey`),
+   * `link_capture_requires_settlement` (`{link}` or `{instalment}` in an item
+   * pattern or record step of a profile that is not a settlement),
+   * `link_requires_settlement` (a `link` section without `role: "settlement"`),
+   * `link_domain_invalid` (a `link.fromDomains` entry the profile domain rules
+   * refuse, or a list that is empty or over 10), `link_days_invalid`
+   * (`link.daysBefore` is not an integer from 0 to 365), `role_trade_conflict`
+   * (a `trade` section with a role other than `standalone`).
    */
   code: string;
 }
@@ -120,8 +140,10 @@ const AMOUNT_CAPTURES: FieldCaptures = {
   allowed: ["amount"],
   required: ["amount"],
 };
+/** The item captures only a settlement part may hold. */
+const LINK_ITEM_CAPTURES: readonly string[] = ["link", "instalment"];
 const ITEM_CAPTURES: FieldCaptures = {
-  allowed: ["name", "amount", "price", "qty"],
+  allowed: ["name", "amount", "price", "qty", ...LINK_ITEM_CAPTURES],
   required: ["name"],
 };
 
@@ -143,6 +165,9 @@ const TOP_LEVEL_KEYS: readonly string[] = [
   "payee",
   "reference",
   "match",
+  "role",
+  "linkKey",
+  "link",
   "tag",
   "aiCategories",
   "balanceTolerance",
@@ -185,6 +210,7 @@ const CURRENCY_CODE = /^[A-Z]{3}$/;
 const TRADE_COMPATIBLE_KEYS: readonly string[] = [
   "version",
   "source",
+  "role",
   "trade",
   "requireLine",
   "skipIfLine",
@@ -211,6 +237,7 @@ const MATCH_KEYS: readonly string[] = [
   "daysAfter",
   "amountTolerance",
 ];
+const LINK_KEYS: readonly string[] = ["fromDomains", "daysBefore"];
 const LABELLED_KEYS: readonly string[] = ["label", "value", "within"];
 const RECORD_STEP_KEYS: readonly string[] = ["line", "optional"];
 const NO_CAPTURES: FieldCaptures = { allowed: [], required: [] };
@@ -488,6 +515,7 @@ function checkGlobList(
 function checkStepLine(
   value: unknown,
   path: string,
+  settlement: boolean,
   errors: Errors,
 ): { line: string | string[]; names: Set<string> } | null {
   const before = errors.list.length;
@@ -510,6 +538,9 @@ function checkStepLine(
     if (found.includes("amount") && found.includes("price")) {
       errors.add(at, "capture_conflict");
     }
+    if (!settlement && found.some((n) => LINK_ITEM_CAPTURES.includes(n))) {
+      errors.add(at, "link_capture_requires_settlement");
+    }
     found.forEach((name) => names.add(name));
   });
   return errors.list.length === before
@@ -526,6 +557,7 @@ function checkStepLine(
  */
 function checkRecord(
   value: unknown,
+  settlement: boolean,
   errors: Errors,
 ): ReceiptRecordStep[] | null {
   const path = "items.record";
@@ -552,7 +584,7 @@ function checkRecord(
     }
     checkKeys(entry, RECORD_STEP_KEYS, `${stepPath}.`, errors);
     const linePath = `${stepPath}.line`;
-    const line = checkStepLine(entry.line, linePath, errors);
+    const line = checkStepLine(entry.line, linePath, settlement, errors);
     if (entry.optional !== undefined && typeof entry.optional !== "boolean") {
       errors.add(`${stepPath}.optional`, "invalid_type");
     }
@@ -592,7 +624,11 @@ type ItemsDefinition =
  * optional `joinWrapped`), `record` (items that span lines, with optional
  * `skipLines`) and `single` (one item for the whole email).
  */
-function checkItems(value: unknown, errors: Errors): ItemsDefinition | null {
+function checkItems(
+  value: unknown,
+  settlement: boolean,
+  errors: Errors,
+): ItemsDefinition | null {
   if (!isPlainObject(value)) {
     errors.add("items", "invalid_type");
     return null;
@@ -643,7 +679,7 @@ function checkItems(value: unknown, errors: Errors): ItemsDefinition | null {
   }
 
   if (hasRecord) {
-    const record = checkRecord(value.record, errors);
+    const record = checkRecord(value.record, settlement, errors);
     let skipLines: string[] | undefined;
     if (value.skipLines !== undefined) {
       skipLines =
@@ -675,6 +711,20 @@ function checkItems(value: unknown, errors: Errors): ItemsDefinition | null {
   );
   if (patterns !== null) {
     checkItemPriceCaptures(patterns as string[], "items.patterns", errors);
+    if (!settlement) {
+      (patterns as string[]).forEach((pattern, index) => {
+        if (
+          parseGlob(pattern).captureNames.some((n) =>
+            LINK_ITEM_CAPTURES.includes(n),
+          )
+        ) {
+          errors.add(
+            `items.patterns[${index}]`,
+            "link_capture_requires_settlement",
+          );
+        }
+      });
+    }
   }
   return errors.list.length === before && patterns !== null
     ? {
@@ -877,6 +927,57 @@ function checkMatch(
       } else {
         out.amountTolerance = value.amountTolerance;
       }
+    }
+  }
+  return errors.list.length === before ? out : null;
+}
+
+/**
+ * The `link` section of a settlement: `fromDomains` (1 to 10 sender domains,
+ * checked by the rule the profile's own `fromDomains` use and stored
+ * normalized) and `daysBefore` (an integer from 0 to 365).
+ */
+function checkLink(
+  value: unknown,
+  errors: Errors,
+): ReceiptLinkDefinition | null {
+  if (!isPlainObject(value)) {
+    errors.add("link", "invalid_type");
+    return null;
+  }
+  const before = errors.list.length;
+  checkKeys(value, LINK_KEYS, "link.", errors);
+  const out: ReceiptLinkDefinition = {};
+  if (value.fromDomains !== undefined) {
+    const path = "link.fromDomains";
+    const list = value.fromDomains;
+    if (
+      !Array.isArray(list) ||
+      list.length === 0 ||
+      list.length > MAX_LINK_DOMAINS
+    ) {
+      errors.add(path, "link_domain_invalid");
+    } else {
+      const domains: string[] = [];
+      list.forEach((entry, index) => {
+        const domain = normalizeReceiptDomain(entry);
+        if (isReceiptDomain(domain)) domains.push(domain as string);
+        else errors.add(`${path}[${index}]`, "link_domain_invalid");
+      });
+      if (domains.length === list.length) out.fromDomains = domains;
+    }
+  }
+  if (value.daysBefore !== undefined) {
+    const days = value.daysBefore;
+    if (
+      typeof days !== "number" ||
+      !Number.isInteger(days) ||
+      days < 0 ||
+      days > MAX_LINK_DAYS_BEFORE
+    ) {
+      errors.add("link.daysBefore", "link_days_invalid");
+    } else {
+      out.daysBefore = days;
     }
   }
   return errors.list.length === before ? out : null;
@@ -1154,6 +1255,15 @@ export function validateReceiptParserDefinition(
       errors.add("source", "invalid_value");
     }
   }
+  let role: ReceiptParserRole | undefined;
+  if (input.role !== undefined) {
+    if (RECEIPT_PARSER_ROLES.includes(input.role as ReceiptParserRole)) {
+      role = input.role as ReceiptParserRole;
+      out.role = role;
+    } else {
+      errors.add("role", "role_invalid");
+    }
+  }
   const fields: [
     (
       | "orderId"
@@ -1180,6 +1290,30 @@ export function validateReceiptParserDefinition(
     if (input[field] === undefined) continue;
     const patterns = checkPatternList(input[field], field, captures, errors, 0);
     if (patterns !== null) out[field] = patterns;
+  }
+  if (input.linkKey !== undefined) {
+    if (role !== "component")
+      errors.add("linkKey", "link_key_requires_component");
+    const patterns = checkPatternList(
+      input.linkKey,
+      "linkKey",
+      captureOf("link"),
+      errors,
+      0,
+    );
+    if (patterns !== null) out.linkKey = patterns;
+  }
+  if (
+    role === "component" &&
+    (input.linkKey === undefined ||
+      (Array.isArray(input.linkKey) && input.linkKey.length === 0))
+  ) {
+    errors.add("linkKey", "link_key_missing");
+  }
+  if (input.link !== undefined) {
+    if (role !== "settlement") errors.add("link", "link_requires_settlement");
+    const link = checkLink(input.link, errors);
+    if (link !== null) out.link = link;
   }
   if (input.discard !== undefined) {
     // Anything that is not one of the two modes is the same refusal, whatever its type.
@@ -1212,6 +1346,9 @@ export function validateReceiptParserDefinition(
     const trade = checkTrade(input.trade, errors);
     if (trade !== null) out.trade = trade;
     // A trade profile reads a brokerage confirmation, nothing else.
+    if (role !== undefined && role !== "standalone") {
+      errors.add("role", "role_trade_conflict");
+    }
     for (const key of Object.keys(input)) {
       if (
         TOP_LEVEL_KEYS.includes(key) &&
@@ -1222,7 +1359,7 @@ export function validateReceiptParserDefinition(
     }
   }
   if (input.items !== undefined) {
-    const items = checkItems(input.items, errors);
+    const items = checkItems(input.items, role === "settlement", errors);
     if (items !== null) out.items = items;
   }
   if (input.categoryRules !== undefined) {

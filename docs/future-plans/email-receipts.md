@@ -80,8 +80,9 @@ section 10.5).
    receipt's proposal is a request of kind `email_receipt`. The receipts page
    (`/email-receipts`) lists every stored email with its state and the actions
    on it (link to a transaction, reprocess, recognize with AI, draft a parser with
-   AI, ignore, delete). Up to five emails can be selected there and a parser
-   drafted from them together.
+   AI, ignore, delete). Up to 25 emails (at most five per sender, at most five senders:
+   `docs/specs/email-receipt-linked-receipts.md` 10a) can be selected there and
+   parsers drafted from them together.
 6. **AI mode and "Recognize with AI".** AI mode is per mailbox: `off` (the poll
    never calls the AI for receipts), `on_demand` and `automatic` (the poll asks
    the AI, bounded per tick, for a matched receipt no approved parser could
@@ -121,7 +122,7 @@ section 10.5).
    buttons use the same decision.
 
    **"Draft parser with AI"** is the same hand-off for a parser instead of a
-   proposal, from one to five emails: `POST /email-receipt-parsers/draft-with-ai`
+   proposal, from one to 25 emails of up to five senders (five per sender): `POST /email-receipt-parsers/draft-with-ai`
    queues a `pending` request of kind `email_parser_draft` (fixed instruction
    `RECEIPT_PARSER_DRAFT_INSTRUCTION`; no provider call), then the chat opens with
    each email attached as a text file (its id in the header) and the message
@@ -784,7 +785,7 @@ user -> link to a transaction (any state but ignored) -> propose
         -> the assistant claims it by id and submits -> proposed
         (no provider, or a relay agent not connected: stays pending in the
         inbox for an agent)
-user -> draft parser with AI (1 to 5 emails, any AI mode)
+user -> draft parser with AI (1 to 25 emails, 5 per sender, any AI mode)
         -> request email_parser_draft pending (no transaction, no email state
            change), chat opened with the emails (or it waits in the inbox)
         -> the assistant claims it by id, tests, save_draft -> proposed
@@ -933,15 +934,16 @@ Module `backend/src/email-receipts/`:
   sanitized, truncated and framed as untrusted data.
 - `EmailReceiptParsersService` + controller: CRUD, approve, test against a
   stored receipt, and `requestAiDraft` (`POST /email-receipt-parsers/draft-with-ai`
-  `{ receiptIds }`: 1 to 5 distinct emails of the user, none skipped; queues the
-  request, calls no provider). Approving a parser marks the `proposed`
+  `{ receiptIds }`: 1 to 25 distinct emails of the user, none skipped, at most five
+  per sender domain and five domains (a trade draft: one domain), a 400 before any
+  write otherwise; queues the request, calls no provider). Approving a parser marks the `proposed`
   parser-draft request that proposed it `applied`, deleting it dismisses that
   request, each in the transaction of the change itself.
 - `EmailReceiptParserToolsService` (module `EmailReceiptParsersModule`, a leaf the
   assistant's executor, the MCP server and `EmailReceiptsModule` all import, so
   the AI module needs no edge to the receipts module): the logic of the shared AI
   tool `email_receipt_parsers`. `categories` lists the user's category ids;
-  `test` reads 1 to 5 stored emails with an unsaved definition and returns what
+  `test` reads 1 to 25 stored emails with an unsaved definition and returns what
   each parsed (decimal amounts, category names, `valid` / `errors` /
   `unknownCategoryIds` / `allComplete`), writing nothing; `save_draft` stores a
   `draft` parser of source `ai` through the one validator (payee resolved with
@@ -1065,7 +1067,7 @@ section 3a.
   again after every command), the receipts table with state
   badges and actions (a checkbox column selects any number of emails; the selection
   bar offers Delete, Ignore and "Prepare a profile with AI (N)", which is on only
-  for one to five emails of one sender and says beside it why it is off, see "Bulk
+  for one to 25 emails (five per sender, five senders) and says beside it why it is off, see "Bulk
   actions" below; the row's own "Draft parser with AI" is the inline action of an
   email no parser read and "Create parser" is in the menu); a detail dialog with the email (HTML in the sandboxed frame by
   default, an HTML / Text / Lines toggle, the note "Remote images are not
@@ -1099,7 +1101,7 @@ section 3a.
   Ignore follows the single `ignore()` rules: an already ignored email is `unchanged`;
   a `skipped` email or one whose proposal was applied is `notIgnorable`. The route is
   owner-only like the others and throttled to 10 a minute. "Prepare a profile with AI"
-  stays limited to one to five emails of one sender and never works on a filter.
+  stays limited to one to 25 emails (five per sender, five senders) and never works on a filter.
   The filter also takes `excludeStatuses`, `excludeDomains`, `receivedFrom` and
   `receivedTo`, and `POST /email-receipts/bulk/count`, `bulk/reprocess` and
   `bulk/approvable` act on the same selection (`receiptSelectionClause`); the plan

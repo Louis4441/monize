@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
 import { tr } from "../../i18n/translate";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import { removeLinkRows } from "../linking/link-rows";
 import {
   closeReceiptRequests,
   currentReceiptRequestStatus,
@@ -65,8 +66,8 @@ export const receiptSkippedConflict = (): ConflictException =>
   );
 
 /**
- * Mark a locked email ignored: its open request is closed and it proposes
- * nothing. The caller has refused an email that was skipped or applied.
+ * Mark a locked email ignored: its open request is closed, its link rows are
+ * deleted and it proposes nothing. The caller has refused an email that was skipped or applied.
  */
 export async function ignoreLockedReceipt(
   m: EntityManager,
@@ -77,12 +78,17 @@ export async function ignoreLockedReceipt(
     await lockReceiptTransaction(m, receipt.transactionId);
   }
   await closeReceiptRequests(m, userId, receipt.id);
-  await m
-    .getRepository(EmailReceipt)
-    .update(
-      { id: receipt.id, userId },
-      { status: "ignored", statusReason: null, aiReviewRequestId: null },
-    );
+  // An ignored settlement takes nothing from a component (linked receipts spec 5).
+  await removeLinkRows(m, userId, [receipt.id]);
+  await m.getRepository(EmailReceipt).update(
+    { id: receipt.id, userId },
+    {
+      status: "ignored",
+      statusReason: null,
+      aiReviewRequestId: null,
+      linkKey: null,
+    },
+  );
 }
 
 /** Delete a locked email; its open request is dismissed in the same transaction. */
@@ -95,5 +101,8 @@ export async function deleteLockedReceipt(
     await lockReceiptTransaction(m, receipt.transactionId);
   }
   await closeReceiptRequests(m, userId, receipt.id);
+  // The rows go through the helper first, so a component only this settlement
+  // used falls back to awaiting_settlement (the cascade would leave its reason).
+  await removeLinkRows(m, userId, [receipt.id]);
   await m.getRepository(EmailReceipt).delete({ id: receipt.id, userId });
 }

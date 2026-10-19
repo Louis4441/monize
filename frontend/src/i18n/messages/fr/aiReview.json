@@ -57,7 +57,8 @@
     "waitingForAgent": "En attente d'un agent IA. <link>Connectez un fournisseur d'IA dans les Paramètres</link> ou laissez un client MCP la prendre en charge.",
     "parserDraftReady": "Brouillon d'profil prêt. <link>Testez-le et approuvez-le dans les paramètres des profils</link>.",
     "tradePending": "Une opération provenant d'un courriel, pas encore lue",
-    "tradeEmail": "E-mail de confirmation d'opération"
+    "tradeEmail": "E-mail de confirmation d'opération",
+    "parserDraftIds": "ID des brouillons de profil : {ids}"
   },
   "actions": {
     "dismiss": "Ignorer"

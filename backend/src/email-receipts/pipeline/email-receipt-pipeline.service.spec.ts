@@ -18,6 +18,17 @@ import type { EmailReceiptCategoryAiService } from "../ai/email-receipt-category
 import { EmailReceiptMailbox } from "../entities/email-receipt-mailbox.entity";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import {
+  ALLEGRO_PAY_COMPONENT_DEFINITION,
+  ALLEGRO_PAY_CONTRACT_1,
+  ALLEGRO_PAY_CONTRACT_2,
+  ALLEGRO_PAY_PURCHASE_LINES,
+  ALLEGRO_PAY_PURCHASE_SUBJECT,
+  ALLEGRO_PAY_REPAYMENT_LINES,
+  ALLEGRO_PAY_REPAYMENT_SUBJECT,
+  ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+} from "../parsing/fixtures/allegro-pay-mails";
+import { parseReceiptLines } from "../parsing/parse-receipt";
 import type {
   ParsedReceipt,
   ParsedTrade,
@@ -196,6 +207,20 @@ interface World {
   requestStatus: string | null;
   /** The kind of the request the receipt stands behind; `email_receipt` by default. */
   requestKind?: string;
+  /** Linked receipts: what the component search finds (`FROM email_receipts r`). */
+  componentRows?: Array<Record<string, unknown>>;
+  /** Units-of-money other settlements took from a component (`SUM(part_amount) AS taken`). */
+  takenRows?: Array<Record<string, unknown>>;
+  /** The component profiles' tags (`definition->>'tag'`). */
+  tagRows?: Array<Record<string, unknown>>;
+  /** What the link rows say about a component (`COUNT(*) AS used`). */
+  usedRow?: Record<string, unknown>;
+  /** The settlements waiting for a component's link value (`SELECT s.id`). */
+  waitingRows?: Array<Record<string, unknown>>;
+  /** The status of a waiting settlement's request (`SELECT q.status`); none when absent. */
+  rejoinStatusRows?: Array<Record<string, unknown>>;
+  /** The components the deleted link rows named (`RETURNING component_receipt_id`). */
+  deletedLinkRows?: Array<Record<string, unknown>>;
 }
 
 function setup(over: Partial<World> = {}) {
@@ -251,6 +276,18 @@ function setup(over: Partial<World> = {}) {
               kind: world.requestKind ?? "email_receipt",
             },
           ];
+    }
+    if (text.includes("SELECT s.id")) return world.waitingRows ?? [];
+    if (text.includes("SELECT q.status")) return world.rejoinStatusRows ?? [];
+    if (text.includes("RETURNING component_receipt_id"))
+      return world.deletedLinkRows ?? [];
+    if (text.includes("FROM email_receipts r"))
+      return world.componentRows ?? [];
+    if (text.includes("SUM(part_amount) AS taken"))
+      return world.takenRows ?? [];
+    if (text.includes("definition->>'tag'")) return world.tagRows ?? [];
+    if (text.includes("COUNT(*) AS used")) {
+      return [world.usedRow ?? { used: "0", taken: "0" }];
     }
     if (text.includes("JOIN accounts a")) return world.candidates;
     if (text.includes("WHERE t.id = $1")) {
@@ -328,6 +365,663 @@ const run = (
   h: ReturnType<typeof setup>,
   options: ProcessReceiptOptions = {},
 ) => h.service.process(USER, RECEIPT, options);
+
+const queriesOf = (h: ReturnType<typeof setup>, fragment: string) =>
+  h.manager.query.mock.calls.filter(([sql]) => String(sql).includes(fragment));
+
+/** The text of the purchase for contract 2, read as the profile reads it. */
+const COMPONENT_DEFINITION = {
+  ...ALLEGRO_PAY_COMPONENT_DEFINITION,
+  defaultCategoryId: CAT_BOOKS,
+  shippingCategoryId: CAT_SHIPPING,
+};
+const SETTLEMENT_DEFINITION = {
+  ...ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+  defaultCategoryId: CAT_BOOKS,
+};
+
+const COMPONENT_PARSED = parseReceiptLines(
+  COMPONENT_DEFINITION,
+  ALLEGRO_PAY_PURCHASE_SUBJECT,
+  ALLEGRO_PAY_PURCHASE_LINES,
+  null,
+);
+
+describe("EmailReceiptPipelineService.process: linked receipts", () => {
+  const COMPONENT_PARSER = "parser-component";
+  const COMPONENT_RECEIPT = "receipt-component";
+
+  const componentWorld = (over: Partial<World> = {}) =>
+    setup({
+      receipt: receiptRow({
+        fromDomain: "shop.example.com",
+        subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+        bodyText: ALLEGRO_PAY_PURCHASE_LINES.join("\n"),
+      }),
+      parsers: [
+        parserRow({
+          id: COMPONENT_PARSER,
+          definition: COMPONENT_DEFINITION as never,
+        }),
+      ],
+      ...over,
+    });
+
+  const settlementWorld = (over: Partial<World> = {}) =>
+    setup({
+      receipt: receiptRow({
+        fromDomain: "pay.example.com",
+        subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+        receivedAt: new Date("2026-01-10T10:00:00Z"),
+        bodyText: ALLEGRO_PAY_REPAYMENT_LINES.join("\n"),
+      }),
+      parsers: [
+        parserRow({
+          id: "parser-settlement",
+          fromDomains: ["pay.example.com"],
+          definition: SETTLEMENT_DEFINITION as never,
+        }),
+      ],
+      candidates: [
+        candidate({ amount: "-272.8900", transaction_date: "2026-01-10" }),
+      ],
+      componentRows: [
+        {
+          id: COMPONENT_RECEIPT,
+          link_key: ALLEGRO_PAY_CONTRACT_2,
+          subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+          effective_date: "2025-12-15",
+          parsed: COMPONENT_PARSED,
+          parser_id: COMPONENT_PARSER,
+        },
+      ],
+      tagRows: [{ id: COMPONENT_PARSER, tag: "Allegro" }],
+      ...over,
+    });
+
+  describe("a component email", () => {
+    it("is stored as component with its link key, and never looks for a transaction or opens a request", async () => {
+      const h = componentWorld();
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "component",
+        statusReason: "awaiting_settlement",
+        transactionId: null,
+        matchKind: null,
+        requestId: null,
+      });
+      expect(h.lastUpdate()[1]).toMatchObject({
+        status: "component",
+        statusReason: "awaiting_settlement",
+        linkKey: ALLEGRO_PAY_CONTRACT_2,
+        transactionId: null,
+        candidateTransactionIds: [],
+        aiReviewRequestId: null,
+      });
+      expect(queriesOf(h, "JOIN accounts a")).toHaveLength(0);
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+      expect(h.requests.enqueuePendingForReceipt).not.toHaveBeenCalled();
+      expect(h.order).toContain("close");
+      expect(h.order).not.toContain("advisory");
+    });
+
+    it("holds settled when the parts took its whole net, instalment when part of it", async () => {
+      let h = componentWorld({ usedRow: { used: "1", taken: "163.0000" } });
+      expect((await run(h)).statusReason).toBe("settled");
+      h = componentWorld({ usedRow: { used: "2", taken: "100.0000" } });
+      expect((await run(h)).statusReason).toBe("instalment");
+    });
+
+    it("is parse_failed no_link_key when the email holds no link value", async () => {
+      const h = componentWorld({
+        receipt: receiptRow({
+          fromDomain: "shop.example.com",
+          bodyText: ALLEGRO_PAY_PURCHASE_LINES.filter(
+            (line) => !line.includes("Allegro Pay") && !line.includes("umowa"),
+          ).join("\n"),
+        }),
+      });
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "parse_failed",
+        statusReason: "no_link_key",
+      });
+      expect(h.lastUpdate()[1]).toMatchObject({ linkKey: null });
+      expect(queriesOf(h, "JOIN accounts a")).toHaveLength(0);
+    });
+
+    it("is read as a standalone email when a person links it to a transaction", async () => {
+      const h = componentWorld({
+        linkRow: {
+          id: TX,
+          amount: "-163.0000",
+          description: null,
+          payee_id: null,
+          reference_number: null,
+          is_transfer: false,
+          status: "UNRECONCILED",
+          plain: true,
+        },
+      });
+      const result = await run(h, { link: { transactionId: TX } });
+      expect(result.status).not.toBe("component");
+      expect(result.matchKind).toBe("manual");
+      expect(h.lastUpdate()[1]).toMatchObject({ linkKey: null });
+    });
+  });
+
+  describe("a settlement email", () => {
+    it("matches, proposes and stores the joined reading, with its link rows and the component's reason", async () => {
+      const h = settlementWorld();
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "review",
+        statusReason: "partially_linked",
+        transactionId: TX,
+      });
+      const stored = h.lastUpdate()[1].parsed as ParsedReceipt;
+      expect(
+        stored.items.map((item) => [item.name, item.amount, item.kind]),
+      ).toEqual([
+        ["Klocki drewniane zestaw", 1098900, undefined],
+        ["Kawa ziarnista 250 g", 1400000, "item"],
+        ["Filtry papierowe 100 szt.", 100000, "item"],
+        ["shipping", 130000, "shipping"],
+      ]);
+      expect(stored.links?.map((l) => l.outcome)).toEqual([
+        "not_found",
+        "joined",
+      ]);
+      const [, values] = queriesOf(h, "INSERT INTO email_receipt_links")[0];
+      expect(values).toEqual([
+        USER,
+        RECEIPT,
+        0,
+        ALLEGRO_PAY_CONTRACT_1,
+        "109.8900",
+        null,
+        "not_found",
+        1,
+        ALLEGRO_PAY_CONTRACT_2,
+        "163.0000",
+        COMPONENT_RECEIPT,
+        "joined",
+      ]);
+      expect(
+        queriesOf(h, "UPDATE email_receipts SET status_reason")[0][1],
+      ).toEqual(["settled", COMPONENT_RECEIPT, USER]);
+      // A reason is written to a row that is still a component only.
+      expect(
+        String(queriesOf(h, "UPDATE email_receipts SET status_reason")[0][0]),
+      ).toContain("status = 'component'");
+      const [, , , input] = h.work.submit.mock.calls[0];
+      expect(input.tagNames).toEqual(["Allegro"]);
+    });
+
+    it("locks the component rows, after the receipt's own row and before the advisory lock", async () => {
+      const h = settlementWorld();
+      await run(h);
+      const sqls = h.manager.query.mock.calls.map(([sql]) => String(sql));
+      const lookup = sqls.findIndex((sql) =>
+        sql.includes("FROM email_receipts r"),
+      );
+      const advisory = sqls.findIndex((sql) =>
+        sql.includes("pg_advisory_xact_lock"),
+      );
+      expect(sqls[lookup]).toContain("FOR UPDATE OF r");
+      expect(lookup).toBeGreaterThanOrEqual(0);
+      expect(lookup).toBeLessThan(advisory);
+    });
+
+    it("equals a single-email reading when no component is stored: one line per part", async () => {
+      const h = settlementWorld({ componentRows: [] });
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "review",
+        statusReason: "partially_linked",
+      });
+      const stored = h.lastUpdate()[1].parsed as ParsedReceipt;
+      expect(stored.items.map((item) => item.amount)).toEqual([
+        1098900, 1630000,
+      ]);
+      expect(stored.links?.map((l) => l.outcome)).toEqual([
+        "not_found",
+        "not_found",
+      ]);
+      expect(
+        queriesOf(h, "UPDATE email_receipts SET status_reason"),
+      ).toHaveLength(0);
+      const [, , , input] = h.work.submit.mock.calls[0];
+      expect(input.tagNames).toBeUndefined();
+    });
+
+    it("asks for the enriched candidates, a standalone email does not", async () => {
+      const h = settlementWorld();
+      await run(h);
+      expect(queriesOf(h, "LEFT JOIN LATERAL")).toHaveLength(1);
+      const standalone = setup();
+      await run(standalone);
+      expect(queriesOf(standalone, "LEFT JOIN LATERAL")).toHaveLength(0);
+      expect(queriesOf(standalone, "applied.status = 'applied'")).toHaveLength(
+        1,
+      );
+    });
+
+    it("replaces the enrichment of a component it joins: proposed as usual", async () => {
+      const h = settlementWorld({
+        candidates: [
+          candidate({
+            amount: "-272.8900",
+            transaction_date: "2026-01-10",
+            enriched_by_receipt_id: COMPONENT_RECEIPT,
+          }),
+        ],
+      });
+      const result = await run(h);
+      expect(result).toMatchObject({ status: "review", transactionId: TX });
+      expect(h.requests.enqueueClaimed).toHaveBeenCalledTimes(1);
+    });
+
+    it("is a review_conflict, enriched_by_other, when another email enriched the transaction", async () => {
+      const h = settlementWorld({
+        candidates: [
+          candidate({
+            amount: "-272.8900",
+            transaction_date: "2026-01-10",
+            enriched_by_receipt_id: "receipt-unrelated",
+          }),
+        ],
+      });
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "review_conflict",
+        statusReason: "enriched_by_other",
+        transactionId: null,
+        requestId: null,
+      });
+      expect(h.lastUpdate()[1]).toMatchObject({
+        candidateTransactionIds: [TX],
+        transactionId: null,
+        aiReviewRequestId: null,
+      });
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+      expect(queriesOf(h, "INSERT INTO email_receipt_links")).toHaveLength(1);
+    });
+
+    it("never auto-applies a join", async () => {
+      const h = settlementWorld({ mailbox: mailboxRow({ autoApply: true }) });
+      const result = await run(h);
+      expect(result.autoApplied).toBe(false);
+      expect(h.actions.confirm).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a component that arrives after its settlement (spec 8)", () => {
+    /** Stub the nested processing of the waiting settlements; the component's own run is real. */
+    const spyNested = (h: ReturnType<typeof setup>) => {
+      const real = h.service.process.bind(h.service);
+      const spy = jest
+        .spyOn(h.service, "process")
+        .mockImplementation(async (user, id, options) =>
+          id === RECEIPT
+            ? real(user, id, options)
+            : ({ status: "review", unchanged: false } as never),
+        );
+      return spy;
+    };
+
+    it("returns the waiting settlements, newest first, from a query that excludes the component itself", async () => {
+      const h = componentWorld({
+        waitingRows: [{ id: "settlement-new" }, { id: "settlement-old" }],
+        rejoinStatusRows: [{ status: null }],
+      });
+      const spy = spyNested(h);
+      await run(h);
+      const [sql, values] = queriesOf(h, "SELECT s.id")[0];
+      expect(String(sql)).toContain("l.component_receipt_id IS NULL");
+      expect(String(sql)).toContain("ORDER BY COALESCE(s.original_sent_at");
+      expect(values).toEqual([USER, RECEIPT, ALLEGRO_PAY_CONTRACT_2, 20]);
+      expect(spy.mock.calls.slice(1).map(([, id]) => id)).toEqual([
+        "settlement-new",
+        "settlement-old",
+      ]);
+    });
+
+    it("reads a settlement that is not applied again as an ordinary automatic pass", async () => {
+      const h = componentWorld({
+        waitingRows: [{ id: "settlement-1" }],
+        rejoinStatusRows: [{ status: "proposed" }],
+      });
+      const spy = spyNested(h);
+      await run(h);
+      expect(spy).toHaveBeenLastCalledWith(USER, "settlement-1", {
+        onlyWhenStatusIn: [
+          "unmatched",
+          "ambiguous",
+          "review",
+          "review_conflict",
+          "parse_failed",
+        ],
+      });
+    });
+
+    it("also reads a settlement with no request at all that way", async () => {
+      const h = componentWorld({
+        waitingRows: [{ id: "settlement-1" }],
+        rejoinStatusRows: [{ status: null }],
+      });
+      const spy = spyNested(h);
+      await run(h);
+      expect(spy.mock.calls[1][2]).toMatchObject({
+        onlyWhenStatusIn: expect.arrayContaining(["unmatched"]),
+      });
+    });
+
+    it("re-joins a settlement whose request was applied", async () => {
+      const h = componentWorld({
+        waitingRows: [{ id: "settlement-1" }],
+        rejoinStatusRows: [{ status: "applied" }],
+      });
+      const spy = spyNested(h);
+      await run(h);
+      expect(spy).toHaveBeenLastCalledWith(USER, "settlement-1", {
+        rejoin: true,
+      });
+    });
+
+    it("logs a failure of a settlement, goes on to the next and keeps the component's result", async () => {
+      const h = componentWorld({
+        waitingRows: [{ id: "settlement-1" }, { id: "settlement-2" }],
+        rejoinStatusRows: [{ status: "proposed" }],
+      });
+      const real = h.service.process.bind(h.service);
+      const spy = jest
+        .spyOn(h.service, "process")
+        .mockImplementation(async (user, id, options) => {
+          if (id === RECEIPT) return real(user, id, options);
+          if (id === "settlement-1") throw new Error("boom with data");
+          return { status: "review" } as never;
+        });
+      const warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
+      const result = await run(h);
+      expect(result.status).toBe("component");
+      expect(spy.mock.calls.map(([, id]) => id)).toEqual([
+        RECEIPT,
+        "settlement-1",
+        "settlement-2",
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("A waiting settlement could not be read again"),
+      );
+      warn.mockRestore();
+    });
+
+    it("reads nothing again when no settlement waits, and never for a component that failed to read", async () => {
+      const h = componentWorld();
+      const spy = spyNested(h);
+      await run(h);
+      expect(spy).toHaveBeenCalledTimes(1);
+      const failed = componentWorld({
+        receipt: receiptRow({
+          fromDomain: "shop.example.com",
+          bodyText: ALLEGRO_PAY_PURCHASE_LINES.filter(
+            (line) => !line.includes("Allegro Pay") && !line.includes("umowa"),
+          ).join("\n"),
+        }),
+        waitingRows: [{ id: "settlement-1" }],
+      });
+      const failedSpy = spyNested(failed);
+      await run(failed);
+      expect(queriesOf(failed, "SELECT s.id")).toHaveLength(0);
+      expect(failedSpy).toHaveBeenCalledTimes(1);
+    });
+
+    describe("the re-join of an applied settlement", () => {
+      /** The reading a settlement stored before its component existed. */
+      const storedBefore = async (): Promise<ParsedReceipt> => {
+        const first = settlementWorld({ componentRows: [] });
+        await run(first);
+        return first.lastUpdate()[1].parsed as ParsedReceipt;
+      };
+      const linkRow = {
+        id: TX,
+        amount: "-272.8900",
+        description: null,
+        payee_id: null,
+        reference_number: null,
+        is_transfer: false,
+        status: "UNRECONCILED",
+        plain: true,
+      };
+      const appliedWorld = async (over: Partial<World> = {}) =>
+        settlementWorld({
+          receipt: receiptRow({
+            fromDomain: "pay.example.com",
+            subject: ALLEGRO_PAY_REPAYMENT_SUBJECT,
+            receivedAt: new Date("2026-01-10T10:00:00Z"),
+            bodyText: ALLEGRO_PAY_REPAYMENT_LINES.join("\n"),
+            status: "review",
+            statusReason: "partially_linked",
+            transactionId: TX,
+            matchKind: "amount_date",
+            aiReviewRequestId: "rq-applied",
+            parsed: (await storedBefore()) as never,
+          }),
+          requestStatus: "applied",
+          linkRow,
+          ...over,
+        });
+
+      it("proposes a new card on the stored transaction without matching again", async () => {
+        const h = await appliedWorld();
+        const result = await run(h, { rejoin: true });
+        expect(result).toMatchObject({
+          status: "review",
+          transactionId: TX,
+          matchKind: "amount_date",
+          requestId: "rq-1",
+          autoApplied: false,
+          unchanged: false,
+        });
+        expect(queriesOf(h, "JOIN accounts a")).toHaveLength(0);
+        expect(h.requests.enqueueClaimed).toHaveBeenCalledTimes(1);
+        expect(h.lastUpdate()[1]).toMatchObject({
+          transactionId: TX,
+          matchKind: "amount_date",
+          aiReviewRequestId: "rq-1",
+        });
+        // The applied request is never closed or rewritten.
+        expect(queriesOf(h, "SET status = 'rejected'")).toHaveLength(1);
+        expect(String(queriesOf(h, "SET status = 'rejected'")[0][0])).toContain(
+          "status IN ('pending', 'claimed', 'proposed')",
+        );
+        expect(queriesOf(h, "INSERT INTO email_receipt_links")).toHaveLength(1);
+        expect(
+          queriesOf(h, "UPDATE email_receipts SET status_reason")[0][1],
+        ).toEqual(["settled", COMPONENT_RECEIPT, USER]);
+        expect(h.actions.confirm).not.toHaveBeenCalled();
+      });
+
+      it("never auto-applies the new card", async () => {
+        const h = await appliedWorld({
+          mailbox: mailboxRow({ autoApply: true }),
+        });
+        const result = await run(h, { rejoin: true });
+        expect(result.autoApplied).toBe(false);
+        expect(h.actions.confirm).not.toHaveBeenCalled();
+      });
+
+      it("writes nothing when no part changed from not joined to joined", async () => {
+        const h = await appliedWorld({ componentRows: [] });
+        const result = await run(h, { rejoin: true });
+        expect(result.unchanged).toBe(true);
+        expect(h.receiptRepo.update).not.toHaveBeenCalled();
+        expect(queriesOf(h, "DELETE FROM email_receipt_links")).toHaveLength(0);
+        expect(queriesOf(h, "INSERT INTO email_receipt_links")).toHaveLength(0);
+        expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+        expect(h.order).not.toContain("close");
+      });
+
+      it("writes nothing when the part was already joined", async () => {
+        const stored = await storedBefore();
+        const already: ParsedReceipt = {
+          ...stored,
+          links: stored.links?.map((l) => ({
+            ...l,
+            outcome: "joined" as const,
+          })),
+        };
+        const h = await appliedWorld();
+        (h.world.receipt as EmailReceipt).parsed = already as never;
+        const result = await run(h, { rejoin: true });
+        expect(result.unchanged).toBe(true);
+        expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      });
+
+      it("leaves a settlement whose request is not applied alone", async () => {
+        const h = await appliedWorld({ requestStatus: "proposed" });
+        const result = await run(h, { rejoin: true });
+        expect(result.unchanged).toBe(true);
+        expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      });
+
+      it("leaves an email that is not read by a settlement profile alone", async () => {
+        const h = await appliedWorld({
+          parsers: [parserRow({ id: "other", definition: DEFINITION })],
+          receipt: receiptRow({
+            status: "review",
+            transactionId: TX,
+            matchKind: "amount_date",
+            aiReviewRequestId: "rq-applied",
+          }),
+        });
+        const result = await run(h, { rejoin: true });
+        expect(result.unchanged).toBe(true);
+        expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      });
+
+      it("leaves an email with no transaction alone", async () => {
+        const h = await appliedWorld();
+        (h.world.receipt as EmailReceipt).transactionId = null;
+        const result = await run(h, { rejoin: true });
+        expect(result.unchanged).toBe(true);
+        expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("an applied email read again as a component (spec 9)", () => {
+    const appliedPurchase = (over: Partial<World> = {}) =>
+      componentWorld({
+        receipt: receiptRow({
+          fromDomain: "shop.example.com",
+          subject: ALLEGRO_PAY_PURCHASE_SUBJECT,
+          bodyText: ALLEGRO_PAY_PURCHASE_LINES.join("\n"),
+          status: "review",
+          transactionId: TX,
+          matchKind: "amount_payee",
+          aiReviewRequestId: "rq-applied",
+        }),
+        requestStatus: "applied",
+        ...over,
+      });
+
+    it("becomes a component, keeps its transaction and the applied request, and answers no 409", async () => {
+      const h = appliedPurchase();
+      const result = await run(h);
+      expect(result).toMatchObject({
+        status: "component",
+        transactionId: TX,
+        matchKind: "amount_payee",
+        requestId: "rq-applied",
+      });
+      expect(h.lastUpdate()[1]).toMatchObject({
+        status: "component",
+        linkKey: ALLEGRO_PAY_CONTRACT_2,
+        transactionId: TX,
+        aiReviewRequestId: "rq-applied",
+      });
+      expect(h.order).not.toContain("close");
+      expect(h.requests.enqueueClaimed).not.toHaveBeenCalled();
+    });
+
+    it("does the same on an automatic pass that allows review", async () => {
+      const h = appliedPurchase();
+      const result = await run(h, { onlyWhenStatusIn: ["review"] });
+      expect(result.status).toBe("component");
+      expect(result.unchanged).toBe(false);
+    });
+
+    it("is refused for a person's link", async () => {
+      const h = appliedPurchase();
+      await expect(
+        run(h, { link: { transactionId: TX } }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("keeps the 409 when the chosen profile is a standalone one", async () => {
+      const h = setup({
+        receipt: receiptRow({ status: "review", aiReviewRequestId: "rq-old" }),
+        requestStatus: "applied",
+      });
+      await expect(run(h)).rejects.toBeInstanceOf(ConflictException);
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing, not even the forwarded identity, on an automatic pass over a standalone applied email", async () => {
+      const h = setup({
+        receipt: receiptRow({
+          status: "review",
+          aiReviewRequestId: "rq-old",
+          fromAddress: "me@mail.example.org",
+          fromDomain: "mail.example.org",
+          subject: "Fwd: Your order ABCD1234",
+          bodyText: [
+            "---------- Forwarded message ---------",
+            "From: Shop <orders@shop.example.com>",
+            "Date: Wed, 9 Sep 2026 at 10:00",
+            "Subject: Your order ABCD1234",
+            "To: me@mail.example.org",
+            "",
+            BODY,
+          ].join("\n"),
+        }),
+        requestStatus: "applied",
+      });
+      const result = await run(h, { onlyWhenStatusIn: ["review"] });
+      expect(result.unchanged).toBe(true);
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+    });
+
+    it("stays applied and unchanged when the component profile's guard would turn the email aside", async () => {
+      const h = appliedPurchase({
+        parsers: [
+          parserRow({
+            id: COMPONENT_PARSER,
+            definition: {
+              ...COMPONENT_DEFINITION,
+              skipIfLine: ["Allegro Pay"],
+            } as never,
+          }),
+        ],
+      });
+      const result = await run(h, { onlyWhenStatusIn: ["review"] });
+      expect(result.unchanged).toBe(true);
+      expect(h.receiptRepo.update).not.toHaveBeenCalled();
+      await expect(run(h)).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  it("clears the link rows on every outcome that never reached the join", async () => {
+    const h = setup({ receipt: receiptRow({ status: "review" }), parsers: [] });
+    await run(h);
+    const deletes = queriesOf(h, "DELETE FROM email_receipt_links");
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0][1]).toEqual([[RECEIPT], USER]);
+    expect(queriesOf(h, "INSERT INTO email_receipt_links")).toHaveLength(0);
+  });
+});
 
 describe("EmailReceiptPipelineService.process", () => {
   describe("the row and who may touch it", () => {
@@ -407,6 +1101,7 @@ describe("EmailReceiptPipelineService.process", () => {
           parsed: null,
           trade: null,
           investmentTransactionId: null,
+          linkKey: null,
           transactionId: null,
           candidateTransactionIds: [],
           matchKind: null,
@@ -1513,11 +2208,13 @@ describe("autoApplyAllowed", () => {
     proposalKind: "itemized",
     usedFallback: false,
     cardBuilt: true,
+    linked: false,
     ...over,
   });
 
   it("holds when every condition does", () => {
     expect(autoApplyAllowed(facts())).toBe(true);
+    expect(autoApplyAllowed(facts({ linked: true }))).toBe(false);
     expect(autoApplyAllowed(facts({ matchKind: "amount_payee" }))).toBe(true);
     // The profile's own identifier in the bank operation is as strong as an order number.
     expect(autoApplyAllowed(facts({ matchKind: "reference" }))).toBe(true);

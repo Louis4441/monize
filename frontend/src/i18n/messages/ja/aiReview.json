@@ -57,7 +57,8 @@
     "waitingForAgent": "AIエージェントを待っています。<link>設定でAIプロバイダーを接続する</link>か、MCPクライアントに引き受けさせてください。",
     "parserDraftReady": "プロフィールの下書きができました。<link>プロフィールの設定でテストして承認する</link>。",
     "tradePending": "メールの取引（未読み取り）",
-    "tradeEmail": "取引確認メール"
+    "tradeEmail": "取引確認メール",
+    "parserDraftIds": "プロフィール下書きのID: {ids}"
   },
   "actions": {
     "dismiss": "却下する"

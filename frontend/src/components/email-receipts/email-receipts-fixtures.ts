@@ -83,6 +83,7 @@ export function makeReceipt(overrides: Partial<EmailReceiptListItem> = {}): Emai
     matchKind: null,
     parserId: null,
     parserName: null,
+    linkKey: null,
     aiReviewRequestId: null,
     isTrade: false,
     tradeSource: null,
@@ -106,6 +107,9 @@ export function makeDetail(overrides: Partial<EmailReceiptDetail> = {}): EmailRe
     trade: null,
     tradeProposal: null,
     candidates: [],
+    linkedComponents: [],
+    linkedSettlements: [],
+    enrichedBy: null,
     ...overrides,
   };
 }

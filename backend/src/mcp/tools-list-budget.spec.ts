@@ -91,6 +91,13 @@ import { McpServerService } from "./mcp-server.service";
 // of the 200-character excerpt a queued instruction carries. Now 2,730
 // bytes measured; cap 2,620 -> 2,740 and total 63,050 -> 63,170 (63,158
 // measured); no other cap moved.
+//
+// Raised, as a reviewed decision approved by the maintainer (linked receipts spec
+// 10a: `test` takes `componentDrafts` on the MCP surface too): the new input
+// field `componentDrafts` (an array of {definition, fromDomains}, no prose: the
+// language guide explains it). `email_receipt_parsers` 2,730 -> 3,023 bytes
+// measured (+293); cap 2,740 -> 3,030 and total 63,170 -> 63,460 (63,451
+// measured); no other cap moved.
 const TOOL_BYTE_BUDGET: Record<string, number> = {
   list_accounts: 2500,
   list_transactions: 3550,
@@ -111,7 +118,7 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   get_budget_status: 2550,
   manage_transaction_rules: 4910,
   ai_review_requests: 3050,
-  email_receipt_parsers: 2740,
+  email_receipt_parsers: 3030,
   fetch_bond_series: 1000,
   enter_bond_series_manually: 1690,
   get_next_prompt: 1400,
@@ -119,7 +126,7 @@ const TOOL_BYTE_BUDGET: Record<string, number> = {
   report_progress: 1250,
 };
 
-const TOTAL_BYTE_BUDGET = 63_170;
+const TOTAL_BYTE_BUDGET = 63_460;
 const INSTRUCTIONS_BYTE_BUDGET = 2_600;
 
 /**

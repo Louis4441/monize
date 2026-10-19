@@ -57,7 +57,8 @@
     "waitingForAgent": "Bir yapay zekâ ajanı bekleniyor. <link>Ayarlar'dan bir yapay zekâ sağlayıcısı bağlayın</link> veya bir MCP istemcisinin üstlenmesine izin verin.",
     "parserDraftReady": "Profil taslağı hazır. <link>Profil ayarlarında test edin ve onaylayın</link>.",
     "tradePending": "E-postadan bir işlem, henüz okunmadı",
-    "tradeEmail": "İşlem onayı e-postası"
+    "tradeEmail": "İşlem onayı e-postası",
+    "parserDraftIds": "Profil taslağı kimlikleri: {ids}"
   },
   "actions": {
     "dismiss": "Yoksay"

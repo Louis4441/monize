@@ -298,11 +298,11 @@ describe("ToolExecutorService email_receipt_parsers", () => {
     ["test without a definition", { operation: "test", receiptIds: [R1] }],
     ["test without emails", { operation: "test", definition: DEFINITION }],
     [
-      "test with six emails",
+      "test with 26 emails",
       {
         operation: "test",
         definition: DEFINITION,
-        receiptIds: [R1, R2, R1, R2, R1, R2],
+        receiptIds: Array.from({ length: 26 }, () => R1),
       },
     ],
     [

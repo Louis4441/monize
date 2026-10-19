@@ -69,6 +69,36 @@ export interface EmailReceiptTradeProposal {
   currencyCode: string;
 }
 
+/** A component a settlement's part joined (linked receipts spec 5). */
+export interface EmailReceiptLinkedComponent {
+  /** The settlement's item index the component paid for. */
+  partIndex: number;
+  receiptId: string;
+  subject: string;
+  /** ISO timestamp: `original_sent_at ?? received_at` of the component. */
+  effectiveDate: string;
+}
+
+/** A settlement part that names a component, seen from the component. */
+export interface EmailReceiptLinkedSettlement {
+  receiptId: string;
+  subject: string;
+  /** ISO timestamp: `original_sent_at ?? received_at` of the settlement. */
+  effectiveDate: string;
+  /** The part's amount, a decimal number. */
+  partAmount: number;
+  /** What the join did with the part (`ReceiptLinkOutcome`). */
+  outcome: string;
+  /** The transaction the settlement is matched to, when it is. */
+  transactionId: string | null;
+}
+
+/** The email that enriched the transaction a settlement stopped at. */
+export interface EmailReceiptEnrichedBy {
+  receiptId: string;
+  subject: string;
+}
+
 /** One stored email in the list: never its text. */
 export interface EmailReceiptListItem {
   id: string;
@@ -94,6 +124,8 @@ export interface EmailReceiptListItem {
   matchKind: EmailReceiptMatchKind | null;
   parserId: string | null;
   parserName: string | null;
+  /** A `component` email's link value; null for every other email. */
+  linkKey: string | null;
   aiReviewRequestId: string | null;
   /**
    * The email is a brokerage trade confirmation (`tradeSource` says who reads
@@ -157,6 +189,12 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
    */
   tradeRequestSource: "profile" | "ai" | null;
   candidates: EmailReceiptCandidateSummary[];
+  /** A settlement: the components its parts joined, by part; empty for every other email. */
+  linkedComponents: EmailReceiptLinkedComponent[];
+  /** A component: the settlements whose parts name it, newest first, at most 20; empty for every other email. */
+  linkedSettlements: EmailReceiptLinkedSettlement[];
+  /** A `review_conflict` with reason `enriched_by_other`: the email that enriched the candidate transaction; null otherwise or when it is gone. */
+  enrichedBy: EmailReceiptEnrichedBy | null;
 }
 
 /** One sender domain of the user's stored emails, with how many there are (`GET /email-receipts/domains`). */

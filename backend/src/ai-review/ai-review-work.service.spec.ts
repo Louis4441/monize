@@ -889,6 +889,7 @@ describe("AiReviewWorkService inbox", () => {
           domain: "shop.example.com",
           emailCount: 3,
           parserId: null,
+          parserIds: [],
         },
       });
       expect(txRepo.find).not.toHaveBeenCalled();
@@ -908,8 +909,29 @@ describe("AiReviewWorkService inbox", () => {
       const [item] = await service.listInbox(USER);
 
       expect(item.parserDraft?.parserId).toBe("p1");
+      expect(item.parserDraft?.parserIds).toEqual(["p1"]);
       expect(item.proposal).toBeUndefined();
       expect(builder.buildUpdateTransaction).not.toHaveBeenCalled();
+    });
+
+    it("lists every parser a multi-sender request holds, in save order, with the first as parserId", async () => {
+      const { service, requests } = setup();
+      requests.listForUser.mockResolvedValue([
+        draft({
+          status: "proposed",
+          claimedBy: "assistant",
+          proposal: {
+            parserId: "p1",
+            parserIds: ["p1", "p2", "p3"],
+            proposedAt: "2026-10-03T10:00:00Z",
+          },
+        }),
+      ]);
+
+      const [item] = await service.listInbox(USER);
+
+      expect(item.parserDraft?.parserId).toBe("p1");
+      expect(item.parserDraft?.parserIds).toEqual(["p1", "p2", "p3"]);
     });
 
     it("lists it beside ordinary requests without crashing, each with its own shape", async () => {

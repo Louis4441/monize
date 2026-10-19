@@ -57,7 +57,8 @@
     "waitingForAgent": "Esperando a un agente de IA. <link>Conecta un proveedor de IA en Ajustes</link> o deja que un cliente MCP la tome.",
     "parserDraftReady": "Borrador de perfil listo. <link>Pruébalo y apruébalo en la configuración de perfiles</link>.",
     "tradePending": "Una operación de un correo, aún sin leer",
-    "tradeEmail": "Correo de confirmación de operación"
+    "tradeEmail": "Correo de confirmación de operación",
+    "parserDraftIds": "ID de los borradores de perfil: {ids}"
   },
   "actions": {
     "dismiss": "Descartar"

@@ -56,7 +56,10 @@ Candidates are the user's transactions, loaded in one query: not a transfer,
 not VOID, not an investment row, in the currency of the account, dated from
 `purchase_date - 3` to `purchase_date + 14` (calendar dates in UTC,
 `addDaysYMD`), at most 200, newest first. A transaction that already has an
-applied receipt, or an open receipt request, is not a candidate.
+applied receipt, or an open receipt request, is not a candidate. An order
+email describes a purchase, so only an expense (amount below zero) is a
+candidate for an automatic match; income and a zero amount are not. A manual
+link is not limited to expenses.
 
 `purchase_date` is the date of the original message: `original_sent_at` when
 the mailbox owner forwarded the receipt to the mailbox and the forwarded
@@ -72,7 +75,7 @@ Signals per candidate:
 
 - **O**: the parsed order id (at least 4 characters) appears, case-insensitive,
   in the transaction's `description`, `payeeName` or `referenceNumber`.
-- **A**: `abs(amount)` in units equals the amount the bank was charged,
+- **A**: `abs(amount)` of an expense in units equals the amount the bank was charged,
   `paid ?? total`, exactly. With neither parsed, A is false for every candidate.
 - **P**: the transaction's payee is the parser's payee (by id), OR the
   transaction's payee NAME is the merchant the email names (`ParsedReceipt.payee`),
@@ -265,7 +268,7 @@ transaction of `-24.99` is description only, reason `amount_differs` (`paid` is
 
 Applies only when every one holds: mailbox `auto_apply`; parser `approved`;
 `complete`; `abs(T) = paid ?? total`; `match_kind` is `order_id`, `reference` or `amount_payee` (never `amount_date`, never a
-match made with a tolerance that an exact amount would not make); the card was built. Any refusal from `confirm` (write limit, reconciled lock, a
+match made with a tolerance that an exact amount would not make); the card was built; the receipt has no `joined` or `scaled` part (linked receipts spec section 7: a person approves every join). Any refusal from `confirm` (write limit, reconciled lock, a
 changed row) leaves the proposal waiting in the inbox.
 
 ## 7. (continued) Tag, categories by the AI, bulk work
@@ -403,6 +406,11 @@ completeness table of section 4. What version 2 adds is HOW a value is found.
   `status_reason` `skip_line`), `waitIfLine` (`unmatched`, `status_reason`
   `wait_line`, read again whole by the poll's 30-day rematch). Skip wins over
   wait; a manual link is not held back.
+- **Roles and links.** `role` (`standalone`, `component`, `settlement`), the
+  `linkKey` of a component, the `{link}` and `{instalment}` captures and the
+  `link` section of a settlement tie several emails to one transaction; the
+  rules and validation codes are in
+  [`email-receipt-linked-receipts.md`](./email-receipt-linked-receipts.md).
 
 Worked example (Allegro, three products, shipping 0,00): the items are
 `3 × 1,47 = 4,41`, `3 × 2,50 = 7,50` and `26 × 1,94 = 50,44`; shipping is 0,00;

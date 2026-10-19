@@ -185,24 +185,54 @@ export function ParserTestPanel({ definition, payeeId, initialReceiptId, categor
             </>
           ) : (
             <>
-              <ParsedReceiptView parsed={result.parsed} categoryLabels={categoryLabels} />
+              <ParsedReceiptView parsed={result.parsed} categoryLabels={categoryLabels} parts={result.links} />
               {result.trace && <ParserTraceList trace={result.trace} />}
-              <div role="status" className="text-sm text-gray-700 dark:text-gray-300">
-                <p className="font-medium text-gray-900 dark:text-gray-100">{t('matchHeading')}</p>
-                {match?.kind === 'matched' && result.transaction && (
-                  <p>
-                    {t('matched', {
-                      date: formatDate(result.transaction.date),
-                      amount: formatCurrency(result.transaction.amount),
-                      payee: result.transaction.payeeName ?? t('noPayee'),
-                      how: t(`matchKinds.${match.matchKind}`),
-                    })}
-                  </p>
-                )}
-                {match?.kind === 'ambiguous' && <p>{t('ambiguous', { count: match.candidateIds.length })}</p>}
-                {match?.kind === 'unmatched' && <p>{t('unmatched', { count: result.candidateCount })}</p>}
-              </div>
-              {result.matchTrace && <MatchTraceView trace={result.matchTrace} />}
+              {result.component ? (
+                // A component is stored, never matched to a transaction: it says which settlements wait for it.
+                (result.outcome === undefined || result.outcome === 'read') && (
+                  <div role="status" className="text-sm text-gray-700 dark:text-gray-300">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">
+                      {result.component.linkKey === null
+                        ? t('component.noLinkKey')
+                        : t('component.heading', { linkKey: result.component.linkKey })}
+                    </p>
+                    {result.component.linkKey !== null &&
+                      (result.component.waitingSettlements.length === 0 ? (
+                        <p>{t('component.noneWaiting')}</p>
+                      ) : (
+                        <>
+                          <p>{t('component.waiting', { count: result.component.waitingSettlements.length })}</p>
+                          <ul className="ml-4 list-disc break-words">
+                            {result.component.waitingSettlements.map((settlement) => (
+                              <li key={settlement.id}>
+                                {t('component.settlement', { subject: settlement.subject, date: formatDate(settlement.effectiveDate) })}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ))}
+                  </div>
+                )
+              ) : (
+                <>
+                  <div role="status" className="text-sm text-gray-700 dark:text-gray-300">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{t('matchHeading')}</p>
+                    {match?.kind === 'matched' && result.transaction && (
+                      <p>
+                        {t('matched', {
+                          date: formatDate(result.transaction.date),
+                          amount: formatCurrency(result.transaction.amount),
+                          payee: result.transaction.payeeName ?? t('noPayee'),
+                          how: t(`matchKinds.${match.matchKind}`),
+                        })}
+                      </p>
+                    )}
+                    {match?.kind === 'ambiguous' && <p>{t('ambiguous', { count: match.candidateIds.length })}</p>}
+                    {match?.kind === 'unmatched' && <p>{t('unmatched', { count: result.candidateCount })}</p>}
+                  </div>
+                  {result.matchTrace && <MatchTraceView trace={result.matchTrace} />}
+                </>
+              )}
             </>
           )}
         </div>

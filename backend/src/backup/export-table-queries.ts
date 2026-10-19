@@ -259,6 +259,11 @@ export const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   // receipt would point at rows that no longer exist under those ids. The
   // receipts rebuild from the mailbox on the next poll.
   "email_receipts",
+  // One row per part of a settlement email (a repayment), naming the purchase
+  // email it joined. It cascades from `email_receipts`, which is not exported,
+  // and both of its receipt ids would name rows that a restore never brings
+  // back; the rows rebuild when the receipts are read again.
+  "email_receipt_links",
 ]);
 
 export function buildExportTableQueries(

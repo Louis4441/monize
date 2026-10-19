@@ -33,6 +33,8 @@ export const EMAIL_RECEIPT_STATUSES = [
   'review_conflict',
   'review',
   'ignored',
+  // The purchase email of a linked receipt: stored, never matched, waits for its settlement.
+  'component',
 ] as const;
 export type EmailReceiptStatus = (typeof EMAIL_RECEIPT_STATUSES)[number];
 
@@ -98,6 +100,26 @@ export type ParsedTradeReason = (typeof PARSED_TRADE_REASONS)[number];
  */
 export const TRADE_CURRENCY_SOURCES = ['amount', 'marker', 'security'] as const;
 export type TradeCurrencySource = (typeof TRADE_CURRENCY_SOURCES)[number];
+
+/** What a profile's emails are for (linked receipts); absent is `standalone`. */
+export const RECEIPT_PARSER_ROLES = ['standalone', 'component', 'settlement'] as const;
+export type ReceiptParserRole = (typeof RECEIPT_PARSER_ROLES)[number];
+
+/** What a split line is: an `item` (absent reads as one), or the `shipping`, a `fee` or the `discount` of a joined component. */
+export const RECEIPT_LINE_KINDS = ['item', 'shipping', 'fee', 'discount'] as const;
+export type ReceiptLineKind = (typeof RECEIPT_LINE_KINDS)[number];
+
+/** What a settlement part became (`ParsedReceipt.links[].outcome`). */
+export const RECEIPT_LINK_OUTCOMES = [
+  'no_link',
+  'not_found',
+  'component_incomplete',
+  'component_used',
+  'joined',
+  'scaled',
+  'amount_exceeds',
+] as const;
+export type ReceiptLinkOutcome = (typeof RECEIPT_LINK_OUTCOMES)[number];
 
 // ---------------------------------------------------------------- mailbox
 
@@ -269,6 +291,36 @@ export interface EmailReceiptTradeProposal {
   currencyCode: string;
 }
 
+/** A component a settlement's part joined (linked receipts spec 5). */
+export interface EmailReceiptLinkedComponent {
+  /** The settlement's item index the component paid for. */
+  partIndex: number;
+  receiptId: string;
+  subject: string;
+  /** ISO timestamp: `original_sent_at ?? received_at` of the component. */
+  effectiveDate: string;
+}
+
+/** A settlement part that names a component, seen from the component. */
+export interface EmailReceiptLinkedSettlement {
+  receiptId: string;
+  subject: string;
+  /** ISO timestamp: `original_sent_at ?? received_at` of the settlement. */
+  effectiveDate: string;
+  /** The part's amount, a decimal number. */
+  partAmount: number;
+  /** What the join did with the part (`ReceiptLinkOutcome`). */
+  outcome: string;
+  /** The transaction the settlement is matched to, when it is. */
+  transactionId: string | null;
+}
+
+/** The email that enriched the transaction a settlement stopped at. */
+export interface EmailReceiptEnrichedBy {
+  receiptId: string;
+  subject: string;
+}
+
 /** One stored email in the list: never its text. */
 export interface EmailReceiptListItem {
   id: string;
@@ -293,6 +345,8 @@ export interface EmailReceiptListItem {
   matchKind: EmailReceiptMatchKind | null;
   parserId: string | null;
   parserName: string | null;
+  /** A `component` email's link value; null for every other email. */
+  linkKey: string | null;
   aiReviewRequestId: string | null;
   /** A brokerage trade confirmation (`tradeSource` says who reads it): it proposes an investment transaction to create, so the bank-transaction actions do not apply. */
   isTrade: boolean;
@@ -462,6 +516,12 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
   /** Who answers the email's `email_trade` request: its trade profile, or the AI ("Recognize as a trade"); null when it has none. Absent from a server that predates it. */
   tradeRequestSource?: 'profile' | 'ai' | null;
   candidates: EmailReceiptCandidateSummary[];
+  /** A settlement: the components its parts joined, by part; empty for every other email. */
+  linkedComponents: EmailReceiptLinkedComponent[];
+  /** A component: the settlements whose parts name it, newest first, at most 20; empty for every other email. */
+  linkedSettlements: EmailReceiptLinkedSettlement[];
+  /** A `review_conflict` with reason `enriched_by_other`: the email that enriched the candidate transaction; null otherwise or when it is gone. */
+  enrichedBy: EmailReceiptEnrichedBy | null;
 }
 
 /**
@@ -563,8 +623,11 @@ export interface EmailReceiptParserDraftRequestResult {
   requestId: string;
 }
 
-/** Most emails one "Draft parser with AI" request names (the server's bound). */
-export const PARSER_DRAFT_MAX_RECEIPTS = 5;
+/** Most emails of one sender domain one "Draft parser with AI" request names (the server's bound). */
+export const MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN = 5;
+
+/** Most sender domains one "Draft parser with AI" request spans (the server's bound); a trade draft takes one. */
+export const MAX_PARSER_DRAFT_DOMAINS = 5;
 
 /** What a bulk command does to the emails it names. */
 export type EmailReceiptBulkAction = 'delete' | 'ignore';
@@ -658,6 +721,8 @@ export const RECEIPT_PARSER_LIMITS = {
   maxLineGuards: 10,
   maxNameLength: 100,
   maxFromDomains: 10,
+  /** `link.daysBefore` of a settlement profile (0 to this). */
+  maxLinkDaysBefore: 365,
   maxSubjectWords: 10,
   maxSubjectWordLength: 100,
   maxTagLength: 50,
@@ -788,6 +853,14 @@ export interface ReceiptTradeDefinition {
   currencyMarkers?: ReceiptTradeCurrencyMarker[];
 }
 
+/** The `link` section of a settlement profile: where its parts look for their components. */
+export interface ReceiptLinkDefinition {
+  /** 1 to 10 sender domains the search is limited to; absent means any sender. */
+  fromDomains?: string[];
+  /** 0 to 365 (default 120): how many days before the settlement's date a component may be dated. */
+  daysBefore?: number;
+}
+
 /** A parser definition, version 2 (`definition` of an `email_receipt_parsers` row). */
 /** What a profile does with the emails it matches instead of reading them: ignore them, or delete them. */
 export const RECEIPT_DISCARD_MODES = ['ignore', 'delete'] as const;
@@ -806,6 +879,12 @@ export interface ReceiptParserDefinition {
   /** An identifier the shop or the payment gateway puts into the bank operation. Capture `{reference}`. */
   reference?: ReceiptFieldEntry[];
   match?: ReceiptMatchDefinition;
+  /** What the profile's emails are for; absent is `standalone`. */
+  role?: ReceiptParserRole;
+  /** A `component` only: the key that ties the email to a settlement. Capture `{link}`. */
+  linkKey?: ReceiptFieldEntry[];
+  /** A `settlement` only: where its parts look for their components. */
+  link?: ReceiptLinkDefinition;
   /** A tag the proposal adds to every transaction the profile categorises. */
   tag?: string;
   /** Ask the user's AI for the category of an item no rule matched. */
@@ -888,6 +967,31 @@ export interface ParsedReceiptItem {
   categoryId: string | null;
   /** `"ai"` when the AI chose this item's category. */
   categorySource?: 'ai';
+  /** What the line is; absent is `item`. Only a joined component's lines carry another kind. */
+  kind?: ReceiptLineKind;
+  /** A settlement part's link value; absent otherwise. */
+  link?: string;
+  /** A settlement part's instalment text; absent otherwise. */
+  instalment?: string;
+}
+
+/** The report of one settlement part (`ParsedReceipt.links`). Amounts are in 1/10000 units. */
+export interface ReceiptLinkReport {
+  partIndex: number;
+  /** The part's link value; null when it captured none. */
+  link: string | null;
+  partAmount: number;
+  outcome: ReceiptLinkOutcome;
+  /** The component found; null when none was. */
+  componentReceiptId: string | null;
+  /** The component's net (its lines, discount subtracted). */
+  componentNet?: number;
+  /** What other settlements already took from the component. */
+  taken?: number;
+  /** How many components the link found (more than one: a resend). */
+  several?: number;
+  /** Why an incomplete component is incomplete. */
+  componentReason?: ParsedReceiptReason | null;
 }
 
 /** What a parser read from one email. Every amount is in 1/10000 units; null means the email did not state it. */
@@ -900,11 +1004,15 @@ export interface ParsedReceipt {
   payee?: string | null;
   /** The identifier the profile's `reference` field read. Absent on a receipt stored before the field existed. */
   reference?: string | null;
+  /** A component's link value; null when its email holds none. Absent on every other receipt. */
+  linkKey?: string | null;
   shipping: number | null;
   discount: number | null;
   items: ParsedReceiptItem[];
   shippingCategoryId: string | null;
   discountCategoryId: string | null;
+  /** A joined settlement only: one report per part. */
+  links?: ReceiptLinkReport[];
   complete: boolean;
   reason: ParsedReceiptReason | null;
   /** Who read the email: a saved parser, the AI, or the email's own schema.org markup. Absent on a receipt stored before the field existed. */
@@ -987,10 +1095,15 @@ export const RECEIPT_TRACE_FIELDS = [
   'requireLine',
   'skipIfLine',
   'waitIfLine',
+  'linkKey',
 ] as const;
 export type ReceiptTraceField = (typeof RECEIPT_TRACE_FIELDS)[number];
 
-export type ReceiptTrace = Record<ReceiptTraceField, ReceiptTraceHit | null> & { items: ReceiptTraceItem[] };
+/** `linkKey` is the line a component's link value was read from; absent from a profile that is not a component and from a server that predates it. */
+export type ReceiptTrace = Record<Exclude<ReceiptTraceField, 'linkKey'>, ReceiptTraceHit | null> & {
+  linkKey?: ReceiptTraceHit | null;
+  items: ReceiptTraceItem[];
+};
 
 /** The fields a trade trace names, in the order the panel lists them. */
 export const RECEIPT_TRADE_TRACE_FIELDS = [
@@ -1020,7 +1133,45 @@ export type ReceiptOutcome =
   | 'discard_delete'
   | 'no_html';
 
+/** A settlement waiting for a component's link key (`WaitingSettlement`). */
+export interface ParserTestWaitingSettlement {
+  id: string;
+  subject: string;
+  /** `YYYY-MM-DD` (UTC): `original_sent_at ?? received_at`. */
+  effectiveDate: string;
+}
+
+/** One part of a settlement as the test's join read it. Amounts are in 1/10000 units; `componentNet` and `taken` are null without a complete component. */
+export interface ParserTestLink {
+  partIndex: number;
+  /** The part's link value; null when it captured none. */
+  link: string | null;
+  /** The component the link found (the newest of several); null when none. */
+  component: {
+    id: string;
+    subject: string;
+    /** `YYYY-MM-DD`. */
+    effectiveDate: string;
+    /** The name of the component's profile; null when it has none. */
+    profileName: string | null;
+  } | null;
+  partAmount: number;
+  componentNet: number | null;
+  taken: number | null;
+  outcome: ReceiptLinkOutcome;
+  /** How many components the link found: 0, 1 or more. */
+  several: number;
+}
+
 export interface EmailReceiptParserTestResult {
+  /**
+   * For a `component` profile: the link value it read and the settlements
+   * waiting for it (newest first, at most 20). Such an email is not matched to
+   * a bank transaction, so `match` is empty.
+   */
+  component?: { linkKey: string | null; waitingSettlements: ParserTestWaitingSettlement[] };
+  /** For a `settlement` profile: one entry per part. `parsed` is then the JOINED reading. */
+  links?: ParserTestLink[];
   /**
    * For a profile with a `trade` section: what it read, and which entry and
    * line read each value (`trace`, absent from a server that predates it).
@@ -1113,6 +1264,7 @@ export const PARSER_PREVIEW_OUTCOMES = [
   'no_html',
   'trade',
   'trade_exists',
+  'component',
 ] as const;
 export type ParserPreviewOutcome = (typeof PARSER_PREVIEW_OUTCOMES)[number];
 

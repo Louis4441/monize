@@ -10,7 +10,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { ProposalCardState } from '@/hooks/useAiReviewInbox';
 import type { PendingAction } from '@/types/ai';
-import { isApprovable, isSendableToAssistant, reviewItemLabel, type AiReviewItem, type AiReviewStatus } from '@/types/ai-review';
+import { draftParserIds, isApprovable, isSendableToAssistant, reviewItemLabel, type AiReviewItem, type AiReviewStatus } from '@/types/ai-review';
 
 /** Requests still open: the person may dismiss them. */
 const DISMISSIBLE: readonly AiReviewStatus[] = ['pending', 'claimed', 'proposed'];
@@ -64,6 +64,7 @@ export function AiReviewRow({
   const { formatDate } = useDateFormat();
   const { formatCurrency, formatNumber, formatShareQuantity } = useNumberFormat();
   const { transaction, proposal, parserDraft, trade } = item;
+  const draftIds = parserDraft ? draftParserIds(parserDraft) : [];
 
   const action = proposal && 'action' in proposal ? proposal.action : null;
   const proposalError = proposal && 'error' in proposal ? proposal.error : null;
@@ -174,6 +175,11 @@ export function AiReviewRow({
                   </Link>
                 ),
               })}
+              {draftIds.length > 0 && (
+                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                  {t('row.parserDraftIds', { ids: draftIds.join(', ') })}
+                </span>
+              )}
             </p>
           )}
           {item.agentNote && (

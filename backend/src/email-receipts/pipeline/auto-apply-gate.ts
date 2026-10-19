@@ -17,6 +17,8 @@ export interface AutoApplyFacts {
   /** The itemized proposal was refused and the description-only one stored instead. */
   usedFallback: boolean;
   cardBuilt: boolean;
+  /** A part of the receipt was joined to a component (`hasJoinedPart`): a person approves every join. */
+  linked: boolean;
 }
 
 const MONEY_UNITS = 10000;
@@ -31,7 +33,8 @@ const MONEY_UNITS = 10000;
  * Stricter than the spec in one way: the stored proposal must be the
  * category lines themselves (itemized or one category), not a description-only
  * proposal or the fallback of a refused one, because the design promises that
- * what is applied "balances to the cent".
+ * what is applied "balances to the cent". A receipt with a joined or scaled
+ * part (linked receipts 7) never auto-applies.
  */
 export function autoApplyAllowed(facts: AutoApplyFacts): boolean {
   return (
@@ -49,6 +52,7 @@ export function autoApplyAllowed(facts: AutoApplyFacts): boolean {
     (facts.proposalKind === "itemized" ||
       facts.proposalKind === "single_category") &&
     !facts.usedFallback &&
-    facts.cardBuilt
+    facts.cardBuilt &&
+    !facts.linked
   );
 }

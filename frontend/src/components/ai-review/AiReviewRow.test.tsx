@@ -186,6 +186,28 @@ describe('AiReviewRow', () => {
       expect(screen.queryByText(/Waiting for an AI agent/)).not.toBeInTheDocument();
     });
 
+    it('lists every draft profile id of a request over several senders, in save order', () => {
+      renderRow(
+        draftItem({
+          status: 'proposed',
+          parserDraft: { domain: 'shop.example.com', emailCount: 4, parserId: 'p-1', parserIds: ['p-1', 'p-2', 'p-3'] },
+        }),
+      );
+      expect(screen.getByText('Draft profile IDs: p-1, p-2, p-3')).toBeInTheDocument();
+    });
+
+    it('falls back to the single parserId when no list is sent, and lists none before a draft is saved', () => {
+      const { unmount } = renderRow(
+        draftItem({ status: 'proposed', parserDraft: { domain: 'shop.example.com', emailCount: 3, parserId: 'p-1' } }),
+      );
+      expect(screen.getByText('Draft profile IDs: p-1')).toBeInTheDocument();
+      unmount();
+      renderRow(
+        draftItem({ status: 'proposed', parserDraft: { domain: 'shop.example.com', emailCount: 3, parserId: null, parserIds: [] } }),
+      );
+      expect(screen.queryByText(/Draft profile IDs/)).not.toBeInTheDocument();
+    });
+
     it.each(['claimed', 'applied', 'rejected', 'expired'] as const)('says neither of those once it is %s', (status) => {
       renderRow(draftItem({ status }));
       expect(screen.queryByText(/Waiting for an AI agent/)).not.toBeInTheDocument();

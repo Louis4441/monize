@@ -90,6 +90,7 @@ describe('EmailReceiptsManager: the cards', () => {
         'Another request is open (0)',
         'In review (2)',
         'Ignored (0)',
+        'Waiting for repayment (0)',
       ]);
     });
 
