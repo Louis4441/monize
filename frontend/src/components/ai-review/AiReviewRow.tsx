@@ -106,7 +106,12 @@ export function AiReviewRow({
             {parserDraft ? (
               t('row.parserDraft', { count: parserDraft.emailCount, domain: parserDraft.domain })
             ) : trade ? (
-              t('row.trade', { action: trade.action, quantity: formatShareQuantity(trade.quantity), symbol: trade.symbol })
+              t('row.trade', {
+                action: trade.action,
+                // A cash dividend may state no shares; its sentence names none.
+                ...(trade.quantity !== null ? { quantity: formatShareQuantity(trade.quantity) } : {}),
+                symbol: trade.symbol,
+              })
             ) : tradeRequest ? (
               // "Not read yet" only while an agent may still answer it; a closed one never will.
               item.status === 'pending' || item.status === 'claimed' ? (

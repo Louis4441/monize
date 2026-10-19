@@ -69,6 +69,45 @@ describe('WizardPreviewTables of a trade profile', () => {
     expect(screen.getByText('The price does not match the total, so it will not be applied automatically')).toBeInTheDocument();
   });
 
+  it('shows a cash dividend that states no share count, and a reinvested dividend with its shares', () => {
+    render(
+      <WizardPreviewTables kind="trade"
+        result={result({
+          selected: [
+            item({
+              receiptId: 'r-4',
+              subject: 'Dividend paid',
+              trade: { action: 'DIVIDEND', symbol: 'XCNS', quantity: null, consistent: null },
+              parsed: { date: '2026-10-15', total: 12.34, currency: null, lineCount: 0 },
+            }),
+            item({
+              receiptId: 'r-5',
+              subject: 'Dividend reinvested',
+              trade: { action: 'REINVEST', symbol: 'XCNS', quantity: 0.4688, consistent: true },
+              parsed: { date: '2026-10-15', total: 12.34, currency: null, lineCount: 0 },
+            }),
+          ],
+        })}
+      />,
+    );
+    const dividend = screen.getByRole('row', { name: /Dividend paid/ });
+    expect(within(dividend).getByText('Pays a dividend from XCNS')).toBeInTheDocument();
+    expect(within(dividend).getByText('Total: 12.34')).toBeInTheDocument();
+    expect(within(dividend).queryByText('Nothing could be read')).not.toBeInTheDocument();
+    const reinvest = screen.getByRole('row', { name: /Dividend reinvested/ });
+    expect(within(reinvest).getByText('Reinvests a dividend in 0.4688 shares of XCNS')).toBeInTheDocument();
+  });
+
+  it('says nothing was read of a buy that states no share count', () => {
+    render(
+      <WizardPreviewTables kind="trade"
+        result={result({ selected: [item({ trade: { action: 'BUY', symbol: 'XCNS', quantity: null, consistent: null } })] })}
+      />,
+    );
+    expect(screen.getByText('Nothing could be read')).toBeInTheDocument();
+    expect(screen.queryByText(/XCNS/)).not.toBeInTheDocument();
+  });
+
   it('labels the outcome and names why an incomplete trade could not be read', () => {
     render(
       <WizardPreviewTables kind="trade"

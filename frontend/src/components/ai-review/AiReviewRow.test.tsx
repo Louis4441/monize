@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { AiReviewRow } from './AiReviewRow';
-import { makeReviewItem, makeTradeItem, PROPOSED_ACTION, TRADE_ACTION } from './ai-review-fixtures';
+import { makeDividendTradeItem, makeReviewItem, makeTradeItem, PROPOSED_ACTION, TRADE_ACTION } from './ai-review-fixtures';
 import type { AiReviewItem } from '@/types/ai-review';
 
 function renderRow(item: AiReviewItem) {
@@ -312,6 +312,18 @@ describe('AiReviewRow', () => {
     it('reads a sell as a sell', () => {
       renderRow(makeTradeItem({ trade: { ...makeTradeItem().trade!, action: 'SELL' } }));
       expect(screen.getByText('Sell 75.9878 shares of XCNS')).toBeInTheDocument();
+    });
+
+    it('reads a cash dividend with no share count as a dividend, never as a sell', () => {
+      renderRow(makeDividendTradeItem());
+      expect(screen.getByText('Dividend from XCNS')).toBeInTheDocument();
+      expect(screen.queryByText(/^Sell/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/null|undefined/)).not.toBeInTheDocument();
+    });
+
+    it('reads a reinvested dividend with its shares', () => {
+      renderRow(makeTradeItem({ trade: { ...makeTradeItem().trade!, action: 'REINVEST', quantity: 0.4688 } }));
+      expect(screen.getByText('Reinvest a dividend in 0.4688 shares of XCNS')).toBeInTheDocument();
     });
 
     it('shows its fixed instruction in the reader\'s language and never says it waits for an agent', () => {

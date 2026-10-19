@@ -150,3 +150,15 @@ export function makeTradeItem(overrides: Partial<AiReviewItem> = {}): AiReviewIt
     ...overrides,
   });
 }
+
+/**
+ * An `email_trade` request for a cash dividend: the email states only the
+ * amount paid, so the trade carries no share count.
+ */
+export function makeDividendTradeItem(overrides: Partial<AiReviewItem> = {}): AiReviewItem {
+  const base = makeTradeItem();
+  return makeTradeItem({
+    trade: { ...base.trade!, action: 'DIVIDEND', quantity: null, totalAmount: 12.34, description: 'Email receipt: Dividend paid' },
+    ...overrides,
+  });
+}

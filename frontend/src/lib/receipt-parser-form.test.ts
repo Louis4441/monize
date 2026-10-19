@@ -648,6 +648,33 @@ describe('a trade profile', () => {
     });
   });
 
+  it('leaves out an empty share-count list, which a dividend profile reads without, and shows such a profile in the form', () => {
+    const dividend = {
+      version: 2,
+      trade: {
+        action: ['*{action} payment*'],
+        symbol: ['Security: {symbol}'],
+        total: ['Amount paid: {amount}'],
+        date: ['Pay date: {date}'],
+      },
+    };
+    const form = emptyParserForm({
+      kind: 'trade',
+      tradeAction: '*{action} payment*',
+      tradeSymbol: 'Security: {symbol}',
+      tradeTotal: 'Amount paid: {amount}',
+      tradeDate: 'Pay date: {date}',
+    });
+    const built = buildParserDefinition(form);
+    expect(built).toEqual(dividend);
+    expect(built.trade).not.toHaveProperty('quantity');
+
+    expect(formCanRepresent(dividend)).toBe(true);
+    const fields = definitionToFormFields(dividend);
+    expect(fields.tradeQuantity).toBe('');
+    expect(buildParserDefinition({ ...emptyParserForm(), ...fields })).toEqual(dividend);
+  });
+
   it('sends no payee for a trade profile', () => {
     expect(buildParserPayload(emptyParserForm({ kind: 'trade', payeeId: 'payee-1' })).payeeId).toBeNull();
   });

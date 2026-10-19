@@ -8,6 +8,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { WizardKind } from '@/components/email-receipts/profile-wizard-types';
 import {
   PARSED_RECEIPT_REASONS,
+  tradeActionMovesShares,
   type ParsedReceiptReason,
   type ParserPreviewItem,
   type ParserPreviewOutcome,
@@ -70,19 +71,19 @@ function ParsedCell({ item, accounts }: { item: ParserPreviewItem; accounts: Pre
     // A trade profile: what the confirmation reports, the account it books to and
     // the trade's currency (the total is in it; a bare number when it is unknown).
     const currency = item.trade.currency ?? parsed.currency;
+    const { action, symbol, quantity } = item.trade;
+    // A cash dividend moves no shares, so its line needs no share count.
+    const tradeLine =
+      action === null || symbol === null || (quantity === null && tradeActionMovesShares(action))
+        ? null
+        : t('parsedTrade', {
+            action,
+            ...(quantity !== null ? { quantity: formatShareQuantity(quantity) } : {}),
+            symbol,
+          });
     return (
       <div className="space-y-0.5">
-        {item.trade.action !== null && item.trade.symbol !== null && item.trade.quantity !== null ? (
-          <div>
-            {t('parsedTrade', {
-              action: item.trade.action,
-              quantity: formatShareQuantity(item.trade.quantity),
-              symbol: item.trade.symbol,
-            })}
-          </div>
-        ) : (
-          <div className={MUTED}>{t('nothingRead')}</div>
-        )}
+        {tradeLine === null ? <div className={MUTED}>{t('nothingRead')}</div> : <div>{tradeLine}</div>}
         <div>{t('parsedDate', { date: parsed.date === null ? t('notStated') : formatDate(parsed.date) })}</div>
         <div>{t('parsedTotal', { total })}</div>
         <TradeAccountLine accountId={item.trade.accountId} accounts={accounts} />

@@ -93,7 +93,7 @@
         "automatic": "[XX-The poll asks the AI about a matched receipt that no approved profile could read completely, and drafts a profile for a sender that has none.-XX]"
       },
       "autoApplyLabel": "[XX-Apply proposals automatically-XX]",
-      "autoApplyHelp": "[XX-Off by default. A proposal is applied without asking only when all of these hold: an approved profile read the whole email, the transaction was found by an order number or a reference, or by exact amount and payee, with a single candidate, and the proposal adds up to the cent. A trade confirmation is booked without asking only when its trade profile is approved, it read the whole trade, the price agrees with the shares and the total, and your ledger does not already hold a matching trade. Everything else waits for your approval.-XX]",
+      "autoApplyHelp": "[XX-Off by default. A proposal is applied without asking only when all of these hold: an approved profile read the whole email, the transaction was found by an order number or a reference, or by exact amount and payee, with a single candidate, and the proposal adds up to the cent. A trade confirmation is booked without asking only when its trade profile is approved, it read the whole trade, the price agrees with the shares and the total (a cash dividend that states only its amount has nothing to check), and your ledger does not already hold a matching trade. Everything else waits for your approval.-XX]",
       "profileLimitLabel": "[XX-Count profile proposals toward the daily AI limit-XX]",
       "profileLimitHelp": "[XX-On by default: an edit a profile proposes from an email is counted in the daily limit of AI-proposed changes, like any other AI proposal. Turn it off when a large batch of stored emails would otherwise use the limit up. Only proposals from profiles are exempt; every proposal still waits for your approval.-XX]"
     },
@@ -377,7 +377,7 @@
       "receipt": "[XX-Order receipt-XX]",
       "trade": "[XX-Brokerage trade-XX]",
       "receiptHelp": "[XX-Reads an order confirmation and finds the bank transaction that paid for it.-XX]",
-      "tradeHelp": "[XX-Reads a brokerage trade confirmation and proposes the investment transaction it reports, a buy or a sell.-XX]"
+      "tradeHelp": "[XX-Reads a brokerage trade confirmation and proposes the investment transaction it reports: a buy, a sell, a cash dividend or a reinvested dividend.-XX]"
     },
     "trade": {
       "guardsHeading": "[XX-Which of the sender's emails it reads-XX]",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "[XX-An email with one of these lines is held and read again later, such as a partial fill.-XX]"
       },
       "fieldsHeading": "[XX-The trade-XX]",
-      "fieldsHelp": "[XX-Buy or sell, the ticker and the share count are required, and a total or a price. Each field takes patterns one per line, tried in order.-XX]",
+      "fieldsHelp": "[XX-The action, the ticker and a total or a price are required, and so is the share count except for a cash dividend. The action is read from its text: Dividend or Distribution is a cash dividend, Reinvest or DRIP a reinvested dividend, otherwise Buy or Sell. Each field takes patterns one per line, tried in order.-XX]",
       "fields": {
-        "tradeAction": "[XX-Buy or sell patterns-XX]",
+        "tradeAction": "[XX-Action patterns-XX]",
         "tradeSymbol": "[XX-Ticker patterns-XX]",
         "tradeQuantity": "[XX-Share count patterns-XX]",
         "tradeTotal": "[XX-Trade total patterns-XX]",
@@ -403,7 +403,7 @@
         "tradeAccount": "[XX-Account patterns-XX]"
       },
       "fieldHint": "[XX-Must capture {capture}. Example: {example}-XX]",
-      "amountsHelp": "[XX-The total is the executed amount, commission included for a buy. The price is a cross-check, and gives the total when the email states none. An amount that names its currency (US$, C$, USD, €) also sets the currency of the trade.-XX]",
+      "amountsHelp": "[XX-The total is the executed amount, commission included for a buy or a reinvested dividend; for a cash dividend it is the amount paid. The price (for a dividend, the amount per share) is a cross-check, and with the share count gives the total when the email states none. An amount that names its currency (US$, C$, USD, €) also sets the currency of the trade.-XX]",
       "rulesHeading": "[XX-Account rules-XX]",
       "rulesHelp": "[XX-Which account the trade is booked to. The rules are tried in order against the account text the Account patterns read, and the first that applies wins; {star} is any text. A rule with a currency applies only to a trade in that currency, so two accounts the broker prints the same way, such as a CAD and a USD RRSP both shown as RRSP, are two rules with the same text and different currencies. When the email prints no account text, only a rule whose text is {star} can apply. The default account takes the rest.-XX]",
       "currencyOrder": "[XX-The currency of the trade is taken from, in order: the amount itself when it names one (US$, C$, USD, €), then the first currency marker below that matches a line of the email, then the currency of your security for the ticker. A rule with a currency never guesses: when none of the three tells the currency, the email waits for you instead of being booked to either account.-XX]",
@@ -512,7 +512,7 @@
       "tag": "[XX-Tag-XX]",
       "aiCategories": "[XX-AI categories-XX]",
       "trade": "[XX-The trade section-XX]",
-      "tradeAction": "[XX-Buy or sell patterns-XX]",
+      "tradeAction": "[XX-Action patterns-XX]",
       "tradeSymbol": "[XX-Ticker patterns-XX]",
       "tradeQuantity": "[XX-Share count patterns-XX]",
       "tradeTotal": "[XX-Trade total patterns-XX]",
@@ -630,7 +630,7 @@
         "waitIfLine": "[XX-Wait line-XX]",
         "reference": "[XX-Reference-XX]",
         "linkKey": "[XX-Link key-XX]",
-        "action": "[XX-Buy or sell-XX]",
+        "action": "[XX-Action-XX]",
         "symbol": "[XX-Ticker-XX]",
         "quantity": "[XX-Shares-XX]",
         "price": "[XX-Price-XX]",
@@ -1008,9 +1008,9 @@
       "no_html": "[XX-This profile reads the HTML part of the email, and this email has none.-XX]",
       "schema_org": "[XX-No profile was needed: the order was read from the structured data (schema.org) in the email.-XX]",
       "item_amount_missing": "[XX-An item has no amount, and the email has no single total to give it.-XX]",
-      "trade_no_action": "[XX-The profile found no buy or sell in this email.-XX]",
+      "trade_no_action": "[XX-The profile found no buy, sell, dividend or reinvestment in this email.-XX]",
       "trade_no_symbol": "[XX-The profile found no ticker symbol in this email.-XX]",
-      "trade_no_quantity": "[XX-The profile found no number of shares in this email.-XX]",
+      "trade_no_quantity": "[XX-The profile found no number of shares in this email, which a buy, a sell or a reinvested dividend needs.-XX]",
       "trade_no_amount": "[XX-The profile found neither a total nor a price in this email.-XX]",
       "trade_no_account": "[XX-The profile could not tell which account this trade is for.-XX]",
       "trade_exists": "[XX-Your accounts already hold this trade, so nothing was proposed.-XX]",
@@ -1078,10 +1078,10 @@
       "openButton": "[XX-Open-XX]",
       "open": "[XX-Open the email {subject}-XX]"
     },
-    "tradeTransactionSummary": "[XX-{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.-XX]",
+    "tradeTransactionSummary": "[XX-{action, select, BUY {Bought {quantity} {symbol} for {total} on {date}.} SELL {Sold {quantity} {symbol} for {total} on {date}.} DIVIDEND {Dividend from {symbol} of {total} on {date}.} REINVEST {Reinvested a dividend in {quantity} {symbol} for {total} on {date}.} other {{quantity} {symbol} for {total} on {date}.}}-XX]",
     "noTradeTransaction": "[XX-None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.-XX]",
     "candidateShares": "[XX-{quantity} shares-XX]",
-    "tradeNoCandidates": "[XX-No investment transaction of this account, direction and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox.-XX]",
+    "tradeNoCandidates": "[XX-No investment transaction of this account, action and ticker within a week of the trade's day is free to link. If you entered the trade yourself, check its account and date; otherwise approve the proposal in the review inbox.-XX]",
     "aiTradeHeading": "[XX-Trade the AI agent proposes-XX]",
     "aiTradeReader": "[XX-None: the AI agent reads it as a trade-XX]",
     "noAiTradeTransaction": "[XX-None yet: the trade is booked when you approve the AI agent's proposal.-XX]",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "[XX-Recognize with AI-XX]",
     "tradeTitle": "[XX-Recognize as a trade with AI-XX]",
-    "tradeMessage": "[XX-The AI will read this email as a brokerage trade confirmation and propose the investment transaction it reports (account, buy or sell, ticker, shares and total). Nothing is saved until you approve it.-XX]",
+    "tradeMessage": "[XX-The AI will read this email as a brokerage trade confirmation and propose the investment transaction it reports (account, buy, sell, cash dividend or reinvested dividend, ticker, shares and total). Nothing is saved until you approve it.-XX]",
     "tradeConfirm": "[XX-Recognize as a trade-XX]",
     "transactionSummary": "[XX-{date}, {amount}, {payee}-XX]",
     "noPayee": "[XX-no payee-XX]",
@@ -1166,7 +1166,7 @@
     "inboxLink": "[XX-Open the AI review inbox-XX]",
     "opened": "[XX-Opened the chat with the email attached. Read the message and press Send.-XX]",
     "chatPrompt": "[XX-Recognize the products, quantities and prices in the attached order email and split my transaction of {date} ({payee}, {amount}) by product with a category for each. Claim AI review request {requestId} and submit your proposal for it.-XX]",
-    "tradeChatPrompt": "[XX-Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy or a sell, the ticker, the shares, the executed total and the date. Claim AI review request {requestId} and submit the trade for it.-XX]",
+    "tradeChatPrompt": "[XX-Recognize the trade in the attached brokerage confirmation email: the account, whether it is a buy, a sell, a cash dividend or a reinvested dividend, the ticker, the shares (a cash dividend may state none), the executed total and the date. Claim AI review request {requestId} and submit the trade for it.-XX]",
     "tradeDetachesTransaction": "[XX-Read as a trade, this email no longer stands behind {summary}: the trade creates its own investment transaction.-XX]"
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "[XX-Date: {date}-XX]",
       "parsedTotal": "[XX-Total: {total}-XX]",
       "parsedLines": "[XX-{count, plural, one {# line} other {# lines}}-XX]",
-      "parsedTrade": "[XX-{action, select, BUY {Buys} other {Sells}} {quantity} shares of {symbol}-XX]",
+      "parsedTrade": "[XX-{action, select, BUY {Buys {quantity} shares of {symbol}} SELL {Sells {quantity} shares of {symbol}} DIVIDEND {Pays a dividend from {symbol}} REINVEST {Reinvests a dividend in {quantity} shares of {symbol}} other {Trades {symbol}}}-XX]",
       "tradeInconsistent": "[XX-The price does not match the total, so it will not be applied automatically-XX]",
       "noExpectation": "[XX-None-XX]",
       "noMatch": "[XX-No transaction-XX]",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "[XX-{action, select, BUY {Buy} other {Sell}} {quantity} shares of {symbol} for {total}, dated {date}.-XX]",
+    "summary": "[XX-{action, select, BUY {Buy {quantity} shares of {symbol} for {total}, dated {date}.} SELL {Sell {quantity} shares of {symbol} for {total}, dated {date}.} DIVIDEND {Dividend from {symbol} of {total}, dated {date}.} REINVEST {Reinvest a dividend in {quantity} shares of {symbol} for {total}, dated {date}.} other {{symbol} for {total}, dated {date}.}}-XX]",
     "account": "[XX-Account named in the email: {account}-XX]",
     "priceMismatch": "[XX-The average price does not match the shares and the total, so this trade will not be applied automatically.-XX]",
+    "dividendMismatch": "[XX-The amount per share does not match the shares and the total, so this dividend will not be applied automatically.-XX]",
+    "dividendShares": "[XX-Paid on {quantity} shares-XX]",
+    "dividendPerShare": "[XX-Amount per share in the email: {price}-XX]",
     "incomplete": "[XX-The profile could not read a complete trade from this email.-XX]",
     "totalFromPrice": "[XX-the total implied by the price-XX]",
     "dateUnknown": "[XX-the day the email arrived-XX]",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "[XX-Security: {name}-XX]",
     "proposalAccount": "[XX-Account: {account}-XX]",
     "proposalPrice": "[XX-Price: {price} a share-XX]",
+    "proposalDividendPerShare": "[XX-Amount per share: {price}-XX]",
     "proposalCommission": "[XX-Commission: {commission}-XX]",
     "proposalReview": "[XX-Nothing is booked until you approve it.-XX]",
     "proposalReviewLink": "[XX-Review it in the inbox-XX]",

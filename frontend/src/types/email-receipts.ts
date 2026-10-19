@@ -101,6 +101,23 @@ export type ParsedTradeReason = (typeof PARSED_TRADE_REASONS)[number];
 export const TRADE_CURRENCY_SOURCES = ['amount', 'marker', 'security'] as const;
 export type TradeCurrencySource = (typeof TRADE_CURRENCY_SOURCES)[number];
 
+/**
+ * What a trade-confirmation email reports (`PARSED_TRADE_ACTIONS` in
+ * `backend/src/email-receipts/parsing/receipt-parser.types.ts`): a buy, a sell,
+ * a cash dividend (no shares move, so no share count is needed) and a
+ * reinvested dividend (shares bought with the distribution).
+ */
+export const TRADE_ACTIONS = ['BUY', 'SELL', 'DIVIDEND', 'REINVEST'] as const;
+export type TradeAction = (typeof TRADE_ACTIONS)[number];
+
+/** The trade action a value names (a stored reading, a booked row's action), else null. */
+export function tradeActionOf(value: unknown): TradeAction | null {
+  return TRADE_ACTIONS.find((action) => action === value) ?? null;
+}
+
+/** Whether a trade action moves shares, so its reading needs a share count; a cash dividend does not. */
+export const tradeActionMovesShares = (action: TradeAction): boolean => action !== 'DIVIDEND';
+
 /** What a profile's emails are for (linked receipts); absent is `standalone`. */
 export const RECEIPT_PARSER_ROLES = ['standalone', 'component', 'settlement'] as const;
 export type ReceiptParserRole = (typeof RECEIPT_PARSER_ROLES)[number];
@@ -279,12 +296,13 @@ export interface EmailReceiptTradeProposal {
   accountName: string;
   /** YYYY-MM-DD. */
   date: string;
-  action: 'BUY' | 'SELL';
+  action: TradeAction;
   symbol: string;
   securityName: string | null;
-  quantity: number;
-  /** Per share, in the security's currency. */
-  price: number;
+  /** Null only for a cash dividend paid as one amount. */
+  quantity: number | null;
+  /** Per share, in the security's currency; null only for a cash dividend paid as one amount. */
+  price: number | null;
   commission: number;
   /** In the security's currency. */
   totalAmount: number;
@@ -529,10 +547,11 @@ export interface EmailReceiptDetail extends EmailReceiptListItem {
  * (`ParsedTrade` in `backend/src/email-receipts/parsing/receipt-parser.types.ts`).
  * `quantity` is a share count; `total`, `price` and `commission` are in 1/10000
  * units (convert once with `fromReceiptUnits`); `date` is `YYYY-MM-DD`. A value
- * the email did not state is `null`.
+ * the email did not state is `null`. A cash dividend (`DIVIDEND`) needs no
+ * share count, so a complete dividend may carry a null `quantity` and `price`.
  */
 export interface ParsedTrade {
-  action: 'BUY' | 'SELL' | null;
+  action: TradeAction | null;
   symbol: string | null;
   quantity: number | null;
   total: number | null;
@@ -550,7 +569,7 @@ export interface ParsedTrade {
   accountText: string | null;
   accountId: string | null;
   complete: boolean;
-  /** Whether shares times price agrees with the total; null when the email states no price to check. */
+  /** Whether shares times price agrees with the total; null when the email does not state all three to check. */
   consistent: boolean | null;
   reason: string | null;
 }
@@ -566,8 +585,9 @@ export function readParsedTrade(value: Record<string, unknown> | null | undefine
   const currency = value.currency ?? null;
   // A source this client does not know is no source, not a reason to drop the reading.
   const currencySource = TRADE_CURRENCY_SOURCES.find((source) => source === value.currencySource) ?? null;
+  const tradeAction = tradeActionOf(action);
   if (
-    (action !== 'BUY' && action !== 'SELL' && action !== null) ||
+    (tradeAction === null && action !== null) ||
     !isNullableString(symbol) ||
     !isNullableNumber(quantity) ||
     !isNullableNumber(total) ||
@@ -584,7 +604,7 @@ export function readParsedTrade(value: Record<string, unknown> | null | undefine
     return null;
   }
   return {
-    action,
+    action: tradeAction,
     symbol,
     quantity,
     total,
@@ -858,12 +878,15 @@ export interface ReceiptTradeCurrencyMarker {
  * The `trade` section of a profile: the email is read as one investment
  * transaction to create. Each field is a list of entries read like a receipt
  * field; the capture each takes is `{action}`, `{symbol}`, `{quantity}`,
- * `{amount}` (total, price, commission), `{date}` and `{account}`.
+ * `{amount}` (total, price, commission), `{date}` and `{account}`. `action`,
+ * `symbol` and one of `total`/`price` are required; `quantity` is optional in
+ * the definition, but a buy, a sell or a reinvested dividend read without one
+ * is `trade_no_quantity` (a cash dividend needs none).
  */
 export interface ReceiptTradeDefinition {
   action: ReceiptFieldEntry[];
   symbol: ReceiptFieldEntry[];
-  quantity: ReceiptFieldEntry[];
+  quantity?: ReceiptFieldEntry[];
   total?: ReceiptFieldEntry[];
   price?: ReceiptFieldEntry[];
   commission?: ReceiptFieldEntry[];
@@ -1300,8 +1323,9 @@ export interface ParserPreviewItem {
   statusReason: string | null;
   /** For a trade profile: what it read (shares, ticker, direction); null for a receipt or when a guard stopped the read. */
   trade: {
-    action: 'BUY' | 'SELL' | null;
+    action: TradeAction | null;
     symbol: string | null;
+    /** Null when the email stated none; a cash dividend needs none. */
     quantity: number | null;
     consistent: boolean | null;
     /** The account the reading books to; null when none was found. Absent from a server that predates it. */

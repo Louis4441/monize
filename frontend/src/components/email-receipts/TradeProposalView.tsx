@@ -35,12 +35,16 @@ export function TradeProposalView({ proposal, booked, displayState }: TradePropo
     return <p className="text-sm text-gray-500 dark:text-gray-400">{t(key)}</p>;
   }
 
+  // A cash dividend may be paid as one amount, with no share count and no price.
+  const dividend = proposal.action === 'DIVIDEND';
+  const { quantity, price } = proposal;
   return (
     <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
       <p className="font-medium text-gray-900 dark:text-gray-100">
         {t('summary', {
           action: proposal.action,
-          quantity: formatShareQuantity(proposal.quantity),
+          // The dividend sentence names no shares; a known count is its own line below.
+          ...(quantity !== null ? { quantity: formatShareQuantity(quantity) } : {}),
           symbol: proposal.symbol,
           total: formatCurrency(proposal.totalAmount, proposal.currencyCode),
           date: formatDate(proposal.date),
@@ -48,7 +52,14 @@ export function TradeProposalView({ proposal, booked, displayState }: TradePropo
       </p>
       {proposal.securityName && <p>{t('proposalSecurity', { name: proposal.securityName })}</p>}
       <p>{t('proposalAccount', { account: proposal.accountName })}</p>
-      <p>{t('proposalPrice', { price: formatCurrencyPrecise(proposal.price, proposal.currencyCode, 4) })}</p>
+      {dividend && quantity !== null && <p>{t('dividendShares', { quantity: formatShareQuantity(quantity) })}</p>}
+      {price !== null && (
+        <p>
+          {dividend
+            ? t('proposalDividendPerShare', { price: formatCurrencyPrecise(price, proposal.currencyCode, 4) })
+            : t('proposalPrice', { price: formatCurrencyPrecise(price, proposal.currencyCode, 4) })}
+        </p>
+      )}
       <p>{t('proposalCommission', { commission: formatCurrency(proposal.commission, proposal.currencyCode) })}</p>
       <p>
         {t('proposalReview')}{' '}

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import toast from 'react-hot-toast';
 import { render, screen, fireEvent, act, within } from '@/test/render';
 import { EmailReceiptDetailDialog } from './EmailReceiptDetailDialog';
-import { makeDetail, PARSED_RECEIPT, PARSED_TRADE } from './email-receipts-fixtures';
+import { makeDetail, PARSED_DIVIDEND, PARSED_RECEIPT, PARSED_TRADE } from './email-receipts-fixtures';
 
 const api = vi.hoisted(() => ({ get: vi.fn(), link: vi.fn() }));
 const txApi = vi.hoisted(() => ({ getAll: vi.fn() }));
@@ -500,7 +500,7 @@ describe('EmailReceiptDetailDialog', () => {
     it('explains why there is nothing to link when no investment transaction fits', async () => {
       api.get.mockResolvedValue(tradeDetail({ candidates: [] }));
       await renderDialog();
-      expect(screen.getByText(/No investment transaction of this account, direction and ticker/)).toBeInTheDocument();
+      expect(screen.getByText(/No investment transaction of this account, action and ticker/)).toBeInTheDocument();
       expect(screen.getByText(/None yet: the trade is booked when you approve its proposal/)).toBeInTheDocument();
     });
 
@@ -531,6 +531,22 @@ describe('EmailReceiptDetailDialog', () => {
       await renderDialog();
       expect(screen.getByText('The profile found no ticker symbol in this email.')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /choose a transaction|pick a transaction/i })).not.toBeInTheDocument();
+    });
+
+    it('lists a dividend\'s candidates without a share count, which says nothing of a dividend', async () => {
+      api.get.mockResolvedValue(
+        tradeDetail({
+          trade: PARSED_DIVIDEND,
+          status: 'ignored',
+          statusReason: 'trade_exists',
+          displayState: null,
+          candidates: [{ ...tradeCandidate, amount: 12.34, quantity: 0 }],
+        }),
+      );
+      await renderDialog();
+      expect(screen.getByText(/^Dividend from XCNS of 12\.34/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Existing transactions that could be this trade' })).toBeInTheDocument();
+      expect(screen.queryByText('0 shares')).not.toBeInTheDocument();
     });
 
     it('says why a trade already in the ledger was not proposed', async () => {
@@ -619,6 +635,61 @@ describe('EmailReceiptDetailDialog', () => {
       expect(screen.getByText("Booked from the AI agent's proposal: see the transaction above.")).toBeInTheDocument();
       expect(screen.getByText(/Bought 75\.9878 XCNS for/)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'View transaction' })).toHaveAttribute('href', '/investments?edit=it-9');
+    });
+
+    it('shows a cash dividend the AI proposes with no share count and no price', async () => {
+      api.get.mockResolvedValue(
+        aiTrade({ tradeProposal: { ...proposal, action: 'DIVIDEND', quantity: null, price: null, totalAmount: 12.34 } }),
+      );
+      await renderDialog();
+      expect(screen.getByText(/^Dividend from XCNS of .*12\.34, dated /)).toBeInTheDocument();
+      expect(screen.queryByText(/null/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Price: /)).not.toBeInTheDocument();
+      expect(screen.queryByText(/\d shares/)).not.toBeInTheDocument();
+      expect(screen.getByText('Account: CA RRSP - Brokerage')).toBeInTheDocument();
+    });
+
+    it('names the shares and the amount per share of a dividend proposal that states them', async () => {
+      api.get.mockResolvedValue(
+        aiTrade({ tradeProposal: { ...proposal, action: 'DIVIDEND', quantity: 100, price: 0.1234, totalAmount: 12.34 } }),
+      );
+      await renderDialog();
+      expect(screen.getByText('Paid on 100 shares')).toBeInTheDocument();
+      expect(screen.getByText(/^Amount per share: /)).toBeInTheDocument();
+      expect(screen.queryByText(/^Price: /)).not.toBeInTheDocument();
+    });
+
+    it('shows a reinvested dividend the AI proposes with its shares', async () => {
+      api.get.mockResolvedValue(aiTrade({ tradeProposal: { ...proposal, action: 'REINVEST', quantity: 0.4688 } }));
+      await renderDialog();
+      expect(screen.getByText(/^Reinvest a dividend in 0\.4688 shares of XCNS for/)).toBeInTheDocument();
+      expect(screen.getByText(/^Price: /)).toBeInTheDocument();
+    });
+
+    it('names a booked dividend and a booked reinvestment as what they are, never as bought', async () => {
+      const booked = { id: 'it-9', date: '2026-10-15', symbol: 'XCNS', totalAmount: 12.34, currencyCode: 'CAD' };
+      api.get.mockResolvedValue(
+        aiTrade({
+          displayState: 'applied',
+          tradeProposal: null,
+          investmentTransaction: { ...booked, action: 'DIVIDEND', quantity: 0 },
+        }),
+      );
+      const { unmount } = await renderDialogWithUnmount();
+      expect(screen.getByText(/^Dividend from XCNS of .*12\.34 on /)).toBeInTheDocument();
+      expect(screen.queryByText(/Bought/)).not.toBeInTheDocument();
+      unmount();
+
+      api.get.mockResolvedValue(
+        aiTrade({
+          displayState: 'applied',
+          tradeProposal: null,
+          investmentTransaction: { ...booked, action: 'REINVEST', quantity: 0.4688 },
+        }),
+      );
+      await renderDialog();
+      expect(screen.getByText(/^Reinvested a dividend in 0\.4688 XCNS for .*12\.34 on /)).toBeInTheDocument();
+      expect(screen.queryByText(/Bought/)).not.toBeInTheDocument();
     });
 
     it('offers no bank transaction to pick, whatever its status', async () => {

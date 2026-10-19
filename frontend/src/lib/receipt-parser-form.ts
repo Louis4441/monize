@@ -370,8 +370,10 @@ const isBlankMarker = (marker: TradeCurrencyMarkerRow): boolean => marker.match.
  * line guards, nothing else (the server refuses any receipt key beside `trade`).
  * The section is always sent, so an empty required list is reported by the
  * server (`trade.action: empty`) rather than the profile turning into a receipt
- * one. A row left wholly blank is dropped; a row half filled is sent as it is,
- * so the server names what is missing.
+ * one. An empty optional list (`quantity` among them: a cash dividend states no
+ * share count) is left out and simply not read. A row left wholly blank is
+ * dropped; a row half filled is sent as it is, so the server names what is
+ * missing.
  */
 function buildTradeDefinition(form: ParserFormState): ReceiptParserDefinition {
   const definition: ReceiptParserDefinition = { version: PARSER_DEFINITION_VERSION };

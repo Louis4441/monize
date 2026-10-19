@@ -612,7 +612,7 @@ describe('ParserEditorDialog', () => {
       for (const gone of ['Payee', 'Total patterns', 'Item patterns', 'Default category', 'Reference patterns', 'Tag name']) {
         expect(screen.queryByLabelText(gone)).not.toBeInTheDocument();
       }
-      for (const shown of ['Lines source', 'Required lines', 'Buy or sell patterns', 'Ticker patterns', 'Share count patterns', 'Trade total patterns', 'Account patterns', 'Default account']) {
+      for (const shown of ['Lines source', 'Required lines', 'Action patterns', 'Ticker patterns', 'Share count patterns', 'Trade total patterns', 'Account patterns', 'Default account']) {
         expect(screen.getByLabelText(shown)).toBeInTheDocument();
       }
       expect(screen.getByText(/the amount itself when it names one/)).toBeInTheDocument();
@@ -635,7 +635,7 @@ describe('ParserEditorDialog', () => {
       await type('Name', 'Broker');
       await type('Sender domains', 'broker.example');
       await type('Required lines', '*has been filled*');
-      await type('Buy or sell patterns', 'You {action} *');
+      await type('Action patterns', 'You {action} *');
       await type('Ticker patterns', 'Symbol: {symbol}');
       await type('Share count patterns', 'Shares: {quantity}');
       await type('Trade total patterns', 'Total: {amount}');

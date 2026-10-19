@@ -1,4 +1,5 @@
 import type { PendingAction } from '@/types/ai';
+import type { TradeAction } from '@/types/email-receipts';
 
 /**
  * The AI review inbox as `GET /ai-review-requests` answers it. Mirrors
@@ -30,10 +31,11 @@ export type AiReviewKind = (typeof AI_REVIEW_KINDS)[number];
 /** The trade a request of kind `email_trade` proposes (`AiReviewTradeInput`); the card is rebuilt from it. */
 export interface AiReviewTrade {
   accountId: string;
-  action: 'BUY' | 'SELL';
+  action: TradeAction;
   symbol: string;
-  quantity: number;
-  /** The executed total, in the security's currency. */
+  /** Shares; null only for a cash dividend whose email states none. */
+  quantity: number | null;
+  /** The executed total (a dividend's amount paid), in the security's currency. */
   totalAmount: number;
   commission: number;
   /** YYYY-MM-DD. */
