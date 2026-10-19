@@ -64,6 +64,28 @@ export const INVESTMENT_CHART_REFRESH_EVENT = 'monize:investment-chart-refresh';
 
 const RANGE_STORAGE_KEY = 'monize-investments-chart-range';
 
+interface InvestmentValueTooltipProps {
+  active?: boolean;
+  payload?: Array<{ value: number; payload: { name: string } }>;
+  portfolioLabel: string;
+  formatValue: (value: number) => string;
+}
+
+function InvestmentValueTooltip({ active, payload, portfolioLabel, formatValue }: InvestmentValueTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0]?.payload;
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{data?.name}</p>
+        <p className="text-sm text-emerald-600 dark:text-emerald-400">
+          {portfolioLabel} {formatValue(payload[0].value)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 interface InvestmentValueChartProps {
   accountIds?: string[];
   displayCurrency?: string | null;
@@ -224,98 +246,107 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
     [chartWindow, accountIds, foreignCurrency, useDaily, isIntraday, formatChartDate],
   );
 
-  const loadData = useCallback(
-    async (opts: { skipCache?: boolean } = {}) => {
+  // The fetch alone. Whoever starts it has already put the view into its
+  // loading state: `loadData` for a refresh, the render below for a change of
+  // range, accounts or currency.
+  const fetchData = useCallback(
+    (opts: { skipCache?: boolean } = {}) => {
       const seq = ++loadSeqRef.current;
-      setIsLoading(true);
-      setIntradayUnavailable(null);
-      setIntradayFallbackNotice(null);
-      try {
-        if (intradayRange) {
-          const cacheKey = buildIntradayCacheKey(
-            dateRange,
-            accountIds,
-            effectiveCurrency,
-          );
-          const cached = !opts.skipCache ? readIntradayCache(cacheKey) : null;
+      // The writes live in the inner function so they run after the request,
+      // not during the effect that starts it.
+      const run = async () => {
+        try {
+          if (intradayRange) {
+            const cacheKey = buildIntradayCacheKey(
+              dateRange,
+              accountIds,
+              effectiveCurrency,
+            );
+            // The cache is read a microtask later, so hydrating from it never
+            // sets state synchronously inside the effect that starts the load.
+            await Promise.resolve();
+            if (loadSeqRef.current !== seq) return;
+            const cached = !opts.skipCache ? readIntradayCache(cacheKey) : null;
 
-          // Hydrate from cache immediately so the chart appears even before
-          // the network round-trip resolves.
-          if (cached && !cached.fallbackToDaily) {
+            // Hydrate from cache immediately so the chart appears even before
+            // the network round-trip resolves.
+            if (cached && !cached.fallbackToDaily) {
+              setLoadedPoints(
+                cached.points.map((p) => ({
+                  name: formatIntradayLabel(p.timestamp, dateRange),
+                  Value: investedValue(p),
+                  iso: p.timestamp,
+                })),
+              );
+              setIsLoading(false);
+            }
+
+            let response;
+            try {
+              response = await investmentsApi.getIntradayValue({
+                range: intradayRange,
+                accountIds: accountIds?.length ? accountIds.join(',') : undefined,
+                displayCurrency: foreignCurrency || undefined,
+              });
+            } catch (error) {
+              logger.error('Failed to load intraday data:', error);
+              if (loadSeqRef.current !== seq) return;
+              // Intraday fetch failed -- silently fall back to the
+              // daily-snapshot endpoint so the user still sees a chart.
+              await loadDailyOrMonthly(seq);
+              return;
+            }
+
+            if (loadSeqRef.current !== seq) return;
+
+            writeIntradayCache(cacheKey, {
+              fetchedAt: Date.now(),
+              points: response.points,
+              interval: response.interval,
+              currency: response.currency,
+              fallbackToDaily: response.fallbackToDaily,
+              skippedSymbols: response.skippedSymbols,
+              failedSymbols: response.failedSymbols ?? [],
+            });
+
+            if (response.fallbackToDaily) {
+              // Some holdings (typically MSN-tracked) lack intraday support.
+              if (dateRange === '1d') {
+                // No sensible daily-resolution fallback for a single day.
+                setLoadedPoints([]);
+                setIntradayUnavailable({ skipped: response.skippedSymbols });
+                setIsLoading(false);
+                return;
+              }
+              // 1W / MTD / 1M: silently fall back to the daily-snapshot endpoint and
+              // flag the title with a small warning icon so the user knows the
+              // chart is at daily resolution rather than the requested intraday
+              // resolution.
+              setIntradayUnavailable(null);
+              setIntradayFallbackNotice({ skipped: response.skippedSymbols });
+              await loadDailyOrMonthly(seq);
+              return;
+            }
+
             setLoadedPoints(
-              cached.points.map((p) => ({
+              response.points.map((p) => ({
                 name: formatIntradayLabel(p.timestamp, dateRange),
                 Value: investedValue(p),
                 iso: p.timestamp,
               })),
             );
+          } else {
+            await loadDailyOrMonthly(seq);
+          }
+        } catch (error) {
+          logger.error('Failed to load investment data:', error);
+        } finally {
+          if (loadSeqRef.current === seq) {
             setIsLoading(false);
           }
-
-          let response;
-          try {
-            response = await investmentsApi.getIntradayValue({
-              range: intradayRange,
-              accountIds: accountIds?.length ? accountIds.join(',') : undefined,
-              displayCurrency: foreignCurrency || undefined,
-            });
-          } catch (error) {
-            logger.error('Failed to load intraday data:', error);
-            if (loadSeqRef.current !== seq) return;
-            // Intraday fetch failed -- silently fall back to the
-            // daily-snapshot endpoint so the user still sees a chart.
-            await loadDailyOrMonthly(seq);
-            return;
-          }
-
-          if (loadSeqRef.current !== seq) return;
-
-          writeIntradayCache(cacheKey, {
-            fetchedAt: Date.now(),
-            points: response.points,
-            interval: response.interval,
-            currency: response.currency,
-            fallbackToDaily: response.fallbackToDaily,
-            skippedSymbols: response.skippedSymbols,
-            failedSymbols: response.failedSymbols ?? [],
-          });
-
-          if (response.fallbackToDaily) {
-            // Some holdings (typically MSN-tracked) lack intraday support.
-            if (dateRange === '1d') {
-              // No sensible daily-resolution fallback for a single day.
-              setLoadedPoints([]);
-              setIntradayUnavailable({ skipped: response.skippedSymbols });
-              setIsLoading(false);
-              return;
-            }
-            // 1W / MTD / 1M: silently fall back to the daily-snapshot endpoint and
-            // flag the title with a small warning icon so the user knows the
-            // chart is at daily resolution rather than the requested intraday
-            // resolution.
-            setIntradayUnavailable(null);
-            setIntradayFallbackNotice({ skipped: response.skippedSymbols });
-            await loadDailyOrMonthly(seq);
-            return;
-          }
-
-          setLoadedPoints(
-            response.points.map((p) => ({
-              name: formatIntradayLabel(p.timestamp, dateRange),
-              Value: investedValue(p),
-              iso: p.timestamp,
-            })),
-          );
-        } else {
-          await loadDailyOrMonthly(seq);
         }
-      } catch (error) {
-        logger.error('Failed to load investment data:', error);
-      } finally {
-        if (loadSeqRef.current === seq) {
-          setIsLoading(false);
-        }
-      }
+      };
+      return run();
     },
     [
       intradayRange,
@@ -328,11 +359,45 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
     ],
   );
 
+  const loadData = useCallback(
+    (opts: { skipCache?: boolean } = {}) => {
+      setIsLoading(true);
+      setIntradayUnavailable(null);
+      setIntradayFallbackNotice(null);
+      return fetchData(opts);
+    },
+    [fetchData],
+  );
+
+  // A new range, account set or currency is a new request: show it loading
+  // from the render that asks for it (the "info from previous render" pattern,
+  // not a setState in the effect that fetches it). An invalid range asks for
+  // nothing, so it leaves the view as it is.
+  const requestKey = isValid
+    ? [
+        dateRange,
+        accountIds?.join(',') ?? '',
+        effectiveCurrency,
+        foreignCurrency ?? '',
+        chartWindow.start,
+        chartWindow.end,
+      ].join('|')
+    : null;
+  const [loadingKey, setLoadingKey] = useState(requestKey);
+  if (loadingKey !== requestKey) {
+    setLoadingKey(requestKey);
+    if (requestKey !== null) {
+      setIsLoading(true);
+      setIntradayUnavailable(null);
+      setIntradayFallbackNotice(null);
+    }
+  }
+
   useEffect(() => {
     if (isValid) {
-      void loadData();
+      void fetchData();
     }
-  }, [isValid, loadData]);
+  }, [isValid, fetchData]);
 
   // Listen for the page-level Refresh button. When the user is on an intraday
   // range, drop the sessionStorage entry and re-fetch only this chart's data.
@@ -482,21 +547,6 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
     [chartPoints, summary.lowest],
   );
   const showFlags = summary.highest !== summary.lowest;
-
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: { name: string } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0]?.payload;
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{data?.name}</p>
-          <p className="text-sm text-emerald-600 dark:text-emerald-400">
-            {t('investmentValueChart.portfolioLabel')} {fmtVal(payload[0].value)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Only show the full-card skeleton on the very first load. Subsequent
   // range / filter changes keep the previous chart on screen so Recharts can
@@ -759,7 +809,14 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix,
                 tick={{ fontSize: 12 }}
                 width={isMobile ? 44 : undefined}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={
+                  <InvestmentValueTooltip
+                    portfolioLabel={t('investmentValueChart.portfolioLabel')}
+                    formatValue={fmtVal}
+                  />
+                }
+              />
               <Area
                 type="monotone"
                 dataKey="Value"

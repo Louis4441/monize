@@ -56,32 +56,41 @@ function AccountsContent() {
   const { convertToDefault, defaultCurrency } = useExchangeRates();
   const { formatCurrency } = useNumberFormat();
 
-  const loadAccounts = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [data, portfolio, insts] = await Promise.all([
-        accountsApi.getAll(true),
-        investmentsApi
-          .getPortfolioSummary()
-          .then((summary) => ({ ok: true as const, summary }))
-          .catch(() => ({ ok: false as const, summary: null })),
-        institutionsApi.getAll().catch(() => [] as Institution[]),
-      ]);
-      setAccounts(data);
-      setPortfolioSummary(portfolio.summary);
-      setPortfolioFailed(!portfolio.ok);
-      setInstitutions(insts);
-    } catch (error) {
-      showErrorToast(error, t('toast.loadFailed'));
-      logger.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+  // The mount load: the state already says loading.
+  const fetchAccounts = useCallback(() => {
+    // Writes live in `run` so they land after the request, not during the effect.
+    const run = async () => {
+      try {
+        const [data, portfolio, insts] = await Promise.all([
+          accountsApi.getAll(true),
+          investmentsApi
+            .getPortfolioSummary()
+            .then((summary) => ({ ok: true as const, summary }))
+            .catch(() => ({ ok: false as const, summary: null })),
+          institutionsApi.getAll().catch(() => [] as Institution[]),
+        ]);
+        setAccounts(data);
+        setPortfolioSummary(portfolio.summary);
+        setPortfolioFailed(!portfolio.ok);
+        setInstitutions(insts);
+      } catch (error) {
+        showErrorToast(error, t('toast.loadFailed'));
+        logger.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    return run();
   }, [t]);
 
+  const loadAccounts = useCallback(() => {
+    setIsLoading(true);
+    return fetchAccounts();
+  }, [fetchAccounts]);
+
   useEffect(() => {
-    loadAccounts();
-  }, [loadAccounts]);
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   useOnUndoRedo(loadAccounts);
   // An AI write can change account balances (e.g. a transaction created from

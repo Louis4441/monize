@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, MutableRefObject } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
@@ -191,7 +191,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     handleSubmit,
     setValue,
     getValues,
-    watch,
+    control,
     reset,
     clearErrors,
     formState: { errors, isSubmitting, isDirty, defaultValues },
@@ -229,7 +229,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     },
   });
 
-  const selectedCurrency = watch('currencyCode');
+  const selectedCurrency = useWatch({ control, name: 'currencyCode' });
 
   /**
    * The user's currencies, plus whatever the form currently holds.
@@ -271,8 +271,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
    * default, so it reads as clean, yet it is the user's explicit choice.
    */
   const [skipSwitchTouched, setSkipSwitchTouched] = useState(false);
-  const watchedQuoteProvider = watch('quoteProvider') || '';
-  const watchedMsnInstrumentId = watch('msnInstrumentId')?.trim() || '';
+  const watchedQuoteProvider = useWatch({ control, name: 'quoteProvider' }) || '';
+  const watchedMsnInstrumentId = useWatch({ control, name: 'msnInstrumentId' })?.trim() || '';
 
   // Show what the save will store: the same rule as `SecuritiesService.update`,
   // a provider or MSN id that differs from the stored one clears the flag.
@@ -295,9 +295,14 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     getValues,
     setValue,
   ]);
-  const isBond = watch('securityType') === 'BOND';
-  const selectedBondProgramId = watch('bondProgramId') || '';
-  const bondAutoFetch = watch('bondAutoFetch') ?? false;
+  const watchedSecurityType = useWatch({ control, name: 'securityType' });
+  const watchedExchange = useWatch({ control, name: 'exchange' });
+  const watchedSkipPriceUpdates = useWatch({ control, name: 'skipPriceUpdates' });
+  const watchedPriceAlertPercent = useWatch({ control, name: 'priceAlertPercent' });
+  const watchedPriceChartEnabled = useWatch({ control, name: 'priceChartEnabled' });
+  const isBond = watchedSecurityType === 'BOND';
+  const selectedBondProgramId = useWatch({ control, name: 'bondProgramId' }) || '';
+  const bondAutoFetch = useWatch({ control, name: 'bondAutoFetch' }) ?? false;
 
   const bondPicker = useBondProgramPicker(isBond, selectedCurrency, selectedBondProgramId);
   const effectiveBondProgramId = bondPicker.effectiveProgramId;
@@ -369,7 +374,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     setValue('bondAutoFetch', false, { shouldDirty: true });
   };
 
-  const isFavourite = watch('isFavourite') ?? false;
+  const isFavourite = useWatch({ control, name: 'isFavourite' }) ?? false;
   const toggleFavourite = () =>
     setValue('isFavourite', !isFavourite, { shouldDirty: true });
 
@@ -463,8 +468,9 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   }, [getValues, preferredExchanges, lookupProvider, applyLookupResult, t]);
 
   // In edit mode, revert to the original security values. In create mode,
-  // blank everything out (keeping the user's default currency).
-  const handleClear = useCallback(() => {
+  // blank everything out (keeping the user's default currency). Only a button's
+  // onClick reads it, so it is left to the compiler to memoize.
+  const handleClear = () => {
     setSkipSwitchTouched(false);
     if (security) {
       reset();
@@ -495,7 +501,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
     setBondCountryChoice(null);
     setHasLookupResult(false);
     setResetNonce((n) => n + 1);
-  }, [reset, defaultValues, defaultCurrency, security]);
+  };
 
   // Drop an asset class from the user's list. The backend removes it from every
   // security that used it; nothing is re-apportioned, so the freed percentage
@@ -537,7 +543,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
   };
 
   const isFundType =
-    watch('securityType') === 'ETF' || watch('securityType') === 'MUTUAL_FUND';
+    watchedSecurityType === 'ETF' || watchedSecurityType === 'MUTUAL_FUND';
 
   const onFormSubmit = async (data: SecurityFormData) => {
     const isFund =
@@ -659,7 +665,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         <Select
           label={t('form.typeLabel')}
           options={securityTypeOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-          value={watch('securityType') || ''}
+          value={watchedSecurityType || ''}
           onChange={(e) => setValue('securityType', e.target.value, { shouldDirty: true })}
           error={errors.securityType?.message}
         />
@@ -678,7 +684,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
           key={`exchange-${resetNonce}`}
           label={t('form.exchangeLabel')}
           options={EXCHANGE_OPTIONS}
-          value={watch('exchange') || ''}
+          value={watchedExchange || ''}
           onChange={(value, label) => setValue('exchange', value || label, { shouldDirty: true })}
           error={errors.exchange?.message}
           placeholder={t('form.exchangeSearchPlaceholder')}
@@ -799,7 +805,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
 
       {!hideExchange && (
         <QuoteProviderSelect
-          value={watch('quoteProvider') || ''}
+          value={watchedQuoteProvider}
           onChange={(value) => setValue('quoteProvider', value, { shouldDirty: true })}
           userDefaultProvider={userDefaultProvider}
           msnReady={msnReady}
@@ -813,7 +819,7 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
         <div>
           <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
             <ToggleSwitch
-              checked={!!watch('skipPriceUpdates')}
+              checked={!!watchedSkipPriceUpdates}
               onChange={(next) => {
                 setValue('skipPriceUpdates', next, { shouldDirty: true });
                 setSkipSwitchTouched(true);
@@ -849,8 +855,8 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
       <NumericInput
         label={t('priceAlert.label')}
         value={
-          watch('priceAlertPercent')?.trim()
-            ? Number(watch('priceAlertPercent'))
+          watchedPriceAlertPercent?.trim()
+            ? Number(watchedPriceAlertPercent)
             : undefined
         }
         onChange={(value) =>
@@ -871,14 +877,14 @@ export function SecurityForm({ security, defaults, onSubmit, onCancel, onDirtyCh
 
       <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
         <ToggleSwitch
-          checked={!!watch('priceChartEnabled')}
+          checked={!!watchedPriceChartEnabled}
           onChange={(next) => setValue('priceChartEnabled', next, { shouldDirty: true })}
           label={t('priceAlert.chartLabel')}
         />
         {t('priceAlert.chartLabel')}
       </label>
 
-      {!hideExchange && watch('quoteProvider') === 'msn' && (
+      {!hideExchange && watchedQuoteProvider === 'msn' && (
         <MsnInstrumentIdInput
           registration={register('msnInstrumentId')}
           error={errors.msnInstrumentId?.message}

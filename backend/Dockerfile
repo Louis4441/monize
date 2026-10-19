@@ -38,7 +38,10 @@ COPY database/migrations ./migrations
 # Copy release notes (needed by production stage for the What's New digest)
 COPY docs/release-notes ./release-notes
 
-RUN npm run build
+# `nest build` type-checks the whole backend in one tsc process, which now
+# needs more than the ~2 GB heap Node defaults to on an 8 GB host (WSL,
+# Docker Desktop). CI runners default higher, so only local builds hit it.
+RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 
 # Production deps stage (uses slim/glibc to avoid Alpine musl SIGILL under QEMU)
 FROM mirror.gcr.io/library/node:24-slim AS deps

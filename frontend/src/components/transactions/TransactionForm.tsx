@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback, MutableRefObject } from 'react';
 import { useTranslations } from 'next-intl';
-import { useForm, Resolver } from 'react-hook-form';
+import { useForm, useWatch, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -321,7 +321,7 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     getValues,
     formState: { errors, isDirty },
   } = useForm<TransactionFormData>({
@@ -357,15 +357,15 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
 
   useFormDirtyNotify(isDirty, onDirtyChange);
 
-  const watchedAccountId = watch('accountId');
-  const watchedAmount = watch('amount');
-  const watchedCurrencyCode = watch('currencyCode');
-  const watchedPayeeName = watch('payeeName');
+  const watchedAccountId = useWatch({ control, name: 'accountId' });
+  const watchedAmount = useWatch({ control, name: 'amount' });
+  const watchedCurrencyCode = useWatch({ control, name: 'currencyCode' });
+  const watchedPayeeName = useWatch({ control, name: 'payeeName' });
   // Read live so the links under the field track what is being typed. The
   // textarea itself cannot hold an anchor, so this is the only way the address
   // in a draft is reachable without saving first.
-  const watchedDescription = watch('description');
-  const watchedDate = watch('transactionDate');
+  const watchedDescription = useWatch({ control, name: 'description' });
+  const watchedDate = useWatch({ control, name: 'transactionDate' });
 
   // Foreign-currency entry is active only for non-transfer transactions whose
   // entry currency differs from the account currency. Transfers already have
@@ -539,11 +539,22 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
     }
   }, [defaultAccountId, transaction, setValue]);
 
-  // Set defaultCategoryId when it changes (and we're not editing/duplicating)
+  // Set defaultCategoryId when it changes (and we're not editing/duplicating).
+  // The picker's own state follows during render (the "info from previous
+  // render" pattern); the form value and the auto-set flag stay in the effect.
+  const [categoryDefaultFor, setCategoryDefaultFor] = useState({ defaultCategoryId, initSource });
+  if (
+    categoryDefaultFor.defaultCategoryId !== defaultCategoryId ||
+    categoryDefaultFor.initSource !== initSource
+  ) {
+    setCategoryDefaultFor({ defaultCategoryId, initSource });
+    if (!initSource && defaultCategoryId) {
+      setSelectedCategoryId(defaultCategoryId);
+    }
+  }
   useEffect(() => {
     if (!initSource && defaultCategoryId) {
       setValue('categoryId', defaultCategoryId);
-      setSelectedCategoryId(defaultCategoryId);
       categoryWasAutoSetRef.current = true;
     }
   }, [defaultCategoryId, initSource, setValue]);
@@ -1117,14 +1128,19 @@ function TransactionFormFields({ transaction, duplicateFrom, defaultAccountId, d
     return formatDatetimeLocal(isoToDatetimeLocal(transaction.createdAt, userTimezone), dateFormat, timeFormat);
   });
 
-  // Recalculate if the timezone preference or date format loads/changes after initial mount
-  useEffect(() => {
-    if (!transaction?.createdAt) return;
-    const dtLocal = isoToDatetimeLocal(transaction.createdAt, userTimezone);
-    setCreatedAtValue(dtLocal);
-    setCreatedAtOriginal(dtLocal);
-    setCreatedAtDisplay(formatDatetimeLocal(dtLocal, dateFormat, timeFormat));
-  }, [transaction?.createdAt, userTimezone, dateFormat, timeFormat]);
+  // Recalculate if the timezone preference or date format loads/changes after
+  // initial mount (the "info from previous render" pattern, not an effect)
+  const createdAtKey = `${transaction?.createdAt ?? ''}|${userTimezone}|${dateFormat}|${timeFormat}`;
+  const [createdAtFor, setCreatedAtFor] = useState(createdAtKey);
+  if (createdAtFor !== createdAtKey) {
+    setCreatedAtFor(createdAtKey);
+    if (transaction?.createdAt) {
+      const dtLocal = isoToDatetimeLocal(transaction.createdAt, userTimezone);
+      setCreatedAtValue(dtLocal);
+      setCreatedAtOriginal(dtLocal);
+      setCreatedAtDisplay(formatDatetimeLocal(dtLocal, dateFormat, timeFormat));
+    }
+  }
 
   // Tag creation modal state
   const [showTagForm, setShowTagForm] = useState(false);

@@ -283,7 +283,7 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
       const val = (externalValue as string) || '';
       return val ? formatDate(val, datePattern) : '';
     });
-    const isFocusedRef = useRef(false);
+    const [isFocused, setIsFocused] = useState(false);
     const localRef = useRef<HTMLInputElement>(null);
     // Hidden native date input ref for touch mode
     const nativeDateRef = useRef<HTMLInputElement>(null);
@@ -329,15 +329,19 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
     // Sync explicit value prop changes to internal state. When the caller is
     // uncontrolled (RHF register, no value prop), externalValue is undefined
     // and we skip -- the mount effect above reads the ref-injected DOM value
-    // instead.
-    useEffect(() => {
-      if (externalValue === undefined) return;
-      const newIso = (externalValue as string) || '';
-      setIsoValue(newIso);
-      if (!isFocusedRef.current) {
-        setDisplayValue(newIso ? formatDate(newIso, datePattern) : '');
+    // instead. The "info from previous render" pattern rather than a setState
+    // in an effect.
+    const [syncedFor, setSyncedFor] = useState({ externalValue, datePattern });
+    if (syncedFor.externalValue !== externalValue || syncedFor.datePattern !== datePattern) {
+      setSyncedFor({ externalValue, datePattern });
+      if (externalValue !== undefined) {
+        const newIso = (externalValue as string) || '';
+        setIsoValue(newIso);
+        if (!isFocused) {
+          setDisplayValue(newIso ? formatDate(newIso, datePattern) : '');
+        }
       }
-    }, [externalValue, datePattern]);
+    }
 
     // Emit a YYYY-MM-DD value change through all relevant callbacks
     const emitDateChange = useCallback((dateStr: string) => {
@@ -491,13 +495,13 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
 
     // Desktop: complete and reformat on blur
     const handleTextBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-      isFocusedRef.current = false;
+      setIsFocused(false);
       commitTypedValue();
       externalOnBlur?.(e);
     }, [commitTypedValue, externalOnBlur]);
 
     const handleTextFocus = useCallback(() => {
-      isFocusedRef.current = true;
+      setIsFocused(true);
     }, []);
 
     // Desktop: toggle custom calendar popover

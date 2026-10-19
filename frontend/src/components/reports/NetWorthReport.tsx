@@ -41,6 +41,62 @@ const logger = createLogger('NetWorthReport');
 
 type NetWorthSortField = 'name' | 'assets' | 'liabilities' | 'netWorth';
 
+interface NetWorthTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string; payload: { name: string } }>;
+  formatCurrency: (value: number) => string;
+}
+
+function NetWorthTooltip({ active, payload, formatCurrency }: NetWorthTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0]?.payload;
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{data?.name}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {formatCurrency(entry.value)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
+
+interface CompositionTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { name: string; Assets: number; Liabilities: number } }>;
+  formatCurrency: (value: number) => string;
+  formatPercent: (value: number, decimals?: number) => string;
+  t: ReturnType<typeof useTranslations<'reports'>>;
+}
+
+function CompositionTooltip({ active, payload, formatCurrency, formatPercent, t }: CompositionTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0]?.payload;
+    const assets = data?.Assets ?? 0;
+    const liabilities = data?.Liabilities ?? 0;
+    const total = assets + liabilities;
+    const pct = (value: number) => (total > 0 ? formatPercent(((value / total) * 100), 1) : '0%');
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{data?.name}</p>
+        <p className="text-sm" style={{ color: chartColors.income }}>
+          {t('netWorth.colAssets')}: {formatCurrency(assets)} ({pct(assets)})
+        </p>
+        <p className="text-sm" style={{ color: chartColors.expense }}>
+          {t('netWorth.colLiabilities')}: {formatCurrency(liabilities)} ({pct(liabilities)})
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 pt-1 border-t border-gray-100 dark:border-gray-700">
+          {t('netWorth.seriesNetWorth')}: {formatCurrency(assets - liabilities)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function NetWorthReport() {
   const t = useTranslations('reports');
   const formatChartDate = useChartDateFormat();
@@ -86,27 +142,6 @@ export function NetWorthReport() {
     } finally {
       setIsRecalculating(false);
     }
-  };
-
-  const handleExportPdf = async () => {
-    const { exportToPdf } = await import('@/lib/pdf-export');
-    await exportToPdf({
-      title: t('netWorth.pdfTitle'),
-      subtitle: `${chartData[0]?.name || ''} - ${chartData[chartData.length - 1]?.name || ''}`,
-      summaryCards: [
-        { label: t('netWorth.currentNetWorth'), value: formatCurrency(summary.current), color: summary.current >= 0 ? '#16a34a' : '#dc2626' },
-        { label: t('netWorth.change'), value: `${summary.change >= 0 ? '+' : ''}${formatCurrency(summary.change)}`, color: summary.change >= 0 ? '#16a34a' : '#dc2626' },
-        { label: t('netWorth.changePct'), value: formatSignedPercent(summary.changePercent, 1), color: summary.changePercent >= 0 ? '#16a34a' : '#dc2626' },
-      ],
-      chartContainer: chartRef.current,
-      filename: 'net-worth-report',
-    });
-  };
-
-  const handleExportCsv = () => {
-    const headers = [t('netWorth.colMonth'), t('netWorth.colAssets'), t('netWorth.colLiabilities'), t('netWorth.colNetWorth')];
-    const rows = sortedTableData.map((d) => [d.name, d.Assets, d.Liabilities, d.NetWorth]);
-    exportToCsv('net-worth-report', headers, rows);
   };
 
   const chartData = useMemo(() =>
@@ -208,6 +243,27 @@ export function NetWorthReport() {
     };
   }, [chartData]);
 
+  const handleExportPdf = async () => {
+    const { exportToPdf } = await import('@/lib/pdf-export');
+    await exportToPdf({
+      title: t('netWorth.pdfTitle'),
+      subtitle: `${chartData[0]?.name || ''} - ${chartData[chartData.length - 1]?.name || ''}`,
+      summaryCards: [
+        { label: t('netWorth.currentNetWorth'), value: formatCurrency(summary.current), color: summary.current >= 0 ? '#16a34a' : '#dc2626' },
+        { label: t('netWorth.change'), value: `${summary.change >= 0 ? '+' : ''}${formatCurrency(summary.change)}`, color: summary.change >= 0 ? '#16a34a' : '#dc2626' },
+        { label: t('netWorth.changePct'), value: formatSignedPercent(summary.changePercent, 1), color: summary.changePercent >= 0 ? '#16a34a' : '#dc2626' },
+      ],
+      chartContainer: chartRef.current,
+      filename: 'net-worth-report',
+    });
+  };
+
+  const handleExportCsv = () => {
+    const headers = [t('netWorth.colMonth'), t('netWorth.colAssets'), t('netWorth.colLiabilities'), t('netWorth.colNetWorth')];
+    const rows = sortedTableData.map((d) => [d.name, d.Assets, d.Liabilities, d.NetWorth]);
+    exportToCsv('net-worth-report', headers, rows);
+  };
+
   // Per-bar value labels are only legible on the shorter (1y/2y) ranges; longer
   // ranges pack too many bars together. Beyond ~14 bars the labels are rotated
   // vertical so the 2-year view doesn't overlap. On mobile the bars are narrow
@@ -234,48 +290,6 @@ export function NetWorthReport() {
   // The 100% stacked view normalises each bar to its assets/liabilities split,
   // so the Y axis reads as a percentage rather than a currency amount.
   const formatPercentAxis = (value: number) => `${formatPercentTrimmed(Math.round(value * 100))}`;
-
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string; payload: { name: string } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0]?.payload;
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{data?.name}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const CompositionTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; Assets: number; Liabilities: number } }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0]?.payload;
-      const assets = data?.Assets ?? 0;
-      const liabilities = data?.Liabilities ?? 0;
-      const total = assets + liabilities;
-      const pct = (value: number) => (total > 0 ? formatPercent(((value / total) * 100), 1) : '0%');
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{data?.name}</p>
-          <p className="text-sm" style={{ color: chartColors.income }}>
-            {t('netWorth.colAssets')}: {formatCurrency(assets)} ({pct(assets)})
-          </p>
-          <p className="text-sm" style={{ color: chartColors.expense }}>
-            {t('netWorth.colLiabilities')}: {formatCurrency(liabilities)} ({pct(liabilities)})
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 pt-1 border-t border-gray-100 dark:border-gray-700">
-            {t('netWorth.seriesNetWorth')}: {formatCurrency(assets - liabilities)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Loading and error states are rendered *inside* this tree, never as an
   // early return. Returning a different tree unmounts the controls block, and
@@ -458,7 +472,7 @@ export function NetWorthReport() {
                   tickFormatter={formatCurrencyAxis}
                   tick={{ fontSize: 12 }}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<NetWorthTooltip formatCurrency={formatCurrency} />} />
                 <Legend />
                 <ReferenceLine y={0} stroke={chartColors.axis} strokeDasharray="3 3" />
                 <Area
@@ -507,7 +521,7 @@ export function NetWorthReport() {
                   tickFormatter={formatPercentAxis}
                   tick={{ fontSize: 12 }}
                 />
-                <Tooltip content={<CompositionTooltip />} />
+                <Tooltip content={<CompositionTooltip formatCurrency={formatCurrency} formatPercent={formatPercent} t={t} />} />
                 <Legend />
                 <Bar dataKey="Assets" stackId="networth" fill={chartColors.income} name={t('netWorth.colAssets')} />
                 <Bar dataKey="Liabilities" stackId="networth" fill={chartColors.expense} name={t('netWorth.colLiabilities')} radius={[4, 4, 0, 0]} />
@@ -526,7 +540,7 @@ export function NetWorthReport() {
                   tickFormatter={formatCurrencyAxis}
                   tick={{ fontSize: 12 }}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<NetWorthTooltip formatCurrency={formatCurrency} />} />
                 <Legend />
                 <ReferenceLine y={0} stroke={chartColors.axis} strokeDasharray="3 3" />
                 <Bar dataKey="NetWorth" fill={chartColors.primary} name={t('netWorth.seriesNetWorth')} radius={[4, 4, 0, 0]}>

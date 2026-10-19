@@ -199,26 +199,30 @@ function OwnerSettingsView() {
 
   const [activeSection, setActiveSection] = useScrollSpy(sectionIds, { enabled: !isLoading });
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [userData, prefsData, smtpStatus, authMethods] = await Promise.all([
-        userSettingsApi.getProfile(),
-        userSettingsApi.getPreferences(),
-        userSettingsApi.getSmtpStatus().catch(() => ({ configured: false })),
-        authApi.getAuthMethods().catch(() => ({ local: true, oidc: false, registration: true, smtp: false, force2fa: false, demo: false })),
-      ]);
-      setUser(userData);
-      setPreferences(prefsData);
-      setSmtpConfigured(smtpStatus.configured);
-      setForce2fa(authMethods.force2fa);
-      useDemoStore.getState().setDemoMode(authMethods.demo ?? false);
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
-      logger.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+  // The only load is the mount one, and the state already says loading.
+  const loadData = useCallback(() => {
+    // Writes live in `run` so they land after the request, not during the effect.
+    const run = async () => {
+      try {
+        const [userData, prefsData, smtpStatus, authMethods] = await Promise.all([
+          userSettingsApi.getProfile(),
+          userSettingsApi.getPreferences(),
+          userSettingsApi.getSmtpStatus().catch(() => ({ configured: false })),
+          authApi.getAuthMethods().catch(() => ({ local: true, oidc: false, registration: true, smtp: false, force2fa: false, demo: false })),
+        ]);
+        setUser(userData);
+        setPreferences(prefsData);
+        setSmtpConfigured(smtpStatus.configured);
+        setForce2fa(authMethods.force2fa);
+        useDemoStore.getState().setDemoMode(authMethods.demo ?? false);
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('toasts.loadFailed')));
+        logger.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    return run();
   }, [t]);
 
   useEffect(() => {

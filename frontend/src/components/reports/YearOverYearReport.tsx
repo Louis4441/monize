@@ -55,6 +55,31 @@ export function monthClickRange(
   };
 }
 
+interface YearOverYearTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+  formatCurrency: (value: number) => string;
+}
+
+function YearOverYearTooltip({ active, payload, label, formatCurrency }: YearOverYearTooltipProps) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+          {label}
+        </p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {formatCurrency(entry.value)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+}
+
 export function YearOverYearReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -195,32 +220,6 @@ export function YearOverYearReport() {
       ...years.map((year) => Number(row[year]) || 0),
     ]);
     exportToCsv(`year-over-year-${metric}`, headers, rows);
-  };
-
-  const CustomTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    payload?: Array<{ name: string; value: number; color: string }>;
-    label?: string;
-  }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-            {label}
-          </p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
   };
 
   if (error) {
@@ -425,7 +424,7 @@ export function YearOverYearReport() {
                   tickFormatter={formatCurrencyAxis}
                   tick={{ fontSize: 12 }}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<YearOverYearTooltip formatCurrency={formatCurrency} />} />
                 <Legend />
                 {years.map((year, index) => (
                   <Bar

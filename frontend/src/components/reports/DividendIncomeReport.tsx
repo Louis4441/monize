@@ -94,6 +94,39 @@ const SERIES_COLORS: Record<SeriesKey, { positive: string; negative: string }> =
   capitalGains: { positive: CHART_SERIES[4], negative: chartColors.expense },
 };
 
+interface DividendIncomeTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string; dataKey?: string }>;
+  label?: string;
+  fmtValue: (value: number | null) => string;
+}
+
+function DividendIncomeTooltip({ active, payload, label, fmtValue }: DividendIncomeTooltipProps) {
+  if (active && payload && payload.length) {
+    // Recharts can pass a Cell-coloured payload entry; surface signed values
+    // and use the original series colour rather than the per-bar Cell colour.
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{label}</p>
+        {payload.map((entry, index) => {
+          const seriesKey = entry.dataKey as SeriesKey | undefined;
+          const colour = seriesKey
+            ? entry.value < 0
+              ? SERIES_COLORS[seriesKey].negative
+              : SERIES_COLORS[seriesKey].positive
+            : entry.color;
+          return (
+            <p key={index} className="text-sm" style={{ color: colour }}>
+              {entry.name}: {fmtValue(entry.value)}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+  return null;
+}
+
 const ACCOUNTS_STORAGE_KEY = 'monize-reports-dividend-income-accounts';
 
 // Today's header cell, unchanged. Kept local -- PHONE_HEADER_CLASS/CAPTION_CLASS/
@@ -326,15 +359,14 @@ export function DividendIncomeReport() {
 
   // Clear the security filter when the account changes or when the selected
   // security drops out of the available set (e.g. switching to an account
-  // that doesn't hold it).
-  useEffect(() => {
-    if (
-      selectedSecurityId &&
-      !availableSecurities.some((s) => s.id === selectedSecurityId)
-    ) {
-      setSelectedSecurityId('');
-    }
-  }, [selectedSecurityId, availableSecurities]);
+  // that doesn't hold it). Adjusted during render, not in an effect, so the
+  // stale filter never paints.
+  if (
+    selectedSecurityId &&
+    !availableSecurities.some((s) => s.id === selectedSecurityId)
+  ) {
+    setSelectedSecurityId('');
+  }
 
   const filteredTransactions = useMemo(() => {
     if (!selectedSecurityId) return transactions;
@@ -1033,32 +1065,6 @@ export function DividendIncomeReport() {
     capitalGains: t('dividendIncome.seriesCapitalGains'),
   };
 
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string; dataKey?: string }>; label?: string }) => {
-    if (active && payload && payload.length) {
-      // Recharts can pass a Cell-coloured payload entry; surface signed values
-      // and use the original series colour rather than the per-bar Cell colour.
-      return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{label}</p>
-          {payload.map((entry, index) => {
-            const seriesKey = entry.dataKey as SeriesKey | undefined;
-            const colour = seriesKey
-              ? entry.value < 0
-                ? SERIES_COLORS[seriesKey].negative
-                : SERIES_COLORS[seriesKey].positive
-              : entry.color;
-            return (
-              <p key={index} className="text-sm" style={{ color: colour }}>
-                {entry.name}: {fmtValue(entry.value)}
-              </p>
-            );
-          })}
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (error) {
     return <ReportError onRetry={reloadAll} />;
   }
@@ -1302,7 +1308,7 @@ export function DividendIncomeReport() {
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={formatCurrencyAxis} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<DividendIncomeTooltip fmtValue={fmtValue} />} />
                 <Legend />
                 <ReferenceLine y={0} stroke={chartColors.axis} />
                 {visibleSeries.dividends && (
@@ -1516,7 +1522,7 @@ export function DividendIncomeReport() {
                   <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={formatCurrencyAxis} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<DividendIncomeTooltip fmtValue={fmtValue} />} />
                   <Legend />
                   <ReferenceLine y={0} stroke={chartColors.axis} />
                   {visibleSeries.dividends && (

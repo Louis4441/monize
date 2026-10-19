@@ -1,6 +1,6 @@
 'use client';
 
-import { MutableRefObject, useMemo, useState } from 'react';
+import { MutableRefObject, useLayoutEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import {
@@ -340,9 +340,12 @@ export function DelegateAccessModal({
     }
   };
 
-  submitRef.current = () => {
-    void handleSave();
-  };
+  // Kept pointing at this render's save after commit, never written during render.
+  useLayoutEffect(() => {
+    submitRef.current = () => {
+      void handleSave();
+    };
+  });
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'accounts', label: t('tabs.accounts') },

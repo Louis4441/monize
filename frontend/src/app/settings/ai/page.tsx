@@ -34,21 +34,25 @@ function AiSettingsContent() {
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [usageDays, setUsageDays] = useState<number | undefined>(30);
 
-  const loadData = useCallback(async () => {
-    try {
-      const [configsData, usageData, statusData] = await Promise.all([
-        aiApi.getConfigs(),
-        aiApi.getUsage(usageDays),
-        aiApi.getStatus(),
-      ]);
-      setConfigs(configsData);
-      setUsage(usageData);
-      setStatus(statusData);
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
-    } finally {
-      setIsLoading(false);
-    }
+  const loadData = useCallback(() => {
+    // Writes live in `run` so they land after the request, not during the effect.
+    const run = async () => {
+      try {
+        const [configsData, usageData, statusData] = await Promise.all([
+          aiApi.getConfigs(),
+          aiApi.getUsage(usageDays),
+          aiApi.getStatus(),
+        ]);
+        setConfigs(configsData);
+        setUsage(usageData);
+        setStatus(statusData);
+      } catch (error) {
+        toast.error(getErrorMessage(error, t('toasts.loadFailed')));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    return run();
   }, [usageDays, t]);
 
   useEffect(() => {

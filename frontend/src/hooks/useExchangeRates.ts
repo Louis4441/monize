@@ -40,17 +40,23 @@ export function useExchangeRates() {
     usePreferencesStore((state) => state.preferences?.defaultCurrency),
   );
 
-  const refresh = useCallback(async () => {
-    try {
-      const data = await exchangeRatesApi.getLatestRates();
-      setRates(data);
-      setHasFailed(false);
-    } catch (error) {
-      logger.error('Failed to load exchange rates:', error);
-      setHasFailed(true);
-    } finally {
-      setIsLoading(false);
-    }
+  const refresh = useCallback(() => {
+    // Every state write here follows the `await`. Keeping them in this inner
+    // function rather than in `refresh` itself is what lets the mount effect
+    // call `refresh` without being read as a synchronous setState.
+    const fetchRates = async () => {
+      try {
+        const data = await exchangeRatesApi.getLatestRates();
+        setRates(data);
+        setHasFailed(false);
+      } catch (error) {
+        logger.error('Failed to load exchange rates:', error);
+        setHasFailed(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    return fetchRates();
   }, []);
 
   useEffect(() => {

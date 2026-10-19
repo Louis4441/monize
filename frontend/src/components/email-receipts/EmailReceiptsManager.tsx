@@ -80,6 +80,20 @@ type ReceiptFilter = (typeof FILTERS)[number];
 /** States from which the detail dialog can link the email to a transaction. */
 const LINKABLE_STATUSES: readonly EmailReceiptStatus[] = ['ambiguous', 'unmatched', 'no_parser', 'parse_failed'];
 
+/** A row's actions in their resting order, before the card's lead action is moved to the front. */
+const ROW_ACTION_KEYS: readonly { key: ReceiptActionKey }[] = [
+  { key: 'view' },
+  { key: 'approve' },
+  { key: 'draftParser' },
+  { key: 'createParser' },
+  { key: 'link' },
+  { key: 'recognizeAi' },
+  { key: 'recognizeTradeAi' },
+  { key: 'reprocess' },
+  { key: 'ignore' },
+  { key: 'delete' },
+];
+
 /**
  * The search goes to the server only when it narrows the list, and as one extra
  * argument, so a call without a search is the call it always was.
@@ -222,96 +236,112 @@ export function EmailReceiptsManager() {
     currentFilters.current = { filter, domain, page, search };
   }, [filter, domain, page, search]);
 
-  const load = useCallback(async (forFilter: ReceiptFilter, forDomain: string, forPage: number, forSearch: EmailReceiptSearch) => {
-    const request = ++latestLoad.current;
-    const forKey = receiptSearchKey(forSearch);
-    const status = forFilter === 'all' ? undefined : forFilter;
-    const sender = forDomain === '' ? undefined : forDomain;
-    try {
-      const items = await emailReceiptsApi.receipts.list(status, undefined, sender, (forPage - 1) * PAGE_SIZE, ...searchArgs(forSearch));
-      if (request !== latestLoad.current) return;
-      if (items.length === 0 && forPage > 1) {
-        // The page no longer exists (its emails were deleted or left the filter): go to the last one that does.
-        let lastPage = forPage - 1;
-        try {
-          const total = await emailReceiptsApi.receipts.countMatching(status, sender, ...searchArgs(forSearch));
-          lastPage = Math.max(1, Math.min(lastPage, Math.ceil(total / PAGE_SIZE)));
-        } catch (error) {
-          logger.error(error);
-        }
+  // Each loader below runs from an effect: its state writes live in the inner `run`, so they happen after the request, not during the effect.
+  const load = useCallback((forFilter: ReceiptFilter, forDomain: string, forPage: number, forSearch: EmailReceiptSearch) => {
+    const run = async () => {
+      const request = ++latestLoad.current;
+      const forKey = receiptSearchKey(forSearch);
+      const status = forFilter === 'all' ? undefined : forFilter;
+      const sender = forDomain === '' ? undefined : forDomain;
+      try {
+        const items = await emailReceiptsApi.receipts.list(status, undefined, sender, (forPage - 1) * PAGE_SIZE, ...searchArgs(forSearch));
         if (request !== latestLoad.current) return;
-        setPage(lastPage);
-        return;
+        if (items.length === 0 && forPage > 1) {
+          // The page no longer exists (its emails were deleted or left the filter): go to the last one that does.
+          let lastPage = forPage - 1;
+          try {
+            const total = await emailReceiptsApi.receipts.countMatching(status, sender, ...searchArgs(forSearch));
+            lastPage = Math.max(1, Math.min(lastPage, Math.ceil(total / PAGE_SIZE)));
+          } catch (error) {
+            logger.error(error);
+          }
+          if (request !== latestLoad.current) return;
+          setPage(lastPage);
+          return;
+        }
+        setLoaded({ filter: forFilter, domain: forDomain, searchKey: forKey, page: forPage, items });
+      } catch (error) {
+        if (request !== latestLoad.current) return;
+        logger.error(error);
+        setLoaded({ filter: forFilter, domain: forDomain, searchKey: forKey, page: forPage, items: null });
       }
-      setLoaded({ filter: forFilter, domain: forDomain, searchKey: forKey, page: forPage, items });
-    } catch (error) {
-      if (request !== latestLoad.current) return;
-      logger.error(error);
-      setLoaded({ filter: forFilter, domain: forDomain, searchKey: forKey, page: forPage, items: null });
-    }
+    };
+    return run();
   }, []);
 
   /** The domains the filter offers; a failed read leaves them unknown, never an empty list. */
-  const loadDomains = useCallback(async (forSearch: EmailReceiptSearch) => {
-    const request = ++latestDomains.current;
-    try {
-      const found = isReceiptSearchActive(forSearch)
-        ? await emailReceiptsApi.receipts.listDomains(undefined, forSearch)
-        : await emailReceiptsApi.receipts.listDomains();
-      if (request !== latestDomains.current) return;
-      setDomains({ searchKey: receiptSearchKey(forSearch), items: found });
-    } catch (error) {
-      if (request !== latestDomains.current) return;
-      logger.error(error);
-      setDomains(null);
-    }
+  const loadDomains = useCallback((forSearch: EmailReceiptSearch) => {
+    const run = async () => {
+      const request = ++latestDomains.current;
+      try {
+        const found = isReceiptSearchActive(forSearch)
+          ? await emailReceiptsApi.receipts.listDomains(undefined, forSearch)
+          : await emailReceiptsApi.receipts.listDomains();
+        if (request !== latestDomains.current) return;
+        setDomains({ searchKey: receiptSearchKey(forSearch), items: found });
+      } catch (error) {
+        if (request !== latestDomains.current) return;
+        logger.error(error);
+        setDomains(null);
+      }
+    };
+    return run();
   }, []);
 
   /** The sender domains of one state's emails; a failed read leaves them unknown. */
-  const loadCloud = useCallback(async (forFilter: ReceiptFilter, forSearch: EmailReceiptSearch) => {
-    if (forFilter === 'all') return;
-    const request = ++latestCloud.current;
-    try {
-      const items = await emailReceiptsApi.receipts.listDomains(forFilter, ...searchArgs(forSearch));
-      if (request !== latestCloud.current) return;
-      setCloud({ filter: forFilter, searchKey: receiptSearchKey(forSearch), items });
-    } catch (error) {
-      if (request !== latestCloud.current) return;
-      logger.error(error);
-      setCloud(null);
-    }
+  const loadCloud = useCallback((forFilter: ReceiptFilter, forSearch: EmailReceiptSearch) => {
+    const run = async () => {
+      if (forFilter === 'all') return;
+      const request = ++latestCloud.current;
+      try {
+        const items = await emailReceiptsApi.receipts.listDomains(forFilter, ...searchArgs(forSearch));
+        if (request !== latestCloud.current) return;
+        setCloud({ filter: forFilter, searchKey: receiptSearchKey(forSearch), items });
+      } catch (error) {
+        if (request !== latestCloud.current) return;
+        logger.error(error);
+        setCloud(null);
+      }
+    };
+    return run();
   }, []);
 
   /** The per-state counts; a failed read leaves them unknown, never zero. */
-  const loadCounts = useCallback(async (forSearch: EmailReceiptSearch) => {
-    const request = ++latestCounts.current;
-    try {
-      const found = await emailReceiptsApi.receipts.getStatusCounts(...searchArgs(forSearch));
-      if (request !== latestCounts.current) return;
-      setCounts({ searchKey: receiptSearchKey(forSearch), items: found });
-    } catch (error) {
-      if (request !== latestCounts.current) return;
-      logger.error(error);
-      setCounts(null);
-    }
+  const loadCounts = useCallback((forSearch: EmailReceiptSearch) => {
+    const run = async () => {
+      const request = ++latestCounts.current;
+      try {
+        const found = await emailReceiptsApi.receipts.getStatusCounts(...searchArgs(forSearch));
+        if (request !== latestCounts.current) return;
+        setCounts({ searchKey: receiptSearchKey(forSearch), items: found });
+      } catch (error) {
+        if (request !== latestCounts.current) return;
+        logger.error(error);
+        setCounts(null);
+      }
+    };
+    return run();
   }, []);
 
   /** How many emails match the filter; a failed read leaves it unknown, so no "select all N" is offered. */
-  const loadMatching = useCallback(async (forFilter: ReceiptFilter, forDomain: string, forSearch: EmailReceiptSearch) => {
-    const request = ++latestMatching.current;
-    try {
-      const total = await emailReceiptsApi.receipts.countMatching(
-        forFilter === 'all' ? undefined : forFilter,
-        forDomain === '' ? undefined : forDomain,
-        ...searchArgs(forSearch),
-      );
-      if (request !== latestMatching.current) return;
-      setMatching({ filter: forFilter, domain: forDomain, searchKey: receiptSearchKey(forSearch), total });
-    } catch (error) {
-      if (request !== latestMatching.current) return;
-      logger.error(error);
-      setMatching(null);
-    }
+  const loadMatching = useCallback((forFilter: ReceiptFilter, forDomain: string, forSearch: EmailReceiptSearch) => {
+    const run = async () => {
+      const request = ++latestMatching.current;
+      try {
+        const total = await emailReceiptsApi.receipts.countMatching(
+          forFilter === 'all' ? undefined : forFilter,
+          forDomain === '' ? undefined : forDomain,
+          ...searchArgs(forSearch),
+        );
+        if (request !== latestMatching.current) return;
+        setMatching({ filter: forFilter, domain: forDomain, searchKey: receiptSearchKey(forSearch), total });
+      } catch (error) {
+        if (request !== latestMatching.current) return;
+        logger.error(error);
+        setMatching(null);
+      }
+    };
+    return run();
   }, []);
 
   // After a command or a change the list, the state counts and the domain counts are read again.
@@ -547,16 +577,18 @@ export function EmailReceiptsManager() {
   const actionsFor = (receipt: EmailReceiptListItem): RowAction[] => {
     const actionable = isReceiptActionable(receipt);
     const disabled = busyId === receipt.id;
-    const actions: Array<RowAction & { key: ReceiptActionKey }> = [
-      {
+    // Each action is built by its key, in the order its card sets, so no handler is handed to another
+    // function while the row renders.
+    const build: Record<ReceiptActionKey, () => RowAction> = {
+      view: () => ({
         key: 'view',
         label: t('actions.view'),
         icon: 'view',
         tone: 'view',
         onClick: () => setDetailId(receipt.id),
         disabled,
-      },
-      {
+      }),
+      approve: () => ({
         // The proposal this email made, applied as the review inbox's Confirm does.
         key: 'approve',
         label: receipt.isTrade ? t('actions.reviewTrade') : t('actions.approve'),
@@ -565,8 +597,8 @@ export function EmailReceiptsManager() {
         onClick: () => void handleApprove(receipt),
         hidden: receipt.status !== 'review' || receipt.displayState !== 'proposed',
         disabled,
-      },
-      {
+      }),
+      draftParser: () => ({
         // The inline action of an email no parser read: the person's own request
         // to the assistant, offered whatever the mailbox's AI mode.
         key: 'draftParser',
@@ -576,8 +608,8 @@ export function EmailReceiptsManager() {
         onClick: () => void handleDraftParser([receipt]),
         hidden: !canDraftParser(receipt),
         disabled: disabled || drafting,
-      },
-      {
+      }),
+      createParser: () => ({
         key: 'createParser',
         label: t('actions.createParser'),
         icon: 'edit',
@@ -585,8 +617,8 @@ export function EmailReceiptsManager() {
         onClick: () => setParserFor(receipt),
         hidden: receipt.status !== 'no_parser',
         disabled,
-      },
-      {
+      }),
+      link: () => ({
         key: 'link',
         label: t('actions.link'),
         icon: 'transactions',
@@ -596,8 +628,8 @@ export function EmailReceiptsManager() {
         // could not tie to a transaction.
         hidden: receipt.isTrade ? !canLinkTradeEmail(receipt) : !LINKABLE_STATUSES.includes(receipt.status),
         disabled,
-      },
-      {
+      }),
+      recognizeAi: () => ({
         // Offered whatever the mailbox's AI mode: the mode governs only what
         // happens by itself, and pressing this is the person's own consent.
         key: 'recognizeAi',
@@ -608,8 +640,8 @@ export function EmailReceiptsManager() {
         // A trade email creates a transaction: there is no bank transaction to split.
         hidden: receipt.isTrade || !canRecognizeWithAi(receipt),
         disabled,
-      },
-      {
+      }),
+      recognizeTradeAi: () => ({
         // The email is a brokerage trade confirmation: the AI proposes the
         // investment transaction it reports. Offered where "Recognize with AI" is.
         key: 'recognizeTradeAi',
@@ -619,8 +651,8 @@ export function EmailReceiptsManager() {
         onClick: () => setRecognizeFor({ receipt, asTrade: true }),
         hidden: !canRecognizeWithAi(receipt),
         disabled,
-      },
-      {
+      }),
+      reprocess: () => ({
         key: 'reprocess',
         label: t('actions.reprocess'),
         icon: 'reopen',
@@ -629,8 +661,8 @@ export function EmailReceiptsManager() {
         // A trade the ledger already held is read again too: it may have been entered by mistake.
         hidden: !canReprocessReceipt(receipt),
         disabled,
-      },
-      {
+      }),
+      ignore: () => ({
         key: 'ignore',
         label: t('actions.ignore'),
         icon: 'skip',
@@ -638,8 +670,8 @@ export function EmailReceiptsManager() {
         onClick: () => setConfirmation({ kind: 'ignore', receipt }),
         hidden: !actionable,
         disabled,
-      },
-      {
+      }),
+      delete: () => ({
         key: 'delete',
         label: tc('delete'),
         icon: 'delete',
@@ -647,10 +679,10 @@ export function EmailReceiptsManager() {
         destructive: true,
         onClick: () => setConfirmation({ kind: 'delete', receipt }),
         disabled,
-      },
-    ];
+      }),
+    };
     // The card being looked at decides which action leads (and so shows inline first).
-    return orderActionsForCard(actions, leadActionKey(filter, receipt));
+    return orderActionsForCard(ROW_ACTION_KEYS, leadActionKey(filter, receipt)).map(({ key }) => build[key]());
   };
 
   const current =

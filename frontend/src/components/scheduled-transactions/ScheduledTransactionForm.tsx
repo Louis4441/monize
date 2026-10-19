@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, MutableRefObject } from 'react';
-import { useForm, Controller, Resolver } from 'react-hook-form';
+import { useForm, useWatch, Controller, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { MAX_REMINDER_DAYS_BEFORE } from '@/lib/scheduled-reminder-bounds';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -257,7 +257,6 @@ export function ScheduledTransactionForm({
     register,
     handleSubmit,
     setValue,
-    watch,
     control,
     formState: { errors, isDirty },
   } = useForm<ScheduledTransactionFormData>({
@@ -315,10 +314,12 @@ export function ScheduledTransactionForm({
 
   useFormDirtyNotify(isDirty, onDirtyChange);
 
-  const watchedAccountId = watch('accountId');
-  const watchedAmount = watch('amount');
-  const watchedFrequency = watch('frequency');
-  const watchedCurrencyCode = watch('currencyCode');
+  const watchedAccountId = useWatch({ control, name: 'accountId' });
+  const watchedAmount = useWatch({ control, name: 'amount' });
+  const watchedFrequency = useWatch({ control, name: 'frequency' });
+  const watchedCurrencyCode = useWatch({ control, name: 'currencyCode' });
+  const watchedIsActive = useWatch({ control, name: 'isActive' });
+  const watchedAutoPost = useWatch({ control, name: 'autoPost' });
 
   // Auto-set currencyCode from the selected account
   useEffect(() => {
@@ -578,16 +579,25 @@ export function ScheduledTransactionForm({
   // a quantity-price action has a Price field to fill; amount-only (DIVIDEND ...)
   // and quantity-only (ADD_SHARES ...) actions never use a close, so skip the
   // request for them -- matching the two dialogs, which gate the fetch the same way.
+  //
+  // Each change of those inputs resets what the last answer left behind, during
+  // render (the "info from previous render" pattern) rather than in the effect:
+  // no request, no close; and "no price history" is a completed-empty result,
+  // not the loading window and not a failed lookup.
+  const wantsMarketPrice =
+    mode === 'investment' && !!investmentSecurityId && isQuantityPriceAction;
+  const priceRequestKey = `${mode}|${investmentSecurityId}|${isQuantityPriceAction}`;
+  const [priceRequestFor, setPriceRequestFor] = useState(priceRequestKey);
+  if (priceRequestFor !== priceRequestKey) {
+    setPriceRequestFor(priceRequestKey);
+    if (!wantsMarketPrice) setMarketPrice(null);
+    setPriceHistoryEmpty(false);
+  }
   useEffect(() => {
     if (mode !== 'investment' || !investmentSecurityId || !isQuantityPriceAction) {
-      setMarketPrice(null);
-      setPriceHistoryEmpty(false);
       return;
     }
     let cancelled = false;
-    // Reset while the request is in flight: "no price history" is a
-    // completed-empty result, not the loading window and not a failed lookup.
-    setPriceHistoryEmpty(false);
     investmentsApi.getSecurityPrices(investmentSecurityId, { limit: 1 })
       .then((prices) => {
         if (cancelled) return;
@@ -1319,7 +1329,7 @@ export function ScheduledTransactionForm({
     <div className="flex items-center space-x-6">
       <label className="flex items-center gap-2 cursor-pointer">
         <ToggleSwitch
-          checked={!!watch('isActive')}
+          checked={!!watchedIsActive}
           onChange={(next) => setValue('isActive', next, { shouldDirty: true })}
           label={t('form.activeLabel')}
         />
@@ -1329,7 +1339,7 @@ export function ScheduledTransactionForm({
       </label>
       <label className="flex items-center gap-2 cursor-pointer">
         <ToggleSwitch
-          checked={!!watch('autoPost')}
+          checked={!!watchedAutoPost}
           onChange={(next) => setValue('autoPost', next, { shouldDirty: true })}
           label={t('form.autoPostLabel')}
         />

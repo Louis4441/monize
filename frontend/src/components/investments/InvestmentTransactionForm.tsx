@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, MutableRefObject } from 'react';
 import { useTranslations } from 'next-intl';
-import { useForm, Resolver } from 'react-hook-form';
+import { useForm, useWatch, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -331,7 +331,7 @@ function InvestmentTransactionFormFields({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors, isDirty },
   } = useForm<InvestmentTransactionFormData>({
@@ -397,8 +397,8 @@ function InvestmentTransactionFormFields({
 
   useFormDirtyNotify(isDirty, onDirtyChange);
 
-  const watchedAccountId = watch('accountId');
-  const watchedAction = watch('action') as InvestmentAction;
+  const watchedAccountId = useWatch({ control, name: 'accountId' });
+  const watchedAction = useWatch({ control, name: 'action' }) as InvestmentAction;
   // 'TRANSFER' is a UI-only action and is not part of InvestmentAction, so it
   // never matches any of the classification arrays below; transfer fields are
   // rendered from this flag instead.
@@ -420,18 +420,18 @@ function InvestmentTransactionFormFields({
   // Source-account holdings are relevant both when creating a transfer and when
   // editing one (to validate the available quantity).
   const transferActive = isTransfer || isTransferEditing;
-  const watchedSecurityId = watch('securityId');
-  const watchedBondInstrumentId = watch('bondInstrumentId');
-  const watchedDestinationAccountId = watch('destinationAccountId');
-  const watchedFundingAccountId = watch('fundingAccountId');
-  const watchedQuantity = Number(watch('quantity')) || 0;
-  const watchedPrice = Number(watch('price')) || 0;
-  const watchedCommission = Number(watch('commission')) || 0;
-  const watchedAccruedInterest = Number(watch('accruedInterest')) || 0;
-  const watchedExchangeRate = Number(watch('exchangeRate')) || 0;
-  const watchedTransactionDate = watch('transactionDate');
-  const watchedSplitNewShares = Number(watch('splitNewShares')) || 0;
-  const watchedSplitOldShares = Number(watch('splitOldShares')) || 0;
+  const watchedSecurityId = useWatch({ control, name: 'securityId' });
+  const watchedBondInstrumentId = useWatch({ control, name: 'bondInstrumentId' });
+  const watchedDestinationAccountId = useWatch({ control, name: 'destinationAccountId' });
+  const watchedFundingAccountId = useWatch({ control, name: 'fundingAccountId' });
+  const watchedQuantity = Number(useWatch({ control, name: 'quantity' })) || 0;
+  const watchedPrice = Number(useWatch({ control, name: 'price' })) || 0;
+  const watchedCommission = Number(useWatch({ control, name: 'commission' })) || 0;
+  const watchedAccruedInterest = Number(useWatch({ control, name: 'accruedInterest' })) || 0;
+  const watchedExchangeRate = Number(useWatch({ control, name: 'exchangeRate' })) || 0;
+  const watchedTransactionDate = useWatch({ control, name: 'transactionDate' });
+  const watchedSplitNewShares = Number(useWatch({ control, name: 'splitNewShares' })) || 0;
+  const watchedSplitOldShares = Number(useWatch({ control, name: 'splitOldShares' })) || 0;
   const splitRatio =
     watchedSplitOldShares > 0 ? watchedSplitNewShares / watchedSplitOldShares : 0;
 
@@ -774,7 +774,16 @@ function InvestmentTransactionFormFields({
   // date, so the preview's "Before" reflects what the user actually held at
   // that point in time -- not the live holdings (which already include this
   // split and any subsequent activity). Re-fetched whenever the inputs that
-  // would change the answer change.
+  // would change the answer change, and dropped (during render, not in the
+  // effect) once there is no split to preview.
+  const splitHoldingWanted =
+    watchedAction === 'SPLIT' &&
+    !!watchedAccountId &&
+    !!watchedSecurityId &&
+    !!watchedTransactionDate;
+  if (!splitHoldingWanted && splitHoldingAt !== null) {
+    setSplitHoldingAt(null);
+  }
   useEffect(() => {
     if (
       watchedAction !== 'SPLIT' ||
@@ -782,7 +791,6 @@ function InvestmentTransactionFormFields({
       !watchedSecurityId ||
       !watchedTransactionDate
     ) {
-      setSplitHoldingAt(null);
       return;
     }
     let cancelled = false;
@@ -815,10 +823,13 @@ function InvestmentTransactionFormFields({
 
   // For a TRANSFER, load the source account's current holdings. Only securities
   // actually held there can be transferred, and each holding carries the
-  // average cost we use to prefill the cost-per-share.
+  // average cost we use to prefill the cost-per-share. Cleared during render,
+  // not in the effect, once there is no transfer source to read.
+  if ((!transferActive || !watchedAccountId) && transferSourceHoldings.length > 0) {
+    setTransferSourceHoldings([]);
+  }
   useEffect(() => {
     if (!transferActive || !watchedAccountId) {
-      setTransferSourceHoldings([]);
       return;
     }
     let cancelled = false;
@@ -841,7 +852,15 @@ function InvestmentTransactionFormFields({
   // When editing a transfer leg, load the paired leg so both the source and
   // destination accounts can be shown. The form's `accountId` always holds the
   // source (TRANSFER_OUT) account and `destinationAccountId` the destination
-  // (TRANSFER_IN) account, regardless of which leg was opened.
+  // (TRANSFER_IN) account, regardless of which leg was opened. Cleared during
+  // render, not in the effect, when the row being edited has no paired leg.
+  const hasLinkedLeg =
+    !!transaction &&
+    (transaction.action === 'TRANSFER_IN' || transaction.action === 'TRANSFER_OUT') &&
+    !!transaction.linkedTransactionId;
+  if (!hasLinkedLeg && transferLinkedLeg !== null) {
+    setTransferLinkedLeg(null);
+  }
   useEffect(() => {
     const action = transaction?.action;
     if (
@@ -849,7 +868,6 @@ function InvestmentTransactionFormFields({
       (action !== 'TRANSFER_IN' && action !== 'TRANSFER_OUT') ||
       !transaction.linkedTransactionId
     ) {
-      setTransferLinkedLeg(null);
       return;
     }
     let cancelled = false;

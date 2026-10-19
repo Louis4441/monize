@@ -98,6 +98,28 @@ const FIGURE_CELL =
 const IDENTITY_CELL =
   `${CELL_PLACEMENT.name} min-w-0 p-0 text-sm sm:table-cell sm:px-4 sm:py-3`;
 
+interface IncomeSourceTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { id: string; name: string; value: number } }>;
+  totalIncome: number;
+  formatCurrency: (value: number) => string;
+  formatPercent: (value: number, decimals?: number) => string;
+}
+
+function IncomeSourceTooltip({ active, payload, totalIncome, formatCurrency, formatPercent }: IncomeSourceTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const percentage = totalIncome > 0 ? (data.value / totalIncome) * 100 : 0;
+  return (
+    <ChartTooltipPanel>
+      <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
+      <p className="text-gray-600 dark:text-gray-400">
+        {formatCurrency(data.value)} ({formatPercent(percentage, 1)})
+      </p>
+    </ChartTooltipPanel>
+  );
+}
+
 export function IncomeBySourceReport() {
   const t = useTranslations('reports');
   const router = useRouter();
@@ -221,20 +243,6 @@ export function IncomeBySourceReport() {
       const { start, end } = resolvedRange;
       router.push(`/transactions?categoryId=${categoryId}&startDate=${start}&endDate=${end}`);
     }
-  };
-
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { id: string; name: string; value: number } }> }) => {
-    if (!active || !payload || !payload.length) return null;
-    const data = payload[0].payload;
-    const percentage = totalIncome > 0 ? (data.value / totalIncome) * 100 : 0;
-    return (
-      <ChartTooltipPanel>
-        <p className="font-medium text-gray-900 dark:text-gray-100">{data.name}</p>
-        <p className="text-gray-600 dark:text-gray-400">
-          {formatCurrency(data.value)} ({formatPercent(percentage, 1)})
-        </p>
-      </ChartTooltipPanel>
-    );
   };
 
   return (
@@ -449,7 +457,7 @@ export function IncomeBySourceReport() {
                         <Cell key={`cell-${index}`} fill={entry.colour} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<IncomeSourceTooltip totalIncome={totalIncome} formatCurrency={formatCurrency} formatPercent={formatPercent} />} />
                   </PieChart>
                 </ResponsiveContainer>
                 {/* The aggregate belongs in the donut's hole. */}
@@ -469,7 +477,7 @@ export function IncomeBySourceReport() {
                     <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<IncomeSourceTooltip totalIncome={totalIncome} formatCurrency={formatCurrency} formatPercent={formatPercent} />} />
                     <Bar
                       dataKey="value"
                       cursor="pointer"

@@ -171,10 +171,13 @@ export function SplitEditor({
     );
   }, [accounts, sourceAccountId, supportsTransfers, splits, accountOptionLabel]);
 
-  // Sync with parent when splits prop changes
-  useEffect(() => {
+  // Sync with parent when splits prop changes (the "info from previous render"
+  // pattern rather than a setState in an effect)
+  const [syncedSplits, setSyncedSplits] = useState(splits);
+  if (syncedSplits !== splits) {
+    setSyncedSplits(splits);
     setLocalSplits(splits);
-  }, [splits]);
+  }
 
   // A category created from a split line is applied before the parent's own
   // state update has re-rendered this component, so the new row is not in

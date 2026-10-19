@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 interface PaginationProps {
@@ -29,10 +29,13 @@ export function Pagination({
   const t = useTranslations('common');
   const [inputPage, setInputPage] = useState(currentPage.toString());
 
-  // Keep input in sync with current page
-  useEffect(() => {
+  // Keep input in sync with current page (the "info from previous render"
+  // pattern rather than a setState in an effect)
+  const [syncedPage, setSyncedPage] = useState(currentPage);
+  if (syncedPage !== currentPage) {
+    setSyncedPage(currentPage);
     setInputPage(currentPage.toString());
-  }, [currentPage]);
+  }
 
   const goToPage = (page: number) => {
     const validPage = Math.max(1, Math.min(page, totalPages));
