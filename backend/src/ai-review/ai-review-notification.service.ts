@@ -12,9 +12,6 @@ import {
 import { CreateNotificationInput } from "../notification-center/notification.service";
 import { NotificationDispatchService } from "../notifications/notification-dispatch.service";
 
-/** The review inbox, where every notice of this service sends the reader. */
-export const AI_REVIEW_NOTIFICATION_TARGET = "/ai-reviews";
-
 /**
  * The expiring window is `[now + 2 days, now + 3 days)` in the database clock.
  * Daily runs sit 24 hours apart, so a request enters the window on exactly one
@@ -39,7 +36,7 @@ export function buildProposalsReadyNotification(
     title: "AI review proposals wait for you",
     message: `Proposals waiting for your decision: ${count}. New since the last notice: ${added}. Open Monize to review.`,
     data: { count, added },
-    target: AI_REVIEW_NOTIFICATION_TARGET,
+    target: "/ai-reviews",
     dedupeKey: `air:ready:${utcHour}`,
   };
 }
@@ -56,7 +53,7 @@ export function buildProposalsExpiringNotification(
     title: "AI review proposals expire soon",
     message: `Proposals that expire within 3 days: ${count}. The first one expires on ${earliestExpiresAt.toISOString().slice(0, 10)}. Open Monize to review.`,
     data: { count, earliestExpiresAt: earliestExpiresAt.toISOString() },
-    target: AI_REVIEW_NOTIFICATION_TARGET,
+    target: "/ai-reviews",
     dedupeKey: `air:exp:${utcDate}`,
   };
 }
