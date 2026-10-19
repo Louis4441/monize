@@ -161,7 +161,7 @@
     "notATradeRequest": "此 AI 审核请求不是交易请求。",
     "tradeOnTradeRequest": "trade 字段只用于回应交易请求。",
     "tradeDateRequired": "交易需要日期（YYYY-MM-DD）：邮件已不存在，因此没有可回退的日期。",
-    "tradeInvalid": "交易需要 accountName、action（BUY 或 SELL）、symbol、quantity、totalAmount，以及可选的 commission 和 date（YYYY-MM-DD）。",
+    "tradeInvalid": "交易需要 accountName、action（BUY、SELL、DIVIDEND 或 REINVEST）、symbol、quantity（DIVIDEND 可选）、totalAmount，以及可选的 commission 和 date（YYYY-MM-DD）。",
     "tradeSecurityAmbiguous": "“{{ symbol }}”匹配你的多个证券（{{ list }}）。请重命名其中一个，使代码唯一。",
     "tradeSecurityUnknown": "你没有代码为“{{ symbol }}”的证券。请先添加该证券，然后重新处理邮件。",
     "tagNamesInvalid": "一条提议最多可添加 {{ max }} 个标签，每个标签 1 到 {{ length }} 个字符，且不能包含控制字符。",

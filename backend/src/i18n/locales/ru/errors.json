@@ -161,7 +161,7 @@
     "notATradeRequest": "Этот запрос на проверку ИИ не является запросом сделки.",
     "tradeOnTradeRequest": "Поле trade отвечает только на запрос сделки.",
     "tradeDateRequired": "Для сделки нужна дата (ГГГГ-ММ-ДД): письма больше нет, поэтому запасного дня нет.",
-    "tradeInvalid": "Для сделки нужны accountName, action (BUY или SELL), symbol, quantity, totalAmount и, при желании, commission и date (ГГГГ-ММ-ДД).",
+    "tradeInvalid": "Для сделки нужны accountName, action (BUY, SELL, DIVIDEND или REINVEST), symbol, quantity (необязательно для DIVIDEND), totalAmount и, при желании, commission и date (ГГГГ-ММ-ДД).",
     "tradeSecurityAmbiguous": "«{{ symbol }}» подходит нескольким вашим ценным бумагам ({{ list }}). Переименуйте одну из них, чтобы тикер был уникальным.",
     "tradeSecurityUnknown": "У вас нет ценной бумаги с тикером «{{ symbol }}». Добавьте её и обработайте письмо заново.",
     "tagNamesInvalid": "Предложение может добавить до {{ max }} тегов длиной от 1 до {{ length }} символов каждый, без управляющих символов.",

@@ -38,14 +38,14 @@
     "transactionMissing": "Deze transactie bestaat niet meer",
     "rule": "Regel: {name}",
     "manualRequest": "Handmatig aangevraagd",
-    "trade": "{action, select, BUY {Aankoop van {quantity} aandelen {symbol}} other {Verkoop van {quantity} aandelen {symbol}}}",
+    "trade": "{action, select, BUY {Aankoop van {quantity} aandelen {symbol}} SELL {Verkoop van {quantity} aandelen {symbol}} DIVIDEND {Dividend van {symbol}} REINVEST {Herbelegging van een dividend in {quantity} aandelen {symbol}} other {Transactie in {symbol}}}",
     "receiptInstruction": {
       "automatic": "Vul deze transactie aan uit de bijgevoegde bestelmail: splits haar per artikel met elk een categorie, of stel de omschrijving in.",
       "chat": "U hebt gevraagd de bijgevoegde bestelmail te herkennen: splits deze transactie per product met elk een categorie, of stel de omschrijving in.",
       "categorize": "Wijs een categorie toe aan elk artikel van de bijgevoegde bestelmail dat geen regel heeft gecategoriseerd en stel daarna de splitsing van deze transactie voor of stel de omschrijving in.",
       "parsed": "Een opgeslagen parser heeft de bestelmail gelezen en stelt deze categorieregels en deze omschrijving voor de transactie voor.",
       "trade": "Een handelsbevestiging die door een opgeslagen profiel is gelezen, stelt deze beleggingstransactie voor. Controleer rekening, effect, aandelen en totaal bij je broker voordat je goedkeurt.",
-      "tradeChat": "Je vroeg om de bijgevoegde handelsbevestiging te herkennen: stel de beleggingstransactie voor die erin staat."
+      "tradeChat": "Je vroeg om de bijgevoegde handelsbevestiging te herkennen: stel de beleggingstransactie voor die erin staat, een aankoop, een verkoop, een contant dividend of een herbelegd dividend."
     },
     "emailReceipt": "E-mailbon: {subject} van {sender}",
     "emailReceiptMissing": "E-mailbon (de e-mail is verwijderd)",

@@ -161,7 +161,7 @@
     "notATradeRequest": "To żądanie przeglądu AI nie jest żądaniem transakcji.",
     "tradeOnTradeRequest": "Pole trade odpowiada tylko na żądanie transakcji.",
     "tradeDateRequired": "Transakcja wymaga daty (RRRR-MM-DD): wiadomości już nie ma, więc nie ma dnia zastępczego.",
-    "tradeInvalid": "Transakcja wymaga accountName, action (BUY lub SELL), symbol, quantity, totalAmount oraz opcjonalnie commission i date (RRRR-MM-DD).",
+    "tradeInvalid": "Transakcja wymaga accountName, action (BUY, SELL, DIVIDEND lub REINVEST), symbol, quantity (opcjonalnie dla DIVIDEND), totalAmount oraz opcjonalnie commission i date (RRRR-MM-DD).",
     "tradeSecurityAmbiguous": "„{{ symbol }}” pasuje do kilku Twoich papierów wartościowych ({{ list }}). Zmień nazwę jednego z nich, aby symbol był unikalny.",
     "tradeSecurityUnknown": "Nie masz papieru wartościowego o symbolu „{{ symbol }}”. Dodaj go, a następnie przetwórz wiadomość ponownie.",
     "tagNamesInvalid": "Propozycja może dodać do {{ max }} tagów, każdy o długości od 1 do {{ length }} znaków, bez znaków sterujących.",

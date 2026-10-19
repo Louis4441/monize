@@ -93,7 +93,7 @@
         "automatic": "Il controllo interpella l'IA su una ricevuta abbinata che nessun profilo approvato ha saputo leggere per intero, e prepara una bozza di profilo per un mittente che non ne ha."
       },
       "autoApplyLabel": "Applica le proposte automaticamente",
-      "autoApplyHelp": "Disattivato per impostazione predefinita. Una proposta viene applicata senza chiedere solo quando valgono tutte queste condizioni: un profilo approvato ha letto l'intera email, la transazione è stata trovata tramite un numero d'ordine o un riferimento, oppure tramite importo e beneficiario esatti, con un solo candidato, e la proposta torna al centesimo. Una conferma di operazione viene registrata senza chiedere solo quando il suo profilo operazioni è approvato, ha letto l'intera operazione, il prezzo torna con le quote e il totale, e i tuoi conti non contengono già un'operazione uguale. Tutto il resto attende la tua approvazione.",
+      "autoApplyHelp": "Disattivato per impostazione predefinita. Una proposta viene applicata senza chiedere solo quando valgono tutte queste condizioni: un profilo approvato ha letto l'intera email, la transazione è stata trovata tramite un numero d'ordine o un riferimento, oppure tramite importo e beneficiario esatti, con un solo candidato, e la proposta torna al centesimo. Una conferma di operazione viene registrata senza chiedere solo quando il suo profilo operazioni è approvato, ha letto l'intera operazione, il prezzo torna con le quote e il totale (un dividendo in contanti che indica solo il suo importo non ha nulla da verificare), e i tuoi conti non contengono già un'operazione uguale. Tutto il resto attende la tua approvazione.",
       "profileLimitLabel": "Conta le proposte dei profili nel limite giornaliero dell'IA",
       "profileLimitHelp": "Attivo per impostazione predefinita: una modifica che un profilo propone da un'email conta nel limite giornaliero di modifiche proposte dall'IA, come qualsiasi altra proposta dell'IA. Disattivalo quando un grande lotto di email salvate esaurirebbe il limite. Solo le proposte dei profili sono esentate; ogni proposta attende comunque la tua approvazione."
     },
@@ -377,7 +377,7 @@
       "receipt": "Ricevuta d'ordine",
       "trade": "Operazione di borsa",
       "receiptHelp": "Legge una conferma d'ordine e trova la transazione bancaria che l'ha pagata.",
-      "tradeHelp": "Legge una conferma di eseguito del broker e propone la transazione d'investimento che riporta, un acquisto o una vendita."
+      "tradeHelp": "Legge una conferma di eseguito del broker e propone la transazione d'investimento che riporta: un acquisto, una vendita, un dividendo in contanti o un dividendo reinvestito."
     },
     "trade": {
       "guardsHeading": "Quali email del mittente legge",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Un'email con una di queste righe viene trattenuta e riletta più tardi, come un eseguito parziale."
       },
       "fieldsHeading": "L'operazione",
-      "fieldsHelp": "Acquisto o vendita, il simbolo e il numero di quote sono obbligatori, più un totale o un prezzo. Ogni campo accetta modelli, uno per riga, provati in ordine.",
+      "fieldsHelp": "Il tipo di operazione, il simbolo e un totale o un prezzo sono obbligatori, e anche il numero di quote tranne che per un dividendo in contanti. Il tipo si legge dal suo testo: Dividend o Distribution è un dividendo in contanti, Reinvest o DRIP un dividendo reinvestito, altrimenti Buy o Sell. Ogni campo accetta modelli, uno per riga, provati in ordine.",
       "fields": {
-        "tradeAction": "Modelli di acquisto o vendita",
+        "tradeAction": "Modelli del tipo di operazione",
         "tradeSymbol": "Modelli del simbolo",
         "tradeQuantity": "Modelli del numero di quote",
         "tradeTotal": "Modelli del totale dell'operazione",
@@ -403,7 +403,7 @@
         "tradeAccount": "Modelli del conto"
       },
       "fieldHint": "Deve catturare {capture}. Esempio: {example}",
-      "amountsHelp": "Il totale è l'importo eseguito, commissione inclusa per un acquisto. Il prezzo serve da verifica e dà il totale quando l'email non lo indica. Un importo che nomina la sua valuta (US$, C$, USD, €) fissa anche la valuta dell'operazione.",
+      "amountsHelp": "Il totale è l'importo eseguito, commissione inclusa per un acquisto o un dividendo reinvestito; per un dividendo in contanti è l'importo pagato. Il prezzo (per un dividendo, l'importo per azione) serve da verifica e, con il numero di quote, dà il totale quando l'email non lo indica. Un importo che nomina la sua valuta (US$, C$, USD, €) fissa anche la valuta dell'operazione.",
       "rulesHeading": "Regole del conto",
       "rulesHelp": "Su quale conto viene registrata l'operazione. Le regole vengono provate in ordine sul testo del conto letto dai modelli del conto, e vince la prima che si applica; {star} è qualsiasi testo. Una regola con valuta si applica solo a un'operazione in quella valuta, quindi due conti che il broker scrive allo stesso modo, come un RRSP in CAD e uno in USD mostrati entrambi come RRSP, sono due regole con lo stesso testo e valute diverse. Se l'email non riporta alcun testo del conto, può applicarsi solo una regola con testo {star}. Il conto predefinito copre il resto.",
       "currencyOrder": "La valuta dell'operazione si ricava, in ordine: dall'importo stesso quando ne nomina una (US$, C$, USD, €), poi dal primo indicatore di valuta qui sotto che corrisponde a una riga dell'email, poi dalla valuta del tuo titolo per quel simbolo. Una regola con valuta non tira mai a indovinare: se nessuno dei tre indica la valuta, l'email ti aspetta invece di essere registrata su uno dei conti.",
@@ -512,7 +512,7 @@
       "tag": "Etichetta",
       "aiCategories": "Categorie dell'IA",
       "trade": "La sezione dell'operazione",
-      "tradeAction": "Modelli di acquisto o vendita",
+      "tradeAction": "Modelli del tipo di operazione",
       "tradeSymbol": "Modelli del simbolo",
       "tradeQuantity": "Modelli del numero di quote",
       "tradeTotal": "Modelli del totale dell'operazione",
@@ -630,7 +630,7 @@
         "waitIfLine": "Riga di attesa",
         "reference": "Riferimento",
         "linkKey": "Chiave di collegamento",
-        "action": "Acquisto o vendita",
+        "action": "Tipo di operazione",
         "symbol": "Simbolo",
         "quantity": "Quote",
         "price": "Prezzo",
@@ -1008,9 +1008,9 @@
       "no_html": "Questo profilo legge la parte HTML dell'email e questa email non ne ha.",
       "schema_org": "Non serviva alcun profilo: l'ordine è stato letto dai dati strutturati (schema.org) dell'email.",
       "item_amount_missing": "Un articolo non ha un importo, e l'email non ha un totale unico da assegnargli.",
-      "trade_no_action": "Il profilo non ha trovato alcun acquisto o vendita in questa email.",
+      "trade_no_action": "Il profilo non ha trovato alcun acquisto, vendita, dividendo o reinvestimento in questa email.",
       "trade_no_symbol": "Il profilo non ha trovato alcun simbolo di titolo in questa email.",
-      "trade_no_quantity": "Il profilo non ha trovato alcun numero di quote in questa email.",
+      "trade_no_quantity": "Il profilo non ha trovato alcun numero di quote in questa email, che serve per un acquisto, una vendita o un dividendo reinvestito.",
       "trade_no_amount": "Il profilo non ha trovato né un totale né un prezzo in questa email.",
       "trade_no_account": "Il profilo non ha saputo stabilire a quale conto appartiene questa operazione.",
       "trade_exists": "I tuoi conti contengono già questa operazione, quindi non è stato proposto nulla.",
@@ -1078,10 +1078,10 @@
       "openButton": "Apri",
       "open": "Apri l'email {subject}"
     },
-    "tradeTransactionSummary": "{action, select, BUY {Acquisto} other {Vendita}} di {quantity} {symbol} per {total} il {date}.",
+    "tradeTransactionSummary": "{action, select, BUY {Acquisto di {quantity} {symbol} per {total} il {date}.} SELL {Vendita di {quantity} {symbol} per {total} il {date}.} DIVIDEND {Dividendo da {symbol} di {total} il {date}.} REINVEST {Dividendo reinvestito in {quantity} {symbol} per {total} il {date}.} other {{quantity} {symbol} per {total} il {date}.}}",
     "noTradeTransaction": "Ancora nessuna: l'operazione viene registrata quando approvi la proposta, oppure collegata a una già presente nel registro.",
     "candidateShares": "{quantity} quote",
-    "tradeNoCandidates": "Nessuna transazione di investimento di questo conto, direzione e simbolo entro una settimana dal giorno dell'operazione è libera da collegare. Se hai inserito tu l'operazione, controllane conto e data; altrimenti approva la proposta nella casella di revisione.",
+    "tradeNoCandidates": "Nessuna transazione di investimento di questo conto, tipo di operazione e simbolo entro una settimana dal giorno dell'operazione è libera da collegare. Se hai inserito tu l'operazione, controllane conto e data; altrimenti approva la proposta nella casella di revisione.",
     "aiTradeHeading": "Operazione proposta dall'agente IA",
     "aiTradeReader": "Nessuno: l'agente IA la legge come operazione",
     "noAiTradeTransaction": "Nessuna per ora: l'operazione viene registrata quando approvi la proposta dell'agente IA.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Riconosci con l'IA",
     "tradeTitle": "Riconosci come operazione con l'IA",
-    "tradeMessage": "L'IA leggerà questa email come conferma di un'operazione di intermediazione e proporrà la transazione di investimento che riporta (conto, acquisto o vendita, simbolo, quote e totale). Non viene salvato nulla finché non approvi.",
+    "tradeMessage": "L'IA leggerà questa email come conferma di un'operazione di intermediazione e proporrà la transazione di investimento che riporta (conto, acquisto, vendita, dividendo in contanti o dividendo reinvestito, simbolo, quote e totale). Non viene salvato nulla finché non approvi.",
     "tradeConfirm": "Riconosci come operazione",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "nessun beneficiario",
@@ -1166,7 +1166,7 @@
     "inboxLink": "Apri la posta di revisione IA",
     "opened": "Chat aperta con l'email allegata. Leggi il messaggio e premi Invia.",
     "chatPrompt": "Riconosci i prodotti, le quantità e i prezzi nell'email d'ordine allegata e suddividi la mia transazione del {date} ({payee}, {amount}) per prodotto, con una categoria per ciascuno. Prendi in carico la richiesta di revisione IA {requestId} e invia la tua proposta per essa.",
-    "tradeChatPrompt": "Riconosci l'operazione nell'email di conferma del broker allegata: il conto, se è un acquisto o una vendita, il simbolo, le quote, il totale eseguito e la data. Prendi in carico la richiesta di revisione IA {requestId} e invia l'operazione per essa.",
+    "tradeChatPrompt": "Riconosci l'operazione nell'email di conferma del broker allegata: il conto, se è un acquisto, una vendita, un dividendo in contanti o un dividendo reinvestito, il simbolo, le quote (un dividendo in contanti può non indicarne), il totale eseguito e la data. Prendi in carico la richiesta di revisione IA {requestId} e invia l'operazione per essa.",
     "tradeDetachesTransaction": "Letta come operazione, questa email non corrisponde più a {summary}: l'operazione crea una propria transazione di investimento."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Data: {date}",
       "parsedTotal": "Totale: {total}",
       "parsedLines": "{count, plural, one {# riga} other {# righe}}",
-      "parsedTrade": "{action, select, BUY {Acquista} other {Vende}} {quantity} quote di {symbol}",
+      "parsedTrade": "{action, select, BUY {Acquista {quantity} quote di {symbol}} SELL {Vende {quantity} quote di {symbol}} DIVIDEND {Paga un dividendo da {symbol}} REINVEST {Reinveste un dividendo in {quantity} quote di {symbol}} other {Opera su {symbol}}}",
       "tradeInconsistent": "Il prezzo non corrisponde al totale, quindi non verrà applicata automaticamente",
       "noExpectation": "Nessuna",
       "noMatch": "Nessuna transazione",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Acquisto} other {Vendita}}: {quantity} quote di {symbol} per {total}, con data {date}.",
+    "summary": "{action, select, BUY {Acquisto: {quantity} quote di {symbol} per {total}, con data {date}.} SELL {Vendita: {quantity} quote di {symbol} per {total}, con data {date}.} DIVIDEND {Dividendo da {symbol} di {total}, con data {date}.} REINVEST {Reinvestimento di un dividendo in {quantity} quote di {symbol} per {total}, con data {date}.} other {{symbol} per {total}, con data {date}.}}",
     "account": "Conto indicato nell'email: {account}",
     "priceMismatch": "Il prezzo medio non corrisponde alle quote e al totale, quindi questa operazione non verrà applicata automaticamente.",
+    "dividendMismatch": "L'importo per azione non corrisponde alle quote e al totale, quindi questo dividendo non verrà applicato automaticamente.",
+    "dividendShares": "Pagato su {quantity} quote",
+    "dividendPerShare": "Importo per azione nell'email: {price}",
     "incomplete": "Il profilo non è riuscito a leggere un'operazione completa da questa email.",
     "totalFromPrice": "il totale ricavato dal prezzo",
     "dateUnknown": "il giorno in cui è arrivata l'email",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Titolo: {name}",
     "proposalAccount": "Conto: {account}",
     "proposalPrice": "Prezzo: {price} per azione",
+    "proposalDividendPerShare": "Importo per azione: {price}",
     "proposalCommission": "Commissione: {commission}",
     "proposalReview": "Nulla viene registrato finché non approvi.",
     "proposalReviewLink": "Controllala nella posta in arrivo",

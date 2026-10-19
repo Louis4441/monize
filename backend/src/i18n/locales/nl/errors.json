@@ -161,7 +161,7 @@
     "notATradeRequest": "Dit AI-beoordelingsverzoek is geen handelsverzoek.",
     "tradeOnTradeRequest": "Het veld trade beantwoordt alleen een handelsverzoek.",
     "tradeDateRequired": "De transactie heeft een datum nodig (JJJJ-MM-DD): de e-mail is weg, dus er is geen dag om op terug te vallen.",
-    "tradeInvalid": "De transactie heeft accountName, action (BUY of SELL), symbol, quantity, totalAmount en eventueel commission en date (JJJJ-MM-DD) nodig.",
+    "tradeInvalid": "De transactie heeft accountName, action (BUY, SELL, DIVIDEND of REINVEST), symbol, quantity (optioneel bij DIVIDEND), totalAmount en eventueel commission en date (JJJJ-MM-DD) nodig.",
     "tradeSecurityAmbiguous": "\"{{ symbol }}\" komt overeen met meerdere van je effecten ({{ list }}). Hernoem er één zodat het symbool uniek is.",
     "tradeSecurityUnknown": "Je hebt geen effect met het symbool \"{{ symbol }}\". Voeg het effect toe en verwerk de e-mail daarna opnieuw.",
     "tagNamesInvalid": "Een voorstel mag maximaal {{ max }} labels toevoegen van elk 1 tot {{ length }} tekens, zonder stuurtekens.",

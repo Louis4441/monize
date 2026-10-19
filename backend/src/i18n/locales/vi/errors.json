@@ -161,7 +161,7 @@
     "notATradeRequest": "Yêu cầu xem xét bằng AI này không phải là yêu cầu giao dịch.",
     "tradeOnTradeRequest": "Trường trade chỉ trả lời một yêu cầu giao dịch.",
     "tradeDateRequired": "Giao dịch cần có ngày (YYYY-MM-DD): email đã không còn, nên không có ngày dự phòng.",
-    "tradeInvalid": "Giao dịch cần accountName, action (BUY hoặc SELL), symbol, quantity, totalAmount và, tùy chọn, commission và date (YYYY-MM-DD).",
+    "tradeInvalid": "Giao dịch cần accountName, action (BUY, SELL, DIVIDEND hoặc REINVEST), symbol, quantity (tùy chọn với DIVIDEND), totalAmount và, tùy chọn, commission và date (YYYY-MM-DD).",
     "tradeSecurityAmbiguous": "\"{{ symbol }}\" khớp với nhiều chứng khoán của bạn ({{ list }}). Hãy đổi tên một mã để mã chứng khoán là duy nhất.",
     "tradeSecurityUnknown": "Bạn không có chứng khoán nào có mã \"{{ symbol }}\". Hãy thêm chứng khoán rồi xử lý lại email.",
     "tagNamesInvalid": "Một đề xuất có thể thêm tối đa {{ max }} thẻ, mỗi thẻ dài từ 1 đến {{ length }} ký tự và không chứa ký tự điều khiển.",

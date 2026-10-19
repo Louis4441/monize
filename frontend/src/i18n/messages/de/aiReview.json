@@ -38,14 +38,14 @@
     "transactionMissing": "Diese Buchung existiert nicht mehr",
     "rule": "Regel: {name}",
     "manualRequest": "Manuell angefordert",
-    "trade": "{action, select, BUY {Kauf von {quantity} Anteilen {symbol}} other {Verkauf von {quantity} Anteilen {symbol}}}",
+    "trade": "{action, select, BUY {Kauf von {quantity} Anteilen {symbol}} SELL {Verkauf von {quantity} Anteilen {symbol}} DIVIDEND {Dividende von {symbol}} REINVEST {Reinvestition einer Dividende in {quantity} Anteile {symbol}} other {Handel mit {symbol}}}",
     "receiptInstruction": {
       "automatic": "Diese Buchung anhand der angehängten Bestell-E-Mail ergänzen: nach Positionen mit je einer Kategorie aufteilen oder die Beschreibung setzen.",
       "chat": "Sie haben die Erkennung der angehängten Bestell-E-Mail angefordert: diese Buchung nach Produkten mit je einer Kategorie aufteilen oder die Beschreibung setzen.",
       "categorize": "Jeder Position der angehängten Bestell-E-Mail, die keine Regel kategorisiert hat, eine Kategorie zuweisen und dann die Aufteilung dieser Buchung vorschlagen oder die Beschreibung setzen.",
       "parsed": "Ein gespeicherter Parser hat die Bestell-E-Mail gelesen und schlägt diese Kategoriezeilen und diese Beschreibung für die Buchung vor.",
       "trade": "Eine von einem gespeicherten Profil gelesene Handelsbestätigung schlägt diese Wertpapiertransaktion vor. Prüfe vor der Freigabe Konto, Wertpapier, Anteile und Summe bei deinem Broker.",
-      "tradeChat": "Du hast darum gebeten, die angehängte Handelsbestätigung zu erkennen: schlage die Wertpapiertransaktion vor, die sie meldet."
+      "tradeChat": "Du hast darum gebeten, die angehängte Handelsbestätigung zu erkennen: schlage die Wertpapiertransaktion vor, die sie meldet, einen Kauf, einen Verkauf, eine Bardividende oder eine reinvestierte Dividende."
     },
     "emailReceipt": "E-Mail-Beleg: {subject} von {sender}",
     "emailReceiptMissing": "E-Mail-Beleg (die E-Mail wurde gelöscht)",

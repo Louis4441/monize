@@ -93,7 +93,7 @@
         "automatic": "Mỗi lần kiểm tra sẽ hỏi AI về hóa đơn đã khớp mà không trình phân tích nào đã duyệt đọc được đầy đủ, và soạn trình phân tích cho người gửi chưa có."
       },
       "autoApplyLabel": "Tự động áp dụng đề xuất",
-      "autoApplyHelp": "Mặc định là tắt. Một đề xuất chỉ được áp dụng mà không hỏi khi thỏa mãn tất cả điều sau: một hồ sơ đã duyệt đọc được toàn bộ email, giao dịch được tìm thấy theo mã đơn hàng hoặc mã tham chiếu, hoặc theo đúng số tiền và người nhận, với duy nhất một ứng viên, và đề xuất khớp tổng đến đơn vị tiền tệ nhỏ nhất. Một xác nhận giao dịch chỉ được ghi sổ mà không hỏi khi hồ sơ giao dịch của nó đã được duyệt, hồ sơ đọc được toàn bộ giao dịch, giá khớp với số lượng và tổng, và các tài khoản của bạn chưa có giao dịch trùng khớp. Mọi trường hợp khác đều chờ bạn phê duyệt.",
+      "autoApplyHelp": "Mặc định là tắt. Một đề xuất chỉ được áp dụng mà không hỏi khi thỏa mãn tất cả điều sau: một hồ sơ đã duyệt đọc được toàn bộ email, giao dịch được tìm thấy theo mã đơn hàng hoặc mã tham chiếu, hoặc theo đúng số tiền và người nhận, với duy nhất một ứng viên, và đề xuất khớp tổng đến đơn vị tiền tệ nhỏ nhất. Một xác nhận giao dịch chỉ được ghi sổ mà không hỏi khi hồ sơ giao dịch của nó đã được duyệt, hồ sơ đọc được toàn bộ giao dịch, giá khớp với số lượng và tổng (cổ tức tiền mặt chỉ nêu số tiền thì không có gì để đối chiếu), và các tài khoản của bạn chưa có giao dịch trùng khớp. Mọi trường hợp khác đều chờ bạn phê duyệt.",
       "profileLimitLabel": "Tính đề xuất của hồ sơ vào giới hạn AI hằng ngày",
       "profileLimitHelp": "Mặc định là bật: một chỉnh sửa do hồ sơ đề xuất từ email được tính vào giới hạn hằng ngày của các thay đổi do AI đề xuất, giống mọi đề xuất AI khác. Hãy tắt khi một loạt lớn email đã lưu sẽ dùng hết giới hạn. Chỉ các đề xuất từ hồ sơ được miễn; mọi đề xuất vẫn chờ bạn phê duyệt."
     },
@@ -377,7 +377,7 @@
       "receipt": "Biên nhận đơn hàng",
       "trade": "Giao dịch chứng khoán",
       "receiptHelp": "Đọc email xác nhận đơn hàng và tìm giao dịch ngân hàng đã thanh toán cho nó.",
-      "tradeHelp": "Đọc email xác nhận giao dịch của công ty chứng khoán và đề xuất giao dịch đầu tư mà nó báo, một lệnh mua hoặc bán."
+      "tradeHelp": "Đọc email xác nhận giao dịch của công ty chứng khoán và đề xuất giao dịch đầu tư mà nó báo: một lệnh mua, lệnh bán, cổ tức tiền mặt hoặc cổ tức tái đầu tư."
     },
     "trade": {
       "guardsHeading": "Hồ sơ đọc những email nào của người gửi",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Email có một trong các dòng này được giữ lại và đọc lại sau, chẳng hạn lệnh khớp một phần."
       },
       "fieldsHeading": "Giao dịch",
-      "fieldsHelp": "Mua hoặc bán, mã chứng khoán và số cổ phiếu là bắt buộc, cùng với tổng tiền hoặc giá. Mỗi trường nhận các mẫu, mỗi dòng một mẫu, được thử theo thứ tự.",
+      "fieldsHelp": "Loại giao dịch, mã chứng khoán và tổng tiền hoặc giá là bắt buộc, số cổ phiếu cũng vậy trừ khi là cổ tức tiền mặt. Loại giao dịch được đọc từ văn bản của nó: Dividend hoặc Distribution là cổ tức tiền mặt, Reinvest hoặc DRIP là cổ tức tái đầu tư, còn lại là Buy hoặc Sell. Mỗi trường nhận các mẫu, mỗi dòng một mẫu, được thử theo thứ tự.",
       "fields": {
-        "tradeAction": "Mẫu mua hoặc bán",
+        "tradeAction": "Mẫu loại giao dịch",
         "tradeSymbol": "Mẫu mã chứng khoán",
         "tradeQuantity": "Mẫu số cổ phiếu",
         "tradeTotal": "Mẫu tổng tiền giao dịch",
@@ -403,7 +403,7 @@
         "tradeAccount": "Mẫu tài khoản"
       },
       "fieldHint": "Phải lấy {capture}. Ví dụ: {example}",
-      "amountsHelp": "Tổng tiền là số tiền đã khớp, với lệnh mua thì gồm cả phí hoa hồng. Giá dùng để đối chiếu và cho ra tổng tiền khi email không nêu. Số tiền có nêu tiền tệ (US$, C$, USD, €) cũng xác định tiền tệ của giao dịch.",
+      "amountsHelp": "Tổng tiền là số tiền đã khớp, với lệnh mua hoặc cổ tức tái đầu tư thì gồm cả phí hoa hồng; với cổ tức tiền mặt thì là số tiền được trả. Giá (với cổ tức là số tiền mỗi cổ phiếu) dùng để đối chiếu và cùng với số cổ phiếu cho ra tổng tiền khi email không nêu. Số tiền có nêu tiền tệ (US$, C$, USD, €) cũng xác định tiền tệ của giao dịch.",
       "rulesHeading": "Quy tắc tài khoản",
       "rulesHelp": "Giao dịch được ghi vào tài khoản nào. Các quy tắc được thử theo thứ tự với văn bản tài khoản mà mẫu tài khoản đọc được, và quy tắc đầu tiên áp dụng được sẽ thắng; {star} là văn bản bất kỳ. Quy tắc có tiền tệ chỉ áp dụng cho giao dịch bằng tiền tệ đó, nên hai tài khoản mà công ty chứng khoán ghi giống nhau, như một RRSP bằng CAD và một bằng USD đều hiện là RRSP, là hai quy tắc cùng văn bản nhưng khác tiền tệ. Khi email không có văn bản tài khoản, chỉ quy tắc có văn bản {star} mới áp dụng được. Tài khoản mặc định nhận phần còn lại.",
       "currencyOrder": "Tiền tệ của giao dịch được lấy theo thứ tự: từ chính số tiền khi nó nêu một tiền tệ (US$, C$, USD, €), rồi từ dấu hiệu tiền tệ đầu tiên bên dưới khớp với một dòng của email, rồi từ tiền tệ của chứng khoán của bạn cho mã đó. Quy tắc có tiền tệ không bao giờ đoán: khi không cách nào trong ba cách cho biết tiền tệ, email sẽ chờ bạn thay vì được ghi vào một trong các tài khoản.",
@@ -512,7 +512,7 @@
       "tag": "Thẻ",
       "aiCategories": "Danh mục do AI chọn",
       "trade": "Phần giao dịch",
-      "tradeAction": "Mẫu mua hoặc bán",
+      "tradeAction": "Mẫu loại giao dịch",
       "tradeSymbol": "Mẫu mã chứng khoán",
       "tradeQuantity": "Mẫu số cổ phiếu",
       "tradeTotal": "Mẫu tổng tiền giao dịch",
@@ -630,7 +630,7 @@
         "waitIfLine": "Dòng chờ",
         "reference": "Tham chiếu",
         "linkKey": "Khóa liên kết",
-        "action": "Mua hoặc bán",
+        "action": "Loại giao dịch",
         "symbol": "Mã",
         "quantity": "Cổ phiếu",
         "price": "Giá",
@@ -1008,9 +1008,9 @@
       "no_html": "Trình phân tích này đọc phần HTML của email, mà email này không có HTML.",
       "schema_org": "Không cần trình phân tích: đơn hàng được đọc từ dữ liệu có cấu trúc (schema.org) trong email.",
       "item_amount_missing": "Một mục hàng không có số tiền, và email không có tổng duy nhất nào để gán cho nó.",
-      "trade_no_action": "Trình phân tích không tìm thấy giao dịch mua hay bán trong email này.",
+      "trade_no_action": "Trình phân tích không tìm thấy giao dịch mua, bán, cổ tức hay tái đầu tư nào trong email này.",
       "trade_no_symbol": "Trình phân tích không tìm thấy mã chứng khoán trong email này.",
-      "trade_no_quantity": "Trình phân tích không tìm thấy số lượng cổ phần trong email này.",
+      "trade_no_quantity": "Trình phân tích không tìm thấy số lượng cổ phần trong email này, điều mà lệnh mua, lệnh bán hoặc cổ tức tái đầu tư cần có.",
       "trade_no_amount": "Trình phân tích không tìm thấy tổng cũng như giá trong email này.",
       "trade_no_account": "Trình phân tích không xác định được giao dịch này thuộc tài khoản nào.",
       "trade_exists": "Các tài khoản của bạn đã có giao dịch này, nên không có gì được đề xuất.",
@@ -1078,10 +1078,10 @@
       "openButton": "Mở",
       "open": "Mở email {subject}"
     },
-    "tradeTransactionSummary": "{action, select, BUY {Đã mua} other {Đã bán}} {quantity} {symbol} với giá {total} vào {date}.",
+    "tradeTransactionSummary": "{action, select, BUY {Đã mua {quantity} {symbol} với giá {total} vào {date}.} SELL {Đã bán {quantity} {symbol} với giá {total} vào {date}.} DIVIDEND {Cổ tức từ {symbol} là {total} vào {date}.} REINVEST {Đã tái đầu tư cổ tức vào {quantity} {symbol} với giá {total} vào {date}.} other {{quantity} {symbol} với giá {total} vào {date}.}}",
     "noTradeTransaction": "Chưa có: giao dịch được ghi khi bạn duyệt đề xuất, hoặc được liên kết với giao dịch đã có trong sổ cái.",
     "candidateShares": "{quantity} cổ phiếu",
-    "tradeNoCandidates": "Không có giao dịch đầu tư nào của tài khoản, chiều và mã này trong vòng một tuần quanh ngày giao dịch còn trống để liên kết. Nếu bạn tự nhập giao dịch, hãy kiểm tra tài khoản và ngày; nếu không, hãy duyệt đề xuất trong hộp thư xem xét.",
+    "tradeNoCandidates": "Không có giao dịch đầu tư nào của tài khoản, loại giao dịch và mã này trong vòng một tuần quanh ngày giao dịch còn trống để liên kết. Nếu bạn tự nhập giao dịch, hãy kiểm tra tài khoản và ngày; nếu không, hãy duyệt đề xuất trong hộp thư xem xét.",
     "aiTradeHeading": "Giao dịch do tác tử AI đề xuất",
     "aiTradeReader": "Không có: tác tử AI đọc email này như một giao dịch",
     "noAiTradeTransaction": "Chưa có: giao dịch được ghi sổ khi bạn duyệt đề xuất của tác tử AI.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Nhận dạng bằng AI",
     "tradeTitle": "Nhận diện là giao dịch bằng AI",
-    "tradeMessage": "AI sẽ đọc email này như một xác nhận giao dịch của công ty môi giới và đề xuất giao dịch đầu tư mà nó báo cáo (tài khoản, mua hoặc bán, mã, số lượng và tổng). Không có gì được lưu cho đến khi bạn phê duyệt.",
+    "tradeMessage": "AI sẽ đọc email này như một xác nhận giao dịch của công ty môi giới và đề xuất giao dịch đầu tư mà nó báo cáo (tài khoản, mua, bán, cổ tức tiền mặt hoặc cổ tức tái đầu tư, mã, số lượng và tổng). Không có gì được lưu cho đến khi bạn phê duyệt.",
     "tradeConfirm": "Nhận diện là giao dịch",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "không có người nhận",
@@ -1166,7 +1166,7 @@
     "inboxLink": "Mở hộp thư xem xét của AI",
     "opened": "Đã mở cuộc trò chuyện kèm email. Hãy đọc tin nhắn và nhấn Gửi.",
     "chatPrompt": "Hãy nhận dạng các sản phẩm, số lượng và giá trong email đơn hàng đính kèm, rồi chia giao dịch ngày {date} của tôi ({payee}, {amount}) theo sản phẩm, mỗi sản phẩm có một danh mục. Hãy nhận yêu cầu xem xét AI {requestId} và gửi đề xuất của bạn cho yêu cầu đó.",
-    "tradeChatPrompt": "Hãy nhận diện giao dịch trong email xác nhận của công ty môi giới đính kèm: tài khoản, mua hay bán, mã, số lượng, tổng đã khớp và ngày. Nhận yêu cầu xem xét bằng AI {requestId} và gửi giao dịch cho nó.",
+    "tradeChatPrompt": "Hãy nhận diện giao dịch trong email xác nhận của công ty môi giới đính kèm: tài khoản, đó là mua, bán, cổ tức tiền mặt hay cổ tức tái đầu tư, mã, số lượng (cổ tức tiền mặt có thể không nêu), tổng đã khớp và ngày. Nhận yêu cầu xem xét bằng AI {requestId} và gửi giao dịch cho nó.",
     "tradeDetachesTransaction": "Khi đọc là giao dịch, email này không còn tương ứng với {summary}: giao dịch sẽ tạo giao dịch đầu tư riêng."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Ngày: {date}",
       "parsedTotal": "Tổng cộng: {total}",
       "parsedLines": "{count, plural, one {# dòng} other {# dòng}}",
-      "parsedTrade": "{action, select, BUY {Mua} other {Bán}} {quantity} cổ phần {symbol}",
+      "parsedTrade": "{action, select, BUY {Mua {quantity} cổ phần {symbol}} SELL {Bán {quantity} cổ phần {symbol}} DIVIDEND {Trả cổ tức từ {symbol}} REINVEST {Tái đầu tư cổ tức vào {quantity} cổ phần {symbol}} other {Giao dịch {symbol}}}",
       "tradeInconsistent": "Giá không khớp với tổng, nên giao dịch sẽ không được áp dụng tự động",
       "noExpectation": "Không có",
       "noMatch": "Không có giao dịch",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Mua} other {Bán}}: {quantity} cổ phần {symbol} với {total}, ngày {date}.",
+    "summary": "{action, select, BUY {Mua: {quantity} cổ phần {symbol} với {total}, ngày {date}.} SELL {Bán: {quantity} cổ phần {symbol} với {total}, ngày {date}.} DIVIDEND {Cổ tức từ {symbol}: {total}, ngày {date}.} REINVEST {Tái đầu tư cổ tức vào {quantity} cổ phần {symbol} với {total}, ngày {date}.} other {{symbol} với {total}, ngày {date}.}}",
     "account": "Tài khoản nêu trong email: {account}",
     "priceMismatch": "Giá trung bình không khớp với số lượng và tổng, nên giao dịch này sẽ không được áp dụng tự động.",
+    "dividendMismatch": "Số tiền mỗi cổ phiếu không khớp với số lượng và tổng, nên cổ tức này sẽ không được áp dụng tự động.",
+    "dividendShares": "Trả cho {quantity} cổ phần",
+    "dividendPerShare": "Số tiền mỗi cổ phiếu trong email: {price}",
     "incomplete": "Trình phân tích không đọc được một giao dịch đầy đủ từ email này.",
     "totalFromPrice": "tổng suy ra từ giá",
     "dateUnknown": "ngày email đến",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Chứng khoán: {name}",
     "proposalAccount": "Tài khoản: {account}",
     "proposalPrice": "Giá: {price} mỗi cổ phiếu",
+    "proposalDividendPerShare": "Số tiền mỗi cổ phiếu: {price}",
     "proposalCommission": "Phí: {commission}",
     "proposalReview": "Chưa có gì được ghi sổ cho đến khi bạn duyệt.",
     "proposalReviewLink": "Xem lại trong hộp thư",

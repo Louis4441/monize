@@ -93,7 +93,7 @@
         "automatic": "Het ophalen vraagt de AI naar een gekoppelde bon die geen enkel goedgekeurd profiel volledig kon lezen, en stelt een concept van een profiel op voor een afzender die er geen heeft."
       },
       "autoApplyLabel": "Voorstellen automatisch toepassen",
-      "autoApplyHelp": "Standaard uit. Een voorstel wordt alleen zonder te vragen toegepast als dit allemaal geldt: een goedgekeurd profiel heeft de hele e-mail gelezen, de transactie is gevonden via een ordernummer of een referentie, of via exact bedrag en begunstigde, met één enkele kandidaat, en het voorstel klopt tot op de cent. Een transactiebevestiging wordt alleen zonder te vragen geboekt als het transactieprofiel is goedgekeurd, het de hele transactie heeft gelezen, de prijs klopt met de aandelen en het totaal, en je rekeningen nog geen overeenkomende transactie bevatten. Al het andere wacht op jouw goedkeuring.",
+      "autoApplyHelp": "Standaard uit. Een voorstel wordt alleen zonder te vragen toegepast als dit allemaal geldt: een goedgekeurd profiel heeft de hele e-mail gelezen, de transactie is gevonden via een ordernummer of een referentie, of via exact bedrag en begunstigde, met één enkele kandidaat, en het voorstel klopt tot op de cent. Een transactiebevestiging wordt alleen zonder te vragen geboekt als het transactieprofiel is goedgekeurd, het de hele transactie heeft gelezen, de prijs klopt met de aandelen en het totaal (een contant dividend dat alleen zijn bedrag noemt, heeft niets te controleren), en je rekeningen nog geen overeenkomende transactie bevatten. Al het andere wacht op jouw goedkeuring.",
       "profileLimitLabel": "Voorstellen van profielen meetellen voor de dagelijkse AI-limiet",
       "profileLimitHelp": "Standaard aan: een wijziging die een profiel uit een e-mail voorstelt, telt mee voor de dagelijkse limiet van door AI voorgestelde wijzigingen, zoals elk ander AI-voorstel. Zet het uit wanneer een grote stapel opgeslagen e-mails de limiet anders zou opmaken. Alleen voorstellen van profielen zijn uitgezonderd; elk voorstel wacht nog steeds op jouw goedkeuring."
     },
@@ -377,7 +377,7 @@
       "receipt": "Bestelbon",
       "trade": "Beurstransactie",
       "receiptHelp": "Leest een orderbevestiging en vindt de banktransactie waarmee ze betaald is.",
-      "tradeHelp": "Leest een uitvoeringsbevestiging van de broker en stelt de beleggingstransactie voor die ze meldt, een aankoop of een verkoop."
+      "tradeHelp": "Leest een uitvoeringsbevestiging van de broker en stelt de beleggingstransactie voor die ze meldt: een aankoop, een verkoop, een contant dividend of een herbelegd dividend."
     },
     "trade": {
       "guardsHeading": "Welke e-mails van de afzender het leest",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Een e-mail met een van deze regels wordt vastgehouden en later opnieuw gelezen, zoals een gedeeltelijke uitvoering."
       },
       "fieldsHeading": "De transactie",
-      "fieldsHelp": "Aankoop of verkoop, de ticker en het aantal aandelen zijn verplicht, plus een totaal of een prijs. Elk veld neemt patronen, één per regel, op volgorde geprobeerd.",
+      "fieldsHelp": "Het transactietype, de ticker en een totaal of een prijs zijn verplicht, en ook het aantal aandelen behalve bij een contant dividend. Het type wordt uit de tekst gelezen: Dividend of Distribution is een contant dividend, Reinvest of DRIP een herbelegd dividend, anders Buy of Sell. Elk veld neemt patronen, één per regel, op volgorde geprobeerd.",
       "fields": {
-        "tradeAction": "Patronen voor aankoop of verkoop",
+        "tradeAction": "Patronen voor het transactietype",
         "tradeSymbol": "Patronen voor de ticker",
         "tradeQuantity": "Patronen voor het aantal aandelen",
         "tradeTotal": "Patronen voor het transactietotaal",
@@ -403,7 +403,7 @@
         "tradeAccount": "Patronen voor de rekening"
       },
       "fieldHint": "Moet {capture} vastleggen. Voorbeeld: {example}",
-      "amountsHelp": "Het totaal is het uitgevoerde bedrag, bij een aankoop inclusief commissie. De prijs is een controle en geeft het totaal als de e-mail er geen noemt. Een bedrag dat zijn valuta noemt (US$, C$, USD, €) bepaalt ook de valuta van de transactie.",
+      "amountsHelp": "Het totaal is het uitgevoerde bedrag, bij een aankoop of een herbelegd dividend inclusief commissie; bij een contant dividend is het het uitbetaalde bedrag. De prijs (bij een dividend het bedrag per aandeel) is een controle en geeft met het aantal aandelen het totaal als de e-mail er geen noemt. Een bedrag dat zijn valuta noemt (US$, C$, USD, €) bepaalt ook de valuta van de transactie.",
       "rulesHeading": "Rekeningregels",
       "rulesHelp": "Op welke rekening de transactie wordt geboekt. De regels worden op volgorde geprobeerd op de rekeningtekst die de rekeningpatronen lezen, en de eerste die van toepassing is wint; {star} is willekeurige tekst. Een regel met een valuta geldt alleen voor een transactie in die valuta, dus twee rekeningen die de broker hetzelfde schrijft, zoals een RRSP in CAD en een in USD die allebei als RRSP verschijnen, zijn twee regels met dezelfde tekst en verschillende valuta. Als de e-mail geen rekeningtekst toont, kan alleen een regel met de tekst {star} gelden. De standaardrekening neemt de rest.",
       "currencyOrder": "De valuta van de transactie komt, op volgorde: uit het bedrag zelf als het er een noemt (US$, C$, USD, €), dan uit de eerste valutamarkering hieronder die bij een regel van de e-mail past, dan uit de valuta van je effect voor de ticker. Een regel met een valuta gokt nooit: als geen van de drie de valuta noemt, wacht de e-mail op jou in plaats van op een van de rekeningen te worden geboekt.",
@@ -512,7 +512,7 @@
       "tag": "Label",
       "aiCategories": "AI-categorieën",
       "trade": "Het transactiedeel",
-      "tradeAction": "Patronen voor aankoop of verkoop",
+      "tradeAction": "Patronen voor het transactietype",
       "tradeSymbol": "Patronen voor de ticker",
       "tradeQuantity": "Patronen voor het aantal aandelen",
       "tradeTotal": "Patronen voor het transactietotaal",
@@ -630,7 +630,7 @@
         "waitIfLine": "Wachtregel",
         "reference": "Referentie",
         "linkKey": "Koppelsleutel",
-        "action": "Koop of verkoop",
+        "action": "Transactietype",
         "symbol": "Ticker",
         "quantity": "Aandelen",
         "price": "Prijs",
@@ -1008,9 +1008,9 @@
       "no_html": "Dit profiel leest het HTML-deel van de e-mail en deze e-mail heeft er geen.",
       "schema_org": "Er was geen profiel nodig: de bestelling is gelezen uit de gestructureerde gegevens (schema.org) in de e-mail.",
       "item_amount_missing": "Een artikel heeft geen bedrag en de e-mail heeft geen enkel totaal om het te geven.",
-      "trade_no_action": "Het profiel vond geen aankoop of verkoop in deze e-mail.",
+      "trade_no_action": "Het profiel vond geen aankoop, verkoop, dividend of herbelegging in deze e-mail.",
       "trade_no_symbol": "Het profiel vond geen beurssymbool in deze e-mail.",
-      "trade_no_quantity": "Het profiel vond geen aantal aandelen in deze e-mail.",
+      "trade_no_quantity": "Het profiel vond geen aantal aandelen in deze e-mail, dat een aankoop, een verkoop of een herbelegd dividend nodig heeft.",
       "trade_no_amount": "Het profiel vond in deze e-mail geen totaal en geen prijs.",
       "trade_no_account": "Het profiel kon niet bepalen voor welke rekening deze transactie is.",
       "trade_exists": "Je rekeningen bevatten deze transactie al, dus er is niets voorgesteld.",
@@ -1078,10 +1078,10 @@
       "openButton": "Openen",
       "open": "De e-mail {subject} openen"
     },
-    "tradeTransactionSummary": "{action, select, BUY {Gekocht} other {Verkocht}}: {quantity} {symbol} voor {total} op {date}.",
+    "tradeTransactionSummary": "{action, select, BUY {Gekocht: {quantity} {symbol} voor {total} op {date}.} SELL {Verkocht: {quantity} {symbol} voor {total} op {date}.} DIVIDEND {Dividend van {symbol}: {total} op {date}.} REINVEST {Dividend herbelegd in {quantity} {symbol} voor {total} op {date}.} other {{quantity} {symbol} voor {total} op {date}.}}",
     "noTradeTransaction": "Nog geen: de transactie wordt geboekt wanneer je het voorstel goedkeurt, of gekoppeld aan een transactie die al in je administratie staat.",
     "candidateShares": "{quantity} aandelen",
-    "tradeNoCandidates": "Geen beleggingstransactie van deze rekening, richting en ticker binnen een week van de transactiedag is vrij om te koppelen. Heb je de transactie zelf ingevoerd, controleer dan de rekening en de datum; keur anders het voorstel goed in de beoordelingsinbox.",
+    "tradeNoCandidates": "Geen beleggingstransactie van deze rekening, transactietype en ticker binnen een week van de transactiedag is vrij om te koppelen. Heb je de transactie zelf ingevoerd, controleer dan de rekening en de datum; keur anders het voorstel goed in de beoordelingsinbox.",
     "aiTradeHeading": "Transactie die de AI-agent voorstelt",
     "aiTradeReader": "Geen: de AI-agent leest het als een transactie",
     "noAiTradeTransaction": "Nog geen: de transactie wordt geboekt zodra je het voorstel van de AI-agent goedkeurt.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Herkennen met AI",
     "tradeTitle": "Herken als transactie met AI",
-    "tradeMessage": "De AI leest deze e-mail als handelsbevestiging van een broker en stelt de beleggingstransactie voor die erin staat (rekening, aankoop of verkoop, symbool, aandelen en totaal). Er wordt niets opgeslagen tot je het goedkeurt.",
+    "tradeMessage": "De AI leest deze e-mail als handelsbevestiging van een broker en stelt de beleggingstransactie voor die erin staat (rekening, aankoop, verkoop, contant dividend of herbelegd dividend, symbool, aandelen en totaal). Er wordt niets opgeslagen tot je het goedkeurt.",
     "tradeConfirm": "Herken als transactie",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "geen begunstigde",
@@ -1166,7 +1166,7 @@
     "inboxLink": "Het AI-controlepostvak openen",
     "opened": "De chat is geopend met de e-mail als bijlage. Lees het bericht en druk op Verzenden.",
     "chatPrompt": "Herken de producten, aantallen en prijzen in de bijgevoegde bestel-e-mail en splits mijn transactie van {date} ({payee}, {amount}) per product, met een categorie voor elk. Neem AI-controleverzoek {requestId} over en dien je voorstel ervoor in.",
-    "tradeChatPrompt": "Herken de transactie in de bijgevoegde bevestigingsmail van de broker: de rekening, of het een aankoop of verkoop is, het symbool, de aandelen, het uitgevoerde totaal en de datum. Neem AI-beoordelingsverzoek {requestId} aan en dien de transactie ervoor in.",
+    "tradeChatPrompt": "Herken de transactie in de bijgevoegde bevestigingsmail van de broker: de rekening, of het een aankoop, een verkoop, een contant dividend of een herbelegd dividend is, het symbool, de aandelen (een contant dividend noemt er misschien geen), het uitgevoerde totaal en de datum. Neem AI-beoordelingsverzoek {requestId} aan en dien de transactie ervoor in.",
     "tradeDetachesTransaction": "Als transactie gelezen hoort deze e-mail niet meer bij {summary}: de transactie maakt een eigen beleggingstransactie aan."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Datum: {date}",
       "parsedTotal": "Totaal: {total}",
       "parsedLines": "{count, plural, one {# regel} other {# regels}}",
-      "parsedTrade": "{action, select, BUY {Koopt} other {Verkoopt}} {quantity} aandelen {symbol}",
+      "parsedTrade": "{action, select, BUY {Koopt {quantity} aandelen {symbol}} SELL {Verkoopt {quantity} aandelen {symbol}} DIVIDEND {Keert een dividend van {symbol} uit} REINVEST {Herbelegt een dividend in {quantity} aandelen {symbol}} other {Handelt in {symbol}}}",
       "tradeInconsistent": "De prijs komt niet overeen met het totaal, dus dit wordt niet automatisch toegepast",
       "noExpectation": "Geen",
       "noMatch": "Geen transactie",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Aankoop} other {Verkoop}}: {quantity} aandelen {symbol} voor {total}, gedateerd {date}.",
+    "summary": "{action, select, BUY {Aankoop: {quantity} aandelen {symbol} voor {total}, gedateerd {date}.} SELL {Verkoop: {quantity} aandelen {symbol} voor {total}, gedateerd {date}.} DIVIDEND {Dividend van {symbol}: {total}, gedateerd {date}.} REINVEST {Herbelegging van een dividend in {quantity} aandelen {symbol} voor {total}, gedateerd {date}.} other {{symbol} voor {total}, gedateerd {date}.}}",
     "account": "Rekening genoemd in de e-mail: {account}",
     "priceMismatch": "De gemiddelde prijs komt niet overeen met de aandelen en het totaal, dus deze transactie wordt niet automatisch toegepast.",
+    "dividendMismatch": "Het bedrag per aandeel komt niet overeen met de aandelen en het totaal, dus dit dividend wordt niet automatisch toegepast.",
+    "dividendShares": "Uitbetaald op {quantity} aandelen",
+    "dividendPerShare": "Bedrag per aandeel in de e-mail: {price}",
     "incomplete": "Het profiel kon uit deze e-mail geen volledige transactie lezen.",
     "totalFromPrice": "het uit de prijs afgeleide totaal",
     "dateUnknown": "de dag waarop de e-mail binnenkwam",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Effect: {name}",
     "proposalAccount": "Rekening: {account}",
     "proposalPrice": "Koers: {price} per aandeel",
+    "proposalDividendPerShare": "Bedrag per aandeel: {price}",
     "proposalCommission": "Provisie: {commission}",
     "proposalReview": "Er wordt niets geboekt tot je het goedkeurt.",
     "proposalReviewLink": "Bekijk het in de inbox",

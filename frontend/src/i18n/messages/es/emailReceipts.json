@@ -93,7 +93,7 @@
         "automatic": "La consulta pregunta a la IA sobre un recibo asociado que ningún perfil aprobado pudo leer por completo, y redacta un perfil para un remitente que no tiene ninguno."
       },
       "autoApplyLabel": "Aplicar las propuestas automáticamente",
-      "autoApplyHelp": "Desactivado por defecto. Una propuesta se aplica sin preguntar solo cuando se cumple todo lo siguiente: un perfil aprobado leyó todo el correo, la transacción se encontró por un número de pedido o una referencia, o por importe y beneficiario exactos, con un único candidato, y la propuesta cuadra al céntimo. Una confirmación de operación se registra sin preguntar solo cuando su perfil de operaciones está aprobado, leyó la operación completa, el precio cuadra con las participaciones y el total, y tus cuentas aún no contienen una operación igual. Todo lo demás espera tu aprobación.",
+      "autoApplyHelp": "Desactivado por defecto. Una propuesta se aplica sin preguntar solo cuando se cumple todo lo siguiente: un perfil aprobado leyó todo el correo, la transacción se encontró por un número de pedido o una referencia, o por importe y beneficiario exactos, con un único candidato, y la propuesta cuadra al céntimo. Una confirmación de operación se registra sin preguntar solo cuando su perfil de operaciones está aprobado, leyó la operación completa, el precio cuadra con las participaciones y el total (un dividendo en efectivo que solo indica su importe no tiene nada que comprobar), y tus cuentas aún no contienen una operación igual. Todo lo demás espera tu aprobación.",
       "profileLimitLabel": "Contar las propuestas de perfiles en el límite diario de la IA",
       "profileLimitHelp": "Activado por defecto: una edición que un perfil propone a partir de un correo cuenta en el límite diario de cambios propuestos por la IA, como cualquier otra propuesta de la IA. Desactívalo cuando un lote grande de correos guardados agotaría el límite. Solo las propuestas de perfiles están exentas; toda propuesta sigue esperando tu aprobación."
     },
@@ -377,7 +377,7 @@
       "receipt": "Recibo de pedido",
       "trade": "Operación bursátil",
       "receiptHelp": "Lee una confirmación de pedido y encuentra la transacción bancaria que la pagó.",
-      "tradeHelp": "Lee una confirmación de operación del bróker y propone la transacción de inversión que informa, una compra o una venta."
+      "tradeHelp": "Lee una confirmación de operación del bróker y propone la transacción de inversión que informa: una compra, una venta, un dividendo en efectivo o un dividendo reinvertido."
     },
     "trade": {
       "guardsHeading": "Qué correos del remitente lee",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Un correo con una de estas líneas se retiene y se vuelve a leer más tarde, como una ejecución parcial."
       },
       "fieldsHeading": "La operación",
-      "fieldsHelp": "Compra o venta, el símbolo y el número de acciones son obligatorios, y un total o un precio. Cada campo admite patrones, uno por línea, probados en orden.",
+      "fieldsHelp": "El tipo de operación, el símbolo y un total o un precio son obligatorios, y también el número de acciones salvo en un dividendo en efectivo. El tipo se lee de su texto: Dividend o Distribution es un dividendo en efectivo, Reinvest o DRIP un dividendo reinvertido, y si no, Buy o Sell. Cada campo admite patrones, uno por línea, probados en orden.",
       "fields": {
-        "tradeAction": "Patrones de compra o venta",
+        "tradeAction": "Patrones del tipo de operación",
         "tradeSymbol": "Patrones del símbolo",
         "tradeQuantity": "Patrones del número de acciones",
         "tradeTotal": "Patrones del total de la operación",
@@ -403,7 +403,7 @@
         "tradeAccount": "Patrones de la cuenta"
       },
       "fieldHint": "Debe capturar {capture}. Ejemplo: {example}",
-      "amountsHelp": "El total es el importe ejecutado, con la comisión incluida en una compra. El precio sirve de comprobación y da el total cuando el correo no indica ninguno. Un importe que nombra su moneda (US$, C$, USD, €) fija también la moneda de la operación.",
+      "amountsHelp": "El total es el importe ejecutado, con la comisión incluida en una compra o un dividendo reinvertido; en un dividendo en efectivo es el importe pagado. El precio (en un dividendo, el importe por acción) sirve de comprobación y, con el número de acciones, da el total cuando el correo no indica ninguno. Un importe que nombra su moneda (US$, C$, USD, €) fija también la moneda de la operación.",
       "rulesHeading": "Reglas de cuenta",
       "rulesHelp": "En qué cuenta se registra la operación. Las reglas se prueban en orden contra el texto de cuenta que leen los patrones de la cuenta, y gana la primera que se aplica; {star} es cualquier texto. Una regla con moneda solo se aplica a una operación en esa moneda, así que dos cuentas que el bróker escribe igual, como un RRSP en CAD y otro en USD mostrados ambos como RRSP, son dos reglas con el mismo texto y monedas distintas. Si el correo no muestra texto de cuenta, solo puede aplicarse una regla cuyo texto sea {star}. La cuenta predeterminada cubre el resto.",
       "currencyOrder": "La moneda de la operación se toma, en este orden: del propio importe cuando nombra una (US$, C$, USD, €), luego del primer marcador de moneda de abajo que coincida con una línea del correo, luego de la moneda de tu valor para el símbolo. Una regla con moneda nunca adivina: si ninguno de los tres indica la moneda, el correo te espera en vez de registrarse en una de las cuentas.",
@@ -512,7 +512,7 @@
       "tag": "Etiqueta",
       "aiCategories": "Categorías de la IA",
       "trade": "La sección de la operación",
-      "tradeAction": "Patrones de compra o venta",
+      "tradeAction": "Patrones del tipo de operación",
       "tradeSymbol": "Patrones del símbolo",
       "tradeQuantity": "Patrones del número de acciones",
       "tradeTotal": "Patrones del total de la operación",
@@ -630,7 +630,7 @@
         "waitIfLine": "Línea de espera",
         "reference": "Referencia",
         "linkKey": "Clave de vínculo",
-        "action": "Compra o venta",
+        "action": "Tipo de operación",
         "symbol": "Símbolo",
         "quantity": "Acciones",
         "price": "Precio",
@@ -1008,9 +1008,9 @@
       "no_html": "Este perfil lee la parte HTML del correo, y este correo no la tiene.",
       "schema_org": "No hizo falta ningún perfil: el pedido se leyó de los datos estructurados (schema.org) del correo.",
       "item_amount_missing": "Un artículo no tiene importe y el correo no tiene un único total que asignarle.",
-      "trade_no_action": "El perfil no encontró ninguna compra ni venta en este correo.",
+      "trade_no_action": "El perfil no encontró ninguna compra, venta, dividendo ni reinversión en este correo.",
       "trade_no_symbol": "El perfil no encontró ningún símbolo bursátil en este correo.",
-      "trade_no_quantity": "El perfil no encontró ninguna cantidad de participaciones en este correo.",
+      "trade_no_quantity": "El perfil no encontró ninguna cantidad de participaciones en este correo, que una compra, una venta o un dividendo reinvertido necesita.",
       "trade_no_amount": "El perfil no encontró ni un total ni un precio en este correo.",
       "trade_no_account": "El perfil no pudo saber a qué cuenta corresponde esta operación.",
       "trade_exists": "Tus cuentas ya contienen esta operación, así que no se propuso nada.",
@@ -1078,10 +1078,10 @@
       "openButton": "Abrir",
       "open": "Abrir el correo {subject}"
     },
-    "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venta}} de {quantity} {symbol} por {total} el {date}.",
+    "tradeTransactionSummary": "{action, select, BUY {Compra de {quantity} {symbol} por {total} el {date}.} SELL {Venta de {quantity} {symbol} por {total} el {date}.} DIVIDEND {Dividendo de {symbol} de {total} el {date}.} REINVEST {Dividendo reinvertido en {quantity} {symbol} por {total} el {date}.} other {{quantity} {symbol} por {total} el {date}.}}",
     "noTradeTransaction": "Ninguna todavía: la operación se registra al aprobar su propuesta, o se vincula a una que ya esté en tu registro.",
     "candidateShares": "{quantity} acciones",
-    "tradeNoCandidates": "Ninguna transacción de inversión de esta cuenta, sentido y símbolo dentro de una semana del día de la operación está libre para vincular. Si registraste la operación tú mismo, revisa su cuenta y fecha; si no, aprueba la propuesta en la bandeja de revisión.",
+    "tradeNoCandidates": "Ninguna transacción de inversión de esta cuenta, tipo de operación y símbolo dentro de una semana del día de la operación está libre para vincular. Si registraste la operación tú mismo, revisa su cuenta y fecha; si no, aprueba la propuesta en la bandeja de revisión.",
     "aiTradeHeading": "Operación que propone el agente de IA",
     "aiTradeReader": "Ninguno: el agente de IA lo lee como una operación",
     "noAiTradeTransaction": "Ninguna todavía: la operación se registra al aprobar la propuesta del agente de IA.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Reconocer con IA",
     "tradeTitle": "Reconocer como operación con IA",
-    "tradeMessage": "La IA leerá este correo como confirmación de una operación de corretaje y propondrá la transacción de inversión que informa (cuenta, compra o venta, símbolo, participaciones y total). No se guarda nada hasta que lo apruebes.",
+    "tradeMessage": "La IA leerá este correo como confirmación de una operación de corretaje y propondrá la transacción de inversión que informa (cuenta, compra, venta, dividendo en efectivo o dividendo reinvertido, símbolo, participaciones y total). No se guarda nada hasta que lo apruebes.",
     "tradeConfirm": "Reconocer como operación",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "sin beneficiario",
@@ -1166,7 +1166,7 @@
     "inboxLink": "Abrir la bandeja de revisión de IA",
     "opened": "Se abrió el chat con el correo adjunto. Lee el mensaje y pulsa Enviar.",
     "chatPrompt": "Reconoce los productos, las cantidades y los precios del correo de pedido adjunto y desglosa mi transacción del {date} ({payee}, {amount}) por producto, con una categoría para cada uno. Toma la solicitud de revisión de IA {requestId} y envía tu propuesta para ella.",
-    "tradeChatPrompt": "Reconoce la operación del correo de confirmación del corredor adjunto: la cuenta, si es compra o venta, el símbolo, las participaciones, el total ejecutado y la fecha. Reclama la solicitud de revisión con IA {requestId} y envía la operación para ella.",
+    "tradeChatPrompt": "Reconoce la operación del correo de confirmación del corredor adjunto: la cuenta, si es una compra, una venta, un dividendo en efectivo o un dividendo reinvertido, el símbolo, las participaciones (un dividendo en efectivo puede no indicar ninguna), el total ejecutado y la fecha. Reclama la solicitud de revisión con IA {requestId} y envía la operación para ella.",
     "tradeDetachesTransaction": "Leído como operación, este correo deja de corresponder a {summary}: la operación crea su propia transacción de inversión."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Fecha: {date}",
       "parsedTotal": "Total: {total}",
       "parsedLines": "{count, plural, one {# línea} other {# líneas}}",
-      "parsedTrade": "{action, select, BUY {Compra} other {Vende}} {quantity} participaciones de {symbol}",
+      "parsedTrade": "{action, select, BUY {Compra {quantity} participaciones de {symbol}} SELL {Vende {quantity} participaciones de {symbol}} DIVIDEND {Paga un dividendo de {symbol}} REINVEST {Reinvierte un dividendo en {quantity} participaciones de {symbol}} other {Opera con {symbol}}}",
       "tradeInconsistent": "El precio no coincide con el total, así que no se aplicará automáticamente",
       "noExpectation": "Ninguna",
       "noMatch": "Sin transacción",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Compra} other {Venta}}: {quantity} participaciones de {symbol} por {total}, con fecha {date}.",
+    "summary": "{action, select, BUY {Compra: {quantity} participaciones de {symbol} por {total}, con fecha {date}.} SELL {Venta: {quantity} participaciones de {symbol} por {total}, con fecha {date}.} DIVIDEND {Dividendo de {symbol} de {total}, con fecha {date}.} REINVEST {Reinversión de un dividendo en {quantity} participaciones de {symbol} por {total}, con fecha {date}.} other {{symbol} por {total}, con fecha {date}.}}",
     "account": "Cuenta indicada en el correo: {account}",
     "priceMismatch": "El precio medio no coincide con las participaciones y el total, así que esta operación no se aplicará automáticamente.",
+    "dividendMismatch": "El importe por acción no coincide con las participaciones y el total, así que este dividendo no se aplicará automáticamente.",
+    "dividendShares": "Pagado sobre {quantity} participaciones",
+    "dividendPerShare": "Importe por acción en el correo: {price}",
     "incomplete": "El perfil no pudo leer una operación completa en este correo.",
     "totalFromPrice": "el total que implica el precio",
     "dateUnknown": "el día en que llegó el correo",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Valor: {name}",
     "proposalAccount": "Cuenta: {account}",
     "proposalPrice": "Precio: {price} por acción",
+    "proposalDividendPerShare": "Importe por acción: {price}",
     "proposalCommission": "Comisión: {commission}",
     "proposalReview": "No se registra nada hasta que lo apruebes.",
     "proposalReviewLink": "Revisarla en la bandeja",

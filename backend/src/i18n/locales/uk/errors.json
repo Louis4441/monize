@@ -161,7 +161,7 @@
     "notATradeRequest": "Цей запит на перевірку ШІ не є запитом угоди.",
     "tradeOnTradeRequest": "Поле trade відповідає лише на запит угоди.",
     "tradeDateRequired": "Для угоди потрібна дата (РРРР-ММ-ДД): листа вже немає, тож запасного дня немає.",
-    "tradeInvalid": "Для угоди потрібні accountName, action (BUY або SELL), symbol, quantity, totalAmount та, за бажанням, commission і date (РРРР-ММ-ДД).",
+    "tradeInvalid": "Для угоди потрібні accountName, action (BUY, SELL, DIVIDEND або REINVEST), symbol, quantity (необов'язково для DIVIDEND), totalAmount та, за бажанням, commission і date (РРРР-ММ-ДД).",
     "tradeSecurityAmbiguous": "«{{ symbol }}» підходить кільком вашим цінним паперам ({{ list }}). Перейменуйте один із них, щоб тікер був унікальним.",
     "tradeSecurityUnknown": "У вас немає цінного паперу з тікером «{{ symbol }}». Додайте його та обробіть лист знову.",
     "tagNamesInvalid": "Пропозиція може додати до {{ max }} тегів завдовжки від 1 до {{ length }} символів кожен, без керівних символів.",

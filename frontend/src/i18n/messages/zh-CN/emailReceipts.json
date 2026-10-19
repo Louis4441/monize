@@ -93,7 +93,7 @@
         "automatic": "检查邮箱时，对于已匹配但已批准的解析器无法完整读取的收据，会询问 AI；对于没有解析器的发件人，会起草解析器。"
       },
       "autoApplyLabel": "自动应用提议",
-      "autoApplyHelp": "默认关闭。仅当以下条件全部满足时，提议才会不经询问直接应用：已批准的配置文件读取了整封邮件；通过订单号或参考号，或通过完全一致的金额和收款人找到了交易，且只有一个候选；提议的合计精确到最小货币单位。仅当交易配置文件已批准、读取了完整的交易、价格与份数和合计相符，且您的账户中尚无相同的交易时，交易确认邮件才会不经询问直接记账。其他情况都会等待您的批准。",
+      "autoApplyHelp": "默认关闭。仅当以下条件全部满足时，提议才会不经询问直接应用：已批准的配置文件读取了整封邮件；通过订单号或参考号，或通过完全一致的金额和收款人找到了交易，且只有一个候选；提议的合计精确到最小货币单位。仅当交易配置文件已批准、读取了完整的交易、价格与份数和合计相符（只写明金额的现金股息无需核对），且您的账户中尚无相同的交易时，交易确认邮件才会不经询问直接记账。其他情况都会等待您的批准。",
       "profileLimitLabel": "将配置文件的提议计入每日 AI 上限",
       "profileLimitHelp": "默认开启：配置文件根据邮件提出的修改，与其他 AI 提议一样，计入 AI 提议更改的每日上限。如果大批已保存的邮件会耗尽该上限，请将其关闭。只有来自配置文件的提议可免计；每条提议仍需等待您的批准。"
     },
@@ -377,7 +377,7 @@
       "receipt": "订单收据",
       "trade": "证券交易",
       "receiptHelp": "读取订单确认邮件，并找到为其付款的银行交易。",
-      "tradeHelp": "读取券商的成交确认邮件，并提议其中报告的投资交易，即一笔买入或卖出。"
+      "tradeHelp": "读取券商的成交确认邮件，并提议其中报告的投资交易：一笔买入、卖出、现金股息或股息再投资。"
     },
     "trade": {
       "guardsHeading": "读取发件人的哪些邮件",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "包含其中一行的邮件会被暂缓，稍后再读取，例如部分成交。"
       },
       "fieldsHeading": "交易",
-      "fieldsHelp": "买入或卖出、代码和股数为必填，另需合计或价格。每个字段每行一个模式，按顺序尝试。",
+      "fieldsHelp": "交易类型、代码以及合计或价格为必填，除现金股息外股数也必填。交易类型从其文本读取：Dividend 或 Distribution 为现金股息，Reinvest 或 DRIP 为股息再投资，否则为 Buy 或 Sell。每个字段每行一个模式，按顺序尝试。",
       "fields": {
-        "tradeAction": "买入或卖出模式",
+        "tradeAction": "交易类型模式",
         "tradeSymbol": "代码模式",
         "tradeQuantity": "股数模式",
         "tradeTotal": "交易合计模式",
@@ -403,7 +403,7 @@
         "tradeAccount": "账户模式"
       },
       "fieldHint": "必须捕获 {capture}。示例：{example}",
-      "amountsHelp": "合计是成交金额，买入时含佣金。价格用于核对，邮件未写合计时由价格得出合计。注明货币的金额（US$、C$、USD、€）也决定交易的货币。",
+      "amountsHelp": "合计是成交金额，买入或股息再投资时含佣金；现金股息的合计是支付的金额。价格（股息为每股金额）用于核对，邮件未写合计时由价格和股数得出合计。注明货币的金额（US$、C$、USD、€）也决定交易的货币。",
       "rulesHeading": "账户规则",
       "rulesHelp": "交易记入哪个账户。规则按顺序与账户模式读取的账户文本匹配，第一个适用的规则生效；{star} 表示任意文本。带货币的规则只适用于该货币的交易，因此券商写法相同的两个账户，例如都显示为 RRSP 的 CAD RRSP 和 USD RRSP，就是文本相同、货币不同的两条规则。邮件未写账户文本时，只有文本为 {star} 的规则可以适用。其余的由默认账户处理。",
       "currencyOrder": "交易的货币按以下顺序确定：金额本身注明货币时取该货币（US$、C$、USD、€），其次是下方第一个与邮件某行匹配的货币标记，再次是您该代码证券的货币。带货币的规则从不猜测：三者都无法说明货币时，邮件会等待您处理，而不会记入任何一个账户。",
@@ -512,7 +512,7 @@
       "tag": "标签",
       "aiCategories": "AI 类别",
       "trade": "交易部分",
-      "tradeAction": "买入或卖出模式",
+      "tradeAction": "交易类型模式",
       "tradeSymbol": "代码模式",
       "tradeQuantity": "股数模式",
       "tradeTotal": "交易合计模式",
@@ -630,7 +630,7 @@
         "waitIfLine": "暂缓行",
         "reference": "参考号",
         "linkKey": "链接键",
-        "action": "买入或卖出",
+        "action": "交易类型",
         "symbol": "代码",
         "quantity": "股数",
         "price": "价格",
@@ -1008,9 +1008,9 @@
       "no_html": "此解析器读取邮件的 HTML 部分，而这封邮件没有 HTML。",
       "schema_org": "无需解析器：订单是从邮件中的结构化数据（schema.org）读取的。",
       "item_amount_missing": "某个明细没有金额，而邮件中也没有可分配给它的单一合计。",
-      "trade_no_action": "解析器在这封邮件中没有找到买入或卖出。",
+      "trade_no_action": "解析器在这封邮件中没有找到买入、卖出、股息或再投资。",
       "trade_no_symbol": "解析器在这封邮件中没有找到股票代码。",
-      "trade_no_quantity": "解析器在这封邮件中没有找到份数。",
+      "trade_no_quantity": "解析器在这封邮件中没有找到份数，而买入、卖出或股息再投资需要份数。",
       "trade_no_amount": "解析器在这封邮件中既没有找到合计，也没有找到价格。",
       "trade_no_account": "解析器无法判断这笔交易属于哪个账户。",
       "trade_exists": "你的账户中已有这笔交易，因此没有提出任何建议。",
@@ -1078,10 +1078,10 @@
       "openButton": "打开",
       "open": "打开邮件 {subject}"
     },
-    "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {买入} other {卖出}} {quantity} 股 {symbol}。",
+    "tradeTransactionSummary": "{action, select, BUY {{date} 以 {total} 买入 {quantity} 股 {symbol}。} SELL {{date} 以 {total} 卖出 {quantity} 股 {symbol}。} DIVIDEND {{date} 收到 {symbol} 的股息 {total}。} REINVEST {{date} 以 {total} 将股息再投资于 {quantity} 股 {symbol}。} other {{date} {quantity} 股 {symbol}，{total}。}}",
     "noTradeTransaction": "暂无：批准提议后会记账这笔交易，或将其关联到账本中已有的交易。",
     "candidateShares": "{quantity} 股",
-    "tradeNoCandidates": "在交易日前后一周内，没有此账户、方向和代码的可关联投资交易。如果您自己录入过这笔交易，请检查其账户和日期；否则请在审核收件箱中批准提议。",
+    "tradeNoCandidates": "在交易日前后一周内，没有此账户、交易类型和代码的可关联投资交易。如果您自己录入过这笔交易，请检查其账户和日期；否则请在审核收件箱中批准提议。",
     "aiTradeHeading": "AI 代理提议的交易",
     "aiTradeReader": "无：AI 代理将其作为交易读取",
     "noAiTradeTransaction": "暂无：批准 AI 代理的提议后会记账这笔交易。",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "用 AI 识别",
     "tradeTitle": "用 AI 识别为交易",
-    "tradeMessage": "AI 会把这封邮件当作券商的交易确认来读取，并提出它所报告的投资交易（账户、买入或卖出、股票代码、份数和合计）。在你批准之前不会保存任何内容。",
+    "tradeMessage": "AI 会把这封邮件当作券商的交易确认来读取，并提出它所报告的投资交易（账户、买入、卖出、现金股息或股息再投资、股票代码、份数和合计）。在你批准之前不会保存任何内容。",
     "tradeConfirm": "识别为交易",
     "transactionSummary": "{date}，{amount}，{payee}",
     "noPayee": "无收款人",
@@ -1166,7 +1166,7 @@
     "inboxLink": "打开 AI 审核收件箱",
     "opened": "已打开聊天并附上该邮件。请阅读消息并点击“发送”。",
     "chatPrompt": "请识别所附订单邮件中的商品、数量和价格，并将我 {date} 的交易（{payee}，{amount}）按商品拆分，并为每项指定类别。请认领 AI 审核请求 {requestId}，并为它提交你的提议。",
-    "tradeChatPrompt": "识别所附券商确认邮件中的交易：账户、是买入还是卖出、股票代码、份数、成交合计和日期。领取 AI 审核请求 {requestId} 并为它提交这笔交易。",
+    "tradeChatPrompt": "识别所附券商确认邮件中的交易：账户、是买入、卖出、现金股息还是股息再投资、股票代码、份数（现金股息可能没有写明）、成交合计和日期。领取 AI 审核请求 {requestId} 并为它提交这笔交易。",
     "tradeDetachesTransaction": "按交易读取后，此邮件不再对应 {summary}：该交易会创建自己的投资交易。"
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "日期：{date}",
       "parsedTotal": "合计：{total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
-      "parsedTrade": "{action, select, BUY {买入} other {卖出}} {quantity} 份 {symbol}",
+      "parsedTrade": "{action, select, BUY {买入 {quantity} 份 {symbol}} SELL {卖出 {quantity} 份 {symbol}} DIVIDEND {派发 {symbol} 的股息} REINVEST {将股息再投资于 {quantity} 份 {symbol}} other {交易 {symbol}}}",
       "tradeInconsistent": "价格与合计不符，因此不会自动应用",
       "noExpectation": "无",
       "noMatch": "无交易",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {买入} other {卖出}}：{quantity} 份 {symbol}，金额 {total}，日期 {date}。",
+    "summary": "{action, select, BUY {买入：{quantity} 份 {symbol}，金额 {total}，日期 {date}。} SELL {卖出：{quantity} 份 {symbol}，金额 {total}，日期 {date}。} DIVIDEND {{symbol} 的股息：金额 {total}，日期 {date}。} REINVEST {股息再投资：{quantity} 份 {symbol}，金额 {total}，日期 {date}。} other {{symbol}，金额 {total}，日期 {date}。}}",
     "account": "邮件中注明的账户：{account}",
     "priceMismatch": "平均价格与份数和合计不符，因此这笔交易不会自动应用。",
+    "dividendMismatch": "每股金额与份数和合计不符，因此这笔股息不会自动应用。",
+    "dividendShares": "按 {quantity} 份支付",
+    "dividendPerShare": "邮件中的每股金额：{price}",
     "incomplete": "解析器无法从这封邮件中读取完整的交易。",
     "totalFromPrice": "由价格推算出的合计",
     "dateUnknown": "邮件到达的当天",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "证券：{name}",
     "proposalAccount": "账户：{account}",
     "proposalPrice": "价格：每股 {price}",
+    "proposalDividendPerShare": "每股金额：{price}",
     "proposalCommission": "佣金：{commission}",
     "proposalReview": "在你批准之前不会记账。",
     "proposalReviewLink": "在收件箱中审阅",

@@ -161,7 +161,7 @@
     "notATradeRequest": "此 AI 審查請求不是交易請求。",
     "tradeOnTradeRequest": "trade 欄位只用於回應交易請求。",
     "tradeDateRequired": "交易需要日期（YYYY-MM-DD）：郵件已不存在，因此沒有可退而求其次的日期。",
-    "tradeInvalid": "交易需要 accountName、action（BUY 或 SELL）、symbol、quantity、totalAmount，以及可選的 commission 和 date（YYYY-MM-DD）。",
+    "tradeInvalid": "交易需要 accountName、action（BUY、SELL、DIVIDEND 或 REINVEST）、symbol、quantity（DIVIDEND 可選）、totalAmount，以及可選的 commission 和 date（YYYY-MM-DD）。",
     "tradeSecurityAmbiguous": "「{{ symbol }}」符合你的多個證券（{{ list }}）。請重新命名其中一個，使代號唯一。",
     "tradeSecurityUnknown": "你沒有代號為「{{ symbol }}」的證券。請先新增該證券，然後重新處理郵件。",
     "tagNamesInvalid": "一則提議最多可新增 {{ max }} 個標籤，每個標籤 1 到 {{ length }} 個字元，且不能包含控制字元。",

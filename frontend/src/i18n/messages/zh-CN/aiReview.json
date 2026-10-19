@@ -38,14 +38,14 @@
     "transactionMissing": "此交易已不存在",
     "rule": "规则：{name}",
     "manualRequest": "手动请求",
-    "trade": "{action, select, BUY {买入 {quantity} 份 {symbol}} other {卖出 {quantity} 份 {symbol}}}",
+    "trade": "{action, select, BUY {买入 {quantity} 份 {symbol}} SELL {卖出 {quantity} 份 {symbol}} DIVIDEND {{symbol} 的股息} REINVEST {将股息再投资于 {quantity} 份 {symbol}} other {{symbol} 的交易}}",
     "receiptInstruction": {
       "automatic": "根据附带的订单邮件完善此交易：按商品行拆分并为每行指定类别，或设置描述。",
       "chat": "你要求识别附带的订单邮件：按产品拆分此交易并为每项指定类别，或设置描述。",
       "categorize": "为附带订单邮件中没有被任何规则分类的每个商品指定类别，然后提议此交易的拆分或设置描述。",
       "parsed": "已保存的解析器读取了订单邮件，并为此交易提议这些类别行和此描述。",
       "trade": "已保存的解析器读取的交易确认邮件提出了这笔投资交易。批准前，请与你的券商核对账户、证券、数量和合计。",
-      "tradeChat": "你要求识别所附的交易确认：请提出它所报告的投资交易。"
+      "tradeChat": "你要求识别所附的交易确认：请提出它所报告的投资交易，即买入、卖出、现金股息或股息再投资。"
     },
     "emailReceipt": "邮件收据：来自 {sender} 的 {subject}",
     "emailReceiptMissing": "邮件收据（该邮件已被删除）",

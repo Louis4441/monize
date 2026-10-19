@@ -93,7 +93,7 @@
         "automatic": "Pemeriksaan meminta AI menangani struk yang cocok yang tidak dapat dibaca lengkap oleh profil yang disetujui mana pun, dan membuat draf profil untuk pengirim yang belum memilikinya."
       },
       "autoApplyLabel": "Terapkan usulan secara otomatis",
-      "autoApplyHelp": "Nonaktif secara default. Usulan diterapkan tanpa bertanya hanya jika semua hal berikut terpenuhi: profil yang disetujui membaca seluruh surel, transaksi ditemukan lewat nomor pesanan atau referensi, atau lewat jumlah dan penerima yang persis sama, dengan satu kandidat saja, dan usulan itu pas sampai ke sen. Konfirmasi perdagangan dicatat tanpa bertanya hanya jika profil perdagangannya sudah disetujui, profil itu membaca seluruh perdagangan, harganya cocok dengan jumlah saham dan total, dan akun Anda belum memuat perdagangan yang sama. Semua yang lain menunggu persetujuan Anda.",
+      "autoApplyHelp": "Nonaktif secara default. Usulan diterapkan tanpa bertanya hanya jika semua hal berikut terpenuhi: profil yang disetujui membaca seluruh surel, transaksi ditemukan lewat nomor pesanan atau referensi, atau lewat jumlah dan penerima yang persis sama, dengan satu kandidat saja, dan usulan itu pas sampai ke sen. Konfirmasi perdagangan dicatat tanpa bertanya hanya jika profil perdagangannya sudah disetujui, profil itu membaca seluruh perdagangan, harganya cocok dengan jumlah saham dan total (dividen tunai yang hanya menyebut jumlahnya tidak memiliki apa pun untuk diperiksa), dan akun Anda belum memuat perdagangan yang sama. Semua yang lain menunggu persetujuan Anda.",
       "profileLimitLabel": "Hitung usulan profil dalam batas harian AI",
       "profileLimitHelp": "Aktif secara default: perubahan yang diusulkan profil dari sebuah surel dihitung dalam batas harian perubahan yang diusulkan AI, seperti usulan AI lainnya. Nonaktifkan bila satu kelompok besar surel tersimpan akan menghabiskan batas. Hanya usulan dari profil yang dikecualikan; setiap usulan tetap menunggu persetujuan Anda."
     },
@@ -377,7 +377,7 @@
       "receipt": "Tanda terima pesanan",
       "trade": "Transaksi pialang",
       "receiptHelp": "Membaca konfirmasi pesanan dan menemukan transaksi bank yang membayarnya.",
-      "tradeHelp": "Membaca konfirmasi transaksi dari pialang dan mengusulkan transaksi investasi yang dilaporkannya, pembelian atau penjualan."
+      "tradeHelp": "Membaca konfirmasi transaksi dari pialang dan mengusulkan transaksi investasi yang dilaporkannya: pembelian, penjualan, dividen tunai, atau dividen yang diinvestasikan kembali."
     },
     "trade": {
       "guardsHeading": "Surel pengirim mana yang dibacanya",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Surel dengan salah satu baris ini ditahan dan dibaca lagi nanti, misalnya eksekusi sebagian."
       },
       "fieldsHeading": "Transaksinya",
-      "fieldsHelp": "Beli atau jual, kode saham, dan jumlah saham wajib ada, beserta total atau harga. Setiap kolom menerima pola, satu per baris, dicoba berurutan.",
+      "fieldsHelp": "Jenis transaksi, kode saham, dan total atau harga wajib ada, begitu juga jumlah saham kecuali untuk dividen tunai. Jenisnya dibaca dari teksnya: Dividend atau Distribution adalah dividen tunai, Reinvest atau DRIP dividen yang diinvestasikan kembali, selain itu Buy atau Sell. Setiap kolom menerima pola, satu per baris, dicoba berurutan.",
       "fields": {
-        "tradeAction": "Pola beli atau jual",
+        "tradeAction": "Pola jenis transaksi",
         "tradeSymbol": "Pola kode saham",
         "tradeQuantity": "Pola jumlah saham",
         "tradeTotal": "Pola total transaksi",
@@ -403,7 +403,7 @@
         "tradeAccount": "Pola akun"
       },
       "fieldHint": "Harus menangkap {capture}. Contoh: {example}",
-      "amountsHelp": "Total adalah jumlah yang dieksekusi, termasuk komisi untuk pembelian. Harga adalah pemeriksaan silang, dan memberi total jika surel tidak menyebutkannya. Jumlah yang menyebut mata uangnya (US$, C$, USD, €) juga menetapkan mata uang transaksi.",
+      "amountsHelp": "Total adalah jumlah yang dieksekusi, termasuk komisi untuk pembelian atau dividen yang diinvestasikan kembali; untuk dividen tunai, total adalah jumlah yang dibayarkan. Harga (untuk dividen, jumlah per saham) adalah pemeriksaan silang, dan bersama jumlah saham memberi total jika surel tidak menyebutkannya. Jumlah yang menyebut mata uangnya (US$, C$, USD, €) juga menetapkan mata uang transaksi.",
       "rulesHeading": "Aturan akun",
       "rulesHelp": "Ke akun mana transaksi dicatat. Aturan dicoba berurutan terhadap teks akun yang dibaca pola akun, dan aturan pertama yang berlaku menang; {star} adalah teks apa pun. Aturan dengan mata uang hanya berlaku untuk transaksi dalam mata uang itu, jadi dua akun yang ditulis pialang dengan cara sama, seperti RRSP CAD dan RRSP USD yang sama-sama tampil sebagai RRSP, adalah dua aturan dengan teks sama dan mata uang berbeda. Jika surel tidak mencantumkan teks akun, hanya aturan dengan teks {star} yang bisa berlaku. Akun bawaan menangani sisanya.",
       "currencyOrder": "Mata uang transaksi diambil, berurutan: dari jumlahnya sendiri jika menyebut satu (US$, C$, USD, €), lalu dari penanda mata uang pertama di bawah yang cocok dengan baris surel, lalu dari mata uang sekuritas Anda untuk kode saham itu. Aturan dengan mata uang tidak pernah menebak: jika tidak satu pun dari ketiganya menyebut mata uang, surel menunggu Anda alih-alih dicatat ke salah satu akun.",
@@ -512,7 +512,7 @@
       "tag": "Tag",
       "aiCategories": "Kategori AI",
       "trade": "Bagian transaksi",
-      "tradeAction": "Pola beli atau jual",
+      "tradeAction": "Pola jenis transaksi",
       "tradeSymbol": "Pola kode saham",
       "tradeQuantity": "Pola jumlah saham",
       "tradeTotal": "Pola total transaksi",
@@ -630,7 +630,7 @@
         "waitIfLine": "Baris tunggu",
         "reference": "Referensi",
         "linkKey": "Kunci tautan",
-        "action": "Beli atau jual",
+        "action": "Jenis transaksi",
         "symbol": "Kode",
         "quantity": "Saham",
         "price": "Harga",
@@ -1008,9 +1008,9 @@
       "no_html": "Profil ini membaca bagian HTML surel, dan surel ini tidak memilikinya.",
       "schema_org": "Tidak perlu profil: pesanan dibaca dari data terstruktur (schema.org) di surel.",
       "item_amount_missing": "Sebuah item tidak memiliki jumlah, dan surel tidak memiliki total tunggal untuk diberikan kepadanya.",
-      "trade_no_action": "Profil tidak menemukan pembelian atau penjualan di surel ini.",
+      "trade_no_action": "Profil tidak menemukan pembelian, penjualan, dividen, atau reinvestasi di surel ini.",
       "trade_no_symbol": "Profil tidak menemukan simbol ticker di surel ini.",
-      "trade_no_quantity": "Profil tidak menemukan jumlah saham di surel ini.",
+      "trade_no_quantity": "Profil tidak menemukan jumlah saham di surel ini, yang diperlukan untuk pembelian, penjualan, atau dividen yang diinvestasikan kembali.",
       "trade_no_amount": "Profil tidak menemukan total maupun harga di surel ini.",
       "trade_no_account": "Profil tidak dapat menentukan akun mana yang dimaksud perdagangan ini.",
       "trade_exists": "Akun Anda sudah memuat perdagangan ini, jadi tidak ada yang diusulkan.",
@@ -1078,10 +1078,10 @@
       "openButton": "Buka",
       "open": "Buka email {subject}"
     },
-    "tradeTransactionSummary": "{action, select, BUY {Membeli} other {Menjual}} {quantity} {symbol} seharga {total} pada {date}.",
+    "tradeTransactionSummary": "{action, select, BUY {Membeli {quantity} {symbol} seharga {total} pada {date}.} SELL {Menjual {quantity} {symbol} seharga {total} pada {date}.} DIVIDEND {Dividen dari {symbol} sebesar {total} pada {date}.} REINVEST {Menginvestasikan kembali dividen ke {quantity} {symbol} seharga {total} pada {date}.} other {{quantity} {symbol} seharga {total} pada {date}.}}",
     "noTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulannya, atau ditautkan ke transaksi yang sudah ada di buku besar Anda.",
     "candidateShares": "{quantity} saham",
-    "tradeNoCandidates": "Tidak ada transaksi investasi dengan akun, arah, dan kode ini dalam seminggu dari hari transaksi yang bebas untuk ditautkan. Jika Anda mencatatnya sendiri, periksa akun dan tanggalnya; jika tidak, setujui usulannya di kotak tinjauan.",
+    "tradeNoCandidates": "Tidak ada transaksi investasi dengan akun, jenis transaksi, dan kode ini dalam seminggu dari hari transaksi yang bebas untuk ditautkan. Jika Anda mencatatnya sendiri, periksa akun dan tanggalnya; jika tidak, setujui usulannya di kotak tinjauan.",
     "aiTradeHeading": "Transaksi yang diusulkan agen AI",
     "aiTradeReader": "Tidak ada: agen AI membacanya sebagai transaksi",
     "noAiTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulan agen AI.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Kenali dengan AI",
     "tradeTitle": "Kenali sebagai perdagangan dengan AI",
-    "tradeMessage": "AI akan membaca surel ini sebagai konfirmasi perdagangan pialang dan mengusulkan transaksi investasi yang dilaporkannya (akun, beli atau jual, ticker, saham, dan total). Tidak ada yang disimpan sampai Anda menyetujuinya.",
+    "tradeMessage": "AI akan membaca surel ini sebagai konfirmasi perdagangan pialang dan mengusulkan transaksi investasi yang dilaporkannya (akun, beli, jual, dividen tunai, atau dividen yang diinvestasikan kembali, ticker, saham, dan total). Tidak ada yang disimpan sampai Anda menyetujuinya.",
     "tradeConfirm": "Kenali sebagai perdagangan",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "tanpa penerima",
@@ -1166,7 +1166,7 @@
     "inboxLink": "Buka kotak masuk peninjauan AI",
     "opened": "Obrolan dibuka dengan surel terlampir. Baca pesannya lalu tekan Kirim.",
     "chatPrompt": "Kenali produk, jumlah, dan harga dalam surel pesanan terlampir, lalu bagi transaksi saya tanggal {date} ({payee}, {amount}) per produk dengan satu kategori untuk masing-masing. Ambil permintaan peninjauan AI {requestId} dan kirimkan usulan Anda untuk permintaan itu.",
-    "tradeChatPrompt": "Kenali perdagangan di surel konfirmasi pialang terlampir: akun, apakah beli atau jual, ticker, saham, total yang dieksekusi, dan tanggal. Ambil permintaan tinjauan AI {requestId} dan ajukan perdagangan untuknya.",
+    "tradeChatPrompt": "Kenali perdagangan di surel konfirmasi pialang terlampir: akun, apakah beli, jual, dividen tunai, atau dividen yang diinvestasikan kembali, ticker, saham (dividen tunai mungkin tidak menyebutkannya), total yang dieksekusi, dan tanggal. Ambil permintaan tinjauan AI {requestId} dan ajukan perdagangan untuknya.",
     "tradeDetachesTransaction": "Jika dibaca sebagai transaksi, email ini tidak lagi mewakili {summary}: transaksi itu membuat transaksi investasinya sendiri."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Tanggal: {date}",
       "parsedTotal": "Total: {total}",
       "parsedLines": "{count, plural, one {# baris} other {# baris}}",
-      "parsedTrade": "{action, select, BUY {Membeli} other {Menjual}} {quantity} saham {symbol}",
+      "parsedTrade": "{action, select, BUY {Membeli {quantity} saham {symbol}} SELL {Menjual {quantity} saham {symbol}} DIVIDEND {Membayar dividen dari {symbol}} REINVEST {Menginvestasikan kembali dividen ke {quantity} saham {symbol}} other {Memperdagangkan {symbol}}}",
       "tradeInconsistent": "Harga tidak cocok dengan total, jadi tidak akan diterapkan otomatis",
       "noExpectation": "Tidak ada",
       "noMatch": "Tidak ada transaksi",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Pembelian} other {Penjualan}}: {quantity} saham {symbol} senilai {total}, bertanggal {date}.",
+    "summary": "{action, select, BUY {Pembelian: {quantity} saham {symbol} senilai {total}, bertanggal {date}.} SELL {Penjualan: {quantity} saham {symbol} senilai {total}, bertanggal {date}.} DIVIDEND {Dividen dari {symbol} sebesar {total}, bertanggal {date}.} REINVEST {Reinvestasi dividen ke {quantity} saham {symbol} senilai {total}, bertanggal {date}.} other {{symbol} senilai {total}, bertanggal {date}.}}",
     "account": "Akun yang disebut di surel: {account}",
     "priceMismatch": "Harga rata-rata tidak cocok dengan jumlah saham dan total, sehingga perdagangan ini tidak akan diterapkan otomatis.",
+    "dividendMismatch": "Jumlah per saham tidak cocok dengan jumlah saham dan total, sehingga dividen ini tidak akan diterapkan otomatis.",
+    "dividendShares": "Dibayar atas {quantity} saham",
+    "dividendPerShare": "Jumlah per saham di surel: {price}",
     "incomplete": "Profil tidak dapat membaca perdagangan yang lengkap dari surel ini.",
     "totalFromPrice": "total yang tersirat dari harga",
     "dateUnknown": "hari surel diterima",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Efek: {name}",
     "proposalAccount": "Akun: {account}",
     "proposalPrice": "Harga: {price} per saham",
+    "proposalDividendPerShare": "Jumlah per saham: {price}",
     "proposalCommission": "Komisi: {commission}",
     "proposalReview": "Tidak ada yang dicatat sebelum Anda menyetujuinya.",
     "proposalReviewLink": "Tinjau di kotak masuk",

@@ -93,7 +93,7 @@
         "automatic": "承認済みのプロフィールでは完全に読み取れなかった一致済みレシートについて確認時にAIに問い合わせ、プロフィールがない送信者にはプロフィールの下書きを作成します。"
       },
       "autoApplyLabel": "提案を自動で適用",
-      "autoApplyHelp": "デフォルトではオフです。提案が確認なしで適用されるのは、次のすべてに当てはまる場合だけです: 承認済みのプロフィールがメール全体を読み取った、取引が注文番号または参照番号、あるいは金額と取引先の完全一致で見つかった、候補が1件だけである、提案が端数まで合計と一致している。取引確認メールが確認なしで記帳されるのは、その取引プロフィールが承認済みで、取引全体を読み取り、価格が数量と合計金額に一致し、同じ取引がまだ口座に記録されていない場合だけです。それ以外はすべて、あなたの承認を待ちます。",
+      "autoApplyHelp": "デフォルトではオフです。提案が確認なしで適用されるのは、次のすべてに当てはまる場合だけです: 承認済みのプロフィールがメール全体を読み取った、取引が注文番号または参照番号、あるいは金額と取引先の完全一致で見つかった、候補が1件だけである、提案が端数まで合計と一致している。取引確認メールが確認なしで記帳されるのは、その取引プロフィールが承認済みで、取引全体を読み取り、価格が数量と合計金額に一致し (金額だけを記載した現金配当には照合するものがありません)、同じ取引がまだ口座に記録されていない場合だけです。それ以外はすべて、あなたの承認を待ちます。",
       "profileLimitLabel": "プロフィールの提案を1日のAI上限に含める",
       "profileLimitHelp": "デフォルトでオンです。プロフィールがメールから提案した編集は、他のAI提案と同様に、AIが提案する変更の1日あたりの上限に含まれます。保存済みメールの大量のバッチで上限を使い切ってしまう場合はオフにしてください。対象外となるのはプロフィールからの提案のみで、すべての提案は引き続きあなたの承認を待ちます。"
     },
@@ -377,7 +377,7 @@
       "receipt": "注文の領収書",
       "trade": "証券取引",
       "receiptHelp": "注文確認メールを読み取り、その支払いに使われた銀行取引を見つけます。",
-      "tradeHelp": "証券会社の約定通知を読み取り、そこに記載された投資取引 (買いまたは売り) を提案します。"
+      "tradeHelp": "証券会社の約定通知を読み取り、そこに記載された投資取引 (買い、売り、現金配当、または配当再投資) を提案します。"
     },
     "trade": {
       "guardsHeading": "送信者のどのメールを読むか",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "これらの行のいずれかがあるメールは保留され、後で再度読まれます (一部約定など)。"
       },
       "fieldsHeading": "取引",
-      "fieldsHelp": "売買の区別、銘柄コード、株数は必須で、合計または価格も必要です。各欄にはパターンを 1 行に 1 つずつ書き、順に試されます。",
+      "fieldsHelp": "取引区分、銘柄コード、合計または価格は必須で、現金配当以外では株数も必須です。取引区分はその文字列から読み取ります: Dividend または Distribution は現金配当、Reinvest または DRIP は配当再投資、それ以外は Buy または Sell です。各欄にはパターンを 1 行に 1 つずつ書き、順に試されます。",
       "fields": {
-        "tradeAction": "売買のパターン",
+        "tradeAction": "取引区分のパターン",
         "tradeSymbol": "銘柄コードのパターン",
         "tradeQuantity": "株数のパターン",
         "tradeTotal": "取引合計のパターン",
@@ -403,7 +403,7 @@
         "tradeAccount": "口座のパターン"
       },
       "fieldHint": "{capture} を取り込む必要があります。例: {example}",
-      "amountsHelp": "合計は約定金額で、買いの場合は手数料を含みます。価格は照合用で、メールに合計がないときは価格から合計を求めます。通貨を示す金額 (US$、C$、USD、€) は取引の通貨も決めます。",
+      "amountsHelp": "合計は約定金額で、買いと配当再投資の場合は手数料を含みます。現金配当の場合は支払われた金額です。価格 (配当の場合は 1 株あたりの金額) は照合用で、メールに合計がないときは株数と価格から合計を求めます。通貨を示す金額 (US$、C$、USD、€) は取引の通貨も決めます。",
       "rulesHeading": "口座のルール",
       "rulesHelp": "取引をどの口座に記帳するか。ルールは口座のパターンが読み取った口座テキストに対して順に試され、最初に当てはまったルールが採用されます。{star} は任意のテキストです。通貨付きのルールはその通貨の取引にだけ当てはまるため、証券会社が同じように表記する 2 つの口座 (どちらも RRSP と表示される CAD の RRSP と USD の RRSP など) は、テキストが同じで通貨が異なる 2 つのルールになります。メールに口座テキストがない場合、当てはまるのはテキストが {star} のルールだけです。残りは既定の口座が受け持ちます。",
       "currencyOrder": "取引の通貨は次の順に決まります: 金額自体が通貨を示していればそれ (US$、C$、USD、€)、次にメールの行に一致する下の最初の通貨マーカー、次にその銘柄コードのあなたの証券の通貨。通貨付きのルールは推測しません。3 つのどれからも通貨が分からない場合、メールはどちらの口座にも記帳されず、あなたの確認を待ちます。",
@@ -512,7 +512,7 @@
       "tag": "タグ",
       "aiCategories": "AIカテゴリ",
       "trade": "取引のセクション",
-      "tradeAction": "売買のパターン",
+      "tradeAction": "取引区分のパターン",
       "tradeSymbol": "銘柄コードのパターン",
       "tradeQuantity": "株数のパターン",
       "tradeTotal": "取引合計のパターン",
@@ -630,7 +630,7 @@
         "waitIfLine": "保留にする行",
         "reference": "参照",
         "linkKey": "リンクキー",
-        "action": "売買区分",
+        "action": "取引区分",
         "symbol": "銘柄コード",
         "quantity": "株数",
         "price": "価格",
@@ -1008,9 +1008,9 @@
       "no_html": "このプロフィールはメールのHTML部分を読み取りますが、このメールにはHTML部分がありません。",
       "schema_org": "プロフィールは不要でした。注文はメール内の構造化データ (schema.org) から読み取られました。",
       "item_amount_missing": "明細に金額がなく、メールにも割り当てられる単一の合計がありません。",
-      "trade_no_action": "プロフィールはこのメールで購入も売却も見つけられませんでした。",
+      "trade_no_action": "プロフィールはこのメールで購入、売却、配当、再投資のいずれも見つけられませんでした。",
       "trade_no_symbol": "プロフィールはこのメールでティッカーシンボルを見つけられませんでした。",
-      "trade_no_quantity": "プロフィールはこのメールで数量を見つけられませんでした。",
+      "trade_no_quantity": "プロフィールはこのメールで数量を見つけられませんでした。購入、売却、配当再投資には数量が必要です。",
       "trade_no_amount": "プロフィールはこのメールで合計も価格も見つけられませんでした。",
       "trade_no_account": "プロフィールは、この取引がどの口座のものか判断できませんでした。",
       "trade_exists": "この取引はすでに口座に記録されているため、何も提案されませんでした。",
@@ -1078,10 +1078,10 @@
       "openButton": "開く",
       "open": "メール {subject} を開く"
     },
-    "tradeTransactionSummary": "{date} に {symbol} を {quantity} 株、{total} で{action, select, BUY {購入} other {売却}}。",
+    "tradeTransactionSummary": "{action, select, BUY {{date} に {symbol} を {quantity} 株、{total} で購入。} SELL {{date} に {symbol} を {quantity} 株、{total} で売却。} DIVIDEND {{date} に {symbol} から {total} の配当。} REINVEST {{date} に配当を {symbol} {quantity} 株に {total} で再投資。} other {{date} に {symbol} を {quantity} 株、{total}。}}",
     "noTradeTransaction": "まだありません。提案を承認すると記帳されるか、台帳にある既存の取引に紐付けられます。",
     "candidateShares": "{quantity} 株",
-    "tradeNoCandidates": "取引日の前後1週間以内に、この口座・売買区分・銘柄コードで紐付けられる投資取引はありません。自分で入力した場合は口座と日付を確認してください。そうでなければ、レビュー受信箱で提案を承認してください。",
+    "tradeNoCandidates": "取引日の前後1週間以内に、この口座・取引区分・銘柄コードで紐付けられる投資取引はありません。自分で入力した場合は口座と日付を確認してください。そうでなければ、レビュー受信箱で提案を承認してください。",
     "aiTradeHeading": "AIエージェントが提案する取引",
     "aiTradeReader": "なし: AIエージェントが取引として読み取ります",
     "noAiTradeTransaction": "まだありません。AIエージェントの提案を承認すると記帳されます。",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "AIで認識",
     "tradeTitle": "AIで取引として認識",
-    "tradeMessage": "AIはこのメールを証券会社の取引確認として読み取り、報告されている投資取引(口座、購入か売却か、ティッカー、数量、合計金額)を提案します。承認するまで何も保存されません。",
+    "tradeMessage": "AIはこのメールを証券会社の取引確認として読み取り、報告されている投資取引(口座、購入・売却・現金配当・配当再投資のいずれか、ティッカー、数量、合計金額)を提案します。承認するまで何も保存されません。",
     "tradeConfirm": "取引として認識",
     "transactionSummary": "{date}、{amount}、{payee}",
     "noPayee": "支払先なし",
@@ -1166,7 +1166,7 @@
     "inboxLink": "AIレビュー受信箱を開く",
     "opened": "メールを添付してチャットを開きました。メッセージを確認して送信を押してください。",
     "chatPrompt": "添付された注文メールの商品、数量、価格を認識し、{date} の私の取引 ({payee}、{amount}) を、それぞれにカテゴリを付けて商品ごとに分割してください。AIレビュー依頼 {requestId} を引き受け、その提案を送信してください。",
-    "tradeChatPrompt": "添付の証券会社の確認メールにある取引を認識してください:口座、購入か売却か、ティッカー、数量、約定合計金額、日付。AIレビューリクエスト{requestId}を受け取り、その取引を提出してください。",
+    "tradeChatPrompt": "添付の証券会社の確認メールにある取引を認識してください:口座、購入・売却・現金配当・配当再投資のいずれか、ティッカー、数量 (現金配当では記載がない場合があります)、約定合計金額、日付。AIレビューリクエスト{requestId}を受け取り、その取引を提出してください。",
     "tradeDetachesTransaction": "取引として読み取ると、このメールは {summary} に対応しなくなります。取引は独自の投資取引を作成します。"
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "日付: {date}",
       "parsedTotal": "合計: {total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
-      "parsedTrade": "{action, select, BUY {購入} other {売却}}: {symbol} × {quantity}",
+      "parsedTrade": "{action, select, BUY {購入: {symbol} × {quantity}} SELL {売却: {symbol} × {quantity}} DIVIDEND {{symbol} の配当} REINVEST {配当再投資: {symbol} × {quantity}} other {取引: {symbol}}}",
       "tradeInconsistent": "価格が合計金額と一致しないため、自動的には適用されません",
       "noExpectation": "なし",
       "noMatch": "取引なし",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {購入} other {売却}}: {symbol} × {quantity}、{total}、日付 {date}。",
+    "summary": "{action, select, BUY {購入: {symbol} × {quantity}、{total}、日付 {date}。} SELL {売却: {symbol} × {quantity}、{total}、日付 {date}。} DIVIDEND {{symbol} の配当: {total}、日付 {date}。} REINVEST {配当再投資: {symbol} × {quantity}、{total}、日付 {date}。} other {{symbol}、{total}、日付 {date}。}}",
     "account": "メールに記載の口座: {account}",
     "priceMismatch": "平均価格が数量と合計金額に一致しないため、この取引は自動的には適用されません。",
+    "dividendMismatch": "1株あたりの金額が数量と合計金額に一致しないため、この配当は自動的には適用されません。",
+    "dividendShares": "{quantity} 株に対する支払い",
+    "dividendPerShare": "メールに記載の1株あたりの金額: {price}",
     "incomplete": "プロフィールはこのメールから完全な取引を読み取れませんでした。",
     "totalFromPrice": "価格から求めた合計",
     "dateUnknown": "メールが届いた日",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "銘柄: {name}",
     "proposalAccount": "口座: {account}",
     "proposalPrice": "価格: 1株あたり {price}",
+    "proposalDividendPerShare": "1株あたりの金額: {price}",
     "proposalCommission": "手数料: {commission}",
     "proposalReview": "承認するまで何も記帳されません。",
     "proposalReviewLink": "受信箱で確認",
