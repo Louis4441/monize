@@ -121,7 +121,7 @@ function OutcomeLabel({ outcome }: { outcome: ParserPreviewOutcome }) {
 function ReasonLabel({ reason }: { reason: string }) {
   const t = useTranslations('emailReceipts.parsed.reasons');
   const tTrade = useTranslations('emailReceipts.detail.reasons');
-  if (TRADE_REASONS.includes(reason)) return <>{tTrade(reason as 'trade_no_action')}</>;
+  if (TRADE_REASONS.includes(reason) || reason === 'no_link_key') return <>{tTrade(reason as 'trade_no_action' | 'no_link_key')}</>;
   const known = (PARSED_RECEIPT_REASONS as readonly string[]).includes(reason);
   return <>{known ? t(reason as ParsedReceiptReason) : reason}</>;
 }

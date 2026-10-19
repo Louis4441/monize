@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/Badge';
+import { ReceiptPartsTable, type ReceiptPartRow } from '@/components/email-receipts/ReceiptPartsTable';
 import { TABLE_BODY_CLASS, TABLE_CLASS, Th, Td } from '@/components/ui/Table';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { fromReceiptUnits } from '@/lib/email-receipts-format';
@@ -18,6 +19,8 @@ interface ParsedReceiptViewProps {
    * says so instead of calling every category unknown.
    */
   categoryLabels: ReadonlyMap<string, string> | null;
+  /** The parts to list instead of `parsed.links` (a test names the component each one found). */
+  parts?: readonly ReceiptPartRow[];
 }
 
 /**
@@ -29,9 +32,11 @@ interface ParsedReceiptViewProps {
  * state is `null` and renders as "not found", never as a zero that would read
  * as a stated free shipping.
  */
-export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: ParsedReceiptViewProps) {
+export function ParsedReceiptView({ parsed, currencyCode, categoryLabels, parts: partsOverride }: ParsedReceiptViewProps) {
   const t = useTranslations('emailReceipts.parsed');
   const { formatCurrency } = useNumberFormat();
+
+  const parts = partsOverride ?? parsed.links;
 
   const money = (units: number | null) =>
     units === null ? (
@@ -60,6 +65,8 @@ export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: Pars
     ...(parsed.payee ? [{ key: 'payee', label: t('payee'), value: parsed.payee }] : []),
     // What the profile's `reference` field read: the identifier the bank operation should carry.
     ...(parsed.reference ? [{ key: 'reference', label: t('reference'), value: parsed.reference }] : []),
+    // A component (a purchase email waiting for its settlement): the key that ties it to one.
+    ...(parsed.linkKey ? [{ key: 'linkKey', label: t('linkKey'), value: parsed.linkKey }] : []),
   ];
 
   return (
@@ -93,12 +100,22 @@ export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: Pars
             <tbody className={TABLE_BODY_CLASS}>
               {parsed.items.map((item, index) => (
                 <tr key={`${index}-${item.name}`}>
-                  <Td className="px-2 sm:px-4 break-words">{item.name}</Td>
+                  <Td className="px-2 sm:px-4 break-words">
+                    {item.name}
+                    {item.instalment ? ` (${item.instalment})` : ''}
+                    {/* A joined component's shipping, fee or discount line says what it is. */}
+                    {item.kind !== undefined && item.kind !== 'item' && (
+                      <Badge variant="gray" className="ml-2">
+                        {t(`kinds.${item.kind}`)}
+                      </Badge>
+                    )}
+                  </Td>
                   <Td align="right" className="px-2 sm:px-4 whitespace-nowrap">
                     {item.qty}
                   </Td>
                   <Td align="right" className="px-2 sm:px-4 whitespace-nowrap">
-                    {money(item.amount)}
+                    {/* A discount line holds a non-negative amount that counts against the total. */}
+                    {money(item.kind === 'discount' && item.amount !== 0 ? -item.amount : item.amount)}
                   </Td>
                   <Td className="px-2 sm:px-4">
                     {category(item.categoryId)}
@@ -115,6 +132,8 @@ export function ParsedReceiptView({ parsed, currencyCode, categoryLabels }: Pars
           </table>
         </div>
       )}
+
+      {parts !== undefined && parts.length > 0 && <ReceiptPartsTable parts={parts} currencyCode={currencyCode} />}
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Badge variant={parsed.complete ? 'green' : 'amber'}>

@@ -150,18 +150,18 @@ describe("EmailReceiptParsersController", () => {
     const ids = (n: number) =>
       Array.from(
         { length: n },
-        (_, i) => `0b9c6b1e-0f3a-4a55-9d57-0c5d3d9f10${i}0`,
+        (_, i) => `0b9c6b1e-0f3a-4a55-9d57-0c5d3d9f${1000 + i}`,
       );
 
-    it("accepts one to five distinct uuids", async () => {
+    it("accepts one to 25 distinct uuids", async () => {
       expect(await check({ receiptIds: [U1] })).toHaveLength(0);
       expect(await check({ receiptIds: [U1, U2] })).toHaveLength(0);
-      expect(await check({ receiptIds: ids(5) })).toHaveLength(0);
+      expect(await check({ receiptIds: ids(25) })).toHaveLength(0);
     });
 
     it.each([
       ["none", []],
-      ["six", ids(6)],
+      ["26", ids(26)],
       ["a duplicate", [U1, U1]],
       ["a non-uuid", ["not-a-uuid"]],
       ["a non-string", [42]],

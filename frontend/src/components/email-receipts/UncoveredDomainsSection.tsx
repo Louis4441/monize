@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { LinkedProfilesHint } from '@/components/email-receipts/LinkedProfilesHint';
 import { SenderDomainCloud } from '@/components/email-receipts/SenderDomainCloud';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -18,6 +19,8 @@ interface UncoveredDomainsSectionProps {
   /** Bumped by the parent to read the list again (a wizard finished). */
   refreshKey?: number;
   disabled?: boolean;
+  /** Opens the Emails tab, where linked profiles start from a selection. */
+  onOpenEmails?: () => void;
 }
 
 /**
@@ -25,7 +28,7 @@ interface UncoveredDomainsSectionProps {
  * approved profile covers, as the same cloud the Emails tab filters with. `domains
  * === null` is loading or failed, never "every domain is covered".
  */
-export function UncoveredDomainsSection({ onSelect, refreshKey = 0, disabled = false }: UncoveredDomainsSectionProps) {
+export function UncoveredDomainsSection({ onSelect, refreshKey = 0, disabled = false, onOpenEmails }: UncoveredDomainsSectionProps) {
   const t = useTranslations('emailReceipts.profileWizard.uncovered');
   const [domains, setDomains] = useState<UncoveredDomain[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -65,6 +68,7 @@ export function UncoveredDomainsSection({ onSelect, refreshKey = 0, disabled = f
         {t('heading')}
       </h2>
       <p className="text-sm text-gray-700 dark:text-gray-300">{t('help')}</p>
+      <LinkedProfilesHint variant="profiles" onOpenEmails={onOpenEmails} />
       {failed ? (
         <div role="alert" className="space-y-2">
           <p className="text-sm text-red-600 dark:text-red-400">{t('error')}</p>

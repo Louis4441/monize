@@ -1622,6 +1622,8 @@ export class ToolExecutorService {
           samples: input.samples as
             Array<{ receiptId: string; transactionId?: string }> | undefined,
           payeeName: input.payeeName as string | undefined,
+          componentDrafts: input.componentDrafts as
+            Array<{ definition: unknown; fromDomains: string[] }> | undefined,
         });
         return {
           data: tested,

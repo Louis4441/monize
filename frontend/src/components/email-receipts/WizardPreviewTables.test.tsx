@@ -165,3 +165,23 @@ describe('WizardPreviewTables of a trade profile', () => {
     expect(screen.getByText('Account: unknown')).toBeInTheDocument();
   });
 });
+
+describe('WizardPreviewTables of a component profile', () => {
+  it('labels a purchase email as waiting for its repayment, and names a missing link key', () => {
+    render(
+      <WizardPreviewTables
+        kind="receipt"
+        result={result({
+          others: [
+            item({ subject: 'Order A', outcome: 'component', trade: null }),
+            item({ receiptId: 'r-2', subject: 'Order B', outcome: 'parse_failed', statusReason: 'no_link_key', trade: null }),
+          ],
+        })}
+      />,
+    );
+    expect(within(screen.getByRole('row', { name: /Order A/ })).getByText('Purchase email (waits for repayment)')).toBeInTheDocument();
+    const failed = screen.getByRole('row', { name: /Order B/ });
+    expect(within(failed).getByText('Could not be read')).toBeInTheDocument();
+    expect(within(failed).getByText(/holds no link key/)).toBeInTheDocument();
+  });
+});

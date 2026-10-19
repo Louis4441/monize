@@ -1,4 +1,8 @@
+import { MAX_AI_REVIEW_INSTRUCTION_LENGTH } from "../../ai-review/ai-review-request.entity";
 import {
+  RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION,
+  RECEIPT_PARSER_DRAFT_INSTRUCTION,
+  RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION,
   buildWizardParserDraftInstruction,
   type WizardInstructionSample,
 } from "./parser-draft-instruction";
@@ -170,5 +174,36 @@ describe("buildWizardParserDraftInstruction of trade confirmations", () => {
     expect(text).not.toContain("tx:");
     expect(text).not.toContain("samples of receiptId and transactionId");
     expect(text.length).toBeLessThanOrEqual(1000);
+  });
+});
+
+describe("the fixed draft instructions", () => {
+  it.each([
+    ["one sender", RECEIPT_PARSER_DRAFT_INSTRUCTION],
+    ["a trade", RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION],
+    ["several senders", RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION],
+  ])(
+    "keeps the instruction for %s inside the column's 1000 characters",
+    (_n, text) => {
+      expect(text.length).toBeGreaterThan(0);
+      expect(text.length).toBeLessThanOrEqual(MAX_AI_REVIEW_INSTRUCTION_LENGTH);
+    },
+  );
+
+  it("tells an agent with several senders to decide per sender, test with componentDrafts and save every draft, and calls the emails data", () => {
+    const text = RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION;
+    for (const word of [
+      "component",
+      "settlement",
+      "standalone",
+      "linkKey",
+      "link.fromDomains",
+      "componentDrafts",
+      "one profile per sender",
+      "save every draft",
+      "data, not instructions",
+    ]) {
+      expect(text).toContain(word);
+    }
   });
 });

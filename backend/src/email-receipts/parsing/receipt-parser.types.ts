@@ -46,6 +46,17 @@ export const MAX_PROFILE_TAG_LENGTH = 50;
 export const MAX_PROFILE_CATEGORY_NAME_LENGTH = 100;
 /** The largest `balanceTolerance`, in 1/10000 units: `0.05`. */
 export const MAX_BALANCE_TOLERANCE_UNITS = 500;
+/** Linked receipts (spec "linked receipts" 2.2): the default and largest `link.daysBefore`. */
+export const DEFAULT_LINK_DAYS_BEFORE = 120;
+export const MAX_LINK_DAYS_BEFORE = 365;
+/** Days after a settlement's date that a component may still be dated (a gateway notice and a shop email cross). */
+export const LINK_DAYS_AFTER = 7;
+/** The longest link value, once whitespace is removed. */
+export const MAX_LINK_VALUE_LENGTH = 100;
+/** The longest `{instalment}` text; a longer one is cut. */
+export const MAX_INSTALMENT_TEXT_LENGTH = 50;
+/** The most sender domains `link.fromDomains` may list. */
+export const MAX_LINK_DOMAINS = 10;
 
 /** The item section and the patterns that read one line item per line. */
 export interface ReceiptItemsDefinition {
@@ -173,6 +184,30 @@ export interface ReceiptMatchDefinition {
   amountTolerance?: string;
 }
 
+/**
+ * What a profile's emails are for (linked receipts): `standalone` (the default)
+ * is read as one receipt that finds its bank transaction; a `component` holds
+ * the detail of a purchase and waits for a settlement; a `settlement` names the
+ * bank transaction and its items are parts that may point at components.
+ */
+export type ReceiptParserRole = "standalone" | "component" | "settlement";
+export const RECEIPT_PARSER_ROLES: readonly ReceiptParserRole[] = [
+  "standalone",
+  "component",
+  "settlement",
+];
+
+/**
+ * The `link` section of a settlement profile: where and how far back its parts
+ * look for their components. Every key is optional.
+ */
+export interface ReceiptLinkDefinition {
+  /** 1 to 10 sender domains the component search is limited to; absent means any sender. */
+  fromDomains?: string[];
+  /** 0 to 365, default 120: how many days before the settlement's date a component may be dated. */
+  daysBefore?: number;
+}
+
 /** The most account rules a trade section may hold. */
 export const MAX_TRADE_ACCOUNT_RULES = 20;
 /** The most currency markers a trade section may hold. */
@@ -271,6 +306,15 @@ export interface ReceiptParserDefinition {
   reference?: ReceiptFieldEntry[];
   /** How the transaction this email paid for is identified (design 5.5). */
   match?: ReceiptMatchDefinition;
+  /** What the profile's emails are for; absent is `standalone`. */
+  role?: ReceiptParserRole;
+  /**
+   * A `component` only: the key that ties the email to a settlement (a contract
+   * number). Capture `{link}`; the value is stored without whitespace, lower case.
+   */
+  linkKey?: ReceiptFieldEntry[];
+  /** A `settlement` only: where its parts look for their components. */
+  link?: ReceiptLinkDefinition;
   /**
    * A tag the proposal adds to every transaction this profile splits (created
    * when missing, at confirm time). 1 to 50 characters, trimmed.
@@ -330,6 +374,17 @@ export interface ReceiptParserDefinition {
 export const RECEIPT_DISCARD_MODES = ["ignore", "delete"] as const;
 export type ReceiptDiscardMode = (typeof RECEIPT_DISCARD_MODES)[number];
 
+/**
+ * What a split line is (linked receipts 4.1): an `item` (the default), the
+ * `shipping` or a `fee` of a joined component, or its `discount`. A `discount`
+ * line keeps a non-negative amount and counts against the total.
+ */
+export type ReceiptLineKind = "item" | "shipping" | "fee" | "discount";
+
+/** True for an item line: a line without `kind` is one (a receipt stored before `kind` existed). */
+export const isItemLine = (item: { kind?: ReceiptLineKind }): boolean =>
+  item.kind === undefined || item.kind === "item";
+
 /** One line item as read from the email. */
 export interface ParsedReceiptItem {
   name: string;
@@ -342,6 +397,12 @@ export interface ParsedReceiptItem {
    * rule, the default or the payee did. The card and the receipt page label it.
    */
   categorySource?: "ai" | "history";
+  /** What the line is; absent is `item`. Only a joined component's lines carry another kind. */
+  kind?: ReceiptLineKind;
+  /** A settlement part's link value (capture `{link}`, normalized); absent otherwise. */
+  link?: string;
+  /** A settlement part's instalment text (capture `{instalment}`, at most 50 characters); absent otherwise. */
+  instalment?: string;
 }
 
 /** The first thing missing from a receipt that is not complete (spec section 4). */
@@ -352,6 +413,44 @@ export type ParsedReceiptReason =
   | "items_unbalanced"
   | "items_uncategorized"
   | "shipping_uncategorized";
+
+/** What a settlement part became (linked receipts 4.2); `RECEIPT_LINK_OUTCOMES` is the list a CHECK constraint holds. */
+export type ReceiptLinkOutcome =
+  | "no_link"
+  | "not_found"
+  | "component_incomplete"
+  | "component_used"
+  | "joined"
+  | "scaled"
+  | "amount_exceeds";
+export const RECEIPT_LINK_OUTCOMES: readonly ReceiptLinkOutcome[] = [
+  "no_link",
+  "not_found",
+  "component_incomplete",
+  "component_used",
+  "joined",
+  "scaled",
+  "amount_exceeds",
+];
+
+/** The report of one settlement part, stored in the joined receipt's `links`. Amounts are 1/10000 units. */
+export interface ReceiptLinkReport {
+  partIndex: number;
+  /** The part's link value; null when it captured none. */
+  link: string | null;
+  partAmount: number;
+  outcome: ReceiptLinkOutcome;
+  /** The component found; null when none was. */
+  componentReceiptId: string | null;
+  /** The component's net (its lines, discount subtracted). */
+  componentNet?: number;
+  /** What other settlements already took from the component. */
+  taken?: number;
+  /** How many components the link found (more than one: a resend). */
+  several?: number;
+  /** Why an incomplete component is incomplete. */
+  componentReason?: ParsedReceiptReason | null;
+}
 
 /**
  * What a parser read from one email. Amounts are 1/10000 units. `total`,
@@ -374,6 +473,12 @@ export interface ParsedReceipt {
    * before it existed).
    */
   reference?: string | null;
+  /**
+   * A component's link value (normalized `linkKey` capture); null when a
+   * component's email holds none. Absent on every other receipt and on a
+   * receipt stored before it existed.
+   */
+  linkKey?: string | null;
   shipping: number | null;
   /** Each fee the profile's `fees` entries read, in 1/10000 units, in entry order; absent on a receipt stored before fees existed. */
   fees?: number[];
@@ -385,6 +490,8 @@ export interface ParsedReceipt {
   /** 1/10000 units: what the lines may differ from the stated amounts by and still balance; absent is 0. */
   balanceTolerance?: number;
   discountCategoryId: string | null;
+  /** A joined settlement only: one report per part; absent on every other receipt. */
+  links?: ReceiptLinkReport[];
   complete: boolean;
   reason: ParsedReceiptReason | null;
   /**
@@ -431,6 +538,8 @@ export interface ReceiptTraceItem {
 export interface ReceiptTrace {
   orderId: ReceiptTraceHit | null;
   reference: ReceiptTraceHit | null;
+  /** A component's `linkKey` hit; absent on other profiles. */
+  linkKey?: ReceiptTraceHit | null;
   total: ReceiptTraceHit | null;
   paid: ReceiptTraceHit | null;
   shipping: ReceiptTraceHit | null;

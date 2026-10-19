@@ -7,6 +7,7 @@ import {
 import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { MAX_PARSE_LINES } from "../parsing/receipt-parser.types";
 import { EmailReceipt } from "../entities/email-receipt.entity";
+import { EMAIL_RECEIPT_PROCESSABLE_STATUSES } from "./dto/email-receipts.dto";
 import type { EmailReceiptPipelineService } from "../pipeline/email-receipt-pipeline.service";
 import {
   deriveDisplayState,
@@ -212,6 +213,7 @@ describe("EmailReceiptsService.list", () => {
       matchKind: "order_id",
       parserId: "p1",
       parserName: "Shop",
+      linkKey: null,
       aiReviewRequestId: "rq1",
       isTrade: false,
       tradeSource: null,
@@ -842,7 +844,161 @@ describe("EmailReceiptsService.get", () => {
       { ...row(), body_text: "", parsed: null, candidate_transaction_ids: [] },
     ]);
     await service.get(USER, ID);
-    expect(manager.query).toHaveBeenCalledTimes(1);
+    // The row, then the components its link rows name: no candidate query.
+    expect(manager.query).toHaveBeenCalledTimes(2);
+    expect(manager.query.mock.calls[1][0]).toContain("email_receipt_links");
+  });
+
+  describe("linked receipts (spec 5 and 6)", () => {
+    const detailRow = (over: Record<string, unknown> = {}) => ({
+      ...row(over),
+      body_text: "",
+      parsed: null,
+      candidate_transaction_ids: [],
+    });
+
+    it("carries the link key of a component and the settlements that name it, newest first, one query each, user-scoped", async () => {
+      const { service, manager } = setup();
+      manager.query
+        .mockResolvedValueOnce([
+          detailRow({ status: "component", link_key: "1000000002" }),
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: "s2",
+            subject: "Repayment",
+            effective_at: new Date("2026-01-10T10:00:00Z"),
+            part_amount: "163.0000",
+            outcome: "joined",
+            transaction_id: "t1",
+          },
+          {
+            id: "s1",
+            subject: "Earlier repayment",
+            effective_at: new Date("2025-12-20T10:00:00Z"),
+            part_amount: "50.5000",
+            outcome: "scaled",
+            transaction_id: null,
+          },
+        ]);
+
+      const detail = await service.get(USER, ID);
+
+      expect(detail.linkKey).toBe("1000000002");
+      expect(detail.linkedComponents).toEqual([]);
+      expect(detail.linkedSettlements).toEqual([
+        {
+          receiptId: "s2",
+          subject: "Repayment",
+          effectiveDate: "2026-01-10T10:00:00.000Z",
+          partAmount: 163,
+          outcome: "joined",
+          transactionId: "t1",
+        },
+        {
+          receiptId: "s1",
+          subject: "Earlier repayment",
+          effectiveDate: "2025-12-20T10:00:00.000Z",
+          partAmount: 50.5,
+          outcome: "scaled",
+          transactionId: null,
+        },
+      ]);
+      expect(detail.enrichedBy).toBeNull();
+      const [sql, params] = manager.query.mock.calls[2];
+      expect(sql).toContain("l.user_id = $1");
+      expect(sql).toContain("DESC");
+      expect(params).toEqual([USER, ID, 20]);
+    });
+
+    it("lists the components of a settlement by part and asks for no settlements of a receipt that is no component", async () => {
+      const { service, manager } = setup();
+      manager.query.mockResolvedValueOnce([detailRow()]).mockResolvedValueOnce([
+        {
+          part_index: 1,
+          id: "c1",
+          subject: "Purchase",
+          effective_at: "2025-12-15T10:00:00.000Z",
+        },
+      ]);
+
+      const detail = await service.get(USER, ID);
+
+      expect(detail.linkKey).toBeNull();
+      expect(detail.linkedComponents).toEqual([
+        {
+          partIndex: 1,
+          receiptId: "c1",
+          subject: "Purchase",
+          effectiveDate: "2025-12-15T10:00:00.000Z",
+        },
+      ]);
+      expect(detail.linkedSettlements).toEqual([]);
+      expect(manager.query).toHaveBeenCalledTimes(2);
+      expect(manager.query.mock.calls[1][1]).toEqual([USER, ID]);
+    });
+
+    it("names the email whose applied request sits on the candidate of an enriched_by_other conflict", async () => {
+      const { service, manager } = setup();
+      manager.query
+        .mockResolvedValueOnce([
+          {
+            ...detailRow({
+              status: "review_conflict",
+              status_reason: "enriched_by_other",
+              transaction_id: null,
+              tx_date: null,
+            }),
+            candidate_transaction_ids: ["t9", "t8"],
+          },
+        ])
+        .mockResolvedValueOnce([]) // the candidates
+        .mockResolvedValueOnce([]) // the components
+        .mockResolvedValueOnce([{ id: "other", subject: "Unrelated" }])
+        .mockResolvedValue([]);
+
+      const detail = await service.get(USER, ID);
+
+      expect(detail.enrichedBy).toEqual({
+        receiptId: "other",
+        subject: "Unrelated",
+      });
+      const enrichedCall = manager.query.mock.calls.find(([sql]) =>
+        String(sql).includes("FROM ai_review_requests applied"),
+      );
+      expect(enrichedCall?.[1]).toEqual([USER, "t9"]);
+    });
+
+    it("has no enrichedBy for another conflict reason, or when that email is gone", async () => {
+      const { service, manager } = setup();
+      manager.query
+        .mockResolvedValueOnce([
+          {
+            ...detailRow({
+              status: "review_conflict",
+              status_reason: "something_else",
+            }),
+            candidate_transaction_ids: ["t9"],
+          },
+        ])
+        .mockResolvedValue([]);
+      expect((await service.get(USER, ID)).enrichedBy).toBeNull();
+
+      manager.query.mockReset();
+      manager.query
+        .mockResolvedValueOnce([
+          {
+            ...detailRow({
+              status: "review_conflict",
+              status_reason: "enriched_by_other",
+            }),
+            candidate_transaction_ids: ["t9"],
+          },
+        ])
+        .mockResolvedValue([]);
+      expect((await service.get(USER, ID)).enrichedBy).toBeNull();
+    });
   });
 
   it("is a 404 for an email that is not the user's", async () => {
@@ -980,8 +1136,16 @@ describe("EmailReceiptsService.ignore", () => {
     expect(close).toBeGreaterThan(advisory);
     expect(receiptRepo.update).toHaveBeenCalledWith(
       { id: ID, userId: USER },
-      { status: "ignored", statusReason: null, aiReviewRequestId: null },
+      {
+        status: "ignored",
+        statusReason: null,
+        aiReviewRequestId: null,
+        linkKey: null,
+      },
     );
+    expect(
+      sqls.some((s) => s.includes("DELETE FROM email_receipt_links")),
+    ).toBe(true);
     expect(detail.status).toBe("ignored");
   });
 
@@ -1012,9 +1176,16 @@ describe("EmailReceiptsService.ignore", () => {
   it("ignoring an ignored receipt is a no-op", async () => {
     const { service, manager, receiptRepo } = setup();
     receiptRepo.findOne.mockResolvedValue(locked({ status: "ignored" }));
-    manager.query.mockResolvedValue([
-      { ...row(), body_text: "", parsed: null, candidate_transaction_ids: [] },
-    ]);
+    manager.query
+      .mockResolvedValueOnce([
+        {
+          ...row(),
+          body_text: "",
+          parsed: null,
+          candidate_transaction_ids: [],
+        },
+      ])
+      .mockResolvedValue([]);
     await service.ignore(USER, ID);
     expect(receiptRepo.update).not.toHaveBeenCalled();
   });
@@ -1264,6 +1435,81 @@ describe("EmailReceiptsService.processBatch", () => {
       failed: 0,
       remaining: 4,
       since: SINCE,
+    });
+  });
+
+  describe("an applied email a component profile covers (linked receipts spec 9)", () => {
+    const batchWithReread = (rows: Array<{ id: string; reread: boolean }>) => {
+      const h = setup();
+      h.manager.query.mockImplementation(async (sql: string) => {
+        const text = String(sql);
+        if (text.includes("AS since")) return [{ since: SINCE }];
+        if (text.includes("SELECT r.id")) return rows;
+        if (text.includes("COUNT(*)::int AS remaining"))
+          return [{ remaining: 0 }];
+        return [];
+      });
+      return h;
+    };
+    const selectionSqls = (h: ReturnType<typeof batchWithReread>) =>
+      h.manager.query.mock.calls
+        .map(([sql]) => String(sql))
+        .filter(
+          (sql) =>
+            sql.includes("SELECT r.id") ||
+            sql.includes("COUNT(*)::int AS remaining"),
+        );
+
+    it("selects them with the default statuses, in the batch and in the remaining count", async () => {
+      const h = batchWithReread([]);
+      await h.service.processBatch(USER, {});
+      const sqls = selectionSqls(h);
+      expect(sqls).toHaveLength(2);
+      for (const sql of sqls) {
+        expect(sql).toContain("r.link_key IS NULL");
+        expect(sql).toContain("applied_rq.status = 'applied'");
+        expect(sql).toContain("cp.definition->>'role' = 'component'");
+        expect(sql).toContain("cp.status = 'approved'");
+      }
+    });
+
+    it("selects none of them when the caller names the statuses", async () => {
+      const h = batchWithReread([]);
+      await h.service.processBatch(USER, { statuses: ["pending"] });
+      for (const sql of selectionSqls(h)) {
+        expect(sql).not.toContain("applied_rq");
+      }
+    });
+
+    it("lets the pipeline act on review for those emails only", async () => {
+      const h = batchWithReread([
+        { id: "applied", reread: true },
+        { id: "plain", reread: false },
+      ]);
+      h.pipeline.process.mockResolvedValue(result("component") as never);
+      await h.service.processBatch(USER, {});
+      const [first, second] = h.pipeline.process.mock.calls;
+      expect(first[2]?.onlyWhenStatusIn).toEqual([
+        ...EMAIL_RECEIPT_PROCESSABLE_STATUSES,
+        "review",
+      ]);
+      expect(second[2]?.onlyWhenStatusIn).toEqual([
+        ...EMAIL_RECEIPT_PROCESSABLE_STATUSES,
+      ]);
+    });
+
+    it("passes over one the pipeline left as it was, so the run does not select it again", async () => {
+      const h = batchWithReread([{ id: "applied", reread: true }]);
+      h.pipeline.process.mockResolvedValue(
+        result("review", { unchanged: true }) as never,
+      );
+      const out = await h.service.processBatch(USER, {});
+      expect(out.processed).toBe(0);
+      expect(
+        h.manager.query.mock.calls.some(([sql]) =>
+          String(sql).includes("SET status_reason = status_reason"),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -1706,6 +1952,11 @@ describe("EmailReceiptsService.bulk", () => {
       String(sql).includes("UPDATE ai_review_requests"),
     );
     expect(close?.[1]).toEqual([USER, [A]]);
+    // An ignored settlement keeps no link rows (linked receipts spec 5).
+    const links = h.manager.query.mock.calls.find(([sql]) =>
+      String(sql).includes("DELETE FROM email_receipt_links"),
+    );
+    expect(links?.[1]).toEqual([[A], USER]);
   });
 
   it("an ignore that has nothing to ignore closes and writes nothing", async () => {
@@ -1734,7 +1985,22 @@ describe("EmailReceiptsService.bulk", () => {
   it("runs in one transaction", async () => {
     const h = bulkSetup([locked(A)]);
     await h.service.bulk(USER, "delete", { ids: [A] }, 1);
-    expect(h.manager.query.mock.calls.length).toBe(3);
+    // Lock, close, the link rows (a component loses its reason first), delete.
+    expect(h.manager.query.mock.calls.length).toBe(4);
+  });
+
+  it("deletes the link rows of deleted settlements before the receipts", async () => {
+    const h = bulkSetup([locked(A)]);
+    await h.service.bulk(USER, "delete", { ids: [A] }, 1);
+    const sqls = h.manager.query.mock.calls.map(([sql]) => String(sql));
+    const links = sqls.findIndex((s) =>
+      s.includes("DELETE FROM email_receipt_links"),
+    );
+    const receipts = sqls.findIndex((s) =>
+      s.includes("DELETE FROM email_receipts"),
+    );
+    expect(links).toBeGreaterThanOrEqual(0);
+    expect(links).toBeLessThan(receipts);
   });
 });
 

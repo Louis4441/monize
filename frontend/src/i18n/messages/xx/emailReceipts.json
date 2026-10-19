@@ -524,7 +524,12 @@
       "currencyMarkers": "[XX-Currency markers-XX]",
       "defaultAccount": "[XX-Default account-XX]",
       "ruleAccount": "[XX-account-XX]",
-      "ruleCurrency": "[XX-currency-XX]"
+      "ruleCurrency": "[XX-currency-XX]",
+      "role": "[XX-Profile role-XX]",
+      "link": "[XX-The link section-XX]",
+      "linkDaysBefore": "[XX-Days before the repayment-XX]",
+      "linkFromDomains": "[XX-Sender domains of the purchase emails-XX]",
+      "linkKey": "[XX-Link key patterns-XX]"
     },
     "codes": {
       "not_object": "[XX-is not a valid definition-XX]",
@@ -560,7 +565,15 @@
       "invalid_currency": "[XX-is not a 3-letter currency code, such as USD-XX]",
       "too_many_lines": "[XX-spans too many lines (at most {max})-XX]",
       "line_break_not_allowed": "[XX-is matched against one text (an item name, the merchant or an account), so it cannot span several lines-XX]",
-      "invalid_uuid_account": "[XX-is not a valid account-XX]"
+      "invalid_uuid_account": "[XX-is not a valid account-XX]",
+      "role_invalid": "[XX-must be standalone, component or settlement-XX]",
+      "link_key_requires_component": "[XX-can only be used when the role is component-XX]",
+      "link_key_missing": "[XX-is needed when the role is component-XX]",
+      "link_capture_requires_settlement": "[XX-uses a link or instalment capture, which only a settlement profile accepts-XX]",
+      "link_requires_settlement": "[XX-can only be used when the role is settlement-XX]",
+      "link_domain_invalid": "[XX-is not a valid sender domain (at most {max} domains)-XX]",
+      "link_days_invalid": "[XX-must be a whole number from 0 to {max}-XX]",
+      "role_trade_conflict": "[XX-cannot be component or settlement in a brokerage trade profile, which reads only the trade-XX]"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "[XX-{count, plural, one {# transaction fits} other {# transactions fit}} equally well, so none would be linked until you choose.-XX]",
     "unmatched": "[XX-No transaction matches, out of {count, plural, one {# candidate} other {# candidates}}.-XX]",
     "jsonInvalid": "[XX-The JSON is not valid, so there is nothing to test yet.-XX]",
+    "component": {
+      "heading": "[XX-Purchase email (component): link key {linkKey}-XX]",
+      "noLinkKey": "[XX-Purchase email (component): no link key was read, so no repayment email can find it.-XX]",
+      "noneWaiting": "[XX-No repayment email is waiting for this link key.-XX]",
+      "waiting": "[XX-{count, plural, one {# repayment email is} other {# repayment emails are}} waiting for this link key:-XX]",
+      "settlement": "[XX-{subject} ({date})-XX]"
+    },
     "outcome": {
       "not_applicable": "[XX-This profile would not read this email: none of its required lines is in it, so the next profile for the sender would be tried.-XX]",
       "skip_line": "[XX-This profile would set this email aside: a line it skips on is in it.-XX]",
@@ -609,6 +629,7 @@
         "skipIfLine": "[XX-Skip line-XX]",
         "waitIfLine": "[XX-Wait line-XX]",
         "reference": "[XX-Reference-XX]",
+        "linkKey": "[XX-Link key-XX]",
         "action": "[XX-Buy or sell-XX]",
         "symbol": "[XX-Ticker-XX]",
         "quantity": "[XX-Shares-XX]",
@@ -674,7 +695,33 @@
     "paid": "[XX-Paid-XX]",
     "payee": "[XX-Merchant-XX]",
     "reference": "[XX-Reference-XX]",
-    "categoryByAi": "[XX-AI-XX]"
+    "categoryByAi": "[XX-AI-XX]",
+    "linkKey": "[XX-Link key-XX]",
+    "kinds": {
+      "shipping": "[XX-Shipping-XX]",
+      "fee": "[XX-Fee-XX]",
+      "discount": "[XX-Discount-XX]"
+    },
+    "parts": {
+      "heading": "[XX-Parts-XX]",
+      "part": "[XX-Part-XX]",
+      "link": "[XX-Link-XX]",
+      "outcome": "[XX-Result-XX]",
+      "noLink": "[XX-No link-XX]",
+      "component": "[XX-Purchase email: {subject} ({date}).-XX]",
+      "componentProfile": "[XX-Profile: {name}.-XX]",
+      "componentNet": "[XX-Purchase total: {amount}.-XX]",
+      "taken": "[XX-Already used: {amount}.-XX]"
+    },
+    "linkOutcomes": {
+      "no_link": "[XX-The part has no link, so it stays one line.-XX]",
+      "not_found": "[XX-No purchase email was found for this link, so the part stays one line.-XX]",
+      "component_incomplete": "[XX-The purchase email was not read completely, so the part stays one line.-XX]",
+      "component_used": "[XX-Other repayments already used the whole purchase, so the part stays one line.-XX]",
+      "joined": "[XX-Replaced by the lines of the purchase email.-XX]",
+      "scaled": "[XX-Replaced by the lines of the purchase email, scaled to this part.-XX]",
+      "amount_exceeds": "[XX-The part is more than what is left of the purchase, so it stays one line.-XX]"
+    }
   },
   "state": {
     "pending": "[XX-Waiting to be read-XX]",
@@ -690,7 +737,8 @@
     "dismissed": "[XX-Dismissed-XX]",
     "expired": "[XX-Expired-XX]",
     "pending_ai": "[XX-Waiting for the AI-XX]",
-    "request_missing": "[XX-Request missing-XX]"
+    "request_missing": "[XX-Request missing-XX]",
+    "component": "[XX-Waiting for its repayment-XX]"
   },
   "receipts": {
     "loading": "[XX-Loading emails-XX]",
@@ -710,7 +758,8 @@
       "ambiguous": "[XX-Several transactions fit-XX]",
       "review_conflict": "[XX-Another request is open-XX]",
       "review": "[XX-In review-XX]",
-      "ignored": "[XX-Ignored-XX]"
+      "ignored": "[XX-Ignored-XX]",
+      "component": "[XX-Waiting for repayment-XX]"
     },
     "search": {
       "label": "[XX-Search emails-XX]",
@@ -805,6 +854,7 @@
       "pageSelected": "[XX-All {count} on this page are selected.-XX]",
       "selectAllMatching": "[XX-Select all {total} matching this filter.-XX]",
       "allMatchingSelected": "[XX-All {total} emails matching this filter are selected.-XX]",
+      "hiddenSelected": "[XX-{hidden, plural, one {# of the selected emails is not shown in this list.} other {# of the selected emails are not shown in this list.}}-XX]",
       "reprocessButton": "[XX-Reprocess ({count})-XX]",
       "restoreButton": "[XX-Restore ignored ({count})-XX]",
       "restoreButtonAll": "[XX-Restore ignored-XX]",
@@ -834,11 +884,12 @@
         "remove": "[XX-Put back: {label}-XX]"
       },
       "draftBlocked": {
-        "tooMany": "[XX-A profile can be prepared from at most {max} emails. Select {max} or fewer emails to use it.-XX]",
-        "differentSenders": "[XX-The selected emails come from different senders ({domains}). A profile reads one sender's emails, so select emails from one sender.-XX]",
         "skipped": "[XX-An email that could not be read has no text to prepare a profile from. Remove it from the selection to use this.-XX]",
         "allMatching": "[XX-A profile is prepared from emails you select yourself, at most {max}. Clear this selection and select up to {max} emails.-XX]",
-        "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]"
+        "mixedKinds": "[XX-The selected emails mix trade confirmations and order emails. A profile reads one kind, so select only trade confirmations or only order emails.-XX]",
+        "tooManyPerDomain": "[XX-At most {perDomain} emails from one sender can be used. Select {perDomain} or fewer emails from each sender ({domains}).-XX]",
+        "tooManyDomains": "[XX-At most {maxDomains} senders can be used together ({domains}). Select emails from {maxDomains} senders or fewer.-XX]",
+        "tradeOneDomain": "[XX-A trade profile reads the emails of one sender ({domains}). Select trade confirmations from one sender.-XX]"
       }
     },
     "pager": {
@@ -898,6 +949,12 @@
       "approveFailed": "[XX-Could not approve the proposals-XX]",
       "noApprovable": "[XX-No proposals in this selection can be approved.-XX]",
       "narrowFailed": "[XX-Could not count the emails. The change was not applied.-XX]"
+    },
+    "linkedDraftDialog": {
+      "title": "[XX-Draft linked profiles?-XX]",
+      "message": "[XX-You selected emails from several senders: {domains}. Use this only when the facts of one bank transaction are spread over emails of several senders, for example a shop and its deferred-payment provider, or a shop and a payment gateway. To draft profiles for unrelated shops, cancel and draft one domain at a time. A request takes at most {perDomain} emails per sender and at most {maxDomains} senders.-XX]",
+      "domainEntry": "[XX-{domain} ({count, plural, one {# email} other {# emails}})-XX]",
+      "confirm": "[XX-Draft linked profiles-XX]"
     }
   },
   "detail": {
@@ -958,7 +1015,13 @@
       "trade_no_account": "[XX-The profile could not tell which account this trade is for.-XX]",
       "trade_exists": "[XX-Your accounts already hold this trade, so nothing was proposed.-XX]",
       "trade_linked": "[XX-Linked to the transaction it reports, so nothing was proposed.-XX]",
-      "trade_no_currency": "[XX-The profile could not tell which currency this trade is in, so it could not choose its account.-XX]"
+      "trade_no_currency": "[XX-The profile could not tell which currency this trade is in, so it could not choose its account.-XX]",
+      "awaiting_settlement": "[XX-Purchase email stored. It waits for the repayment email that pays for it.-XX]",
+      "settled": "[XX-Purchase email stored. The repayment emails joined with it pay its whole amount.-XX]",
+      "instalment": "[XX-Purchase email stored. Repayments paid part of it; the rest is still to be paid.-XX]",
+      "partially_linked": "[XX-Some parts of this repayment have no purchase email yet. They are shown as one line each.-XX]",
+      "enriched_by_other": "[XX-The matched transaction was already enriched by another email. Open it and use Link to replace that enrichment, or ignore this email.-XX]",
+      "no_link_key": "[XX-This purchase email holds no link key, so no repayment can find it.-XX]"
     },
     "reasonUnknown": "[XX-Reason: {reason}-XX]",
     "requestNote": "[XX-Review request ({state}): {note}-XX]",
@@ -1005,6 +1068,15 @@
       "capped": "[XX-Only the first {max} lines are read.-XX]",
       "empty": "[XX-No lines.-XX]",
       "listLabel": "[XX-Numbered lines of the email-XX]"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "[XX-Linked purchase emails-XX]",
+      "component": "[XX-Part {part}: {subject} ({date})-XX]",
+      "settlementsHeading": "[XX-Paid by-XX]",
+      "settlement": "[XX-{subject} ({date}), part {amount}-XX]",
+      "enrichedBy": "[XX-Already enriched by: {subject}-XX]",
+      "openButton": "[XX-Open-XX]",
+      "open": "[XX-Open the email {subject}-XX]"
     },
     "tradeTransactionSummary": "[XX-{action, select, BUY {Bought} other {Sold}} {quantity} {symbol} for {total} on {date}.-XX]",
     "noTradeTransaction": "[XX-None yet: the trade is booked when you approve its proposal, or linked to one already in your ledger.-XX]",
@@ -1333,7 +1405,8 @@
         "discard_delete": "[XX-Deleted by this profile-XX]",
         "no_html": "[XX-No HTML part-XX]",
         "trade": "[XX-Proposes a trade-XX]",
-        "trade_exists": "[XX-Already in your ledger-XX]"
+        "trade_exists": "[XX-Already in your ledger-XX]",
+        "component": "[XX-Purchase email (waits for repayment)-XX]"
       },
       "parsedTradeAccount": "[XX-Account: {account}-XX]",
       "accountWithCurrency": "[XX-{name} ({currency})-XX]",
@@ -1363,5 +1436,10 @@
     "bookTo": "[XX-Books to: {account}-XX]",
     "bookToNotTradable": "[XX-Books to {account}, which is not an open brokerage account, so the trade cannot be booked there.-XX]",
     "bookToUnknown": "[XX-Books to an account that is not in your list, so the trade cannot be booked there.-XX]"
+  },
+  "linkedHint": {
+    "emails": "[XX-One bank transaction described by emails from several senders (for example a shop and its deferred-payment provider)? Select up to {max} emails from each of those senders together and draft linked profiles.-XX]",
+    "profiles": "[XX-The wizard below drafts a profile for one sender. One bank transaction described by emails from several senders (for example a shop and its deferred-payment provider)? Select up to {max} emails from each of those senders on the Emails tab and draft linked profiles.-XX]",
+    "openEmails": "[XX-Open the Emails tab-XX]"
   }
 }

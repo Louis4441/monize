@@ -203,6 +203,32 @@ describe('parserToForm', () => {
   });
 });
 
+describe('linked receipts definitions', () => {
+  it('opens a definition with a role, a link key or a link section in JSON mode', () => {
+    expect(formCanRepresent({ version: 2, role: 'component', linkKey: ['Contract {link}'] })).toBe(false);
+    expect(formCanRepresent({ version: 2, role: 'settlement', link: { daysBefore: 30 } })).toBe(false);
+    expect(formCanRepresent({ version: 2, link: { fromDomains: ['shop.example.com'] } })).toBe(false);
+    expect(formCanRepresent({ version: 2, total: ['Total {amount}'] })).toBe(true);
+  });
+
+  it('reads the eight link codes of a 400', () => {
+    expect(
+      parseValidationProblems(
+        'x: role: role_invalid; linkKey: link_key_requires_component; (definition): link_key_missing; items.patterns[0]: link_capture_requires_settlement; link: link_requires_settlement; link.fromDomains[1]: link_domain_invalid; link.daysBefore: link_days_invalid; role: role_trade_conflict',
+      ).map((problem) => problem.code),
+    ).toEqual([
+      'role_invalid',
+      'link_key_requires_component',
+      'link_key_missing',
+      'link_capture_requires_settlement',
+      'link_requires_settlement',
+      'link_domain_invalid',
+      'link_days_invalid',
+      'role_trade_conflict',
+    ]);
+  });
+});
+
 describe('parseValidationProblems', () => {
   it('reads the problems a 400 lists', () => {
     expect(

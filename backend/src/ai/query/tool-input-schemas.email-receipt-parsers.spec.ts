@@ -72,11 +72,11 @@ describe("email_receipt_parsers schema", () => {
       { operation: "test", definition: DEFINITION, receiptIds: [] },
     ],
     [
-      "test with six emails",
+      "test with 26 emails",
       {
         operation: "test",
         definition: DEFINITION,
-        receiptIds: [R1, R1, R1, R1, R1, R1],
+        receiptIds: Array.from({ length: 26 }, () => R1),
       },
     ],
     [
@@ -84,11 +84,11 @@ describe("email_receipt_parsers schema", () => {
       { operation: "test", definition: DEFINITION, receiptIds: ["nope"] },
     ],
     [
-      "test with six samples",
+      "test with 26 samples",
       {
         operation: "test",
         definition: DEFINITION,
-        samples: Array.from({ length: 6 }, () => ({ receiptId: R1 })),
+        samples: Array.from({ length: 26 }, () => ({ receiptId: R1 })),
       },
     ],
     [

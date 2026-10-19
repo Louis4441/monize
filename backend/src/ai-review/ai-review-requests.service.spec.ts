@@ -2,7 +2,10 @@ import { ConflictException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { LockScope } from "../common/db/locks";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
-import { AiReviewRequest } from "./ai-review-request.entity";
+import {
+  AiReviewRequest,
+  MAX_PARSER_DRAFT_DOMAINS,
+} from "./ai-review-request.entity";
 import { AiReviewRequestsService } from "./ai-review-requests.service";
 
 jest.mock("../common/db/scoped-db", () =>
@@ -668,7 +671,7 @@ describe("AiReviewRequestsService.enqueueParserDraft", () => {
     expect((manager.query.mock.calls[3][1] as unknown[])[1]).toHaveLength(1000);
   });
 
-  it.each([[[]], [[R1, R1, R1, R1, R1, R1]]])(
+  it.each([[[]], [Array.from({ length: 26 }, () => R1)]])(
     "refuses %j emails before touching the database",
     async (ids) => {
       const { service, manager } = setup();
@@ -848,12 +851,25 @@ describe("AiReviewRequestsService the parser draft lifecycle", () => {
     const [sql, params] = manager.query.mock.calls[0];
     expect(sql).toMatch(/SET status = 'proposed'/);
     expect(sql).toMatch(/kind = 'email_parser_draft'/);
-    expect(sql).toMatch(/status = 'claimed'/);
+    expect(sql).toMatch(/q\.status = 'claimed'/);
     expect(sql).toMatch(/claimed_by = \$3/);
     expect(sql).toMatch(/expires_at > CURRENT_TIMESTAMP/);
-    expect(sql).toMatch(/'parserId', \$4::text/);
+    // The first draft stays `parserId`; every draft is appended to `parserIds`.
+    expect(sql).toMatch(
+      /'parserId', COALESCE\(q\.proposal ->> 'parserId', \$4::text\)/,
+    );
+    expect(sql).toMatch(/'parserIds'/);
+    // A proposed request takes another draft only when it spans several domains.
+    expect(sql).toMatch(/q\.status = 'proposed'/);
+    expect(sql).toMatch(/COUNT\(DISTINCT r\.from_domain\)/);
     expect(sql).not.toContain(PARSER);
-    expect(params).toEqual([REQUEST, USER, "assistant", PARSER]);
+    expect(params).toEqual([
+      REQUEST,
+      USER,
+      "assistant",
+      PARSER,
+      MAX_PARSER_DRAFT_DOMAINS,
+    ]);
   });
 
   it("does not propose for a caller that does not hold the claim", async () => {
@@ -883,7 +899,10 @@ describe("AiReviewRequestsService the parser draft lifecycle", () => {
     expect(sql).toMatch(/SET status = 'applied'/);
     expect(sql).toMatch(/kind = 'email_parser_draft'/);
     expect(sql).toMatch(/status = 'proposed'/);
-    expect(sql).toMatch(/proposal ->> 'parserId' = \$2::text/);
+    // Every parser the request lists must be an approved parser of the user's.
+    expect(sql).toMatch(/q\.proposal -> 'parserIds'/);
+    expect(sql).toMatch(/q\.proposal ->> 'parserId'/);
+    expect(sql).toMatch(/p\.status = 'approved'/);
     expect(params).toEqual([USER, PARSER]);
   });
 
@@ -907,7 +926,9 @@ describe("AiReviewRequestsService the parser draft lifecycle", () => {
     const [sql, params] = manager.query.mock.calls[0];
     expect(sql).toMatch(/SET status = 'rejected'/);
     expect(sql).toMatch(/status IN \('pending', 'claimed', 'proposed'\)/);
-    expect(sql).toMatch(/proposal ->> 'parserId' = \$2::text/);
+    // Rejected only when none of the parsers the request lists exists any more.
+    expect(sql).toMatch(/NOT EXISTS/);
+    expect(sql).toMatch(/JOIN email_receipt_parsers p/);
     expect(params).toEqual([USER, PARSER]);
   });
 

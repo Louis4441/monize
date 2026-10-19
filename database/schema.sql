@@ -818,6 +818,8 @@ CREATE TABLE email_receipts (
     candidate_transaction_ids UUID[] NOT NULL DEFAULT '{}'::uuid[],
     match_kind VARCHAR(20),
     ai_review_request_id UUID,
+    -- The link value of a `component` receipt (docs/specs/email-receipt-linked-receipts.md); null otherwise.
+    link_key VARCHAR(100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_email_receipts_message UNIQUE (mailbox_id, uid_validity, uid),
@@ -828,7 +830,7 @@ CREATE TABLE email_receipts (
     CONSTRAINT ck_email_receipts_status
       CHECK (status IN ('pending', 'skipped', 'no_parser', 'parse_failed',
                         'unmatched', 'ambiguous', 'review_conflict', 'review',
-                        'ignored')),
+                        'ignored', 'component')),
     CONSTRAINT ck_email_receipts_match_kind
       CHECK (match_kind IS NULL
              OR match_kind IN ('order_id', 'reference', 'amount_payee',
@@ -847,10 +849,48 @@ CREATE INDEX idx_email_receipts_parser
     ON email_receipts(parser_id) WHERE parser_id IS NOT NULL;
 CREATE INDEX idx_email_receipts_investment_transaction
     ON email_receipts(investment_transaction_id) WHERE investment_transaction_id IS NOT NULL;
+CREATE INDEX idx_email_receipts_link_key
+    ON email_receipts(user_id, link_key) WHERE link_key IS NOT NULL;
 CREATE INDEX idx_email_receipt_parsers_user
     ON email_receipt_parsers(user_id);
 CREATE INDEX idx_email_receipt_parsers_payee
     ON email_receipt_parsers(payee_id) WHERE payee_id IS NOT NULL;
+
+-- Linked email receipts (docs/specs/email-receipt-linked-receipts.md): one row
+-- per part of a settlement receipt (a repayment email): the part's link value
+-- and amount, the component receipt it joined (set only for `joined` and
+-- `scaled`; SET NULL when that email is deleted) and what the part became. The
+-- rows of a settlement are replaced in the transaction that stores its new
+-- state; a deleted settlement takes its rows with it. The defaults on part_index
+-- and outcome exist for the RLS spec's generic row seeder.
+CREATE TABLE email_receipt_links (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    settlement_receipt_id UUID NOT NULL REFERENCES email_receipts(id) ON DELETE CASCADE,
+    part_index INTEGER NOT NULL DEFAULT 0,
+    link_value VARCHAR(100),
+    part_amount NUMERIC(20,4) NOT NULL,
+    component_receipt_id UUID REFERENCES email_receipts(id) ON DELETE SET NULL,
+    outcome VARCHAR(30) NOT NULL DEFAULT 'no_link',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_email_receipt_links_part UNIQUE (settlement_receipt_id, part_index),
+    CONSTRAINT ck_email_receipt_links_part_index
+      CHECK (part_index BETWEEN 0 AND 99),
+    CONSTRAINT ck_email_receipt_links_part_amount
+      CHECK (part_amount >= 0),
+    CONSTRAINT ck_email_receipt_links_outcome
+      CHECK (outcome IN ('no_link', 'not_found', 'component_incomplete',
+                         'component_used', 'joined', 'scaled', 'amount_exceeds'))
+);
+
+-- A component that arrives after its settlement finds the parts waiting for it;
+-- `taken` sums the parts that already used a component.
+CREATE INDEX idx_email_receipt_links_waiting
+    ON email_receipt_links(user_id, link_value)
+    WHERE component_receipt_id IS NULL AND link_value IS NOT NULL;
+CREATE INDEX idx_email_receipt_links_component
+    ON email_receipt_links(component_receipt_id) WHERE component_receipt_id IS NOT NULL;
 
 -- AI review requests: the durable queue behind a rule's `request_ai_review`
 -- action (docs/future-plans/transaction-rules.md section 6.5). pending ->
@@ -860,11 +900,11 @@ CREATE INDEX idx_email_receipt_parsers_payee
 -- nullable, and NULLs are distinct there, so a manual request is not deduped
 -- (NULLS NOT DISTINCT would make deleting a rule fail on two open requests).
 -- A request of kind email_parser_draft (email-receipts design section 6) asks an
--- agent to write a receipt parser from up to five stored emails of one sender: it
--- has no transaction, names its emails in email_receipt_ids (no foreign key: an
--- array has none) and its sender domain in parser_domain, and at most one is open
--- per (user, domain). NULL transaction ids are distinct in the open-request index
--- above, so it never conflicts there.
+-- agent to write a receipt parser from up to 25 stored emails (at most five per
+-- sender, at most five senders): it has no transaction, names its emails in
+-- email_receipt_ids (no foreign key: an array has none) and its main sender domain
+-- in parser_domain, and at most one is open per (user, domain). NULL transaction
+-- ids are distinct in the open-request index above, so it never conflicts there.
 -- The defaults on kind, status and expires_at exist for the RLS spec's generic
 -- row seeder.
 CREATE TABLE ai_review_requests (
@@ -887,7 +927,7 @@ CREATE TABLE ai_review_requests (
     CONSTRAINT ck_ai_review_requests_kind
       CHECK (kind IN ('transaction_review', 'email_receipt', 'email_parser_draft', 'email_trade')),
     CONSTRAINT ck_ai_review_requests_email_receipt_ids
-      CHECK (email_receipt_ids IS NULL OR cardinality(email_receipt_ids) <= 5),
+      CHECK (email_receipt_ids IS NULL OR cardinality(email_receipt_ids) <= 25),
     CONSTRAINT ck_ai_review_requests_transaction_required
       CHECK (kind IN ('email_parser_draft', 'email_trade') OR transaction_id IS NOT NULL),
     CONSTRAINT ck_ai_review_requests_trade_shape
@@ -2986,6 +3026,7 @@ CREATE TRIGGER update_ai_review_requests_updated_at BEFORE UPDATE ON ai_review_r
 CREATE TRIGGER update_email_receipt_mailboxes_updated_at BEFORE UPDATE ON email_receipt_mailboxes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_email_receipt_parsers_updated_at BEFORE UPDATE ON email_receipt_parsers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_email_receipts_updated_at BEFORE UPDATE ON email_receipts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_email_receipt_links_updated_at BEFORE UPDATE ON email_receipt_links FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Action History (undo/redo support)
 CREATE TABLE action_history (
@@ -3553,6 +3594,7 @@ DECLARE
         'budgets',
         'calendar_day_notes',
         'custom_reports',
+        'email_receipt_links',
         'email_receipt_mailboxes',
         'email_receipt_parsers',
         'email_receipts',

@@ -524,7 +524,12 @@
       "currencyMarkers": "货币标记",
       "defaultAccount": "默认账户",
       "ruleAccount": "账户",
-      "ruleCurrency": "货币"
+      "ruleCurrency": "货币",
+      "role": "配置文件角色",
+      "link": "link 部分",
+      "linkDaysBefore": "还款前的天数",
+      "linkFromDomains": "购买邮件的发件人域名",
+      "linkKey": "链接键模式"
     },
     "codes": {
       "not_object": "不是有效的定义",
@@ -560,7 +565,15 @@
       "invalid_currency": "不是 3 个字母的货币代码，例如 USD",
       "too_many_lines": "跨越的行数过多（最多 {max} 行）",
       "line_break_not_allowed": "只与一段文本（商品名称、商家或账户）匹配，因此不能跨越多行",
-      "invalid_uuid_account": "不是有效的账户"
+      "invalid_uuid_account": "不是有效的账户",
+      "role_invalid": "必须是 standalone、component 或 settlement",
+      "link_key_requires_component": "仅当角色为 component 时才能使用",
+      "link_key_missing": "当角色为 component 时是必需的",
+      "link_capture_requires_settlement": "使用了 link 或 instalment 捕获，只有 settlement 配置文件才接受",
+      "link_requires_settlement": "仅当角色为 settlement 时才能使用",
+      "link_domain_invalid": "不是有效的发件人域名（最多 {max} 个域名）",
+      "link_days_invalid": "必须是 0 到 {max} 之间的整数",
+      "role_trade_conflict": "在只读取交易的证券交易配置文件中不能是 component 或 settlement"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# 笔交易} other {# 笔交易}}同样匹配，因此在您选择之前不会关联任何一笔。",
     "unmatched": "在 {count, plural, one {# 个候选} other {# 个候选}}中没有匹配的交易。",
     "jsonInvalid": "JSON 无效，因此暂时没有可测试的内容。",
+    "component": {
+      "heading": "购买邮件（component）：链接键 {linkKey}",
+      "noLinkKey": "购买邮件（component）：未读取到链接键，因此任何还款邮件都找不到它。",
+      "noneWaiting": "没有还款邮件在等待此链接键。",
+      "waiting": "{count, plural, one {# 封还款邮件} other {# 封还款邮件}}正在等待此链接键：",
+      "settlement": "{subject}（{date}）"
+    },
     "outcome": {
       "not_applicable": "此解析器不会读取这封邮件：邮件中没有任何必需的行，因此将尝试该发件人的下一个解析器。",
       "skip_line": "此解析器会将这封邮件排除在外：邮件中含有它要跳过的行。",
@@ -609,6 +629,7 @@
         "skipIfLine": "跳过行",
         "waitIfLine": "暂缓行",
         "reference": "参考号",
+        "linkKey": "链接键",
         "action": "买入或卖出",
         "symbol": "代码",
         "quantity": "股数",
@@ -674,7 +695,33 @@
     "paid": "已付",
     "payee": "商家",
     "reference": "参考号",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "链接键",
+    "kinds": {
+      "shipping": "运费",
+      "fee": "费用",
+      "discount": "折扣"
+    },
+    "parts": {
+      "heading": "部分",
+      "part": "部分",
+      "link": "链接",
+      "outcome": "结果",
+      "noLink": "无链接",
+      "component": "购买邮件：{subject}（{date}）。",
+      "componentProfile": "配置文件：{name}。",
+      "componentNet": "购买合计：{amount}。",
+      "taken": "已使用：{amount}。"
+    },
+    "linkOutcomes": {
+      "no_link": "该部分没有链接，因此仍为一行。",
+      "not_found": "未找到此链接对应的购买邮件，因此该部分仍为一行。",
+      "component_incomplete": "购买邮件未被完整读取，因此该部分仍为一行。",
+      "component_used": "其他还款已用完整笔购买，因此该部分仍为一行。",
+      "joined": "已替换为购买邮件的各行。",
+      "scaled": "已替换为购买邮件的各行，并按此部分缩放。",
+      "amount_exceeds": "该部分超过了购买的剩余金额，因此仍为一行。"
+    }
   },
   "state": {
     "pending": "等待读取",
@@ -690,7 +737,8 @@
     "dismissed": "已驳回",
     "expired": "已过期",
     "pending_ai": "等待 AI",
-    "request_missing": "请求缺失"
+    "request_missing": "请求缺失",
+    "component": "等待其还款"
   },
   "receipts": {
     "loading": "正在加载邮件",
@@ -710,7 +758,8 @@
       "ambiguous": "多笔交易匹配",
       "review_conflict": "已有其他请求未完成",
       "review": "审核中",
-      "ignored": "已忽略"
+      "ignored": "已忽略",
+      "component": "等待还款"
     },
     "search": {
       "label": "搜索邮件",
@@ -805,6 +854,7 @@
       "pageSelected": "此页面上的 {count} 封邮件已全部选中。",
       "selectAllMatching": "选择符合此筛选条件的全部 {total} 封邮件。",
       "allMatchingSelected": "符合此筛选条件的全部 {total} 封邮件已选中。",
+      "hiddenSelected": "{hidden, plural, other {已选中的邮件中有 # 封未显示在此列表中。}}",
       "reprocessButton": "重新处理({count})",
       "restoreButton": "恢复已忽略({count})",
       "restoreButtonAll": "恢复已忽略",
@@ -834,11 +884,12 @@
         "remove": "恢复:{label}"
       },
       "draftBlocked": {
-        "tooMany": "最多可用 {max} 封邮件准备解析器。请选择不超过 {max} 封邮件。",
-        "differentSenders": "所选邮件来自不同的发件人（{domains}）。解析器只读取一个发件人的邮件，请选择同一发件人的邮件。",
         "skipped": "无法读取的邮件没有可用于准备解析器的文本。请将其从选择中移除。",
         "allMatching": "解析器需用你自己选择的邮件准备，最多 {max} 封。请清除当前选择，再选择不超过 {max} 封邮件。",
-        "mixedKinds": "所选邮件中混有交易确认邮件和订单邮件。一个配置文件只读取一种邮件，请只选择交易确认邮件或只选择订单邮件。"
+        "mixedKinds": "所选邮件中混有交易确认邮件和订单邮件。一个配置文件只读取一种邮件，请只选择交易确认邮件或只选择订单邮件。",
+        "tooManyPerDomain": "每个发件人最多可使用 {perDomain} 封邮件。请为每个发件人（{domains}）选择不超过 {perDomain} 封邮件。",
+        "tooManyDomains": "最多可同时使用 {maxDomains} 个发件人（{domains}）。请选择不超过 {maxDomains} 个发件人的邮件。",
+        "tradeOneDomain": "交易配置文件只读取一个发件人（{domains}）的邮件。请选择同一发件人的交易确认邮件。"
       }
     },
     "pager": {
@@ -898,6 +949,12 @@
       "approveFailed": "无法批准这些提案",
       "noApprovable": "此选择中没有可批准的提案。",
       "narrowFailed": "无法统计邮件数量。更改未应用。"
+    },
+    "linkedDraftDialog": {
+      "title": "起草关联的配置文件？",
+      "message": "您选择了多个发件人的邮件：{domains}。仅当一笔银行交易的信息分散在多个发件人的邮件里时才使用，例如商店及其延期付款服务商，或商店及支付网关。要为互不相关的商店起草配置文件，请取消并每次处理一个域名。一次请求每个发件人最多 {perDomain} 封邮件，最多 {maxDomains} 个发件人。",
+      "domainEntry": "{domain}（{count, plural, one {# 封} other {# 封}}）",
+      "confirm": "起草关联的配置文件"
     }
   },
   "detail": {
@@ -958,7 +1015,13 @@
       "trade_no_account": "解析器无法判断这笔交易属于哪个账户。",
       "trade_exists": "你的账户中已有这笔交易，因此没有提出任何建议。",
       "trade_linked": "已关联到它所报告的交易，因此没有提出任何建议。",
-      "trade_no_currency": "配置文件无法判断这笔交易的币种，因此无法选择其账户。"
+      "trade_no_currency": "配置文件无法判断这笔交易的币种，因此无法选择其账户。",
+      "awaiting_settlement": "购买邮件已保存。它在等待支付它的还款邮件。",
+      "settled": "购买邮件已保存。与之关联的还款邮件支付了它的全部金额。",
+      "instalment": "购买邮件已保存。还款已支付其中一部分，其余仍待支付。",
+      "partially_linked": "此还款的某些部分还没有购买邮件。它们各显示为一行。",
+      "enriched_by_other": "匹配的交易已被另一封邮件完善。请打开它，用“关联”替换该完善内容，或忽略这封邮件。",
+      "no_link_key": "此购买邮件不含链接键，因此任何还款都找不到它。"
     },
     "reasonUnknown": "原因：{reason}",
     "requestNote": "审核请求（{state}）：{note}",
@@ -1005,6 +1068,15 @@
       "capped": "仅读取前 {max} 行。",
       "empty": "没有行。",
       "listLabel": "邮件的编号行"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "已关联的购买邮件",
+      "component": "第 {part} 部分：{subject}（{date}）",
+      "settlementsHeading": "支付方",
+      "settlement": "{subject}（{date}），金额 {amount}",
+      "enrichedBy": "已被以下邮件完善：{subject}",
+      "openButton": "打开",
+      "open": "打开邮件 {subject}"
     },
     "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {买入} other {卖出}} {quantity} 股 {symbol}。",
     "noTradeTransaction": "暂无：批准提议后会记账这笔交易，或将其关联到账本中已有的交易。",
@@ -1333,7 +1405,8 @@
         "discard_delete": "已被此解析器删除",
         "no_html": "没有 HTML 部分",
         "trade": "提出一笔交易",
-        "trade_exists": "已在账本中"
+        "trade_exists": "已在账本中",
+        "component": "购买邮件（等待还款）"
       },
       "parsedTradeAccount": "账户：{account}",
       "accountWithCurrency": "{name}（{currency}）",
@@ -1363,5 +1436,10 @@
     "bookTo": "记入：{account}",
     "bookToNotTradable": "记入 {account}，但它不是开放的证券账户，因此交易无法记入该账户。",
     "bookToUnknown": "记入不在您列表中的账户，因此交易无法记入该账户。"
+  },
+  "linkedHint": {
+    "emails": "一笔银行交易的信息分散在多个发件人的邮件里（例如商店及其延期付款服务商）？请同时选择这些发件人各自最多 {max} 封邮件，并起草关联的配置文件。",
+    "profiles": "下面的向导只为一个发件人起草配置文件。一笔银行交易的信息分散在多个发件人的邮件里（例如商店及其延期付款服务商）？请在“邮件”标签页中选择这些发件人各自最多 {max} 封邮件，并起草关联的配置文件。",
+    "openEmails": "打开“邮件”标签页"
   }
 }

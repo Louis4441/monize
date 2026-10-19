@@ -524,7 +524,12 @@
       "currencyMarkers": "Marcadores de moneda",
       "defaultAccount": "Cuenta predeterminada",
       "ruleAccount": "cuenta",
-      "ruleCurrency": "moneda"
+      "ruleCurrency": "moneda",
+      "role": "Rol del perfil",
+      "link": "La sección «link»",
+      "linkDaysBefore": "Días antes del pago",
+      "linkFromDomains": "Dominios de remitente de los correos de compra",
+      "linkKey": "Patrones de la clave de vínculo"
     },
     "codes": {
       "not_object": "no es una definición válida",
@@ -560,7 +565,15 @@
       "invalid_currency": "no es un código de moneda de 3 letras, como USD",
       "too_many_lines": "abarca demasiadas líneas (como máximo {max})",
       "line_break_not_allowed": "se compara con un solo texto (el nombre de un artículo, el comercio o una cuenta), así que no puede abarcar varias líneas",
-      "invalid_uuid_account": "no es una cuenta válida"
+      "invalid_uuid_account": "no es una cuenta válida",
+      "role_invalid": "debe ser standalone, component o settlement",
+      "link_key_requires_component": "solo se puede usar cuando el rol es component",
+      "link_key_missing": "es necesario cuando el rol es component",
+      "link_capture_requires_settlement": "usa una captura de link o instalment, que solo acepta un perfil settlement",
+      "link_requires_settlement": "solo se puede usar cuando el rol es settlement",
+      "link_domain_invalid": "no es un dominio de remitente válido (como máximo {max} dominios)",
+      "link_days_invalid": "debe ser un número entero de 0 a {max}",
+      "role_trade_conflict": "no puede ser component ni settlement en un perfil de operación de bolsa, que solo lee la operación"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transacción encaja} other {# transacciones encajan}} igual de bien, así que no se vincularía ninguna hasta que elijas.",
     "unmatched": "Ninguna transacción coincide, entre {count, plural, one {# candidata} other {# candidatas}}.",
     "jsonInvalid": "El JSON no es válido, así que todavía no hay nada que probar.",
+    "component": {
+      "heading": "Correo de compra (component): clave de vínculo {linkKey}",
+      "noLinkKey": "Correo de compra (component): no se leyó ninguna clave de vínculo, así que ningún correo de pago puede encontrarlo.",
+      "noneWaiting": "Ningún correo de pago está esperando esta clave de vínculo.",
+      "waiting": "{count, plural, one {# correo de pago está esperando} other {# correos de pago están esperando}} esta clave de vínculo:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Este perfil no leería este correo: ninguna de sus líneas obligatorias está en él, así que se probaría el siguiente perfil del remitente.",
       "skip_line": "Este perfil dejaría este correo aparte: contiene una línea en la que omite.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Línea de omisión",
         "waitIfLine": "Línea de espera",
         "reference": "Referencia",
+        "linkKey": "Clave de vínculo",
         "action": "Compra o venta",
         "symbol": "Símbolo",
         "quantity": "Acciones",
@@ -674,7 +695,33 @@
     "paid": "Pagado",
     "payee": "Comercio",
     "reference": "Referencia",
-    "categoryByAi": "IA"
+    "categoryByAi": "IA",
+    "linkKey": "Clave de vínculo",
+    "kinds": {
+      "shipping": "Envío",
+      "fee": "Comisión",
+      "discount": "Descuento"
+    },
+    "parts": {
+      "heading": "Partes",
+      "part": "Parte",
+      "link": "Vínculo",
+      "outcome": "Resultado",
+      "noLink": "Sin vínculo",
+      "component": "Correo de compra: {subject} ({date}).",
+      "componentProfile": "Perfil: {name}.",
+      "componentNet": "Total de la compra: {amount}.",
+      "taken": "Ya utilizado: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "La parte no tiene vínculo, así que sigue siendo una línea.",
+      "not_found": "No se encontró ningún correo de compra para este vínculo, así que la parte sigue siendo una línea.",
+      "component_incomplete": "El correo de compra no se leyó por completo, así que la parte sigue siendo una línea.",
+      "component_used": "Otros pagos ya usaron toda la compra, así que la parte sigue siendo una línea.",
+      "joined": "Sustituida por las líneas del correo de compra.",
+      "scaled": "Sustituida por las líneas del correo de compra, ajustadas a esta parte.",
+      "amount_exceeds": "La parte supera lo que queda de la compra, así que sigue siendo una línea."
+    }
   },
   "state": {
     "pending": "Pendiente de lectura",
@@ -690,7 +737,8 @@
     "dismissed": "Descartado",
     "expired": "Caducado",
     "pending_ai": "Esperando a la IA",
-    "request_missing": "Falta la solicitud"
+    "request_missing": "Falta la solicitud",
+    "component": "Esperando su pago"
   },
   "receipts": {
     "loading": "Cargando correos",
@@ -710,7 +758,8 @@
       "ambiguous": "Encajan varias transacciones",
       "review_conflict": "Hay otra solicitud abierta",
       "review": "En revisión",
-      "ignored": "Ignorado"
+      "ignored": "Ignorado",
+      "component": "Esperando el pago"
     },
     "search": {
       "label": "Buscar correos",
@@ -805,6 +854,7 @@
       "pageSelected": "Los {count} correos de esta página están seleccionados.",
       "selectAllMatching": "Seleccionar los {total} correos que coinciden con este filtro.",
       "allMatchingSelected": "Los {total} correos que coinciden con este filtro están seleccionados.",
+      "hiddenSelected": "{hidden, plural, one {# de los correos seleccionados no aparece en esta lista.} many {# de los correos seleccionados no aparecen en esta lista.} other {# de los correos seleccionados no aparecen en esta lista.}}",
       "reprocessButton": "Reprocesar ({count})",
       "restoreButton": "Restaurar ignorados ({count})",
       "restoreButtonAll": "Restaurar ignorados",
@@ -834,11 +884,12 @@
         "remove": "Volver a incluir: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Un perfil se prepara con {max} correos como máximo. Selecciona {max} correos o menos.",
-        "differentSenders": "Los correos seleccionados vienen de remitentes distintos ({domains}). Un perfil lee los correos de un solo remitente, así que selecciona correos de uno solo.",
         "skipped": "Un correo que no se pudo leer no tiene texto para preparar un perfil. Quítalo de la selección.",
         "allMatching": "Un perfil se prepara con correos que seleccionas tú, como máximo {max}. Borra esta selección y selecciona hasta {max} correos.",
-        "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos."
+        "mixedKinds": "Los correos seleccionados mezclan confirmaciones de operaciones y correos de pedidos. Un perfil lee un solo tipo, así que selecciona solo confirmaciones de operaciones o solo correos de pedidos.",
+        "tooManyPerDomain": "Se pueden usar como máximo {perDomain} correos de un remitente. Selecciona {perDomain} correos o menos de cada remitente ({domains}).",
+        "tooManyDomains": "Se pueden usar juntos como máximo {maxDomains} remitentes ({domains}). Selecciona correos de {maxDomains} remitentes o menos.",
+        "tradeOneDomain": "Un perfil de operación lee los correos de un solo remitente ({domains}). Selecciona confirmaciones de operación de un solo remitente."
       }
     },
     "pager": {
@@ -898,6 +949,12 @@
       "approveFailed": "No se pudieron aprobar las propuestas",
       "noApprovable": "Ninguna propuesta de esta selección se puede aprobar.",
       "narrowFailed": "No se pudieron contar los correos. El cambio no se aplicó."
+    },
+    "linkedDraftDialog": {
+      "title": "¿Preparar perfiles vinculados?",
+      "message": "Has seleccionado correos de varios remitentes: {domains}. Úsalo solo cuando los datos de una transacción bancaria estén repartidos en correos de varios remitentes, por ejemplo una tienda y su proveedor de pago aplazado, o una tienda y una pasarela de pago. Para preparar perfiles de tiendas sin relación, cancela y prepara un dominio cada vez. Una solicitud admite como máximo {perDomain} correos por remitente y {maxDomains} remitentes.",
+      "domainEntry": "{domain} ({count, plural, one {# correo} other {# correos}})",
+      "confirm": "Preparar perfiles vinculados"
     }
   },
   "detail": {
@@ -958,7 +1015,13 @@
       "trade_no_account": "El perfil no pudo saber a qué cuenta corresponde esta operación.",
       "trade_exists": "Tus cuentas ya contienen esta operación, así que no se propuso nada.",
       "trade_linked": "Vinculado a la transacción que informa, así que no se propuso nada.",
-      "trade_no_currency": "El perfil no pudo saber en qué moneda está esta operación, así que no pudo elegir su cuenta."
+      "trade_no_currency": "El perfil no pudo saber en qué moneda está esta operación, así que no pudo elegir su cuenta.",
+      "awaiting_settlement": "Correo de compra guardado. Espera el correo de pago que lo cubre.",
+      "settled": "Correo de compra guardado. Los correos de pago unidos a él cubren su importe completo.",
+      "instalment": "Correo de compra guardado. Los pagos cubrieron una parte; el resto aún está por pagar.",
+      "partially_linked": "Algunas partes de este pago aún no tienen correo de compra. Se muestran como una línea cada una.",
+      "enriched_by_other": "La transacción coincidente ya fue completada por otro correo. Ábrela y usa Vincular para reemplazar ese complemento, o ignora este correo.",
+      "no_link_key": "Este correo de compra no contiene ninguna clave de vínculo, así que ningún pago puede encontrarlo."
     },
     "reasonUnknown": "Motivo: {reason}",
     "requestNote": "Solicitud de revisión ({state}): {note}",
@@ -1005,6 +1068,15 @@
       "capped": "Solo se leen las primeras {max} líneas.",
       "empty": "No hay líneas.",
       "listLabel": "Líneas numeradas del correo"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Correos de compra vinculados",
+      "component": "Parte {part}: {subject} ({date})",
+      "settlementsHeading": "Pagado por",
+      "settlement": "{subject} ({date}), parte {amount}",
+      "enrichedBy": "Ya completada por: {subject}",
+      "openButton": "Abrir",
+      "open": "Abrir el correo {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Compra} other {Venta}} de {quantity} {symbol} por {total} el {date}.",
     "noTradeTransaction": "Ninguna todavía: la operación se registra al aprobar su propuesta, o se vincula a una que ya esté en tu registro.",
@@ -1333,7 +1405,8 @@
         "discard_delete": "Eliminado por este perfil",
         "no_html": "Sin parte HTML",
         "trade": "Propone una operación",
-        "trade_exists": "Ya está en tu registro"
+        "trade_exists": "Ya está en tu registro",
+        "component": "Correo de compra (espera el pago)"
       },
       "parsedTradeAccount": "Cuenta: {account}",
       "accountWithCurrency": "{name} ({currency})",
@@ -1363,5 +1436,10 @@
     "bookTo": "Se registra en: {account}",
     "bookToNotTradable": "Se registra en {account}, que no es una cuenta de corretaje abierta, así que la operación no puede registrarse allí.",
     "bookToUnknown": "Se registra en una cuenta que no está en tu lista, así que la operación no puede registrarse allí."
+  },
+  "linkedHint": {
+    "emails": "¿Una transacción bancaria descrita en correos de varios remitentes (por ejemplo, una tienda y su proveedor de pago aplazado)? Selecciona juntos hasta {max} correos de cada uno de esos remitentes y prepara perfiles vinculados.",
+    "profiles": "La guía de abajo prepara un perfil para un solo remitente. ¿Una transacción bancaria descrita en correos de varios remitentes (por ejemplo, una tienda y su proveedor de pago aplazado)? Selecciona en la pestaña Correos hasta {max} correos de cada uno de esos remitentes y prepara perfiles vinculados.",
+    "openEmails": "Abrir la pestaña Correos"
   }
 }

@@ -524,7 +524,12 @@
       "currencyMarkers": "Währungsmarkierungen",
       "defaultAccount": "Standardkonto",
       "ruleAccount": "Konto",
-      "ruleCurrency": "Währung"
+      "ruleCurrency": "Währung",
+      "role": "Profilrolle",
+      "link": "Der Abschnitt „link“",
+      "linkDaysBefore": "Tage vor der Rückzahlung",
+      "linkFromDomains": "Absenderdomains der Kauf-E-Mails",
+      "linkKey": "Muster für den Link-Schlüssel"
     },
     "codes": {
       "not_object": "ist keine gültige Definition",
@@ -560,7 +565,15 @@
       "invalid_currency": "ist kein dreistelliger Währungscode wie USD",
       "too_many_lines": "erstreckt sich über zu viele Zeilen (höchstens {max})",
       "line_break_not_allowed": "wird mit einem einzelnen Text verglichen (einem Artikelnamen, dem Händler oder einem Konto) und kann sich daher nicht über mehrere Zeilen erstrecken",
-      "invalid_uuid_account": "ist kein gültiges Konto"
+      "invalid_uuid_account": "ist kein gültiges Konto",
+      "role_invalid": "muss standalone, component oder settlement sein",
+      "link_key_requires_component": "kann nur verwendet werden, wenn die Rolle component ist",
+      "link_key_missing": "wird benötigt, wenn die Rolle component ist",
+      "link_capture_requires_settlement": "verwendet eine Erfassung von link oder instalment, die nur ein settlement-Profil akzeptiert",
+      "link_requires_settlement": "kann nur verwendet werden, wenn die Rolle settlement ist",
+      "link_domain_invalid": "ist keine gültige Absenderdomain (höchstens {max} Domains)",
+      "link_days_invalid": "muss eine ganze Zahl von 0 bis {max} sein",
+      "role_trade_conflict": "darf in einem Profil für Wertpapierhandel, das nur den Handel liest, nicht component oder settlement sein"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# Buchung passt} other {# Buchungen passen}} gleich gut, daher würde keine verknüpft, bis du eine auswählst.",
     "unmatched": "Keine Buchung passt, geprüft wurden {count, plural, one {# Kandidat} other {# Kandidaten}}.",
     "jsonInvalid": "Das JSON ist nicht gültig, daher gibt es noch nichts zu testen.",
+    "component": {
+      "heading": "Kauf-E-Mail (component): Link-Schlüssel {linkKey}",
+      "noLinkKey": "Kauf-E-Mail (component): Es wurde kein Link-Schlüssel gelesen, daher kann keine Rückzahlungs-E-Mail sie finden.",
+      "noneWaiting": "Keine Rückzahlungs-E-Mail wartet auf diesen Link-Schlüssel.",
+      "waiting": "{count, plural, one {# Rückzahlungs-E-Mail wartet} other {# Rückzahlungs-E-Mails warten}} auf diesen Link-Schlüssel:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Dieses Profil würde diese E-Mail nicht lesen: Keine seiner erforderlichen Zeilen kommt darin vor, daher würde das nächste Profil für den Absender versucht.",
       "skip_line": "Dieses Profil würde diese E-Mail beiseitelegen: Sie enthält eine Zeile, bei der es überspringt.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Überspringzeile",
         "waitIfLine": "Zurückhaltezeile",
         "reference": "Referenz",
+        "linkKey": "Link-Schlüssel",
         "action": "Kauf oder Verkauf",
         "symbol": "Kürzel",
         "quantity": "Anteile",
@@ -674,7 +695,33 @@
     "paid": "Bezahlt",
     "payee": "Händler",
     "reference": "Referenz",
-    "categoryByAi": "KI"
+    "categoryByAi": "KI",
+    "linkKey": "Link-Schlüssel",
+    "kinds": {
+      "shipping": "Versand",
+      "fee": "Gebühr",
+      "discount": "Rabatt"
+    },
+    "parts": {
+      "heading": "Teile",
+      "part": "Teil",
+      "link": "Verknüpfung",
+      "outcome": "Ergebnis",
+      "noLink": "Keine Verknüpfung",
+      "component": "Kauf-E-Mail: {subject} ({date}).",
+      "componentProfile": "Profil: {name}.",
+      "componentNet": "Kaufsumme: {amount}.",
+      "taken": "Bereits verwendet: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "Der Teil hat keine Verknüpfung und bleibt daher eine Zeile.",
+      "not_found": "Für diese Verknüpfung wurde keine Kauf-E-Mail gefunden, daher bleibt der Teil eine Zeile.",
+      "component_incomplete": "Die Kauf-E-Mail wurde nicht vollständig gelesen, daher bleibt der Teil eine Zeile.",
+      "component_used": "Andere Rückzahlungen haben den ganzen Kauf bereits verbraucht, daher bleibt der Teil eine Zeile.",
+      "joined": "Durch die Zeilen der Kauf-E-Mail ersetzt.",
+      "scaled": "Durch die Zeilen der Kauf-E-Mail ersetzt, auf diesen Teil skaliert.",
+      "amount_exceeds": "Der Teil ist größer als der Rest des Kaufs, daher bleibt er eine Zeile."
+    }
   },
   "state": {
     "pending": "Wartet auf das Einlesen",
@@ -690,7 +737,8 @@
     "dismissed": "Verworfen",
     "expired": "Abgelaufen",
     "pending_ai": "Wartet auf die KI",
-    "request_missing": "Anfrage fehlt"
+    "request_missing": "Anfrage fehlt",
+    "component": "Wartet auf die Rückzahlung"
   },
   "receipts": {
     "loading": "E-Mails werden geladen",
@@ -710,7 +758,8 @@
       "ambiguous": "Mehrere Buchungen passen",
       "review_conflict": "Andere Anfrage offen",
       "review": "In Prüfung",
-      "ignored": "Ignoriert"
+      "ignored": "Ignoriert",
+      "component": "Wartet auf Rückzahlung"
     },
     "search": {
       "label": "E-Mails durchsuchen",
@@ -805,6 +854,7 @@
       "pageSelected": "Alle {count} E-Mails auf dieser Seite sind ausgewählt.",
       "selectAllMatching": "Alle {total} E-Mails auswählen, die zu diesem Filter passen.",
       "allMatchingSelected": "Alle {total} E-Mails, die zu diesem Filter passen, sind ausgewählt.",
+      "hiddenSelected": "{hidden, plural, one {# der ausgewählten E-Mails wird in dieser Liste nicht angezeigt.} other {# der ausgewählten E-Mails werden in dieser Liste nicht angezeigt.}}",
       "reprocessButton": "Erneut verarbeiten ({count})",
       "restoreButton": "Ignorierte wiederherstellen ({count})",
       "restoreButtonAll": "Ignorierte wiederherstellen",
@@ -834,11 +884,12 @@
         "remove": "Zurücknehmen: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Ein Profil kann aus höchstens {max} E-Mails erstellt werden. Wähle {max} oder weniger E-Mails aus.",
-        "differentSenders": "Die ausgewählten E-Mails stammen von verschiedenen Absendern ({domains}). Ein Profil liest die E-Mails eines Absenders, wähle also E-Mails von einem Absender.",
         "skipped": "Eine E-Mail, die nicht gelesen werden konnte, hat keinen Text für ein Profil. Entferne sie aus der Auswahl.",
         "allMatching": "Ein Profil wird aus E-Mails erstellt, die du selbst auswählst, höchstens {max}. Hebe diese Auswahl auf und wähle bis zu {max} E-Mails aus.",
-        "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails."
+        "mixedKinds": "Die ausgewählten E-Mails mischen Handelsbestätigungen und Bestell-E-Mails. Ein Profil liest nur eine Art, wähle also nur Handelsbestätigungen oder nur Bestell-E-Mails.",
+        "tooManyPerDomain": "Von einem Absender können höchstens {perDomain} E-Mails verwendet werden. Wähle von jedem Absender ({domains}) {perDomain} oder weniger E-Mails.",
+        "tooManyDomains": "Höchstens {maxDomains} Absender können zusammen verwendet werden ({domains}). Wähle E-Mails von {maxDomains} Absendern oder weniger.",
+        "tradeOneDomain": "Ein Trade-Profil liest die E-Mails eines Absenders ({domains}). Wähle Trade-Bestätigungen von einem Absender."
       }
     },
     "pager": {
@@ -898,6 +949,12 @@
       "approveFailed": "Die Vorschläge konnten nicht genehmigt werden",
       "noApprovable": "In dieser Auswahl kann kein Vorschlag genehmigt werden.",
       "narrowFailed": "Die E-Mails konnten nicht gezählt werden. Die Änderung wurde nicht übernommen."
+    },
+    "linkedDraftDialog": {
+      "title": "Verknüpfte Profile entwerfen?",
+      "message": "Du hast E-Mails mehrerer Absender gewählt: {domains}. Nutze das nur, wenn die Angaben zu einer Banktransaktion auf E-Mails mehrerer Absender verteilt sind, zum Beispiel ein Shop und sein Anbieter für Ratenzahlung oder ein Shop und ein Zahlungsdienst. Für voneinander unabhängige Shops brich ab und entwirf eine Domain nach der anderen. Eine Anfrage nimmt höchstens {perDomain} E-Mails je Absender und höchstens {maxDomains} Absender.",
+      "domainEntry": "{domain} ({count, plural, one {# E-Mail} other {# E-Mails}})",
+      "confirm": "Verknüpfte Profile entwerfen"
     }
   },
   "detail": {
@@ -958,7 +1015,13 @@
       "trade_no_account": "Das Profil konnte nicht erkennen, für welches Konto dieser Handel gilt.",
       "trade_exists": "Deine Konten enthalten diesen Handel bereits, daher wurde nichts vorgeschlagen.",
       "trade_linked": "Mit der Buchung verknüpft, die sie meldet, daher wurde nichts vorgeschlagen.",
-      "trade_no_currency": "Das Profil konnte nicht erkennen, in welcher Währung dieser Handel ist, und daher sein Konto nicht wählen."
+      "trade_no_currency": "Das Profil konnte nicht erkennen, in welcher Währung dieser Handel ist, und daher sein Konto nicht wählen.",
+      "awaiting_settlement": "Kauf-E-Mail gespeichert. Sie wartet auf die Rückzahlungs-E-Mail, die sie bezahlt.",
+      "settled": "Kauf-E-Mail gespeichert. Die damit verbundenen Rückzahlungs-E-Mails bezahlen den ganzen Betrag.",
+      "instalment": "Kauf-E-Mail gespeichert. Rückzahlungen haben einen Teil bezahlt; der Rest ist noch offen.",
+      "partially_linked": "Für einige Teile dieser Rückzahlung gibt es noch keine Kauf-E-Mail. Sie werden jeweils als eine Zeile gezeigt.",
+      "enriched_by_other": "Die passende Buchung wurde bereits durch eine andere E-Mail ergänzt. Öffne sie und nutze Verknüpfen, um diese Ergänzung zu ersetzen, oder ignoriere diese E-Mail.",
+      "no_link_key": "Diese Kauf-E-Mail enthält keinen Link-Schlüssel, daher kann keine Rückzahlung sie finden."
     },
     "reasonUnknown": "Grund: {reason}",
     "requestNote": "Prüfanfrage ({state}): {note}",
@@ -1005,6 +1068,15 @@
       "capped": "Es werden nur die ersten {max} Zeilen gelesen.",
       "empty": "Keine Zeilen.",
       "listLabel": "Nummerierte Zeilen der E-Mail"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Verknüpfte Kauf-E-Mails",
+      "component": "Teil {part}: {subject} ({date})",
+      "settlementsHeading": "Bezahlt durch",
+      "settlement": "{subject} ({date}), Teil {amount}",
+      "enrichedBy": "Bereits ergänzt durch: {subject}",
+      "openButton": "Öffnen",
+      "open": "Die E-Mail {subject} öffnen"
     },
     "tradeTransactionSummary": "{action, select, BUY {Gekauft} other {Verkauft}}: {quantity} {symbol} für {total} am {date}.",
     "noTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag freigibst, oder mit einer bereits erfassten Transaktion verknüpft.",
@@ -1333,7 +1405,8 @@
         "discard_delete": "Von diesem Profil gelöscht",
         "no_html": "Kein HTML-Teil",
         "trade": "Schlägt einen Handel vor",
-        "trade_exists": "Bereits gebucht"
+        "trade_exists": "Bereits gebucht",
+        "component": "Kauf-E-Mail (wartet auf Rückzahlung)"
       },
       "parsedTradeAccount": "Konto: {account}",
       "accountWithCurrency": "{name} ({currency})",
@@ -1363,5 +1436,10 @@
     "bookTo": "Gebucht auf: {account}",
     "bookToNotTradable": "Gebucht auf {account}, das kein offenes Depotkonto ist, daher kann der Handel dort nicht gebucht werden.",
     "bookToUnknown": "Gebucht auf ein Konto, das nicht in deiner Liste ist, daher kann der Handel dort nicht gebucht werden."
+  },
+  "linkedHint": {
+    "emails": "Eine Banktransaktion, die in E-Mails mehrerer Absender beschrieben wird (zum Beispiel ein Shop und sein Anbieter für Ratenzahlung)? Wähle zusammen bis zu {max} E-Mails von jedem dieser Absender und entwirf verknüpfte Profile.",
+    "profiles": "Die Anleitung unten entwirft ein Profil für einen Absender. Eine Banktransaktion, die in E-Mails mehrerer Absender beschrieben wird (zum Beispiel ein Shop und sein Anbieter für Ratenzahlung)? Wähle auf dem Tab E-Mails bis zu {max} E-Mails von jedem dieser Absender und entwirf verknüpfte Profile.",
+    "openEmails": "Tab E-Mails öffnen"
   }
 }

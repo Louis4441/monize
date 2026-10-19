@@ -8,7 +8,9 @@ import {
   AiReviewRequest,
   AiReviewRequestStatus,
   MAX_AI_REVIEW_INSTRUCTION_LENGTH,
+  MAX_PARSER_DRAFT_DOMAINS,
   MAX_PARSER_DRAFT_EMAILS,
+  MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN,
 } from "./ai-review-request.entity";
 
 /** One request to queue: which row, which rule asked, and what to do. */
@@ -70,12 +72,13 @@ export interface AiReviewEnqueueForReceiptInput {
 }
 
 /**
- * A request to write a receipt parser from stored emails of one sender
+ * A request to write a receipt parser from stored emails of one or more senders
  * (`email_parser_draft`). It has no transaction. `parserDomain` is the sender
- * domain the draft is for; at most one such request is open per (user, domain).
+ * domain the request is filed under; at most one such request is open per (user,
+ * domain).
  */
 export interface AiReviewEnqueueParserDraftInput {
-  /** 1 to 5 stored emails of the user; the caller has checked they are the user's. */
+  /** 1 to 25 stored emails of the user (at most 5 per domain, 5 domains); the caller has checked they are the user's. */
   readonly emailReceiptIds: readonly string[];
   readonly parserDomain: string;
   readonly instruction: string;
@@ -125,6 +128,17 @@ interface RequestRow {
   email_receipt_ids: string[] | null;
   parser_domain: string | null;
 }
+
+/**
+ * The parsers a parser-draft request lists, as a JSON array of text ids: its
+ * `proposal.parserIds`, else the single `proposal.parserId` of a request written
+ * before a request could hold two drafts, else empty. `q` is the request's alias.
+ */
+const PROPOSED_PARSER_IDS_SQL = `COALESCE(
+  q.proposal -> 'parserIds',
+  CASE WHEN q.proposal ->> 'parserId' IS NOT NULL
+       THEN jsonb_build_array(q.proposal ->> 'parserId')
+       ELSE '[]'::jsonb END)`;
 
 function parserDraftClaimed(): ConflictException {
   return new ConflictException(
@@ -374,7 +388,7 @@ export class AiReviewRequestsService {
       input.emailReceiptIds.length < 1 ||
       input.emailReceiptIds.length > MAX_PARSER_DRAFT_EMAILS
     ) {
-      throw new Error("A parser draft request names 1 to 5 emails");
+      throw new Error("A parser draft request names 1 to 25 emails");
     }
     await acquireAdvisoryLock(
       m,
@@ -438,11 +452,15 @@ export class AiReviewRequestsService {
     userId: string,
     input: AiReviewEnqueueParserDraftInput,
   ): Promise<AiReviewRequest> {
+    // The wizard's request is for one sender: five emails, not the 25 of a
+    // multi-domain request (`enqueueParserDraft`).
     if (
       input.emailReceiptIds.length < 1 ||
-      input.emailReceiptIds.length > MAX_PARSER_DRAFT_EMAILS
+      input.emailReceiptIds.length > MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN
     ) {
-      throw new Error("A parser draft request names 1 to 5 emails");
+      throw new Error(
+        `A wizard parser draft request names 1 to ${MAX_PARSER_DRAFT_EMAILS_PER_DOMAIN} emails`,
+      );
     }
     await acquireAdvisoryLock(
       m,
@@ -496,13 +514,16 @@ export class AiReviewRequestsService {
   }
 
   /**
-   * The agent that holds a parser-draft request has saved its draft: move the
-   * request to `proposed` and remember which parser answers it
-   * (`proposal = { parserId, proposedAt }`). ONE conditional UPDATE in the
-   * caller's transaction, the same one that wrote the parser: it matches only a
-   * `claimed` request of this kind whose `claimed_by` is this caller and whose
-   * life has not run out, so a caller that never claimed it (or lost the claim to
-   * a dismissal, a replacement or an expiry) matches nothing. Returns whether it
+   * The agent that holds a parser-draft request has saved a draft: move the
+   * request to `proposed` and remember which parsers answer it (`proposal =
+   * { parserId, parserIds, proposedAt }`: `parserId` is the first draft and stays
+   * it, `parserIds` every draft in save order, at most `MAX_PARSER_DRAFT_DOMAINS`, no duplicate). ONE
+   * conditional UPDATE in the caller's transaction, the same one that wrote the
+   * parser: it matches only a request of this kind whose `claimed_by` is this
+   * caller and whose life has not run out, and that is `claimed`, or `proposed`
+   * while it spans several sender domains and holds fewer than `MAX_PARSER_DRAFT_DOMAINS` drafts (or already
+   * lists this one). A caller that never claimed it (or lost the claim to a
+   * dismissal, a replacement or an expiry) matches nothing. Returns whether it
    * matched; the caller refuses before writing the parser when it did not.
    */
   async proposeParserDraft(
@@ -514,28 +535,45 @@ export class AiReviewRequestsService {
   ): Promise<boolean> {
     const rows = returnedRows<{ id: string }>(
       await m.query(
-        `UPDATE ai_review_requests
+        `UPDATE ai_review_requests q
             SET status = 'proposed',
                 proposal = jsonb_build_object(
-                  'parserId', $4::text,
+                  'parserId', COALESCE(q.proposal ->> 'parserId', $4::text),
+                  'parserIds',
+                    CASE WHEN ${PROPOSED_PARSER_IDS_SQL} @> jsonb_build_array($4::text)
+                         THEN ${PROPOSED_PARSER_IDS_SQL}
+                         ELSE ${PROPOSED_PARSER_IDS_SQL} || jsonb_build_array($4::text)
+                    END,
                   'proposedAt', CURRENT_TIMESTAMP)
-          WHERE id = $1
-            AND user_id = $2
-            AND kind = 'email_parser_draft'
-            AND status = 'claimed'
-            AND claimed_by = $3
-            AND expires_at > CURRENT_TIMESTAMP
-         RETURNING id`,
-        [id, userId, claimedBy, parserId],
+          WHERE q.id = $1
+            AND q.user_id = $2
+            AND q.kind = 'email_parser_draft'
+            AND q.claimed_by = $3
+            AND q.expires_at > CURRENT_TIMESTAMP
+            AND (q.status = 'claimed'
+                 OR (q.status = 'proposed'
+                     AND (SELECT COUNT(DISTINCT r.from_domain)
+                            FROM email_receipts r
+                           WHERE r.user_id = q.user_id
+                             AND r.id = ANY(q.email_receipt_ids)
+                             AND r.from_domain <> '') > 1
+                     AND (jsonb_array_length(${PROPOSED_PARSER_IDS_SQL}) < $5::int
+                          OR ${PROPOSED_PARSER_IDS_SQL} @> jsonb_build_array($4::text))))
+         RETURNING q.id`,
+        [id, userId, claimedBy, parserId, MAX_PARSER_DRAFT_DOMAINS],
       ),
     );
     return rows.length > 0;
   }
 
   /**
-   * A parser was approved: every `proposed` parser-draft request that proposed
-   * it is `applied`, in the approving transaction. Nothing matching is not an
-   * error (a draft written by hand, or by a request since dismissed).
+   * A parser was approved: every `proposed` parser-draft request that lists it
+   * is `applied` once EVERY parser it lists (`parserIds`, else the single
+   * `parserId`) is an approved parser of the user's, in the approving
+   * transaction (the approval's own UPDATE is visible to the check). A request
+   * that lists another parser still unapproved, or since deleted, stays
+   * `proposed`. Nothing matching is not an error (a draft written by hand, or by a
+   * request since dismissed).
    */
   async markParserDraftApplied(
     m: EntityManager,
@@ -544,13 +582,22 @@ export class AiReviewRequestsService {
   ): Promise<number> {
     const rows = returnedRows<{ id: string }>(
       await m.query(
-        `UPDATE ai_review_requests
+        `UPDATE ai_review_requests q
             SET status = 'applied'
-          WHERE user_id = $1
-            AND kind = 'email_parser_draft'
-            AND status = 'proposed'
-            AND proposal ->> 'parserId' = $2::text
-         RETURNING id`,
+          WHERE q.user_id = $1
+            AND q.kind = 'email_parser_draft'
+            AND q.status = 'proposed'
+            AND ${PROPOSED_PARSER_IDS_SQL} @> jsonb_build_array($2::text)
+            AND NOT EXISTS (
+                  SELECT 1
+                    FROM jsonb_array_elements_text(${PROPOSED_PARSER_IDS_SQL}) AS listed(id)
+                   WHERE NOT EXISTS (
+                           SELECT 1
+                             FROM email_receipt_parsers p
+                            WHERE p.user_id = q.user_id
+                              AND p.id::text = listed.id
+                              AND p.status = 'approved'))
+         RETURNING q.id`,
         [userId, parserId],
       ),
     );
@@ -558,8 +605,11 @@ export class AiReviewRequestsService {
   }
 
   /**
-   * A parser was deleted: the open parser-draft requests that proposed it are
-   * dismissed (`rejected`), so the inbox does not offer a draft that is gone.
+   * A parser was deleted: the open parser-draft requests that listed it are
+   * dismissed (`rejected`) when none of the parsers they list exists any more, so
+   * the inbox does not offer a draft that is gone. A multi-domain request whose
+   * other draft is still there stays `proposed`. The caller deletes the parser
+   * first, in the same transaction, so the check does not see the deleted row.
    */
   async dismissParserDraftsFor(
     m: EntityManager,
@@ -568,13 +618,19 @@ export class AiReviewRequestsService {
   ): Promise<number> {
     const rows = returnedRows<{ id: string }>(
       await m.query(
-        `UPDATE ai_review_requests
+        `UPDATE ai_review_requests q
             SET status = 'rejected'
-          WHERE user_id = $1
-            AND kind = 'email_parser_draft'
-            AND status IN ('pending', 'claimed', 'proposed')
-            AND proposal ->> 'parserId' = $2::text
-         RETURNING id`,
+          WHERE q.user_id = $1
+            AND q.kind = 'email_parser_draft'
+            AND q.status IN ('pending', 'claimed', 'proposed')
+            AND ${PROPOSED_PARSER_IDS_SQL} @> jsonb_build_array($2::text)
+            AND NOT EXISTS (
+                  SELECT 1
+                    FROM jsonb_array_elements_text(${PROPOSED_PARSER_IDS_SQL}) AS listed(id)
+                    JOIN email_receipt_parsers p
+                      ON p.user_id = q.user_id
+                     AND p.id::text = listed.id)
+         RETURNING q.id`,
         [userId, parserId],
       ),
     );

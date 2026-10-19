@@ -524,7 +524,12 @@
       "currencyMarkers": "Penanda mata uang",
       "defaultAccount": "Akun bawaan",
       "ruleAccount": "akun",
-      "ruleCurrency": "mata uang"
+      "ruleCurrency": "mata uang",
+      "role": "Peran profil",
+      "link": "Bagian link",
+      "linkDaysBefore": "Jumlah hari sebelum pembayaran",
+      "linkFromDomains": "Domain pengirim email pembelian",
+      "linkKey": "Pola kunci tautan"
     },
     "codes": {
       "not_object": "bukan definisi yang valid",
@@ -560,7 +565,15 @@
       "invalid_currency": "bukan kode mata uang 3 huruf, seperti USD",
       "too_many_lines": "mencakup terlalu banyak baris (maksimal {max})",
       "line_break_not_allowed": "dicocokkan dengan satu teks (nama item, pedagang, atau akun), jadi tidak dapat mencakup beberapa baris",
-      "invalid_uuid_account": "bukan akun yang valid"
+      "invalid_uuid_account": "bukan akun yang valid",
+      "role_invalid": "harus standalone, component, atau settlement",
+      "link_key_requires_component": "hanya dapat digunakan jika perannya component",
+      "link_key_missing": "diperlukan jika perannya component",
+      "link_capture_requires_settlement": "menggunakan tangkapan link atau instalment, yang hanya diterima profil settlement",
+      "link_requires_settlement": "hanya dapat digunakan jika perannya settlement",
+      "link_domain_invalid": "bukan domain pengirim yang valid (paling banyak {max} domain)",
+      "link_days_invalid": "harus berupa bilangan bulat dari 0 sampai {max}",
+      "role_trade_conflict": "tidak boleh component atau settlement dalam profil transaksi bursa, yang hanya membaca transaksinya"
     }
   },
   "test": {
@@ -587,6 +600,13 @@
     "ambiguous": "{count, plural, one {# transaksi} other {# transaksi}} sama-sama cocok, jadi tidak ada yang akan ditautkan sampai Anda memilih.",
     "unmatched": "Tidak ada transaksi yang cocok, dari {count, plural, one {# kandidat} other {# kandidat}}.",
     "jsonInvalid": "JSON tidak valid, jadi belum ada yang dapat diuji.",
+    "component": {
+      "heading": "Email pembelian (component): kunci tautan {linkKey}",
+      "noLinkKey": "Email pembelian (component): tidak ada kunci tautan yang terbaca, sehingga tidak ada email pembayaran yang dapat menemukannya.",
+      "noneWaiting": "Tidak ada email pembayaran yang menunggu kunci tautan ini.",
+      "waiting": "{count, plural, one {# email pembayaran menunggu} other {# email pembayaran menunggu}} kunci tautan ini:",
+      "settlement": "{subject} ({date})"
+    },
     "outcome": {
       "not_applicable": "Profil ini tidak akan membaca surel ini: tidak ada baris wajibnya yang ada di dalamnya, sehingga profil berikutnya untuk pengirim akan dicoba.",
       "skip_line": "Profil ini akan menyisihkan surel ini: di dalamnya ada baris yang membuatnya dilewati.",
@@ -609,6 +629,7 @@
         "skipIfLine": "Baris lewati",
         "waitIfLine": "Baris tunggu",
         "reference": "Referensi",
+        "linkKey": "Kunci tautan",
         "action": "Beli atau jual",
         "symbol": "Kode",
         "quantity": "Saham",
@@ -674,7 +695,33 @@
     "paid": "Dibayar",
     "payee": "Penjual",
     "reference": "Referensi",
-    "categoryByAi": "AI"
+    "categoryByAi": "AI",
+    "linkKey": "Kunci tautan",
+    "kinds": {
+      "shipping": "Pengiriman",
+      "fee": "Biaya",
+      "discount": "Diskon"
+    },
+    "parts": {
+      "heading": "Bagian",
+      "part": "Bagian",
+      "link": "Tautan",
+      "outcome": "Hasil",
+      "noLink": "Tanpa tautan",
+      "component": "Email pembelian: {subject} ({date}).",
+      "componentProfile": "Profil: {name}.",
+      "componentNet": "Total pembelian: {amount}.",
+      "taken": "Sudah digunakan: {amount}."
+    },
+    "linkOutcomes": {
+      "no_link": "Bagian ini tidak memiliki tautan, jadi tetap satu baris.",
+      "not_found": "Tidak ditemukan email pembelian untuk tautan ini, jadi bagian ini tetap satu baris.",
+      "component_incomplete": "Email pembelian tidak terbaca seluruhnya, jadi bagian ini tetap satu baris.",
+      "component_used": "Pembayaran lain sudah menggunakan seluruh pembelian, jadi bagian ini tetap satu baris.",
+      "joined": "Diganti dengan baris-baris email pembelian.",
+      "scaled": "Diganti dengan baris-baris email pembelian, disesuaikan dengan bagian ini.",
+      "amount_exceeds": "Bagian ini melebihi sisa pembelian, jadi tetap satu baris."
+    }
   },
   "state": {
     "pending": "Menunggu dibaca",
@@ -690,7 +737,8 @@
     "dismissed": "Diabaikan",
     "expired": "Kedaluwarsa",
     "pending_ai": "Menunggu AI",
-    "request_missing": "Permintaan hilang"
+    "request_missing": "Permintaan hilang",
+    "component": "Menunggu pembayarannya"
   },
   "receipts": {
     "loading": "Memuat surel",
@@ -710,7 +758,8 @@
       "ambiguous": "Beberapa transaksi cocok",
       "review_conflict": "Permintaan lain masih terbuka",
       "review": "Sedang ditinjau",
-      "ignored": "Dikecualikan"
+      "ignored": "Dikecualikan",
+      "component": "Menunggu pembayaran"
     },
     "search": {
       "label": "Cari email",
@@ -805,6 +854,7 @@
       "pageSelected": "Semua {count} surel di halaman ini dipilih.",
       "selectAllMatching": "Pilih semua {total} surel yang cocok dengan filter ini.",
       "allMatchingSelected": "Semua {total} surel yang cocok dengan filter ini dipilih.",
+      "hiddenSelected": "{hidden, plural, other {# surel yang dipilih tidak tampil di daftar ini.}}",
       "reprocessButton": "Proses ulang ({count})",
       "restoreButton": "Pulihkan yang diabaikan ({count})",
       "restoreButtonAll": "Pulihkan yang diabaikan",
@@ -834,11 +884,12 @@
         "remove": "Masukkan kembali: {label}"
       },
       "draftBlocked": {
-        "tooMany": "Profil dapat disiapkan dari paling banyak {max} surel. Pilih {max} surel atau kurang.",
-        "differentSenders": "Surel terpilih berasal dari pengirim yang berbeda ({domains}). Profil membaca surel dari satu pengirim, jadi pilih surel dari satu pengirim saja.",
         "skipped": "Surel yang tidak dapat dibaca tidak punya teks untuk menyiapkan profil. Hapus dari pilihan.",
         "allMatching": "Profil disiapkan dari surel yang Anda pilih sendiri, paling banyak {max}. Hapus pilihan ini lalu pilih paling banyak {max} surel.",
-        "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan."
+        "mixedKinds": "Surel yang dipilih mencampur konfirmasi perdagangan dan surel pesanan. Satu profil membaca satu jenis, jadi pilih hanya konfirmasi perdagangan atau hanya surel pesanan.",
+        "tooManyPerDomain": "Paling banyak {perDomain} surel dari satu pengirim dapat dipakai. Pilih {perDomain} surel atau kurang dari setiap pengirim ({domains}).",
+        "tooManyDomains": "Paling banyak {maxDomains} pengirim dapat dipakai bersamaan ({domains}). Pilih surel dari {maxDomains} pengirim atau kurang.",
+        "tradeOneDomain": "Profil transaksi efek membaca surel dari satu pengirim ({domains}). Pilih konfirmasi transaksi dari satu pengirim."
       }
     },
     "pager": {
@@ -898,6 +949,12 @@
       "approveFailed": "Usulan tidak dapat disetujui",
       "noApprovable": "Tidak ada usulan dalam pilihan ini yang dapat disetujui.",
       "narrowFailed": "Email tidak dapat dihitung. Perubahan tidak diterapkan."
+    },
+    "linkedDraftDialog": {
+      "title": "Siapkan profil yang saling terkait?",
+      "message": "Anda memilih surel dari beberapa pengirim: {domains}. Gunakan ini hanya jika data satu transaksi bank tersebar di surel dari beberapa pengirim, misalnya toko dan penyedia pembayaran tertunda, atau toko dan gerbang pembayaran. Untuk toko yang tidak berkaitan, batalkan dan siapkan satu domain setiap kali. Satu permintaan menerima paling banyak {perDomain} surel per pengirim dan {maxDomains} pengirim.",
+      "domainEntry": "{domain} ({count, plural, one {# surel} other {# surel}})",
+      "confirm": "Siapkan profil terkait"
     }
   },
   "detail": {
@@ -958,7 +1015,13 @@
       "trade_no_account": "Profil tidak dapat menentukan akun mana yang dimaksud perdagangan ini.",
       "trade_exists": "Akun Anda sudah memuat perdagangan ini, jadi tidak ada yang diusulkan.",
       "trade_linked": "Ditautkan ke transaksi yang dilaporkannya, jadi tidak ada yang diusulkan.",
-      "trade_no_currency": "Profil tidak dapat mengetahui mata uang perdagangan ini, sehingga tidak dapat memilih akunnya."
+      "trade_no_currency": "Profil tidak dapat mengetahui mata uang perdagangan ini, sehingga tidak dapat memilih akunnya.",
+      "awaiting_settlement": "Email pembelian disimpan. Email ini menunggu email pembayaran yang melunasinya.",
+      "settled": "Email pembelian disimpan. Email pembayaran yang digabungkan dengannya melunasi seluruh jumlahnya.",
+      "instalment": "Email pembelian disimpan. Pembayaran telah melunasi sebagian; sisanya masih harus dibayar.",
+      "partially_linked": "Beberapa bagian pembayaran ini belum memiliki email pembelian. Masing-masing ditampilkan sebagai satu baris.",
+      "enriched_by_other": "Transaksi yang cocok sudah dilengkapi oleh email lain. Buka transaksi itu dan gunakan Tautkan untuk mengganti pelengkap tersebut, atau abaikan email ini.",
+      "no_link_key": "Email pembelian ini tidak memuat kunci tautan, sehingga tidak ada pembayaran yang dapat menemukannya."
     },
     "reasonUnknown": "Alasan: {reason}",
     "requestNote": "Permintaan peninjauan ({state}): {note}",
@@ -1005,6 +1068,15 @@
       "capped": "Hanya {max} baris pertama yang dibaca.",
       "empty": "Tidak ada baris.",
       "listLabel": "Baris surel yang bernomor"
+    },
+    "linkedReceipts": {
+      "componentsHeading": "Email pembelian yang ditautkan",
+      "component": "Bagian {part}: {subject} ({date})",
+      "settlementsHeading": "Dibayar oleh",
+      "settlement": "{subject} ({date}), bagian {amount}",
+      "enrichedBy": "Sudah dilengkapi oleh: {subject}",
+      "openButton": "Buka",
+      "open": "Buka email {subject}"
     },
     "tradeTransactionSummary": "{action, select, BUY {Membeli} other {Menjual}} {quantity} {symbol} seharga {total} pada {date}.",
     "noTradeTransaction": "Belum ada: transaksi dicatat saat Anda menyetujui usulannya, atau ditautkan ke transaksi yang sudah ada di buku besar Anda.",
@@ -1333,7 +1405,8 @@
         "discard_delete": "Dihapus oleh profil ini",
         "no_html": "Tidak ada bagian HTML",
         "trade": "Mengusulkan perdagangan",
-        "trade_exists": "Sudah ada di buku besar"
+        "trade_exists": "Sudah ada di buku besar",
+        "component": "Email pembelian (menunggu pembayaran)"
       },
       "parsedTradeAccount": "Akun: {account}",
       "accountWithCurrency": "{name} ({currency})",
@@ -1363,5 +1436,10 @@
     "bookTo": "Dicatat ke: {account}",
     "bookToNotTradable": "Dicatat ke {account}, yang bukan akun pialang yang terbuka, jadi transaksi tidak dapat dicatat di sana.",
     "bookToUnknown": "Dicatat ke akun yang tidak ada di daftar Anda, jadi transaksi tidak dapat dicatat di sana."
+  },
+  "linkedHint": {
+    "emails": "Satu transaksi bank dijelaskan dalam surel dari beberapa pengirim (misalnya toko dan penyedia pembayaran tertunda)? Pilih bersamaan hingga {max} surel dari setiap pengirim itu dan siapkan profil yang saling terkait.",
+    "profiles": "Panduan di bawah menyiapkan profil untuk satu pengirim. Satu transaksi bank dijelaskan dalam surel dari beberapa pengirim (misalnya toko dan penyedia pembayaran tertunda)? Pilih di tab Surel hingga {max} surel dari setiap pengirim itu dan siapkan profil yang saling terkait.",
+    "openEmails": "Buka tab Surel"
   }
 }

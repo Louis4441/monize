@@ -9,11 +9,19 @@ import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
 import { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import { EmailReceipt } from "../entities/email-receipt.entity";
 import {
+  ALLEGRO_PAY_COMPONENT_DEFINITION,
+  ALLEGRO_PAY_CONTRACT_2,
+  ALLEGRO_PAY_PURCHASE_LINES,
+  ALLEGRO_PAY_REPAYMENT_LINES,
+  ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+} from "../parsing/fixtures/allegro-pay-mails";
+import {
   dominantSenderDomain,
   EmailReceiptParsersService,
   MAX_PARSERS_PER_USER,
 } from "./email-receipt-parsers.service";
 import {
+  RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION,
   RECEIPT_PARSER_DRAFT_INSTRUCTION,
   RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION,
 } from "./parser-draft-instruction";
@@ -278,6 +286,10 @@ describe("EmailReceiptParsersService reprocessableCount", () => {
     expect(sql).toContain("right(r.from_domain, length(pd.domain) + 1)");
     expect(sql).toContain("p.user_id = $1");
     expect(sql).toContain("r.user_id = p.user_id");
+    // a component profile also counts the applied review emails it covers (spec 9)
+    expect(sql).toContain("p.definition->>'role' = 'component'");
+    expect(sql).toContain("r.link_key IS NULL");
+    expect(sql).toContain("applied_rq.status = 'applied'");
     expect(params).toEqual([
       USER,
       [
@@ -599,6 +611,113 @@ describe("EmailReceiptParsersService.requestAiDraft", () => {
     );
   });
 
+  describe("the sender limits of a selection (spec 10a)", () => {
+    const many = (domain: string, n: number, from = 0) =>
+      Array.from({ length: n }, (_, i) =>
+        row(`r-${domain}-${from + i}`, domain),
+      );
+    const idsOf = (rows: Array<{ id: string }>) => rows.map((r) => r.id);
+
+    it("takes five emails of each of five domains (25 in all), with the multi-sender instruction", async () => {
+      const { service, receiptRepo, requests } = setup();
+      const rows = [1, 2, 3, 4, 5].flatMap((d) => many(`d${d}.example.com`, 5));
+      receiptRepo.find.mockResolvedValue(rows);
+      requests.enqueueParserDraft.mockResolvedValue({ id: "req-1" });
+
+      await service.requestAiDraft(USER, idsOf(rows));
+
+      const input = requests.enqueueParserDraft.mock.calls[0][2];
+      expect(input.instruction).toBe(
+        RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION,
+      );
+      expect(input.emailReceiptIds).toHaveLength(25);
+    });
+
+    it("uses the one-sender instruction for one domain and the multi-sender one for two", async () => {
+      const { service, receiptRepo, requests } = setup();
+      requests.enqueueParserDraft.mockResolvedValue({ id: "req-1" });
+      const one = many("a.example.com", 5);
+      receiptRepo.find.mockResolvedValue(one);
+      await service.requestAiDraft(USER, idsOf(one));
+      expect(requests.enqueueParserDraft.mock.calls[0][2].instruction).toBe(
+        RECEIPT_PARSER_DRAFT_INSTRUCTION,
+      );
+      const two = [...many("a.example.com", 5), ...many("b.example.com", 1)];
+      receiptRepo.find.mockResolvedValue(two);
+      await service.requestAiDraft(USER, idsOf(two));
+      expect(requests.enqueueParserDraft.mock.calls[1][2].instruction).toBe(
+        RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION,
+      );
+    });
+
+    it("refuses more than five domains with a 400 naming the limit, writing nothing", async () => {
+      const { service, receiptRepo, requests } = setup();
+      const rows = [1, 2, 3, 4, 5, 6].flatMap((d) =>
+        many(`d${d}.example.com`, 1),
+      );
+      receiptRepo.find.mockResolvedValue(rows);
+
+      const error = await service
+        .requestAiDraft(USER, idsOf(rows))
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).toBe(
+        "Select emails from at most 5 senders.",
+      );
+      expect(requests.enqueueParserDraft).not.toHaveBeenCalled();
+    });
+
+    it("refuses more than five emails of one domain, even beside another domain", async () => {
+      const { service, receiptRepo, requests } = setup();
+      const rows = [...many("a.example.com", 6), ...many("b.example.com", 1)];
+      receiptRepo.find.mockResolvedValue(rows);
+
+      const error = await service
+        .requestAiDraft(USER, idsOf(rows))
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).toBe(
+        "Select at most 5 emails from one sender.",
+      );
+      expect(requests.enqueueParserDraft).not.toHaveBeenCalled();
+    });
+
+    it("refuses a trade draft of two domains, and still takes five of one", async () => {
+      const { service, receiptRepo, requests } = setup();
+      requests.enqueueParserDraft.mockResolvedValue({ id: "req-1" });
+      const two = [...many("a.example.com", 1), ...many("b.example.com", 1)];
+      receiptRepo.find.mockResolvedValue(two);
+
+      const error = await service
+        .requestAiDraft(USER, idsOf(two), "trade")
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).toMatch(/one sender/);
+      expect(requests.enqueueParserDraft).not.toHaveBeenCalled();
+
+      const one = many("a.example.com", 5);
+      receiptRepo.find.mockResolvedValue(one);
+      await service.requestAiDraft(USER, idsOf(one), "trade");
+      expect(requests.enqueueParserDraft.mock.calls[0][2].instruction).toBe(
+        RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION,
+      );
+    });
+
+    it("refuses a selection when one of its domains is not usable", async () => {
+      const { service, receiptRepo, requests } = setup();
+      const rows = [...many("a.example.com", 2), row("r-x", "localhost")];
+      receiptRepo.find.mockResolvedValue(rows);
+
+      await expect(
+        service.requestAiDraft(USER, idsOf(rows)),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(requests.enqueueParserDraft).not.toHaveBeenCalled();
+    });
+  });
+
   it("is a 404 for an email that is not the user's, and writes nothing", async () => {
     const { service, receiptRepo, requests } = setup();
     receiptRepo.find.mockResolvedValue([row(R1, "shop.example.com")]);
@@ -716,6 +835,78 @@ describe("EmailReceiptParsersService.test", () => {
     for (const [sql] of manager.query.mock.calls) {
       expect(String(sql).trim()).toMatch(/^SELECT/);
     }
+  });
+
+  describe("componentDrafts", () => {
+    const componentDefinition = {
+      version: 2,
+      role: "component",
+      linkKey: ["Contract {link}"],
+      total: ["Order total: {amount}"],
+    };
+    const settlement = {
+      version: 2,
+      role: "settlement",
+      paid: ["Paid {amount}"],
+    };
+
+    it("refuses drafts beside a definition that is not a settlement, with the code, before any read", async () => {
+      const { service, receiptRepo } = setup();
+      receiptRepo.findOne.mockResolvedValue(receipt);
+
+      const error = await service
+        .test(
+          USER,
+          testDto({
+            componentDrafts: [
+              {
+                definition: componentDefinition,
+                fromDomains: ["shop.example.com"],
+              },
+            ],
+          }),
+        )
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).toContain(
+        "component_draft_requires_settlement",
+      );
+    });
+
+    it("refuses a draft that is not a component and one with a bad domain", async () => {
+      const { service, receiptRepo } = setup();
+      receiptRepo.findOne.mockResolvedValue(receipt);
+
+      const notComponent = await service
+        .test(
+          USER,
+          testDto({
+            definition: settlement,
+            componentDrafts: [
+              { definition: settlement, fromDomains: ["shop.example.com"] },
+            ],
+          }),
+        )
+        .catch((e: unknown) => e);
+      expect((notComponent as Error).message).toContain(
+        "component_draft_requires_component",
+      );
+      const badDomain = await service
+        .test(
+          USER,
+          testDto({
+            definition: settlement,
+            componentDrafts: [
+              { definition: componentDefinition, fromDomains: ["nope"] },
+            ],
+          }),
+        )
+        .catch((e: unknown) => e);
+      expect((badDomain as Error).message).toContain(
+        "component_draft_domain_invalid",
+      );
+    });
   });
 
   describe("the lines source", () => {
@@ -906,6 +1097,68 @@ describe("EmailReceiptParsersService.test", () => {
     expect(error).toBeInstanceOf(BadRequestException);
     expect(error.message).toContain("unsupported_version");
     expect(manager.getRepository).not.toHaveBeenCalled();
+  });
+});
+
+describe("EmailReceiptParsersService.test of linked receipts", () => {
+  const receiptOf = (lines: string[], id: string) =>
+    Object.assign(new EmailReceipt(), {
+      id,
+      userId: USER,
+      subject: "Subject",
+      bodyText: lines.join("\n"),
+      receivedAt: new Date("2026-01-10T10:00:00Z"),
+    });
+
+  it("returns a component's link value and waiting settlements, with the empty match", async () => {
+    const { service, manager, receiptRepo } = setup();
+    receiptRepo.findOne.mockResolvedValue(
+      receiptOf(ALLEGRO_PAY_PURCHASE_LINES, "c1"),
+    );
+    manager.query.mockResolvedValue([
+      { id: "s1", subject: "Repayment", effective_date: "2026-01-10" },
+    ]);
+
+    const result = await service.test(USER, {
+      receiptId: "c1",
+      definition: ALLEGRO_PAY_COMPONENT_DEFINITION,
+    } as never);
+
+    expect(result.component).toEqual({
+      linkKey: ALLEGRO_PAY_CONTRACT_2,
+      waitingSettlements: [
+        { id: "s1", subject: "Repayment", effectiveDate: "2026-01-10" },
+      ],
+    });
+    expect(result.links).toBeUndefined();
+    expect(result.match).toEqual({
+      kind: "unmatched",
+      considered: 0,
+      attempts: [],
+    });
+    expect(result.candidateCount).toBe(0);
+    expect(result.transaction).toBeNull();
+  });
+
+  it("returns a settlement's links per part and the joined reading", async () => {
+    const { service, manager, receiptRepo } = setup();
+    receiptRepo.findOne.mockResolvedValue(
+      receiptOf(ALLEGRO_PAY_REPAYMENT_LINES, "s1"),
+    );
+    manager.query.mockResolvedValue([]);
+
+    const result = await service.test(USER, {
+      receiptId: "s1",
+      definition: ALLEGRO_PAY_SETTLEMENT_DEFINITION,
+    } as never);
+
+    expect(result.component).toBeUndefined();
+    expect(result.links?.map((link) => link.outcome)).toEqual([
+      "not_found",
+      "not_found",
+    ]);
+    expect(result.parsed.links).toHaveLength(2);
+    expect(result.parsed.items).toHaveLength(2);
   });
 });
 
