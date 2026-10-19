@@ -191,7 +191,7 @@ export function EmailReceiptsManager() {
   if (seenSearchKey !== searchKey) {
     setSeenSearchKey(searchKey);
     setPage(1);
-    setSelectedIds(new Set());
+    setSelectedRows(new Map());
     setAllMatching(null);
   }
   const [drafting, setDrafting] = useState(false);
