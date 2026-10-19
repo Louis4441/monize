@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -172,47 +172,68 @@ function SecurityDetailContent() {
   // The security on screen right now, readable from inside an in-flight load.
   // The switcher moves between securities on the same route (`router.push`
   // below), so this component stays mounted and a load started for the previous
-  // one can still be running. Assigned during render so it is never a render
-  // behind the id the page is currently showing.
+  // one can still be running. Assigned in a layout effect, before any effect
+  // or response can read it, so it is never a commit behind the id the page is
+  // currently showing.
   const shownIdRef = useRef(securityId);
-  shownIdRef.current = securityId;
+  useLayoutEffect(() => {
+    shownIdRef.current = securityId;
+  });
 
-  const loadData = useCallback(async () => {
-    const requestedId = securityId;
-    // Every write below is guarded on the page still showing the security this
-    // load was started for. Without it a slow response for the previous
-    // security lands after the new one's and paints its figures under the new
-    // URL -- the reader sees another instrument's position, and nothing looks
-    // wrong until they reload.
-    const isStale = () => shownIdRef.current !== requestedId;
-
+  // Switching securities shows the spinner again; set during render rather
+  // than in the effect that loads the new one.
+  const [loadingId, setLoadingId] = useState(securityId);
+  if (loadingId !== securityId) {
+    setLoadingId(securityId);
     setIsLoading(true);
     setError(null);
-    try {
-      // The detail is the page; prices and trades feed the chart and its
-      // markers, so a failure in either costs the chart, never the page.
-      const detailData = await investmentsApi.getSecurityDetail(requestedId);
-      const [priceData, historyData] = await Promise.all([
-        investmentsApi
-          .getSecurityPrices(requestedId, { limit: SECURITY_PRICE_HISTORY_LIMIT })
-          .catch(() => []),
-        investmentsApi
-          .getSecurityTransactionHistory(requestedId)
-          .catch(() => null),
-      ]);
-      if (isStale()) return;
-      setDetail(detailData);
-      setPrices(priceData);
-      setTrades(historyData?.transactions ?? []);
-    } catch (err) {
-      if (isStale()) return;
-      const message = getErrorMessage(err, t('loadFailed'));
-      setError(message);
-    } finally {
-      // A stale load must not clear the spinner the current one put up.
-      if (!isStale()) setIsLoading(false);
-    }
+  }
+
+  // The mount / security-switch load: the state already says loading.
+  const fetchData = useCallback(() => {
+    // Writes live in `run` so they land after the request, not during the effect.
+    const run = async () => {
+      const requestedId = securityId;
+      // Every write below is guarded on the page still showing the security this
+      // load was started for. Without it a slow response for the previous
+      // security lands after the new one's and paints its figures under the new
+      // URL -- the reader sees another instrument's position, and nothing looks
+      // wrong until they reload.
+      const isStale = () => shownIdRef.current !== requestedId;
+
+      try {
+        // The detail is the page; prices and trades feed the chart and its
+        // markers, so a failure in either costs the chart, never the page.
+        const detailData = await investmentsApi.getSecurityDetail(requestedId);
+        const [priceData, historyData] = await Promise.all([
+          investmentsApi
+            .getSecurityPrices(requestedId, { limit: SECURITY_PRICE_HISTORY_LIMIT })
+            .catch(() => []),
+          investmentsApi
+            .getSecurityTransactionHistory(requestedId)
+            .catch(() => null),
+        ]);
+        if (isStale()) return;
+        setDetail(detailData);
+        setPrices(priceData);
+        setTrades(historyData?.transactions ?? []);
+      } catch (err) {
+        if (isStale()) return;
+        const message = getErrorMessage(err, t('loadFailed'));
+        setError(message);
+      } finally {
+        // A stale load must not clear the spinner the current one put up.
+        if (!isStale()) setIsLoading(false);
+      }
+    };
+    return run();
   }, [securityId, t]);
+
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    return fetchData();
+  }, [fetchData]);
 
   // After a price refresh the quote and the market-value cards are stale, but
   // the page is already on screen -- reload in place rather than through
@@ -258,8 +279,8 @@ function SecurityDetailContent() {
   }, [refreshPrices, securityId]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    fetchData();
+  }, [fetchData]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
@@ -67,9 +67,19 @@ function AccountDetailContent() {
   // The loan the latest load asked for: a reload answering after the user
   // switched loans is dropped instead of drawn over the new one.
   const currentAccountId = useRef(accountId);
-  currentAccountId.current = accountId;
+  useLayoutEffect(() => {
+    currentAccountId.current = accountId;
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Switching loans shows the spinner again; set during render rather than in
+  // the effect that loads the new account.
+  const [loadingAccountId, setLoadingAccountId] = useState(accountId);
+  if (loadingAccountId !== accountId) {
+    setLoadingAccountId(accountId);
+    setIsLoading(true);
+    setError(null);
+  }
   // Only for the caret beside the name; a failure costs the switcher, not the page.
   const [accounts, setAccounts] = useState<Account[]>([]);
   // Populated by LoanDetailView so the loan's PDF export can live in the shared
@@ -90,92 +100,102 @@ function AccountDetailContent() {
   const isRevolving = detailView === 'lineOfCredit';
   const hasDetailPage = detailView !== null;
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const accountData = await accountsApi.getById(accountId);
-      // A pair is one account, so it gets one URL: the brokerage half. A link
-      // to the cash id -- an old bookmark, a deep link from a register --
-      // lands on the same page rather than a second one that would carry its
-      // own switcher state and history entry.
-      if (isInvestmentCashHalf(accountData) && accountData.linkedAccountId) {
-        router.replace(`/accounts/${accountData.linkedAccountId}`);
-        return;
-      }
-      // Only the amortizing loan/mortgage view needs transaction history and
-      // scenarios; the line-of-credit and credit-card views load their own
-      // analytics, so just resolve the account for them.
-      if (resolveAccountDetailView(accountData.accountType) !== 'loan') {
+  // The mount / account-switch load: the state already says loading.
+  const fetchData = useCallback(() => {
+    // Writes live in `run` so they land after the request, not during the effect.
+    const run = async () => {
+      try {
+        const accountData = await accountsApi.getById(accountId);
+        // A pair is one account, so it gets one URL: the brokerage half. A link
+        // to the cash id -- an old bookmark, a deep link from a register --
+        // lands on the same page rather than a second one that would carry its
+        // own switcher state and history entry.
+        if (isInvestmentCashHalf(accountData) && accountData.linkedAccountId) {
+          router.replace(`/accounts/${accountData.linkedAccountId}`);
+          return;
+        }
+        // Only the amortizing loan/mortgage view needs transaction history and
+        // scenarios; the line-of-credit and credit-card views load their own
+        // analytics, so just resolve the account for them.
+        if (resolveAccountDetailView(accountData.accountType) !== 'loan') {
+          setAccount(accountData);
+          setTransactions([]);
+          setInterestTransactions([]);
+          setScenarios([]);
+          setRateChanges([]);
+          setSettlements(null);
+          return;
+        }
+        // A scenario failure keeps the page usable but must not be silent: an
+        // empty panel reads as "my saved scenarios are gone" while the rows still
+        // exist (a retried save then hits the duplicate-name 409). Scenarios feed
+        // no headline figure, so degrading to [] costs nothing but the panel.
+        //
+        // The rate history is NOT in that category any more. Recording a rate
+        // change deliberately leaves `account.interestRate` alone, so these rows
+        // are where the loan's CURRENT rate lives -- `buildLoanProjectionInput`
+        // resolves both the projection's rate and its payment from them. An empty
+        // list is therefore a claim ("no rate change was ever recorded"), and
+        // substituting it for a failed read projects the payoff and remaining
+        // interest at a stale scalar rate: at 5% against a real 12% a payment
+        // short of the interest looks comfortably amortizing. So it fails with the
+        // page, where the error is retryable, rather than answering with a number
+        // nobody can tell is wrong.
+        const [
+          transactionsData,
+          interestData,
+          scenariosData,
+          rateChangesData,
+          anchorData,
+          settlementsData,
+        ] = await Promise.all([
+          fetchAllAccountTransactions(accountId),
+          fetchLoanInterestTransactions(accountData),
+          loanScenariosApi.getAll(accountId).catch(() => {
+            toast.error(t('loanDetail.scenarios.loadFailed'));
+            return [] as LoanScenario[];
+          }),
+          loanRateChangesApi.getAll(accountId),
+          // This page prints per-installment interest in its schedule table, so
+          // it prices the same installment the amortization report does and must
+          // anchor on the same boundary -- otherwise the two screens show
+          // different interest for one payment (INV-LOAN-006). Like the rate
+          // history above, a failed fetch fails the page rather than quietly
+          // projecting from today.
+          scheduledTransactionsApi.getLoanProjectionAnchor(accountId),
+          // The settled installments feed no projection, so a failure costs the
+          // panel's list, which then says it failed rather than that nothing
+          // was settled.
+          loadSettlements(accountId),
+        ]);
         setAccount(accountData);
-        setTransactions([]);
-        setInterestTransactions([]);
-        setScenarios([]);
-        setRateChanges([]);
-        setSettlements(null);
-        return;
+        setTransactions(transactionsData);
+        setInterestTransactions(interestData);
+        setScenarios(scenariosData);
+        setRateChanges(rateChangesData);
+        setProjectionAnchor(anchorData);
+        setSettlements(settlementsData);
+      } catch (err) {
+        const message = getErrorMessage(err, t('loanDetail.loadFailed'));
+        setError(message);
+        toast.error(message);
+      } finally {
+        setIsLoading(false);
       }
-      // A scenario failure keeps the page usable but must not be silent: an
-      // empty panel reads as "my saved scenarios are gone" while the rows still
-      // exist (a retried save then hits the duplicate-name 409). Scenarios feed
-      // no headline figure, so degrading to [] costs nothing but the panel.
-      //
-      // The rate history is NOT in that category any more. Recording a rate
-      // change deliberately leaves `account.interestRate` alone, so these rows
-      // are where the loan's CURRENT rate lives -- `buildLoanProjectionInput`
-      // resolves both the projection's rate and its payment from them. An empty
-      // list is therefore a claim ("no rate change was ever recorded"), and
-      // substituting it for a failed read projects the payoff and remaining
-      // interest at a stale scalar rate: at 5% against a real 12% a payment
-      // short of the interest looks comfortably amortizing. So it fails with the
-      // page, where the error is retryable, rather than answering with a number
-      // nobody can tell is wrong.
-      const [
-        transactionsData,
-        interestData,
-        scenariosData,
-        rateChangesData,
-        anchorData,
-        settlementsData,
-      ] = await Promise.all([
-        fetchAllAccountTransactions(accountId),
-        fetchLoanInterestTransactions(accountData),
-        loanScenariosApi.getAll(accountId).catch(() => {
-          toast.error(t('loanDetail.scenarios.loadFailed'));
-          return [] as LoanScenario[];
-        }),
-        loanRateChangesApi.getAll(accountId),
-        // This page prints per-installment interest in its schedule table, so
-        // it prices the same installment the amortization report does and must
-        // anchor on the same boundary -- otherwise the two screens show
-        // different interest for one payment (INV-LOAN-006). Like the rate
-        // history above, a failed fetch fails the page rather than quietly
-        // projecting from today.
-        scheduledTransactionsApi.getLoanProjectionAnchor(accountId),
-        // The settled installments feed no projection, so a failure costs the
-        // panel's list, which then says it failed rather than that nothing
-        // was settled.
-        loadSettlements(accountId),
-      ]);
-      setAccount(accountData);
-      setTransactions(transactionsData);
-      setInterestTransactions(interestData);
-      setScenarios(scenariosData);
-      setRateChanges(rateChangesData);
-      setProjectionAnchor(anchorData);
-      setSettlements(settlementsData);
-    } catch (err) {
-      const message = getErrorMessage(err, t('loanDetail.loadFailed'));
-      setError(message);
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
+    };
+    return run();
   }, [accountId, router, t]);
 
+  // Every other caller (retry, undo/redo, AI action, saves) shows the spinner.
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    return fetchData();
+  }, [fetchData]);
+
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    fetchData();
+  }, [fetchData]);
 
   useOnUndoRedo(loadData);
   useOnAiAction(loadData);

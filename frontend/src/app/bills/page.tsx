@@ -164,53 +164,62 @@ function BillsContent() {
   // wins".
   const loadGenerationRef = useRef(0);
 
-  const loadData = useCallback(async () => {
-    const generation = ++loadGenerationRef.current;
-    setIsLoading(true);
-    try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  // The mount load: the state already says loading.
+  const fetchData = useCallback(() => {
+    // Writes live in `run` so they land after the request, not during the effect.
+    const run = async () => {
+      const generation = ++loadGenerationRef.current;
+      try {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
-      const [transactionsData, categoriesData, accountsData, futureData] = await Promise.all([
-        scheduledTransactionsApi.getAll(),
-        categoriesApi.getAll(),
-        accountsApi.getAll(),
-        transactionsApi.getAll({ startDate: tomorrowStr, limit: 200 }),
-      ]);
-      // A newer load started while this one was awaiting: discard this result
-      // so it cannot overwrite the fresher state.
-      if (generation !== loadGenerationRef.current) return;
-      setScheduledTransactions(transactionsData);
-      setCategories(categoriesData);
-      setAccounts(accountsData);
-      setFutureTransactions(
-        futureData.data
-          .filter(t => t.status !== 'VOID')
-          .map(t => ({
-            id: t.id,
-            accountId: t.accountId,
-            name: t.payeeName || t.payee?.name || t.description || 'Transaction',
-            amount: Number(t.amount),
-            date: t.transactionDate.split('T')[0],
-          }))
-      );
-    } catch (error) {
-      // A superseded request must not surface an obsolete failure over a newer
-      // load that has already succeeded.
-      if (generation !== loadGenerationRef.current) return;
-      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
-      logger.error(error);
-    } finally {
-      if (generation === loadGenerationRef.current) {
-        setIsLoading(false);
+        const [transactionsData, categoriesData, accountsData, futureData] = await Promise.all([
+          scheduledTransactionsApi.getAll(),
+          categoriesApi.getAll(),
+          accountsApi.getAll(),
+          transactionsApi.getAll({ startDate: tomorrowStr, limit: 200 }),
+        ]);
+        // A newer load started while this one was awaiting: discard this result
+        // so it cannot overwrite the fresher state.
+        if (generation !== loadGenerationRef.current) return;
+        setScheduledTransactions(transactionsData);
+        setCategories(categoriesData);
+        setAccounts(accountsData);
+        setFutureTransactions(
+          futureData.data
+            .filter(t => t.status !== 'VOID')
+            .map(t => ({
+              id: t.id,
+              accountId: t.accountId,
+              name: t.payeeName || t.payee?.name || t.description || 'Transaction',
+              amount: Number(t.amount),
+              date: t.transactionDate.split('T')[0],
+            }))
+        );
+      } catch (error) {
+        // A superseded request must not surface an obsolete failure over a newer
+        // load that has already succeeded.
+        if (generation !== loadGenerationRef.current) return;
+        toast.error(getErrorMessage(error, t('toasts.loadFailed')));
+        logger.error(error);
+      } finally {
+        if (generation === loadGenerationRef.current) {
+          setIsLoading(false);
+        }
       }
-    }
+    };
+    return run();
   }, [t]);
 
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    return fetchData();
+  }, [fetchData]);
+
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    fetchData();
+  }, [fetchData]);
 
   useOnUndoRedo(loadData);
   // Refresh on AI chat-bubble writes (the forecast depends on transactions).
