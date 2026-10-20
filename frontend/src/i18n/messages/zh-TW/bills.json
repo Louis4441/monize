@@ -39,6 +39,7 @@
     "scheduledCount": "預測中有 {count, plural, one {# 筆排程交易} other {# 筆排程交易}}",
     "tooltipTransactions": "交易：",
     "tooltipMore": "還有 +{count} 筆",
+    "tooltipOverdue": "包含 {count, plural, one {# 筆} other {# 筆}}逾期排程交易",
     "noData": "無資料可顯示",
     "noAccounts": "找不到科目",
     "noScheduled": "無排程交易",

@@ -39,6 +39,7 @@
     "scheduledCount": "{count, plural, one {# transaksi terjadwal} other {# transaksi terjadwal}} dalam prakiraan",
     "tooltipTransactions": "Transaksi:",
     "tooltipMore": "+{count} lagi",
+    "tooltipOverdue": "Termasuk {count, plural, one {# transaksi terjadwal lewat jatuh tempo} other {# transaksi terjadwal lewat jatuh tempo}}",
     "noData": "Tidak ada data untuk ditampilkan",
     "noAccounts": "Tidak ada akun ditemukan",
     "noScheduled": "Tidak ada transaksi terjadwal",

@@ -39,6 +39,7 @@
     "scheduledCount": "{count, plural, one {# terminierte Buchung} other {# terminierte Buchungen}} in der Prognose",
     "tooltipTransactions": "Buchungen:",
     "tooltipMore": "+{count} weitere",
+    "tooltipOverdue": "Enthält {count, plural, one {# überfällige terminierte Buchung} other {# überfällige terminierte Buchungen}}",
     "noData": "Keine Daten zum Anzeigen",
     "noAccounts": "Keine Konten gefunden",
     "noScheduled": "Keine terminierten Buchungen",

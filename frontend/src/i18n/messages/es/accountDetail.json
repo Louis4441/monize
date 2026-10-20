@@ -45,5 +45,6 @@
     "missingRate": "{name}: el tipo de cambio con el que se liquida esta ocurrencia no está disponible, así que se desconoce el importe.",
     "crossCurrencyTransfer": "{name}: una transferencia que llega desde una cuenta en {from} mientras esta cuenta está en {to}. El importe que entra aquí se fija al registrarse la transferencia, así que no se puede prever.",
     "howToFix": "Para corregir un tipo de cambio ausente: abre Divisas y actualiza los tipos, o comprueba que el valor y su cuenta de liquidación tengan las divisas que esperas."
-  }
+  },
+  "forecastOverdue": "Incluye {count, plural, one {# transacción planificada vencida} other {# transacciones planificadas vencidas}}"
 }

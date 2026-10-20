@@ -3,6 +3,7 @@
     "currentBalance": "Saldo Saat Ini",
     "projectedBalance": "Saldo Proyeksi",
     "projectedNote": "Dalam 90 hari",
+    "projectedNoteOverdue": "Dalam 90 hari, termasuk {count, plural, one {# transaksi terjadwal lewat jatuh tempo} other {# transaksi terjadwal lewat jatuh tempo}}",
     "moneyIn": "Uang Masuk",
     "moneyOut": "Uang Keluar",
     "thisMonth": "Bulan ini",

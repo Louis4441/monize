@@ -3,6 +3,7 @@
     "currentBalance": "Güncel Bakiye",
     "projectedBalance": "Öngörülen Bakiye",
     "projectedNote": "90 gün içinde",
+    "projectedNoteOverdue": "90 gün içinde, {count, plural, one {# vadesi geçmiş zamanlanmış işlem} other {# vadesi geçmiş zamanlanmış işlem}} dahil",
     "moneyIn": "Gelen Para",
     "moneyOut": "Giden Para",
     "thisMonth": "Bu ay",

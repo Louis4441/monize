@@ -3,6 +3,7 @@
     "currentBalance": "Số dư hiện tại",
     "projectedBalance": "Số dư dự kiến",
     "projectedNote": "Trong 90 ngày",
+    "projectedNoteOverdue": "Trong 90 ngày, bao gồm {count, plural, one {# giao dịch theo lịch quá hạn} other {# giao dịch theo lịch quá hạn}}",
     "moneyIn": "Tiền vào",
     "moneyOut": "Tiền ra",
     "thisMonth": "Tháng này",

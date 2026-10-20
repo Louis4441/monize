@@ -45,5 +45,6 @@
     "missingRate": "{name}：找不到這筆到期項目的結算匯率，因此金額未知。",
     "crossCurrencyTransfer": "{name}：本帳戶為 {to}，而這是一筆來自 {from} 帳戶的轉帳。入帳金額在轉帳記帳時才確定，因此無法提前預測。",
     "howToFix": "缺少匯率時的處理：開啟「貨幣」頁面重新整理匯率，或檢查該證券及其結算帳戶的幣別是否符合預期。"
-  }
+  },
+  "forecastOverdue": "包含 {count, plural, one {# 筆} other {# 筆}}逾期排程交易"
 }

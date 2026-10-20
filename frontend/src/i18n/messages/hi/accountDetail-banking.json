@@ -3,6 +3,7 @@
     "currentBalance": "वर्तमान शेष",
     "projectedBalance": "अनुमानित शेष",
     "projectedNote": "90 दिनों में",
+    "projectedNoteOverdue": "90 दिनों में, {count, plural, one {# अतिदेय निर्धारित लेनदेन} other {# अतिदेय निर्धारित लेनदेन}} शामिल",
     "moneyIn": "आया धन",
     "moneyOut": "गया धन",
     "thisMonth": "इस महीने",

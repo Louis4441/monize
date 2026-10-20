@@ -3,6 +3,7 @@
     "currentBalance": "Aktueller Saldo",
     "projectedBalance": "Prognostizierter Saldo",
     "projectedNote": "In 90 Tagen",
+    "projectedNoteOverdue": "In 90 Tagen, einschließlich {count, plural, one {# überfälligen terminierten Buchung} other {# überfälligen terminierten Buchungen}}",
     "moneyIn": "Eingänge",
     "moneyOut": "Ausgänge",
     "thisMonth": "Diesen Monat",

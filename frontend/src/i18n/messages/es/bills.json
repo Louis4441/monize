@@ -39,6 +39,7 @@
     "scheduledCount": "{count, plural, one {# transacción planificada} other {# transacciones planificadas}} en el pronóstico",
     "tooltipTransactions": "Transacciones:",
     "tooltipMore": "+{count} más",
+    "tooltipOverdue": "Incluye {count, plural, one {# transacción planificada vencida} other {# transacciones planificadas vencidas}}",
     "noData": "No hay datos para mostrar",
     "noAccounts": "No se encontraron cuentas",
     "noScheduled": "Sin transacciones planificadas",

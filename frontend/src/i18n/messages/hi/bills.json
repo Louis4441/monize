@@ -39,6 +39,7 @@
     "scheduledCount": "पूर्वानुमान में {count, plural, one {# निर्धारित लेनदेन} other {# निर्धारित लेनदेन}}",
     "tooltipTransactions": "लेनदेन:",
     "tooltipMore": "+{count} और",
+    "tooltipOverdue": "{count, plural, one {# अतिदेय निर्धारित लेनदेन} other {# अतिदेय निर्धारित लेनदेन}} शामिल",
     "noData": "प्रदर्शित करने के लिए कोई डेटा नहीं",
     "noAccounts": "कोई खाता नहीं मिला",
     "noScheduled": "कोई निर्धारित लेनदेन नहीं",

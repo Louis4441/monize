@@ -39,6 +39,7 @@
     "scheduledCount": "{count, plural, one {# geplande transactie} other {# geplande transacties}} in prognose",
     "tooltipTransactions": "Transacties:",
     "tooltipMore": "+{count} meer",
+    "tooltipOverdue": "Inclusief {count, plural, one {# achterstallige geplande transactie} other {# achterstallige geplande transacties}}",
     "noData": "Geen gegevens om weer te geven",
     "noAccounts": "Geen rekeningen gevonden",
     "noScheduled": "Geen geplande transacties",

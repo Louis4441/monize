@@ -45,5 +45,6 @@
     "missingRate": "{name}: Der Wechselkurs für die Abrechnung dieser Fälligkeit ist nicht verfügbar, daher ist der Betrag unbekannt.",
     "crossCurrencyTransfer": "{name}: eine Umbuchung von einem Konto in {from}, während dieses Konto in {to} geführt wird. Der hier eingehende Betrag wird erst beim Buchen festgelegt und lässt sich daher nicht im Voraus prognostizieren.",
     "howToFix": "So beheben Sie einen fehlenden Kurs: Öffnen Sie Währungen und aktualisieren Sie die Kurse, oder prüfen Sie, ob das Wertpapier und sein Abrechnungskonto die erwarteten Währungen führen."
-  }
+  },
+  "forecastOverdue": "Enthält {count, plural, one {# überfällige terminierte Buchung} other {# überfällige terminierte Buchungen}}"
 }
