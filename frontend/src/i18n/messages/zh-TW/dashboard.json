@@ -49,6 +49,11 @@
     "nextMonth": "下個月",
     "emptyAll": "沒有已排程的有效帳單、存入或轉帳。"
   },
+  "cashFlowForecast": {
+    "title": "現金流量預測",
+    "period": "預測期間",
+    "loadFailed": "無法載入日期晚於今天的交易，因此無法顯示預測。請重新載入儀表板後再試一次。"
+  },
   "gettingStarted": {
     "title": "快速入門",
     "subtitle": "透過幾個簡單步驟設定您的帳號",

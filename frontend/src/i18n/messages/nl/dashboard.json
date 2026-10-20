@@ -49,6 +49,11 @@
     "nextMonth": "Volgende maand",
     "emptyAll": "Geen actieve rekeningen, stortingen of overboekingen gepland."
   },
+  "cashFlowForecast": {
+    "title": "Kasstroomprognose",
+    "period": "Prognoseperiode",
+    "loadFailed": "De transacties die al na vandaag gedateerd zijn konden niet worden geladen, dus de prognose kan niet worden getoond. Laad het dashboard opnieuw om het nogmaals te proberen."
+  },
   "gettingStarted": {
     "title": "Aan de slag",
     "subtitle": "Stel je account in een paar stappen in",

@@ -49,6 +49,11 @@
     "nextMonth": "Mese successivo",
     "emptyAll": "Nessuna bolletta, entrata o trasferimento attivo pianificato."
   },
+  "cashFlowForecast": {
+    "title": "Previsione flusso di cassa",
+    "period": "Periodo di previsione",
+    "loadFailed": "Impossibile caricare le transazioni già datate dopo oggi, quindi la previsione non può essere mostrata. Ricarica la dashboard per riprovare."
+  },
   "gettingStarted": {
     "title": "Per iniziare",
     "subtitle": "Configura il tuo account in pochi passaggi",
