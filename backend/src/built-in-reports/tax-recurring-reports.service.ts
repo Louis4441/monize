@@ -50,17 +50,15 @@ const INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
 const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
 
 /**
- * The spending rows the recurrence analysis reads, for transaction alias `t`
- * and account alias `a`. One definition so the analysis and the history start
- * it is measured against count the same rows.
+ * The same two halves of the predicate for the history subquery's own aliases
+ * (`h`, `ha`), so the history start the recurring estimate is measured against
+ * counts exactly the rows the analysis counts.
  */
-function recurringSpendingRows(t: string, a: string): string {
-  return `${reportableTransactionAmountSql(t)} < 0
-        AND ${t}.is_transfer = false
-        AND (${t}.status IS NULL OR ${t}.status != 'VOID')
-        AND ${t}.parent_transaction_id IS NULL
-        AND ${investmentExclusionSql({ accountAlias: a, transactionAlias: t })}`;
-}
+const HISTORY_INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
+  accountAlias: "ha",
+  transactionAlias: "h",
+});
+const HISTORY_REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("h");
 
 /** Months each bounded recurring-expense window looks back. */
 const RECURRING_RANGE_MONTHS: Record<
@@ -304,7 +302,11 @@ export class TaxRecurringReportsService {
           LEFT JOIN accounts ha ON ha.id = h.account_id
           WHERE h.user_id = $1
             AND h.transaction_date <= $3
-            AND ${recurringSpendingRows("h", "ha")}
+            AND ${HISTORY_REPORTABLE_TX_AMOUNT} < 0
+            AND h.is_transfer = false
+            AND (h.status IS NULL OR h.status != 'VOID')
+            AND h.parent_transaction_id IS NULL
+            AND ${HISTORY_INVESTMENT_EXCLUSION_NO_SPLITS}
         ) as history_start
       FROM transactions t
       LEFT JOIN payees p ON p.id = t.payee_id
@@ -313,7 +315,11 @@ export class TaxRecurringReportsService {
       WHERE t.user_id = $1
         AND ($2::date IS NULL OR t.transaction_date >= $2::date)
         AND t.transaction_date <= $3
-        AND ${recurringSpendingRows("t", "a")}
+        AND ${REPORTABLE_TX_AMOUNT} < 0
+        AND t.is_transfer = false
+        AND (t.status IS NULL OR t.status != 'VOID')
+        AND t.parent_transaction_id IS NULL
+        AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
         AND (COALESCE(p.name, t.payee_name) IS NOT NULL AND TRIM(COALESCE(p.name, t.payee_name)) != '')
       GROUP BY t.payee_id, LOWER(TRIM(COALESCE(p.name, t.payee_name))), COALESCE(p.name, t.payee_name), c.name, t.currency_code
       HAVING COUNT(*) >= $4

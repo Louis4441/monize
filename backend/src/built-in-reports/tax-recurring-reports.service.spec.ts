@@ -6,6 +6,10 @@ import { ReportCurrencyService } from "./report-currency.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import {
+  investmentExclusionSql,
+  reportableTransactionAmountSql,
+} from "../common/investment-filter.util";
+import {
   createScopedDbMocks,
   DataSourceMock,
   ManagerMock,
@@ -806,6 +810,11 @@ describe("TaxRecurringReportsService", () => {
         expect(history).toContain("h.is_transfer = false");
         expect(history).toContain("h.status != 'VOID'");
         expect(history).toContain("h.parent_transaction_id IS NULL");
+        // Investment cash is not spending history either (INV-REPORT-001).
+        expect(history).toContain(`${reportableTransactionAmountSql("h")} < 0`);
+        expect(history).toContain(
+          investmentExclusionSql({ accountAlias: "ha", transactionAlias: "h" }),
+        );
       });
 
       it("leaves all unbounded and spans the user's spending history", async () => {
