@@ -8,7 +8,9 @@ import type { Account } from '@/types/account';
 vi.mock('recharts', async () => (await import('@/test/recharts-mock')).rechartsMock());
 
 const mockUpdateConfig = vi.fn();
-const configState: { current: Partial<CashFlowForecastConfig> & Record<string, unknown> } = {
+// Typed as the stored preference can hold it, not as the widget wants it, so a
+// case can store a value that is not a period.
+const configState: { current: Omit<CashFlowForecastConfig, 'period'> & { period: string } } = {
   current: { period: 'month', accountIds: [] },
 };
 vi.mock('@/hooks/useWidgetConfig', () => ({
