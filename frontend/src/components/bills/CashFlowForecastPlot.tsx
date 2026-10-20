@@ -23,6 +23,7 @@ import {
   computeMinMaxFlagIndices,
   renderMinMaxFlagDots,
 } from '@/components/investments/portfolio-chart-utils';
+import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -57,72 +58,74 @@ function CashFlowTooltip({
     );
     const accountNames = new Map(lines.map((line) => [line.accountId, line.name]));
     return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 max-w-xs">
-        <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-          {formatChartDate(data.date, 'MMM d')}
-        </p>
-        {accountRows.length > 0 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {t('forecast.totalOfAccounts')}
+      <ChartTooltipPanel>
+        <div className="max-w-xs">
+          <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+            {formatChartDate(data.date, 'MMM d')}
           </p>
-        )}
-        <p
-          className={`text-lg font-semibold ${
-            gainLossColor(data.balance)
-          }`}
-        >
-          {formatValue(data.balance)}
-        </p>
-        {accountRows.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
-            {accountRows.map((line) => (
-              <p key={line.accountId} className="flex items-center gap-2 text-sm">
-                <span
-                  aria-hidden="true"
-                  className="inline-block h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: line.color }}
-                />
-                <span className="truncate text-gray-700 dark:text-gray-300">{line.name}</span>
-                <span className="ml-auto shrink-0 font-medium text-gray-900 dark:text-gray-100">
-                  {formatValue(balances[line.accountId])}
-                </span>
-              </p>
-            ))}
-          </div>
-        )}
-        {data.transactions.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-              {t('forecast.tooltipTransactions')}
+          {accountRows.length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('forecast.totalOfAccounts')}
             </p>
-            {data.transactions.slice(0, 5).map((tx, i) => {
-              const accountName = tx.accountId ? accountNames.get(tx.accountId) : undefined;
-              return (
-                <p key={i} className="text-sm text-gray-700 dark:text-gray-300">
+          )}
+          <p
+            className={`text-lg font-semibold ${
+              gainLossColor(data.balance)
+            }`}
+          >
+            {formatValue(data.balance)}
+          </p>
+          {accountRows.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
+              {accountRows.map((line) => (
+                <p key={line.accountId} className="flex items-center gap-2 text-sm">
                   <span
-                    className={
-                      gainLossColor(tx.amount)
-                    }
-                  >
-                    {formatValue(tx.amount)}
-                  </span>{' '}
-                  {accountName
-                    ? t('forecast.tooltipTransactionForAccount', {
-                        name: tx.name,
-                        account: accountName,
-                      })
-                    : tx.name}
+                    aria-hidden="true"
+                    className="inline-block h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: line.color }}
+                  />
+                  <span className="truncate text-gray-700 dark:text-gray-300">{line.name}</span>
+                  <span className="ml-auto shrink-0 font-medium text-gray-900 dark:text-gray-100">
+                    {formatValue(balances[line.accountId])}
+                  </span>
                 </p>
-              );
-            })}
-            {data.transactions.length > 5 && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {t('forecast.tooltipMore', { count: data.transactions.length - 5 })}
+              ))}
+            </div>
+          )}
+          {data.transactions.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                {t('forecast.tooltipTransactions')}
               </p>
-            )}
-          </div>
-        )}
-      </div>
+              {data.transactions.slice(0, 5).map((tx, i) => {
+                const accountName = tx.accountId ? accountNames.get(tx.accountId) : undefined;
+                return (
+                  <p key={i} className="text-sm text-gray-700 dark:text-gray-300">
+                    <span
+                      className={
+                        gainLossColor(tx.amount)
+                      }
+                    >
+                      {formatValue(tx.amount)}
+                    </span>{' '}
+                    {accountName
+                      ? t('forecast.tooltipTransactionForAccount', {
+                          name: tx.name,
+                          account: accountName,
+                        })
+                      : tx.name}
+                  </p>
+                );
+              })}
+              {data.transactions.length > 5 && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  {t('forecast.tooltipMore', { count: data.transactions.length - 5 })}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </ChartTooltipPanel>
     );
   }
   return null;
