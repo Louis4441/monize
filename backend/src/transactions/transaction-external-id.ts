@@ -6,6 +6,10 @@ import { QueryFailedError } from "typeorm";
  * already holds it instead of writing a second one, so a client whose request
  * timed out can retry without knowing whether the first attempt committed.
  *
+ * An OFX import stores each row's bank id under the same column
+ * (`import/ofx-external-id.ts`) and skips a row whose key the account already
+ * holds, so a download that overlaps an earlier one adds only the new rows.
+ *
  * The guarantee is the partial unique index below, one row per
  * `(account_id, external_id)`, the same shape bank sync uses for the rows it
  * imports. The lookup each create path makes before its insert is advisory: it

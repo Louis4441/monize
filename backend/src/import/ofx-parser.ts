@@ -132,6 +132,23 @@ function extractBlocks(
 }
 
 /**
+ * Drop the `FITID` of every row whose `FITID` another row of the same file
+ * also carries. The specification makes a `FITID` unique per account, but some
+ * banks give several rows the same one, and keying on it would skip every row
+ * after the first as already imported. Such rows import without a key, as
+ * every OFX row did before the import read it.
+ */
+function dropRepeatedFitIds(transactions: QifTransaction[]): void {
+  const seen = new Map<string, number>();
+  for (const tx of transactions) {
+    if (tx.fitId) seen.set(tx.fitId, (seen.get(tx.fitId) ?? 0) + 1);
+  }
+  for (const tx of transactions) {
+    if (tx.fitId && (seen.get(tx.fitId) ?? 0) > 1) delete tx.fitId;
+  }
+}
+
+/**
  * Validate that content looks like an OFX file.
  */
 export function validateOfxContent(content: string): {
@@ -206,6 +223,7 @@ export function parseOfx(content: string): QifParseResult {
     const name = getTagValue(block, "NAME");
     const memo = getTagValue(block, "MEMO");
     const checkNum = getTagValue(block, "CHECKNUM");
+    const fitId = getTagValue(block, "FITID");
 
     // Determine cleared status based on transaction type
     const isCleared = true; // OFX transactions are typically already posted
@@ -227,6 +245,7 @@ export function parseOfx(content: string): QifParseResult {
       payee,
       memo: memoText,
       number: truncate(checkNum, 100),
+      ...(fitId ? { fitId } : {}),
       cleared: isCleared,
       reconciled: false,
       category: "",
@@ -244,6 +263,8 @@ export function parseOfx(content: string): QifParseResult {
 
     transactions.push(tx);
   }
+
+  dropRepeatedFitIds(transactions);
 
   return {
     accountType,

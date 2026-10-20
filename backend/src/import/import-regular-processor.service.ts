@@ -11,10 +11,31 @@ import { Payee } from "../payees/entities/payee.entity";
 import { PayeeAlias } from "../payees/entities/payee-alias.entity";
 import { TransactionTag } from "../tags/entities/transaction-tag.entity";
 import { TransactionSplitTag } from "../tags/entities/transaction-split-tag.entity";
-import { ImportContext, updateAccountBalance } from "./import-context";
+import {
+  ImportContext,
+  recordSkippedRow,
+  updateAccountBalance,
+} from "./import-context";
+import { ofxExternalId } from "./ofx-external-id";
 import { deletionBalanceEffect } from "../common/deletion-balance.util";
+import { roundMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
+
+/**
+ * Whether the row holding a bank id is the file row carrying it: the same date
+ * and amount. A row someone edited to another date or amount no longer
+ * matches, so a later download of it imports again.
+ */
+function isSameBankRow(
+  holder: Pick<Transaction, "transactionDate" | "amount">,
+  qifTx: { date: string; amount: number },
+): boolean {
+  return (
+    holder.transactionDate === qifTx.date &&
+    roundMoney(Number(holder.amount)) === roundMoney(qifTx.amount)
+  );
+}
 
 @Injectable()
 export class ImportRegularProcessorService {
@@ -23,14 +44,47 @@ export class ImportRegularProcessorService {
   constructor(private readonly rulesApplier: TransactionRulesApplierService) {}
 
   async processTransaction(ctx: ImportContext, qifTx: any): Promise<void> {
+    // A row whose bank id the account already holds, on a row of the same date
+    // and amount, was imported from an earlier file. The lookup is advisory:
+    // two imports racing past it both insert, the unique index on
+    // (account_id, external_id) refuses the second, and the import loop counts
+    // that row as skipped too (`isExternalIdConflict`).
+    let externalId = ofxExternalId(qifTx.fitId);
+    if (externalId) {
+      const holder = await this.rowHoldingExternalId(ctx, externalId);
+      if (holder && isSameBankRow(holder, qifTx)) {
+        // The held row is one of the transfers `isDuplicateTransfer` counts
+        // per signature, so this line still takes its turn in that count;
+        // otherwise a new transfer of the same date, amount and account later
+        // in the file would be matched against it and skipped.
+        if (qifTx.isTransfer) await this.isDuplicateTransfer(ctx, qifTx);
+        recordSkippedRow(
+          ctx.importResult,
+          qifTx,
+          "alreadyImported",
+          ctx.account.currencyCode,
+        );
+        return;
+      }
+      // A different row holds the id: the bank reused it (a counter that
+      // restarts each statement, say), so it does not name this row, and the
+      // row imports without a key rather than being lost.
+      if (holder) externalId = null;
+    }
+
     // Check for duplicate transfers (from prior imports or earlier account blocks)
     if (await this.isDuplicateTransfer(ctx, qifTx)) {
-      ctx.importResult.skipped++;
+      recordSkippedRow(
+        ctx.importResult,
+        qifTx,
+        "duplicateTransfer",
+        ctx.account.currencyCode,
+      );
       return;
     }
 
     // Check for pending cross-currency transfers to update
-    if (await this.matchPendingTransfer(ctx, qifTx)) {
+    if (await this.matchPendingTransfer(ctx, qifTx, externalId)) {
       ctx.importResult.imported++;
       return;
     }
@@ -76,6 +130,7 @@ export class ImportRegularProcessorService {
       currencyCode: ctx.account.currencyCode,
       isSplit,
       isTransfer,
+      externalId,
       createdAt: baseTime,
     });
 
@@ -325,9 +380,25 @@ export class ImportRegularProcessorService {
     return false;
   }
 
+  /**
+   * The row in the import's account holding `externalId`, if any. Keyed as the
+   * unique index is, by account alone: the key is the account's, whoever
+   * wrote the row that holds it.
+   */
+  private async rowHoldingExternalId(
+    ctx: ImportContext,
+    externalId: string,
+  ): Promise<Pick<Transaction, "transactionDate" | "amount"> | null> {
+    return ctx.manager.findOne(Transaction, {
+      where: { accountId: ctx.accountId, externalId },
+      select: { id: true, transactionDate: true, amount: true },
+    });
+  }
+
   private async matchPendingTransfer(
     ctx: ImportContext,
     qifTx: any,
+    externalId: string | null,
   ): Promise<boolean> {
     if (!qifTx.isTransfer || !qifTx.transferAccount) return false;
 
@@ -364,6 +435,10 @@ export class ImportRegularProcessorService {
       description: qifTx.memo || null,
       payeeName: qifTx.payee || pendingTransfer.payeeName,
       referenceNumber: qifTx.number || pendingTransfer.referenceNumber,
+      // The row now stands for this line of the file, so it takes the line's
+      // bank id, and a later download of the same line is skipped; a key the
+      // row already holds is kept.
+      ...(externalId && !pendingTransfer.externalId ? { externalId } : {}),
     });
 
     if (balanceDiff !== 0) {

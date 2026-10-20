@@ -117,7 +117,9 @@ The API create's `externalId` is the same shape one level up:
 lookup before the insert is advisory, and the create whose insert loses the race
 matches the violation by the index's name (`isExternalIdConflict`) and answers
 with the winner's row rather than a 409, because a repeated create is a retry,
-not a conflict (INV-API-001).
+not a conflict (INV-API-001). An OFX import writes the same key from the bank's
+`FITID`; the row whose insert loses there rolls back to its savepoint and is
+counted as skipped, since the winner already holds that line of the file.
 
 ### 3 -- conditional update as the claim
 

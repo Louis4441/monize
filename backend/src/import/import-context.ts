@@ -3,7 +3,7 @@ import { Account } from "../accounts/entities/account.entity";
 import { applyAccountBalanceDelta } from "../accounts/accounts.service";
 import { roundMoney } from "../common/round.util";
 import { TransactionRule } from "../transaction-rules/transaction-rule.entity";
-import { ImportResultDto } from "./dto/import.dto";
+import { ImportResultDto, ImportSkipReason } from "./dto/import.dto";
 import {
   BondProgramCache,
   inferSeriesForDate,
@@ -114,6 +114,26 @@ export function bondStateOf(ctx: ImportContext): ImportBondState {
     };
   }
   return ctx.bond;
+}
+
+/**
+ * Count a row the import left out and name it in the result. Every `skipped`
+ * increment goes through here, so the count and `skippedRows` cannot disagree.
+ */
+export function recordSkippedRow(
+  importResult: ImportResultDto,
+  row: { date: string; amount: number; payee?: string | null },
+  reason: ImportSkipReason,
+  currencyCode: string,
+): void {
+  importResult.skipped++;
+  importResult.skippedRows.push({
+    date: row.date,
+    amount: row.amount,
+    currencyCode,
+    payee: row.payee ?? "",
+    reason,
+  });
 }
 
 /**

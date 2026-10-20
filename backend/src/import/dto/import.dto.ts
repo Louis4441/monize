@@ -316,12 +316,50 @@ export class ParsedQifResponseDto {
   investmentSummary?: CsvInvestmentSummary;
 }
 
+/**
+ * Why an import left a row of the file out: `alreadyImported` when the account
+ * already holds the row's bank id (OFX `FITID`), `duplicateTransfer` when the
+ * transfer is already recorded between the same two accounts.
+ */
+export const IMPORT_SKIP_REASONS = [
+  "alreadyImported",
+  "duplicateTransfer",
+] as const;
+
+export type ImportSkipReason = (typeof IMPORT_SKIP_REASONS)[number];
+
+export class ImportSkippedRowDto {
+  @ApiProperty({ description: "The row's date, YYYY-MM-DD" })
+  date: string;
+
+  @ApiProperty({ description: "The row's amount as the file gave it" })
+  amount: number;
+
+  @ApiProperty({
+    description: "The currency of the account the row was imported into",
+  })
+  currencyCode: string;
+
+  @ApiProperty({ description: "The row's payee text, empty when it has none" })
+  payee: string;
+
+  @ApiProperty({ enum: IMPORT_SKIP_REASONS })
+  reason: ImportSkipReason;
+}
+
 export class ImportResultDto {
   @ApiProperty()
   imported: number;
 
   @ApiProperty()
   skipped: number;
+
+  @ApiProperty({
+    type: [ImportSkippedRowDto],
+    description:
+      "Every row counted in `skipped`, in the order the import reached it, so a person can see which rows of the file were not written and why",
+  })
+  skippedRows: ImportSkippedRowDto[];
 
   @ApiProperty()
   errors: number;

@@ -51,7 +51,12 @@ import {
   CsvHeadersResponseDto,
   ColumnMappingResponseDto,
 } from "./dto/import.dto";
-import { ImportContext, updateAccountBalance } from "./import-context";
+import {
+  ImportContext,
+  recordSkippedRow,
+  updateAccountBalance,
+} from "./import-context";
+import { isExternalIdConflict } from "../transactions/transaction-external-id";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
 import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
@@ -265,6 +270,7 @@ export class ImportService {
     const importResult: ImportResultDto = {
       imported: 0,
       skipped: 0,
+      skippedRows: [],
       errors: 0,
       errorMessages: [],
       categoriesCreated: 0,
@@ -1300,6 +1306,7 @@ export class ImportService {
     const importResult: ImportResultDto = {
       imported: 0,
       skipped: 0,
+      skippedRows: [],
       errors: 0,
       errorMessages: [],
       categoriesCreated: 0,
@@ -1412,13 +1419,25 @@ export class ImportService {
               await manager.query(`RELEASE SAVEPOINT ${savepointName}`);
             } catch (error) {
               await manager.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-              importResult.errors++;
-              importResult.errorMessages.push(
-                `Error importing transaction ${txIndex}/${totalTransactions} on ${qifTx.date}: ${error.message}`,
-              );
-              this.logger.warn(
-                `Error importing transaction ${txIndex}/${totalTransactions}: ${error.message}`,
-              );
+              if (isExternalIdConflict(error)) {
+                // Another writer committed a row holding this row's bank id
+                // after the processor's lookup missed it; the unique index
+                // refused this insert, so the row is already in the account.
+                recordSkippedRow(
+                  importResult,
+                  qifTx,
+                  "alreadyImported",
+                  account.currencyCode,
+                );
+              } else {
+                importResult.errors++;
+                importResult.errorMessages.push(
+                  `Error importing transaction ${txIndex}/${totalTransactions} on ${qifTx.date}: ${error.message}`,
+                );
+                this.logger.warn(
+                  `Error importing transaction ${txIndex}/${totalTransactions}: ${error.message}`,
+                );
+              }
             }
           } catch (savepointError) {
             importResult.errors++;

@@ -23,6 +23,7 @@ describe("ImportEntityCreatorService", () => {
     return {
       imported: 0,
       skipped: 0,
+      skippedRows: [],
       errors: 0,
       errorMessages: [],
       categoriesCreated: 0,
