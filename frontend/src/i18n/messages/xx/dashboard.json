@@ -271,7 +271,9 @@
     "minOccurrences": "[XX-Minimum occurrences-XX]",
     "minOccurrencesOption": "[XX-{count} or more-XX]",
     "occurrences": "[XX-{count} occurrences-XX]",
-    "monthlyEstimate": "[XX-Monthly estimate-XX]"
+    "monthlyEstimate": "[XX-Monthly estimate-XX]",
+    "viewCallouts": "[XX-Labels-XX]",
+    "viewLegend": "[XX-Legend-XX]"
   },
   "weekendVsWeekday": {
     "title": "[XX-Weekend vs Weekday Spending-XX]",

@@ -271,7 +271,9 @@
     "minOccurrences": "Minimalna liczba wystąpień",
     "minOccurrencesOption": "{count} lub więcej",
     "occurrences": "{count} wystąpień",
-    "monthlyEstimate": "Szacunek miesięczny"
+    "monthlyEstimate": "Szacunek miesięczny",
+    "viewCallouts": "Etykiety",
+    "viewLegend": "Legenda"
   },
   "weekendVsWeekday": {
     "title": "Wydatki w weekend a w dni robocze",

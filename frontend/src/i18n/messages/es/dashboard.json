@@ -271,7 +271,9 @@
     "minOccurrences": "Ocurrencias mínimas",
     "minOccurrencesOption": "{count} o más",
     "occurrences": "{count} ocurrencias",
-    "monthlyEstimate": "Estimado mensual"
+    "monthlyEstimate": "Estimado mensual",
+    "viewCallouts": "Etiquetas",
+    "viewLegend": "Leyenda"
   },
   "weekendVsWeekday": {
     "title": "Gastos fin de semana vs días de semana",

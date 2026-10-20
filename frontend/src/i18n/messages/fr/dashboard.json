@@ -271,7 +271,9 @@
     "minOccurrences": "Occurrences minimales",
     "minOccurrencesOption": "{count} ou plus",
     "occurrences": "{count} occurrences",
-    "monthlyEstimate": "Estimation mensuelle"
+    "monthlyEstimate": "Estimation mensuelle",
+    "viewCallouts": "Étiquettes",
+    "viewLegend": "Légende"
   },
   "weekendVsWeekday": {
     "title": "Dépenses week-end vs semaine",

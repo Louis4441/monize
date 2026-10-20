@@ -271,7 +271,9 @@
     "minOccurrences": "न्यूनतम घटनाएँ",
     "minOccurrencesOption": "{count} या अधिक",
     "occurrences": "{count} घटनाएँ",
-    "monthlyEstimate": "मासिक अनुमान"
+    "monthlyEstimate": "मासिक अनुमान",
+    "viewCallouts": "लेबल",
+    "viewLegend": "संकेत"
   },
   "weekendVsWeekday": {
     "title": "सप्ताहांत बनाम कार्यदिवस व्यय",

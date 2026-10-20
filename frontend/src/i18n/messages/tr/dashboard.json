@@ -271,7 +271,9 @@
     "minOccurrences": "Minimum tekrar",
     "minOccurrencesOption": "{count} veya daha fazla",
     "occurrences": "{count} tekrar",
-    "monthlyEstimate": "Aylık Tahmin"
+    "monthlyEstimate": "Aylık Tahmin",
+    "viewCallouts": "Etiketler",
+    "viewLegend": "Gösterge"
   },
   "weekendVsWeekday": {
     "title": "Hafta Sonu - Hafta İçi Harcama",

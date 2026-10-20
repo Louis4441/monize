@@ -271,7 +271,9 @@
     "minOccurrences": "Mindestanzahl Vorkommen",
     "minOccurrencesOption": "{count} oder mehr",
     "occurrences": "{count} Vorkommen",
-    "monthlyEstimate": "Monatliche Schätzung"
+    "monthlyEstimate": "Monatliche Schätzung",
+    "viewCallouts": "Beschriftungen",
+    "viewLegend": "Legende"
   },
   "weekendVsWeekday": {
     "title": "Wochenend- vs. Wochentagsausgaben",

@@ -271,7 +271,9 @@
     "minOccurrences": "最小発生回数",
     "minOccurrencesOption": "{count} 回以上",
     "occurrences": "{count} 回",
-    "monthlyEstimate": "月次見積もり"
+    "monthlyEstimate": "月次見積もり",
+    "viewCallouts": "ラベル",
+    "viewLegend": "凡例"
   },
   "weekendVsWeekday": {
     "title": "週末 vs 平日の支出",

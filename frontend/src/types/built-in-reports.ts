@@ -357,11 +357,19 @@ export interface RecurringExpenseItem {
   categoryName: string | null;
 }
 
+/** Look-back windows the recurring expenses analysis accepts; `6m` is its default. */
+export const RECURRING_EXPENSE_RANGES = ['6m', '1y', '2y', '5y', 'all'] as const;
+
+export type RecurringExpenseRange = (typeof RECURRING_EXPENSE_RANGES)[number];
+
 export interface RecurringExpensesResponse {
   data: RecurringExpenseItem[];
   summary: {
     totalRecurring: number;
+    /** totalRecurring spread over `monthCount` months. */
     monthlyEstimate: number;
+    /** Months the window covers (for `all`, since the first matching payment). */
+    monthCount: number;
     uniquePayees: number;
   };
 }

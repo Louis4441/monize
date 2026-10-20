@@ -271,7 +271,9 @@
     "minOccurrences": "最少出現次數",
     "minOccurrencesOption": "{count} 次或以上",
     "occurrences": "出現 {count} 次",
-    "monthlyEstimate": "每月估計"
+    "monthlyEstimate": "每月估計",
+    "viewCallouts": "標籤",
+    "viewLegend": "圖例"
   },
   "weekendVsWeekday": {
     "title": "假日與平日支出",

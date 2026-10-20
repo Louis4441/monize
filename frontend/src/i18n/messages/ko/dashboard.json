@@ -271,7 +271,9 @@
     "minOccurrences": "최소 발생 횟수",
     "minOccurrencesOption": "{count}회 이상",
     "occurrences": "{count}회 발생",
-    "monthlyEstimate": "월 예상액"
+    "monthlyEstimate": "월 예상액",
+    "viewCallouts": "레이블",
+    "viewLegend": "범례"
   },
   "weekendVsWeekday": {
     "title": "주말 대 평일 지출",
