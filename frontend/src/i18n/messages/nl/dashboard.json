@@ -276,7 +276,9 @@
     "minOccurrences": "Minimaal aantal keer",
     "minOccurrencesOption": "{count} of meer",
     "occurrences": "{count} keer",
-    "monthlyEstimate": "Maandelijkse schatting"
+    "monthlyEstimate": "Maandelijkse schatting",
+    "viewCallouts": "Labels",
+    "viewLegend": "Legenda"
   },
   "weekendVsWeekday": {
     "title": "Weekend- vs. weekdaguitgaven",

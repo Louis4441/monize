@@ -30,6 +30,8 @@ import {
   MonthlyCategoryBreakdownResponse,
   CashFlowSankeyResponse,
   SankeyDepth,
+  DEFAULT_RECURRING_EXPENSE_RANGE,
+  type RecurringExpenseRange,
 } from "./dto";
 
 @Injectable()
@@ -154,10 +156,12 @@ export class BuiltInReportsService {
   getRecurringExpenses(
     userId: string,
     minOccurrences: number = 3,
+    range: RecurringExpenseRange = DEFAULT_RECURRING_EXPENSE_RANGE,
   ): Promise<RecurringExpensesResponse> {
     return this.taxRecurringReports.getRecurringExpenses(
       userId,
       minOccurrences,
+      range,
     );
   }
 

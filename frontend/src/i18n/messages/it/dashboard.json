@@ -276,7 +276,9 @@
     "minOccurrences": "Occorrenze minime",
     "minOccurrencesOption": "{count} o più",
     "occurrences": "{count} occorrenze",
-    "monthlyEstimate": "Stima mensile"
+    "monthlyEstimate": "Stima mensile",
+    "viewCallouts": "Etichette",
+    "viewLegend": "Legenda"
   },
   "weekendVsWeekday": {
     "title": "Uscite weekend vs giorni feriali",

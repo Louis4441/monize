@@ -6,6 +6,7 @@
  */
 
 import type { ForecastPeriod } from '@/lib/forecast';
+import { RECURRING_EXPENSE_RANGES, type RecurringExpenseRange } from '@/types/built-in-reports';
 
 /** Range presets offered by the transaction-based spending/income widgets. */
 export const SPENDING_RANGES = ['mtd', '1m', '3m', '6m', '1y', 'ytd'] as const;
@@ -29,6 +30,8 @@ export const PORTFOLIO_RANGES = [
   '5y',
   'all',
 ] as const;
+/** Range presets for the recurring expenses widget (the analysis' own windows). */
+export const RECURRING_RANGES = RECURRING_EXPENSE_RANGES;
 /** Range presets for the weekend/weekday widget. */
 export const WEEKEND_RANGES = ['1m', '3m', '6m', '1y'] as const;
 
@@ -118,8 +121,16 @@ export interface CashFlowForecastConfig {
   accountIds: string[];
 }
 
+/**
+ * Top Recurring Expenses settings. `view` names each slice either in a box
+ * beside the donut with a line to its slice (`callouts`, which falls back to
+ * the legend where the widget is too small for the boxes) or in a legend
+ * under it.
+ */
 export interface RecurringConfig {
   minOccurrences: number;
+  range: RecurringExpenseRange;
+  view: 'callouts' | 'legend';
 }
 
 export interface WeekendConfig {
@@ -174,7 +185,12 @@ export const CASH_FLOW_FORECAST_DEFAULT: CashFlowForecastConfig = {
   accountIds: [],
 };
 
-export const RECURRING_EXPENSES_DEFAULT: RecurringConfig = { minOccurrences: 3 };
+// Six months is the window the widget always used.
+export const RECURRING_EXPENSES_DEFAULT: RecurringConfig = {
+  minOccurrences: 3,
+  range: '6m',
+  view: 'callouts',
+};
 
 export const WEEKEND_WEEKDAY_DEFAULT: WeekendConfig = {
   range: '3m',

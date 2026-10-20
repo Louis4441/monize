@@ -276,7 +276,9 @@
     "minOccurrences": "Мінімальна кількість повторень",
     "minOccurrencesOption": "{count} або більше",
     "occurrences": "{count} повторень",
-    "monthlyEstimate": "Місячна оцінка"
+    "monthlyEstimate": "Місячна оцінка",
+    "viewCallouts": "Підписи",
+    "viewLegend": "Умовні позначення"
   },
   "weekendVsWeekday": {
     "title": "Витрати у вихідні проти будніх",

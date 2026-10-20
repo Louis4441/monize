@@ -276,7 +276,9 @@
     "minOccurrences": "Kejadian minimum",
     "minOccurrencesOption": "{count} atau lebih",
     "occurrences": "{count} kejadian",
-    "monthlyEstimate": "Perkiraan Bulanan"
+    "monthlyEstimate": "Perkiraan Bulanan",
+    "viewCallouts": "Label",
+    "viewLegend": "Keterangan"
   },
   "weekendVsWeekday": {
     "title": "Pengeluaran Akhir Pekan vs Hari Kerja",

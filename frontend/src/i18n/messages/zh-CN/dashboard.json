@@ -276,7 +276,9 @@
     "minOccurrences": "最少发生次数",
     "minOccurrencesOption": "{count} 次或以上",
     "occurrences": "发生 {count} 次",
-    "monthlyEstimate": "月度估算"
+    "monthlyEstimate": "月度估算",
+    "viewCallouts": "标签",
+    "viewLegend": "图例"
   },
   "weekendVsWeekday": {
     "title": "周末与工作日支出",

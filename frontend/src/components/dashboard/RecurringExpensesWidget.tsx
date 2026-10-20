@@ -3,16 +3,16 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { builtInReportsApi } from '@/lib/built-in-reports';
-import { RecurringExpenseItem } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { chartSeriesColor } from '@/lib/chart-colors';
-import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
+import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
-import { RECURRING_EXPENSES_DEFAULT, RecurringConfig } from './widget-config';
+import { WidgetSegmentedControl } from './WidgetSegmentedControl';
+import { RecurringExpensesChart, RecurringSlice } from './RecurringExpensesChart';
+import { RECURRING_EXPENSES_DEFAULT, RECURRING_RANGES, RecurringConfig } from './widget-config';
 
 const WIDGET_ID = 'recurring-expenses';
 const MIN_OCCURRENCE_OPTIONS = [2, 3, 4, 5, 6];
@@ -21,20 +21,18 @@ interface RecurringExpensesWidgetProps {
   isLoading: boolean;
 }
 
-type RecurringSlice = RecurringExpenseItem & { color: string };
-
 export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetProps) {
   const t = useTranslations('dashboard');
   const router = useRouter();
-  const { formatCurrency, formatCurrencyCompact } = useNumberFormat();
+  const { formatCurrencyCompact } = useNumberFormat();
   const { config, updateConfig } = useWidgetConfig<RecurringConfig>(
     WIDGET_ID,
     RECURRING_EXPENSES_DEFAULT,
   );
 
   const { data: response, isLoading: dataLoading } = useReportData(
-    () => builtInReportsApi.getRecurringExpenses(config.minOccurrences),
-    [config.minOccurrences],
+    () => builtInReportsApi.getRecurringExpenses(config.minOccurrences, config.range),
+    [config.minOccurrences, config.range],
   );
 
   const chartData = useMemo<RecurringSlice[]>(
@@ -52,20 +50,44 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
     if (payeeId) router.push(`/transactions?payeeId=${payeeId}`);
   };
 
+  const rangeLabel = (range: string) =>
+    t(`widgets.rangeLabels.${range}` as Parameters<typeof t>[0]);
+
   const configControls = (
-    <WidgetConfigRow label={t('recurringExpenses.minOccurrences')}>
-      <select
-        value={config.minOccurrences}
-        onChange={(e) => updateConfig({ minOccurrences: Number(e.target.value) })}
-        className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-      >
-        {MIN_OCCURRENCE_OPTIONS.map((n) => (
-          <option key={n} value={n}>
-            {t('recurringExpenses.minOccurrencesOption', { count: n })}
-          </option>
-        ))}
-      </select>
-    </WidgetConfigRow>
+    <>
+      <WidgetConfigRow label={t('widgets.timeframe')}>
+        <DateRangeSelector
+          ranges={RECURRING_RANGES}
+          labels={Object.fromEntries(RECURRING_RANGES.map((r) => [r, rangeLabel(r)]))}
+          value={config.range}
+          onChange={(range) => updateConfig({ range: range as RecurringConfig['range'] })}
+          size="sm"
+        />
+      </WidgetConfigRow>
+      <WidgetConfigRow label={t('recurringExpenses.minOccurrences')}>
+        <select
+          value={config.minOccurrences}
+          onChange={(e) => updateConfig({ minOccurrences: Number(e.target.value) })}
+          className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+        >
+          {MIN_OCCURRENCE_OPTIONS.map((n) => (
+            <option key={n} value={n}>
+              {t('recurringExpenses.minOccurrencesOption', { count: n })}
+            </option>
+          ))}
+        </select>
+      </WidgetConfigRow>
+      <WidgetConfigRow label={t('widgets.view')}>
+        <WidgetSegmentedControl
+          value={config.view}
+          onChange={(view) => updateConfig({ view })}
+          options={[
+            { value: 'callouts', label: t('recurringExpenses.viewCallouts') },
+            { value: 'legend', label: t('recurringExpenses.viewLegend') },
+          ]}
+        />
+      </WidgetConfigRow>
+    </>
   );
 
   const loading = isLoading || dataLoading;
@@ -74,6 +96,9 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
     <WidgetCard
       title={t('recurringExpenses.title')}
       widgetId={WIDGET_ID}
+      headerRight={
+        <span className="text-sm text-gray-500 dark:text-gray-400">{rangeLabel(config.range)}</span>
+      }
       configControls={configControls}
       configTitle={t('recurringExpenses.title')}
     >
@@ -83,45 +108,11 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
         <WidgetMessage>{t('recurringExpenses.empty')}</WidgetMessage>
       ) : (
         <>
-          <div className="flex-1 min-h-[240px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="55%"
-                  outerRadius="85%"
-                  paddingAngle={2}
-                  dataKey="totalAmount"
-                  nameKey="payeeName"
-                  cursor="pointer"
-                  onClick={(d) => handleSliceClick((d as unknown as RecurringSlice).payeeId)}
-                >
-                  {chartData.map((entry) => (
-                    <Cell key={entry.payeeId || entry.payeeName} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload as RecurringSlice;
-                    return (
-                      <ChartTooltipPanel>
-                        <p className="font-medium text-gray-900 dark:text-gray-100">{d.payeeName}</p>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {formatCurrency(d.totalAmount)}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {t('recurringExpenses.occurrences', { count: d.occurrences })}
-                        </p>
-                      </ChartTooltipPanel>
-                    );
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <RecurringExpensesChart
+            slices={chartData}
+            view={config.view}
+            onSliceClick={handleSliceClick}
+          />
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm flex-shrink-0">
             <span className="text-gray-500 dark:text-gray-400">{t('recurringExpenses.monthlyEstimate')}</span>
             <span className="font-semibold text-gray-900 dark:text-gray-100">

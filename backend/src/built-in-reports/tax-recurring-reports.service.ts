@@ -11,7 +11,11 @@ import {
   BillPaymentItem,
   MonthlyBillTotal,
 } from "./dto";
-import type { RecurringExpenseFrequency } from "./dto/recurring-expenses.dto";
+import {
+  DEFAULT_RECURRING_EXPENSE_RANGE,
+  type RecurringExpenseFrequency,
+  type RecurringExpenseRange,
+} from "./dto/recurring-expenses.dto";
 import { formatDateYMD } from "../common/date-utils";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
 import {
@@ -44,6 +48,65 @@ const INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
  * F-RPT-001).
  */
 const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
+
+/**
+ * The same two halves of the predicate for the history subquery's own aliases
+ * (`h`, `ha`), so the history start the recurring estimate is measured against
+ * counts exactly the rows the analysis counts.
+ */
+const HISTORY_INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
+  accountAlias: "ha",
+  transactionAlias: "h",
+});
+const HISTORY_REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("h");
+
+/** Months each bounded recurring-expense window looks back. */
+const RECURRING_RANGE_MONTHS: Record<
+  Exclude<RecurringExpenseRange, "all">,
+  number
+> = {
+  "6m": 6,
+  "1y": 12,
+  "2y": 24,
+  "5y": 60,
+};
+
+/**
+ * Payments per six months for each frequency label. The thresholds were set
+ * for the original six-month window; a wider window scales them by its length,
+ * so a monthly bill reads MONTHLY over five years too rather than WEEKLY.
+ */
+const FREQUENCY_PER_SIX_MONTHS: ReadonlyArray<
+  [number, RecurringExpenseFrequency]
+> = [
+  [24, "WEEKLY"],
+  [12, "BIWEEKLY"],
+  [5, "MONTHLY"],
+  [3, "OCCASIONAL"],
+];
+
+function classifyFrequency(
+  occurrences: number,
+  monthCount: number,
+): RecurringExpenseFrequency {
+  for (const [perSixMonths, frequency] of FREQUENCY_PER_SIX_MONTHS) {
+    // occurrences / monthCount >= perSixMonths / 6, in integers.
+    if (occurrences * 6 >= perSixMonths * monthCount) return frequency;
+  }
+  return "IRREGULAR";
+}
+
+const DAYS_PER_MONTH = 365.25 / 12;
+
+/** Months from one YYYY-MM-DD date to another, to the nearest month, at least 1. */
+function monthsBetween(startYmd: string, endYmd: string): number {
+  const toUtc = (ymd: string) => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const days = (toUtc(endYmd) - toUtc(startYmd)) / 86_400_000;
+  return Math.max(1, Math.round(days / DAYS_PER_MONTH));
+}
 
 @Injectable()
 export class TaxRecurringReportsService {
@@ -205,16 +268,23 @@ export class TaxRecurringReportsService {
   async getRecurringExpenses(
     userId: string,
     minOccurrences: number = 3,
+    range: RecurringExpenseRange = DEFAULT_RECURRING_EXPENSE_RANGE,
   ): Promise<RecurringExpensesResponse> {
     const defaultCurrency =
       await this.currencyService.getDefaultCurrency(userId);
     const rateMap = await this.currencyService.buildRateMap(defaultCurrency);
 
     const now = new Date();
-    const sixMonthsAgo = new Date(now);
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const startDate = formatDateYMD(sixMonthsAgo);
     const endDate = formatDateYMD(now);
+    // `all` has no lower bound: $2 is NULL and the predicate always holds.
+    let startDate: string | null = null;
+    if (range !== "all") {
+      const windowStart = new Date(now);
+      windowStart.setMonth(
+        windowStart.getMonth() - RECURRING_RANGE_MONTHS[range],
+      );
+      startDate = formatDateYMD(windowStart);
+    }
 
     const query = `
       SELECT
@@ -225,13 +295,25 @@ export class TaxRecurringReportsService {
         t.currency_code,
         COUNT(*)::int as occurrences,
         SUM(ABS(${REPORTABLE_TX_AMOUNT})) as total_amount,
-        MAX(t.transaction_date) as last_transaction_date
+        MAX(t.transaction_date) as last_transaction_date,
+        (
+          SELECT TO_CHAR(MIN(h.transaction_date), 'YYYY-MM-DD')
+          FROM transactions h
+          LEFT JOIN accounts ha ON ha.id = h.account_id
+          WHERE h.user_id = $1
+            AND h.transaction_date <= $3
+            AND ${HISTORY_REPORTABLE_TX_AMOUNT} < 0
+            AND h.is_transfer = false
+            AND (h.status IS NULL OR h.status != 'VOID')
+            AND h.parent_transaction_id IS NULL
+            AND ${HISTORY_INVESTMENT_EXCLUSION_NO_SPLITS}
+        ) as history_start
       FROM transactions t
       LEFT JOIN payees p ON p.id = t.payee_id
       LEFT JOIN categories c ON c.id = t.category_id
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE t.user_id = $1
-        AND t.transaction_date >= $2
+        AND ($2::date IS NULL OR t.transaction_date >= $2::date)
         AND t.transaction_date <= $3
         AND ${REPORTABLE_TX_AMOUNT} < 0
         AND t.is_transfer = false
@@ -253,6 +335,8 @@ export class TaxRecurringReportsService {
       occurrences: number;
       total_amount: string;
       last_transaction_date: Date;
+      /** The user's first spending row on or before the end date. */
+      history_start: string | null;
     }
 
     const rawResults: RawRecurring[] = await withScopedDb(
@@ -301,16 +385,28 @@ export class TaxRecurringReportsService {
       }
     }
 
+    // The estimate is spread over the months the window actually holds: a
+    // preset never claims more months than the user's spending history has
+    // (five years over eight months of data would understate it sevenfold),
+    // and `all` spans exactly that history.
+    const historyStart = rawResults[0]?.history_start ?? null;
+    const historyMonths =
+      historyStart !== null ? monthsBetween(historyStart, endDate) : null;
+    let monthCount: number;
+    if (range === "all") {
+      monthCount = historyMonths ?? 1;
+    } else {
+      monthCount = Math.min(
+        RECURRING_RANGE_MONTHS[range],
+        historyMonths ?? RECURRING_RANGE_MONTHS[range],
+      );
+    }
+
     const data: RecurringExpenseItem[] = Array.from(payeeMerged.values()).map(
       (row) => {
         const totalAmount = row.totalAmount;
         const occurrences = row.occurrences;
-
-        let frequency: RecurringExpenseFrequency = "IRREGULAR";
-        if (occurrences >= 24) frequency = "WEEKLY";
-        else if (occurrences >= 12) frequency = "BIWEEKLY";
-        else if (occurrences >= 5) frequency = "MONTHLY";
-        else if (occurrences >= 3) frequency = "OCCASIONAL";
+        const frequency = classifyFrequency(occurrences, monthCount);
 
         return {
           payeeName: row.payeeName,
@@ -331,7 +427,8 @@ export class TaxRecurringReportsService {
       data,
       summary: {
         totalRecurring: roundMoney(totalRecurring),
-        monthlyEstimate: roundMoney(totalRecurring / 6),
+        monthlyEstimate: roundMoney(totalRecurring / monthCount),
+        monthCount,
         uniquePayees: data.length,
       },
     };

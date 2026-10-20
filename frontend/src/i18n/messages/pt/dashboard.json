@@ -276,7 +276,9 @@
     "minOccurrences": "Ocorrências mínimas",
     "minOccurrencesOption": "{count} ou mais",
     "occurrences": "{count} ocorrências",
-    "monthlyEstimate": "Estimativa Mensal"
+    "monthlyEstimate": "Estimativa Mensal",
+    "viewCallouts": "Etiquetas",
+    "viewLegend": "Legenda"
   },
   "weekendVsWeekday": {
     "title": "Despesas: Fim de Semana vs Dia de Semana",

@@ -276,7 +276,9 @@
     "minOccurrences": "Минимальное количество вхождений",
     "minOccurrencesOption": "{count} или более",
     "occurrences": "{count} вхождений",
-    "monthlyEstimate": "Ежемесячная оценка"
+    "monthlyEstimate": "Ежемесячная оценка",
+    "viewCallouts": "Подписи",
+    "viewLegend": "Условные обозначения"
   },
   "weekendVsWeekday": {
     "title": "Расходы в выходные против будней",

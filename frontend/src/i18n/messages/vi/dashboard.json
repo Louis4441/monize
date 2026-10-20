@@ -276,7 +276,9 @@
     "minOccurrences": "Số lần xuất hiện tối thiểu",
     "minOccurrencesOption": "{count} trở lên",
     "occurrences": "{count} lần xuất hiện",
-    "monthlyEstimate": "Ước tính hàng tháng"
+    "monthlyEstimate": "Ước tính hàng tháng",
+    "viewCallouts": "Nhãn",
+    "viewLegend": "Chú giải"
   },
   "weekendVsWeekday": {
     "title": "Chi tiêu cuối tuần so với ngày thường",
