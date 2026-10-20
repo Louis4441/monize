@@ -14,6 +14,7 @@ import {
   BuildingOffice2Icon,
   CalendarDaysIcon,
   CalendarIcon,
+  ChartBarSquareIcon,
   ChartBarIcon,
   ChartPieIcon,
   ClipboardDocumentCheckIcon,
@@ -43,6 +44,7 @@ type WidgetIconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 export const WIDGET_ICONS: Record<DashboardWidgetId, WidgetIconComponent> = {
   'favourite-accounts': BuildingLibraryIcon,
   'upcoming-bills': CalendarDaysIcon,
+  'cash-flow-forecast': ChartBarSquareIcon,
   'top-movers': ArrowTrendingUpIcon,
   'favourite-securities': StarIcon,
   'portfolio-value': PresentationChartLineIcon,

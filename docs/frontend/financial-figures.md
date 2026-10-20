@@ -95,6 +95,15 @@ zero, which is a bar of height zero rather than a gap the chart closes up. Each
 bucket carries `periodStart` and `periodEnd`, so a drill-down uses the dates the
 server bucketed by rather than re-deriving them.
 
+The Cash Flow Forecast has no endpoint: it is projected in the browser on
+both surfaces, so the rule there is one computation rather than one request.
+The Bills & Deposits chart and the dashboard widget build it through
+`useCashFlowForecast` and draw it through `CashFlowForecastPlot`
+(`components/bills/`), over the posted future-dated rows
+`loadFutureTransactions` (`lib/future-transactions.ts`) loads. Those rows are
+not in `currentBalance`, so a widget that cannot load them says so rather than
+projecting from a balance missing them.
+
 ## A portfolio chart NAMES the period it measures; it does not date it
 
 `usePortfolioPeriodResult` sends the range as `period` and the server resolves the window from `backend/src/net-worth/portfolio-period-presets.util.ts` -- the same file the batch route behind "Portfolio performance" resolves its windows from. Two surfaces on one page cannot then disagree about where a quarter opens. `isPortfolioPeriodPreset` (`types/net-worth.ts`) says which ranges the server knows; `mtd` and a custom window are the ones it does not, and they send the window the chart draws: `periodStartDate` is where the period opens and `startDate`, where it is earlier, is the baseline.

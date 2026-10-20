@@ -48,11 +48,13 @@ const SectorWeightingsWidget = dynamic(() => import('./SectorWeightingsWidget').
 const SecurityTypeAllocationWidget = dynamic(() => import('./SecurityTypeAllocationWidget').then(m => m.SecurityTypeAllocationWidget), { ssr: false, loading: widgetSkeleton() });
 const GeographicAllocationWidget = dynamic(() => import('./GeographicAllocationWidget').then(m => m.GeographicAllocationWidget), { ssr: false, loading: widgetSkeleton() });
 const RecurringExpensesWidget = dynamic(() => import('./RecurringExpensesWidget').then(m => m.RecurringExpensesWidget), { ssr: false, loading: widgetSkeleton() });
+const CashFlowForecastWidget = dynamic(() => import('./CashFlowForecastWidget').then(m => m.CashFlowForecastWidget), { ssr: false, loading: widgetSkeleton() });
 const WeekendVsWeekdayWidget = dynamic(() => import('./WeekendVsWeekdayWidget').then(m => m.WeekendVsWeekdayWidget), { ssr: false, loading: widgetSkeleton() });
 
 export type DashboardWidgetId =
   | 'favourite-accounts'
   | 'upcoming-bills'
+  | 'cash-flow-forecast'
   | 'top-movers'
   | 'favourite-securities'
   | 'net-worth'
@@ -147,6 +149,21 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
         accounts={ctx.accounts}
         isLoading={ctx.isLoading}
         maxItems={upcomingBillsMaxItems(ctx.accounts)}
+      />
+    ),
+  },
+  // Opt-in, and listed beside Upcoming Bills so the Customize modal's hidden
+  // widgets offer the two together.
+  {
+    id: 'cash-flow-forecast',
+    titleSection: 'cashFlowForecast',
+    iconType: 'line',
+    defaultEnabled: false,
+    render: (ctx) => (
+      <CashFlowForecastWidget
+        scheduledTransactions={ctx.scheduledTransactions}
+        accounts={ctx.accounts}
+        isLoading={ctx.isLoading}
       />
     ),
   },

@@ -5,6 +5,8 @@
  * by useWidgetConfig, which memoizes on the defaults reference).
  */
 
+import type { ForecastPeriod } from '@/lib/forecast';
+
 /** Range presets offered by the transaction-based spending/income widgets. */
 export const SPENDING_RANGES = ['mtd', '1m', '3m', '6m', '1y', 'ytd'] as const;
 /** Range presets for month-trend widgets. */
@@ -107,6 +109,15 @@ export interface UpcomingBillsConfig {
   view: 'list' | 'calendar';
 }
 
+/**
+ * Cash Flow Forecast settings: how far ahead to project, and which accounts.
+ * An empty `accountIds` is every account, drawn as one line.
+ */
+export interface CashFlowForecastConfig {
+  period: ForecastPeriod;
+  accountIds: string[];
+}
+
 export interface RecurringConfig {
   minOccurrences: number;
 }
@@ -155,6 +166,12 @@ export const GEOGRAPHIC_ALLOCATION_DEFAULT: GeographicConfig = {
 export const UPCOMING_BILLS_DEFAULT: UpcomingBillsConfig = {
   scope: 'dueSoon',
   view: 'list',
+};
+
+// The Bills & Deposits chart's own default window.
+export const CASH_FLOW_FORECAST_DEFAULT: CashFlowForecastConfig = {
+  period: 'month',
+  accountIds: [],
 };
 
 export const RECURRING_EXPENSES_DEFAULT: RecurringConfig = { minOccurrences: 3 };

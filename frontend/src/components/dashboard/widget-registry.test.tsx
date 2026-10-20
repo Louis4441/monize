@@ -28,6 +28,13 @@ describe('widget-registry', () => {
     expect(def!.defaultEnabled).toBe(false);
   });
 
+  it('registers the cash flow forecast right after Upcoming Bills, and not for delegates', () => {
+    const ids = DASHBOARD_WIDGETS.map((w) => w.id);
+    expect(ids.indexOf('cash-flow-forecast')).toBe(ids.indexOf('upcoming-bills') + 1);
+    const def = DASHBOARD_WIDGETS.find((w) => w.id === 'cash-flow-forecast')!;
+    expect(def.delegateVisible).toBeUndefined();
+  });
+
   describe('resolveDashboardWidgets', () => {
     it('returns the default layout for an empty or missing preference', () => {
       expect(resolveDashboardWidgets(undefined).map((w) => w.id)).toEqual(
@@ -120,6 +127,7 @@ describe('widget-registry', () => {
       'recurring-expenses',
       'weekend-weekday',
       'cash-flow-sankey',
+      'cash-flow-forecast',
     ];
     for (const id of reportWidgetIds) {
       const def = DASHBOARD_WIDGETS.find((w) => w.id === id);
