@@ -49,6 +49,11 @@
     "nextMonth": "Nächster Monat",
     "emptyAll": "Keine aktiven Rechnungen, Einzahlungen oder Überweisungen geplant."
   },
+  "cashFlowForecast": {
+    "title": "Cashflow-Prognose",
+    "period": "Prognosezeitraum",
+    "loadFailed": "Die bereits nach heute datierten Buchungen konnten nicht geladen werden, daher kann die Prognose nicht angezeigt werden. Laden Sie das Dashboard neu, um es erneut zu versuchen."
+  },
   "gettingStarted": {
     "title": "Erste Schritte",
     "subtitle": "Richten Sie Ihr Konto in wenigen Schritten ein",

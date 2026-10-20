@@ -49,6 +49,11 @@
     "nextMonth": "Sonraki ay",
     "emptyAll": "Planlanmış etkin fatura, para yatırma veya transfer yok."
   },
+  "cashFlowForecast": {
+    "title": "Nakit Akışı Tahmini",
+    "period": "Tahmin dönemi",
+    "loadFailed": "Bugünden sonraki bir tarihe sahip işlemler yüklenemedi, bu nedenle tahmin gösterilemiyor. Tekrar denemek için panoyu yeniden yükleyin."
+  },
   "gettingStarted": {
     "title": "Başlarken",
     "subtitle": "Hesabınızı birkaç hızlı adımda ayarlayın",

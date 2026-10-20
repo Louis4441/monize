@@ -49,6 +49,11 @@
     "nextMonth": "다음 달",
     "emptyAll": "예약된 활성 청구, 입금 또는 이체가 없습니다."
   },
+  "cashFlowForecast": {
+    "title": "현금 흐름 예측",
+    "period": "예측 기간",
+    "loadFailed": "오늘 이후 날짜의 거래를 불러오지 못해 예측을 표시할 수 없습니다. 대시보드를 새로 고쳐 다시 시도해 주세요."
+  },
   "gettingStarted": {
     "title": "시작하기",
     "subtitle": "몇 가지 빠른 단계로 계정을 설정하세요",

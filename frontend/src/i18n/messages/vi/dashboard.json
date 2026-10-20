@@ -49,6 +49,11 @@
     "nextMonth": "Tháng sau",
     "emptyAll": "Không có hóa đơn, khoản nạp hoặc chuyển khoản đang hoạt động nào được lên lịch."
   },
+  "cashFlowForecast": {
+    "title": "Dự báo dòng tiền",
+    "period": "Kỳ dự báo",
+    "loadFailed": "Không thể tải các giao tác đã ghi ngày sau hôm nay, vì vậy không thể hiển thị dự báo. Hãy tải lại bảng điều khiển để thử lại."
+  },
   "gettingStarted": {
     "title": "Bắt đầu",
     "subtitle": "Thiết lập tài khoản của bạn qua vài bước nhanh",

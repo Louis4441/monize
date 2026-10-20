@@ -5,6 +5,7 @@
  * by useWidgetConfig, which memoizes on the defaults reference).
  */
 
+import type { ForecastPeriod } from '@/lib/forecast';
 import { RECURRING_EXPENSE_RANGES, type RecurringExpenseRange } from '@/types/built-in-reports';
 
 /** Range presets offered by the transaction-based spending/income widgets. */
@@ -112,6 +113,15 @@ export interface UpcomingBillsConfig {
 }
 
 /**
+ * Cash Flow Forecast settings: how far ahead to project, and which accounts.
+ * An empty `accountIds` is every account, drawn as one line.
+ */
+export interface CashFlowForecastConfig {
+  period: ForecastPeriod;
+  accountIds: string[];
+}
+
+/**
  * Top Recurring Expenses settings. `view` names each slice either in a box
  * beside the donut with a line to its slice (`callouts`, which falls back to
  * the legend where the widget is too small for the boxes) or in a legend
@@ -167,6 +177,12 @@ export const GEOGRAPHIC_ALLOCATION_DEFAULT: GeographicConfig = {
 export const UPCOMING_BILLS_DEFAULT: UpcomingBillsConfig = {
   scope: 'dueSoon',
   view: 'list',
+};
+
+// The Bills & Deposits chart's own default window.
+export const CASH_FLOW_FORECAST_DEFAULT: CashFlowForecastConfig = {
+  period: 'month',
+  accountIds: [],
 };
 
 // Six months is the window the widget always used.

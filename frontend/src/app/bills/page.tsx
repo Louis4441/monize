@@ -21,7 +21,6 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SummaryCard, SummaryIcons } from '@/components/ui/SummaryCard';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
-import { transactionsApi } from '@/lib/transactions';
 import { categoriesApi } from '@/lib/categories';
 import { createCategoryFromInput } from '@/lib/category-create';
 import { buildCategoryColorMap } from '@/lib/categoryUtils';
@@ -41,6 +40,7 @@ import { occurrenceKind } from '@/lib/scheduled-kind';
 import { scheduleEffectiveAmount } from '@/lib/scheduled-effective-amount';
 import { monthlyEquivalent } from '@/lib/frequency';
 import type { FutureTransaction } from '@/lib/forecast';
+import { loadFutureTransactions } from '@/lib/future-transactions';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { combineTotals, isComplete, sumConverted } from '@/lib/currency-total';
@@ -170,15 +170,11 @@ function BillsContent() {
     const run = async () => {
       const generation = ++loadGenerationRef.current;
       try {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-
         const [transactionsData, categoriesData, accountsData, futureData] = await Promise.all([
           scheduledTransactionsApi.getAll(),
           categoriesApi.getAll(),
           accountsApi.getAll(),
-          transactionsApi.getAll({ startDate: tomorrowStr, limit: 200 }),
+          loadFutureTransactions(t('forecast.untitledTransaction')),
         ]);
         // A newer load started while this one was awaiting: discard this result
         // so it cannot overwrite the fresher state.
@@ -186,17 +182,7 @@ function BillsContent() {
         setScheduledTransactions(transactionsData);
         setCategories(categoriesData);
         setAccounts(accountsData);
-        setFutureTransactions(
-          futureData.data
-            .filter(t => t.status !== 'VOID')
-            .map(t => ({
-              id: t.id,
-              accountId: t.accountId,
-              name: t.payeeName || t.payee?.name || t.description || 'Transaction',
-              amount: Number(t.amount),
-              date: t.transactionDate.split('T')[0],
-            }))
-        );
+        setFutureTransactions(futureData);
       } catch (error) {
         // A superseded request must not surface an obsolete failure over a newer
         // load that has already succeeded.

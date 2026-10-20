@@ -49,6 +49,11 @@
     "nextMonth": "Bulan berikutnya",
     "emptyAll": "Tidak ada tagihan, setoran, atau transfer aktif yang dijadwalkan."
   },
+  "cashFlowForecast": {
+    "title": "Prakiraan Arus Kas",
+    "period": "Periode prakiraan",
+    "loadFailed": "Tidak dapat memuat transaksi yang sudah bertanggal setelah hari ini, sehingga prakiraan tidak dapat ditampilkan. Muat ulang dasbor untuk mencoba lagi."
+  },
   "gettingStarted": {
     "title": "Memulai",
     "subtitle": "Atur akun Anda dalam beberapa langkah cepat",

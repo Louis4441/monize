@@ -49,6 +49,11 @@
     "nextMonth": "Mes siguiente",
     "emptyAll": "No hay facturas, ingresos ni transferencias activas programadas."
   },
+  "cashFlowForecast": {
+    "title": "Pronóstico de flujo de caja",
+    "period": "Periodo de pronóstico",
+    "loadFailed": "No se pudieron cargar las transacciones con fecha posterior a hoy, por lo que no se puede mostrar el pronóstico. Recarga el panel para intentarlo de nuevo."
+  },
   "gettingStarted": {
     "title": "Primeros pasos",
     "subtitle": "Configura tu cuenta en unos pocos pasos rápidos",
