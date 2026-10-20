@@ -161,7 +161,7 @@
     "notATradeRequest": "This AI review request is not a trade request.",
     "tradeOnTradeRequest": "The trade field answers a trade request only.",
     "tradeDateRequired": "The trade needs a date (YYYY-MM-DD): the email is gone, so there is no day to fall back on.",
-    "tradeInvalid": "The trade needs accountName, action (BUY or SELL), symbol, quantity, totalAmount and, optionally, commission and date (YYYY-MM-DD).",
+    "tradeInvalid": "The trade needs accountName, action (BUY, SELL, DIVIDEND or REINVEST), symbol, quantity (optional for a DIVIDEND), totalAmount and, optionally, commission and date (YYYY-MM-DD).",
     "tradeSecurityAmbiguous": "\"{{ symbol }}\" matches several of your securities ({{ list }}). Rename one so the ticker is unique.",
     "tradeSecurityUnknown": "You have no security with the ticker \"{{ symbol }}\". Add the security, then reprocess the email.",
     "tagNamesInvalid": "A proposal may add up to {{ max }} tags of 1 to {{ length }} characters each, with no control characters.",

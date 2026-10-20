@@ -47,6 +47,7 @@ export const RECEIPT_MULTI_DOMAIN_PARSER_DRAFT_INSTRUCTION =
  */
 export const RECEIPT_TRADE_PARSER_DRAFT_INSTRUCTION =
   "The user asked for a trade-confirmation profile for the brokerage emails " +
+  "(buys, sells, cash or reinvested dividends) " +
   "attached to this request, all from one sender: read them and write ONE " +
   "profile with a trade section that reads each of them completely. Use the " +
   "email_receipt_parsers tool: operation categories for the guide and " +

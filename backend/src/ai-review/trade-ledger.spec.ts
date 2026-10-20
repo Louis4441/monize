@@ -8,7 +8,8 @@ const USER = "user-1";
 const trade = {
   accountId: "acc-1",
   action: "BUY" as const,
-  quantity: 75.9878,
+  quantity: 75.9878 as number | null,
+  totalAmount: 2000,
   date: "2026-10-15",
 };
 
@@ -55,6 +56,8 @@ describe("findTradeInLedger", () => {
       "X\\_NS.%",
       "r-1",
       null,
+      true,
+      "2000",
     ]);
   });
 
@@ -77,7 +80,104 @@ describe("findTradeInLedger", () => {
       null,
       null,
       "sec-1",
+      true,
+      "2000",
     ]);
+  });
+
+  it("tells a reinvested dividend apart by its shares, as a buy", async () => {
+    const m = manager();
+    await findTradeInLedger(
+      m as never,
+      USER,
+      { ...trade, action: "REINVEST", securityId: "sec-1" },
+      null,
+    );
+    const [, params] = m.query.mock.calls[0] as [string, unknown[]];
+    expect(params[2]).toBe("REINVEST");
+    expect(params[4]).toBe("75.9878");
+    expect(params[9]).toBe(true);
+  });
+
+  it("tells a cash dividend apart by its amount: it moves no shares, and its row may store a quantity of 0", async () => {
+    const m = manager();
+    await findTradeInLedger(
+      m as never,
+      USER,
+      {
+        ...trade,
+        action: "DIVIDEND",
+        quantity: null,
+        totalAmount: 12.34,
+        securityId: "sec-1",
+      },
+      "r-1",
+    );
+    const [sql, params] = m.query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("ELSE it.total_amount = $11::numeric END");
+    expect(params).toEqual([
+      USER,
+      "acc-1",
+      "DIVIDEND",
+      "2026-10-15",
+      null,
+      null,
+      null,
+      "r-1",
+      "sec-1",
+      false,
+      "12.34",
+    ]);
+  });
+
+  it("counts the same day's reinvestment of a dividend as a match, so a DRIP's payout email never auto-applies beside it", async () => {
+    const m = {
+      query: jest.fn(async (sql: string) =>
+        String(sql).includes("claimed") ? [] : [{ id: "it-drip" }],
+      ),
+    };
+    await expect(
+      findTradeInLedger(
+        m as never,
+        USER,
+        { ...trade, action: "DIVIDEND", quantity: null, securityId: "sec-1" },
+        "r-1",
+      ),
+    ).resolves.toEqual({ unclaimedId: null, anyMatch: true });
+    const [, params] = m.query.mock.calls[1] as unknown as [string, unknown[]];
+    expect(params).toEqual([
+      USER,
+      "acc-1",
+      "REINVEST",
+      "2026-10-15",
+      null,
+      null,
+      "sec-1",
+    ]);
+  });
+
+  it("asks for no payout twin of a buy", async () => {
+    const m = manager();
+    await findTradeInLedger(
+      m as never,
+      USER,
+      { ...trade, symbol: "XCNS" },
+      null,
+    );
+    expect(m.query).toHaveBeenCalledTimes(1);
+  });
+
+  it("a dividend email stating the shares still compares the amount, not a share count the ledger may not hold", async () => {
+    const m = manager();
+    await findTradeInLedger(
+      m as never,
+      USER,
+      { ...trade, action: "DIVIDEND", securityId: "sec-1" },
+      null,
+    );
+    const [, params] = m.query.mock.calls[0] as [string, unknown[]];
+    expect(params[4]).toBeNull();
+    expect(params[9]).toBe(false);
   });
 });
 

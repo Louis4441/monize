@@ -93,7 +93,7 @@
         "automatic": "Beim Abruf fragt die KI zu einem zugeordneten Beleg nach, den kein freigegebenes Profil vollständig lesen konnte, und entwirft ein Profil für einen Absender, der noch keines hat."
       },
       "autoApplyLabel": "Vorschläge automatisch anwenden",
-      "autoApplyHelp": "Standardmäßig aus. Ein Vorschlag wird nur dann ohne Nachfrage angewendet, wenn alles Folgende zutrifft: Ein freigegebenes Profil hat die ganze E-Mail gelesen, die Buchung wurde über eine Bestellnummer oder eine Referenz gefunden oder über genauen Betrag und Empfänger, mit genau einem Kandidaten, und der Vorschlag geht auf den Cent auf. Eine Handelsbestätigung wird nur dann ohne Nachfrage gebucht, wenn ihr Handelsprofil freigegeben ist, es den ganzen Handel gelesen hat, der Kurs zu den Anteilen und der Summe passt und deine Konten noch keinen passenden Handel enthalten. Alles andere wartet auf deine Freigabe.",
+      "autoApplyHelp": "Standardmäßig aus. Ein Vorschlag wird nur dann ohne Nachfrage angewendet, wenn alles Folgende zutrifft: Ein freigegebenes Profil hat die ganze E-Mail gelesen, die Buchung wurde über eine Bestellnummer oder eine Referenz gefunden oder über genauen Betrag und Empfänger, mit genau einem Kandidaten, und der Vorschlag geht auf den Cent auf. Eine Handelsbestätigung wird nur dann ohne Nachfrage gebucht, wenn ihr Handelsprofil freigegeben ist, es den ganzen Handel gelesen hat, der Kurs zu den Anteilen und der Summe passt (eine Bardividende, die nur ihren Betrag nennt, hat nichts zu prüfen) und deine Konten noch keinen passenden Handel enthalten. Alles andere wartet auf deine Freigabe.",
       "profileLimitLabel": "Vorschläge von Profilen auf das tägliche KI-Limit anrechnen",
       "profileLimitHelp": "Standardmäßig an: Eine Änderung, die ein Profil aus einer E-Mail vorschlägt, zählt wie jeder andere KI-Vorschlag zum Tageslimit KI-vorgeschlagener Änderungen. Schalte es aus, wenn ein großer Stapel gespeicherter E-Mails das Limit sonst aufbrauchen würde. Nur Vorschläge von Profilen sind ausgenommen; jeder Vorschlag wartet weiterhin auf deine Freigabe."
     },
@@ -377,7 +377,7 @@
       "receipt": "Bestellbeleg",
       "trade": "Wertpapierhandel",
       "receiptHelp": "Liest eine Bestellbestätigung und findet die Banktransaktion, mit der sie bezahlt wurde.",
-      "tradeHelp": "Liest eine Handelsbestätigung des Brokers und schlägt die Anlagetransaktion vor, die sie meldet, einen Kauf oder einen Verkauf."
+      "tradeHelp": "Liest eine Handelsbestätigung des Brokers und schlägt die Anlagetransaktion vor, die sie meldet: einen Kauf, einen Verkauf, eine Bardividende oder eine reinvestierte Dividende."
     },
     "trade": {
       "guardsHeading": "Welche E-Mails des Absenders es liest",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Eine E-Mail mit einer dieser Zeilen wird zurückgehalten und später erneut gelesen, etwa eine Teilausführung."
       },
       "fieldsHeading": "Der Handel",
-      "fieldsHelp": "Kauf oder Verkauf, das Kürzel und die Stückzahl sind Pflicht, dazu eine Summe oder ein Preis. Jedes Feld nimmt Muster auf, eines pro Zeile, in Reihenfolge versucht.",
+      "fieldsHelp": "Die Handelsart, das Kürzel und eine Summe oder ein Preis sind Pflicht, ebenso die Stückzahl außer bei einer Bardividende. Die Handelsart wird aus ihrem Text gelesen: Dividend oder Distribution ist eine Bardividende, Reinvest oder DRIP eine reinvestierte Dividende, sonst Buy oder Sell. Jedes Feld nimmt Muster auf, eines pro Zeile, in Reihenfolge versucht.",
       "fields": {
-        "tradeAction": "Muster für Kauf oder Verkauf",
+        "tradeAction": "Muster für die Handelsart",
         "tradeSymbol": "Muster für das Kürzel",
         "tradeQuantity": "Muster für die Stückzahl",
         "tradeTotal": "Muster für die Handelssumme",
@@ -403,7 +403,7 @@
         "tradeAccount": "Muster für das Konto"
       },
       "fieldHint": "Muss {capture} erfassen. Beispiel: {example}",
-      "amountsHelp": "Die Summe ist der ausgeführte Betrag, bei einem Kauf mit Provision. Der Preis dient zur Gegenprüfung und ergibt die Summe, wenn die E-Mail keine nennt. Ein Betrag, der seine Währung nennt (US$, C$, USD, €), legt auch die Währung des Handels fest.",
+      "amountsHelp": "Die Summe ist der ausgeführte Betrag, bei einem Kauf oder einer reinvestierten Dividende mit Provision; bei einer Bardividende ist sie der ausgezahlte Betrag. Der Preis (bei einer Dividende der Betrag je Anteil) dient zur Gegenprüfung und ergibt mit der Stückzahl die Summe, wenn die E-Mail keine nennt. Ein Betrag, der seine Währung nennt (US$, C$, USD, €), legt auch die Währung des Handels fest.",
       "rulesHeading": "Kontoregeln",
       "rulesHelp": "Auf welches Konto der Handel gebucht wird. Die Regeln werden der Reihe nach mit dem Kontotext verglichen, den die Kontomuster lesen, und die erste passende gewinnt; {star} steht für beliebigen Text. Eine Regel mit Währung gilt nur für einen Handel in dieser Währung, daher sind zwei Konten, die der Broker gleich schreibt, etwa ein RRSP in CAD und eines in USD, beide als RRSP angezeigt, zwei Regeln mit demselben Text und verschiedenen Währungen. Nennt die E-Mail keinen Kontotext, kann nur eine Regel mit dem Text {star} gelten. Das Standardkonto nimmt den Rest.",
       "currencyOrder": "Die Währung des Handels wird in dieser Reihenfolge bestimmt: aus dem Betrag selbst, wenn er eine nennt (US$, C$, USD, €), dann aus der ersten Währungsmarkierung unten, die zu einer Zeile der E-Mail passt, dann aus der Währung deines Wertpapiers für das Kürzel. Eine Regel mit Währung rät nie: Wenn keine der drei die Währung verrät, wartet die E-Mail auf dich, statt auf eines der Konten gebucht zu werden.",
@@ -512,7 +512,7 @@
       "tag": "Tag",
       "aiCategories": "KI-Kategorien",
       "trade": "Der Handelsabschnitt",
-      "tradeAction": "Muster für Kauf oder Verkauf",
+      "tradeAction": "Muster für die Handelsart",
       "tradeSymbol": "Muster für das Kürzel",
       "tradeQuantity": "Muster für die Stückzahl",
       "tradeTotal": "Muster für die Handelssumme",
@@ -630,7 +630,7 @@
         "waitIfLine": "Zurückhaltezeile",
         "reference": "Referenz",
         "linkKey": "Link-Schlüssel",
-        "action": "Kauf oder Verkauf",
+        "action": "Handelsart",
         "symbol": "Kürzel",
         "quantity": "Anteile",
         "price": "Preis",
@@ -1008,9 +1008,9 @@
       "no_html": "Dieses Profil liest den HTML-Teil der E-Mail, und diese E-Mail hat keinen.",
       "schema_org": "Es wurde kein Profil benötigt: Die Bestellung wurde aus den strukturierten Daten (schema.org) der E-Mail gelesen.",
       "item_amount_missing": "Eine Position hat keinen Betrag, und die E-Mail enthält keine einzelne Summe, die ihr zugewiesen werden könnte.",
-      "trade_no_action": "Das Profil hat in dieser E-Mail weder einen Kauf noch einen Verkauf gefunden.",
+      "trade_no_action": "Das Profil hat in dieser E-Mail keinen Kauf, keinen Verkauf, keine Dividende und keine Reinvestition gefunden.",
       "trade_no_symbol": "Das Profil hat in dieser E-Mail kein Börsenkürzel gefunden.",
-      "trade_no_quantity": "Das Profil hat in dieser E-Mail keine Anzahl von Anteilen gefunden.",
+      "trade_no_quantity": "Das Profil hat in dieser E-Mail keine Anzahl von Anteilen gefunden, die ein Kauf, ein Verkauf oder eine reinvestierte Dividende braucht.",
       "trade_no_amount": "Das Profil hat in dieser E-Mail weder eine Summe noch einen Preis gefunden.",
       "trade_no_account": "Das Profil konnte nicht erkennen, für welches Konto dieser Handel gilt.",
       "trade_exists": "Deine Konten enthalten diesen Handel bereits, daher wurde nichts vorgeschlagen.",
@@ -1078,10 +1078,10 @@
       "openButton": "Öffnen",
       "open": "Die E-Mail {subject} öffnen"
     },
-    "tradeTransactionSummary": "{action, select, BUY {Gekauft} other {Verkauft}}: {quantity} {symbol} für {total} am {date}.",
+    "tradeTransactionSummary": "{action, select, BUY {Gekauft: {quantity} {symbol} für {total} am {date}.} SELL {Verkauft: {quantity} {symbol} für {total} am {date}.} DIVIDEND {Dividende von {symbol}: {total} am {date}.} REINVEST {Dividende reinvestiert in {quantity} {symbol} für {total} am {date}.} other {{quantity} {symbol} für {total} am {date}.}}",
     "noTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag freigibst, oder mit einer bereits erfassten Transaktion verknüpft.",
     "candidateShares": "{quantity} Anteile",
-    "tradeNoCandidates": "Keine Investmenttransaktion dieses Kontos, dieser Richtung und dieses Kürzels innerhalb einer Woche um den Handelstag ist frei zum Verknüpfen. Wenn du den Trade selbst erfasst hast, prüfe Konto und Datum; andernfalls gib den Vorschlag im Prüfeingang frei.",
+    "tradeNoCandidates": "Keine Investmenttransaktion dieses Kontos, dieser Handelsart und dieses Kürzels innerhalb einer Woche um den Handelstag ist frei zum Verknüpfen. Wenn du den Trade selbst erfasst hast, prüfe Konto und Datum; andernfalls gib den Vorschlag im Prüfeingang frei.",
     "aiTradeHeading": "Vom KI-Agenten vorgeschlagener Handel",
     "aiTradeReader": "Keins: Der KI-Agent liest sie als Handel",
     "noAiTradeTransaction": "Noch keine: Der Trade wird gebucht, wenn du den Vorschlag des KI-Agenten freigibst.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Mit KI erkennen",
     "tradeTitle": "Mit KI als Handel erkennen",
-    "tradeMessage": "Die KI liest diese E-Mail als Handelsbestätigung eines Brokers und schlägt die Wertpapiertransaktion vor, die sie meldet (Konto, Kauf oder Verkauf, Börsenkürzel, Anteile und Summe). Nichts wird gespeichert, bis du es freigibst.",
+    "tradeMessage": "Die KI liest diese E-Mail als Handelsbestätigung eines Brokers und schlägt die Wertpapiertransaktion vor, die sie meldet (Konto, Kauf, Verkauf, Bardividende oder reinvestierte Dividende, Börsenkürzel, Anteile und Summe). Nichts wird gespeichert, bis du es freigibst.",
     "tradeConfirm": "Als Handel erkennen",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "kein Zahlungsempfänger",
@@ -1166,7 +1166,7 @@
     "inboxLink": "KI-Prüfungseingang öffnen",
     "opened": "Der Chat wurde mit der angehängten E-Mail geöffnet. Lies die Nachricht und drücke auf Senden.",
     "chatPrompt": "Erkenne die Produkte, Mengen und Preise in der angehängten Bestell-E-Mail und teile meine Buchung vom {date} ({payee}, {amount}) nach Produkten auf, mit je einer Kategorie. Übernimm die KI-Prüfungsanfrage {requestId} und reiche deinen Vorschlag dafür ein.",
-    "tradeChatPrompt": "Erkenne den Handel in der angehängten Broker-Bestätigung: das Konto, ob es ein Kauf oder Verkauf ist, das Börsenkürzel, die Anteile, die ausgeführte Summe und das Datum. Übernimm die KI-Prüfanfrage {requestId} und reiche den Handel dafür ein.",
+    "tradeChatPrompt": "Erkenne den Handel in der angehängten Broker-Bestätigung: das Konto, ob es ein Kauf, ein Verkauf, eine Bardividende oder eine reinvestierte Dividende ist, das Börsenkürzel, die Anteile (eine Bardividende nennt vielleicht keine), die ausgeführte Summe und das Datum. Übernimm die KI-Prüfanfrage {requestId} und reiche den Handel dafür ein.",
     "tradeDetachesTransaction": "Als Trade gelesen, gehört diese E-Mail nicht mehr zu {summary}: Der Trade erzeugt eine eigene Investmenttransaktion."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Datum: {date}",
       "parsedTotal": "Summe: {total}",
       "parsedLines": "{count, plural, one {# Zeile} other {# Zeilen}}",
-      "parsedTrade": "{action, select, BUY {Kauft} other {Verkauft}} {quantity} Anteile {symbol}",
+      "parsedTrade": "{action, select, BUY {Kauft {quantity} Anteile {symbol}} SELL {Verkauft {quantity} Anteile {symbol}} DIVIDEND {{symbol} zahlt eine Dividende} REINVEST {Reinvestiert eine Dividende in {quantity} Anteile {symbol}} other {Handelt {symbol}}}",
       "tradeInconsistent": "Der Preis passt nicht zur Summe, daher wird er nicht automatisch angewendet",
       "noExpectation": "Keine",
       "noMatch": "Keine Buchung",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Kauf} other {Verkauf}}: {quantity} Anteile {symbol} für {total}, datiert auf {date}.",
+    "summary": "{action, select, BUY {Kauf: {quantity} Anteile {symbol} für {total}, datiert auf {date}.} SELL {Verkauf: {quantity} Anteile {symbol} für {total}, datiert auf {date}.} DIVIDEND {Dividende von {symbol}: {total}, datiert auf {date}.} REINVEST {Reinvestition einer Dividende in {quantity} Anteile {symbol} für {total}, datiert auf {date}.} other {{symbol} für {total}, datiert auf {date}.}}",
     "account": "In der E-Mail genanntes Konto: {account}",
     "priceMismatch": "Der Durchschnittspreis passt nicht zu den Anteilen und der Summe, daher wird dieser Handel nicht automatisch angewendet.",
+    "dividendMismatch": "Der Betrag je Anteil passt nicht zu den Anteilen und der Summe, daher wird diese Dividende nicht automatisch angewendet.",
+    "dividendShares": "Gezahlt auf {quantity} Anteile",
+    "dividendPerShare": "Betrag je Anteil in der E-Mail: {price}",
     "incomplete": "Das Profil konnte aus dieser E-Mail keinen vollständigen Handel lesen.",
     "totalFromPrice": "die aus dem Preis abgeleitete Summe",
     "dateUnknown": "der Tag, an dem die E-Mail eintraf",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Wertpapier: {name}",
     "proposalAccount": "Konto: {account}",
     "proposalPrice": "Preis: {price} je Anteil",
+    "proposalDividendPerShare": "Betrag je Anteil: {price}",
     "proposalCommission": "Provision: {commission}",
     "proposalReview": "Gebucht wird erst, wenn du freigibst.",
     "proposalReviewLink": "Im Posteingang prüfen",

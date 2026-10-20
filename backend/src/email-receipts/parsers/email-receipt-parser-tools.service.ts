@@ -52,6 +52,7 @@ import {
   RECEIPT_PARSER_VERSION,
   type ParsedReceipt,
   type ParsedTrade,
+  type ParsedTradeAction,
   type ReceiptParserDefinition,
   type ReceiptTrace,
   type ReceiptTradeTrace,
@@ -130,11 +131,11 @@ export interface LlmParsedReceipt {
 
 /**
  * What a trade profile read from one tested email, in the units a model reads:
- * shares, decimal money. `consistent` null means the email states no price to
- * check against the total.
+ * shares, decimal money. `consistent` null means the email does not state the
+ * shares, the price and the total, so there is nothing to cross-check.
  */
 export interface LlmParsedTrade {
-  action: "BUY" | "SELL" | null;
+  action: ParsedTradeAction | null;
   symbol: string | null;
   quantity: number | null;
   total: number | null;

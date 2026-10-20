@@ -12,6 +12,7 @@ import { ParsedReceiptView } from '@/components/email-receipts/ParsedReceiptView
 import { ReceiptTransactionPicker } from '@/components/email-receipts/ReceiptTransactionPicker';
 import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge';
 import { StructuredOrderView } from '@/components/email-receipts/StructuredOrderView';
+import { useBookedTradeSummary } from '@/components/email-receipts/useBookedTradeSummary';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LinkifiedText } from '@/components/ui/LinkifiedText';
@@ -26,7 +27,12 @@ import { emailReceiptsApi } from '@/lib/email-receipts-api';
 import { canLinkTradeEmail, isReceiptActionable, readParsedReceipt } from '@/lib/email-receipts-format';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
-import { readParsedTrade, type EmailReceiptDetail, type EmailReceiptStatus } from '@/types/email-receipts';
+import {
+  readParsedTrade,
+  tradeActionMovesShares,
+  type EmailReceiptDetail,
+  type EmailReceiptStatus,
+} from '@/types/email-receipts';
 
 const logger = createLogger('EmailReceiptDetail');
 
@@ -62,6 +68,7 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
   const tc = useTranslations('common');
   const { formatDate, formatDateTime } = useDateFormat();
   const { formatCurrency, formatShareQuantity } = useNumberFormat();
+  const bookedTradeSummary = useBookedTradeSummary();
   const [state, setState] = useState<DetailState>({ status: 'loading' });
   // Bumped by the retry button; each value is one request.
   const [attempt, setAttempt] = useState(0);
@@ -168,6 +175,9 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
     const tradeLinkable = isTradeEmail && canLinkTradeEmail(detail);
     const canLink = detail.candidates.length > 0 && (isTradeEmail ? tradeLinkable : isReceiptActionable(detail) && detail.status !== 'component');
     const booked = detail.investmentTransaction ?? null;
+    // A cash dividend's candidates are dividends, whose share count says nothing (zero when none was given).
+    const tradeAction = trade?.action ?? proposal?.action ?? null;
+    const candidateSharesShown = tradeAction === null || tradeActionMovesShares(tradeAction);
     // An email the matcher could not tie to a transaction can be tied by hand.
     const canPick = !isTradeEmail && PICKABLE_STATUSES.includes(detail.status) && isReceiptActionable(detail);
     const enrichedBy = detail.status === 'review_conflict' && detail.statusReason === 'enriched_by_other' ? detail.enrichedBy : null;
@@ -231,13 +241,7 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
               {isTradeEmail ? (
                 booked ? (
                   <>
-                    {t('tradeTransactionSummary', {
-                      action: booked.action === 'SELL' ? 'SELL' : 'BUY',
-                      quantity: formatShareQuantity(booked.quantity),
-                      symbol: booked.symbol,
-                      total: formatCurrency(booked.totalAmount, booked.currencyCode),
-                      date: formatDate(booked.date),
-                    })}{' '}
+                    {bookedTradeSummary(booked)}{' '}
                     <Link
                       href={`/investments?edit=${booked.id}`}
                       className="text-blue-600 hover:underline dark:text-blue-400"
@@ -407,7 +411,7 @@ export function EmailReceiptDetailDialog({ receiptId, categoryLabels, onClose, o
                         payee: candidate.payeeName ?? t('noPayee'),
                       })}
                     </div>
-                    {candidate.quantity !== undefined && (
+                    {candidate.quantity !== undefined && candidateSharesShown && (
                       <div className="text-gray-500 dark:text-gray-400">
                         {t('candidateShares', { quantity: formatShareQuantity(candidate.quantity) })}
                       </div>

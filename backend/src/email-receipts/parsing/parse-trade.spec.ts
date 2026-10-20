@@ -5,7 +5,9 @@ import {
   parseTradeLinesTraced,
   parseTradeQuantity,
   resolveTradeAccount,
+  tradeExecutedTotalUnits,
   tradeIsConsistent,
+  tradeMayAutoApply,
 } from "./parse-trade";
 import { normalizeReceiptLines } from "./receipt-lines";
 import { validateReceiptParserDefinition } from "./receipt-parser.validation";
@@ -15,6 +17,11 @@ import {
   WEALTHSIMPLE_TFSA_ACCOUNT_ID,
   WEALTHSIMPLE_TRADE_DEFINITION,
 } from "./fixtures/wealthsimple-trade";
+import {
+  WEALTHSIMPLE_DIVIDEND_BODY,
+  WEALTHSIMPLE_DIVIDEND_DEFINITION,
+  WEALTHSIMPLE_DRIP_BODY,
+} from "./fixtures/wealthsimple-dividend";
 import type { ReceiptTradeDefinition } from "./receipt-parser.types";
 
 const trade = WEALTHSIMPLE_TRADE_DEFINITION.trade as ReceiptTradeDefinition;
@@ -224,6 +231,121 @@ describe("parseTradeLines", () => {
   });
 });
 
+describe("dividends", () => {
+  const dividend =
+    WEALTHSIMPLE_DIVIDEND_DEFINITION.trade as ReceiptTradeDefinition;
+
+  it("reads a cash dividend completely without a share count or a price", () => {
+    const parsed = parseTradeLines(dividend, lines(WEALTHSIMPLE_DIVIDEND_BODY));
+    expect(parsed).toMatchObject({
+      action: "DIVIDEND",
+      symbol: "XEQT",
+      quantity: null,
+      total: 123_400,
+      price: null,
+      date: "2026-10-15",
+      complete: true,
+      consistent: null,
+      reason: null,
+    });
+    expect(tradeExecutedTotalUnits(parsed)).toBe(123_400);
+  });
+
+  it("a complete cash dividend may auto-apply: there is nothing to cross-check", () => {
+    const parsed = parseTradeLines(dividend, lines(WEALTHSIMPLE_DIVIDEND_BODY));
+    expect(tradeMayAutoApply(parsed)).toBe(true);
+  });
+
+  it("a dividend whose shares times amount per share disagrees with its amount never auto-applies", () => {
+    const body = WEALTHSIMPLE_DIVIDEND_BODY.replace(
+      "Amount: $12.34",
+      "Shares: 100\nPrice: $0.1234\nAmount: $123.40",
+    );
+    const parsed = parseTradeLines(dividend, lines(body));
+    expect(parsed.complete).toBe(true);
+    expect(parsed.consistent).toBe(false);
+    expect(tradeMayAutoApply(parsed)).toBe(false);
+  });
+
+  it("a dividend stated per share with its shares proposes their product", () => {
+    const body = WEALTHSIMPLE_DIVIDEND_BODY.replace(
+      "Amount: $12.34",
+      "Shares: 100\nPrice: $0.1234",
+    );
+    const parsed = parseTradeLines(dividend, lines(body));
+    expect(parsed.complete).toBe(true);
+    expect(tradeExecutedTotalUnits(parsed)).toBe(123_400);
+  });
+
+  it("a dividend stated per share without its shares has no amount", () => {
+    const body = WEALTHSIMPLE_DIVIDEND_BODY.replace(
+      "Amount: $12.34",
+      "Price: $0.1234",
+    );
+    const parsed = parseTradeLines(dividend, lines(body));
+    expect(parsed.complete).toBe(false);
+    expect(parsed.reason).toBe("trade_no_amount");
+  });
+
+  it("reads a reinvested dividend with its shares and cross-checks it like a buy", () => {
+    const parsed = parseTradeLines(dividend, lines(WEALTHSIMPLE_DRIP_BODY));
+    expect(parsed).toMatchObject({
+      action: "REINVEST",
+      symbol: "XEQT",
+      quantity: 0.3721,
+      total: 123_400,
+      complete: true,
+      consistent: true,
+    });
+    expect(tradeMayAutoApply(parsed)).toBe(true);
+  });
+
+  it("a reinvestment needs its shares", () => {
+    const body = WEALTHSIMPLE_DRIP_BODY.replace("Shares: 0.3721\n", "");
+    expect(parseTradeLines(dividend, lines(body)).reason).toBe(
+      "trade_no_quantity",
+    );
+  });
+
+  it("a buy read by a profile with no quantity field is incomplete, not a dividend", () => {
+    const { quantity: _quantity, ...noQuantity } = trade;
+    const parsed = parseTradeLines(noQuantity, lines(WEALTHSIMPLE_BUY_BODY));
+    expect(parsed.complete).toBe(false);
+    expect(parsed.reason).toBe("trade_no_quantity");
+  });
+
+  it("a buy with nothing to cross-check still waits for a person", () => {
+    const { price: _price, ...noPrice } = trade;
+    const parsed = parseTradeLines(noPrice, lines(WEALTHSIMPLE_BUY_BODY));
+    expect(parsed.complete).toBe(true);
+    expect(parsed.consistent).toBeNull();
+    expect(tradeMayAutoApply(parsed)).toBe(false);
+  });
+
+  it("takes a dividend's commission out of its amount, as a sell's", () => {
+    expect(
+      tradeIsConsistent({
+        action: "DIVIDEND",
+        quantityUnits: 100n * 100_000_000n,
+        priceUnits8: 12_340_000n,
+        priceDecimals: 4,
+        totalUnits: 113_400,
+        commissionUnits: 10_000,
+      }),
+    ).toBe(true);
+    expect(
+      tradeIsConsistent({
+        action: "REINVEST",
+        quantityUnits: 100n * 100_000_000n,
+        priceUnits8: 12_340_000n,
+        priceDecimals: 4,
+        totalUnits: 133_400,
+        commissionUnits: 10_000,
+      }),
+    ).toBe(true);
+  });
+});
+
 describe("trade value readers", () => {
   it("reads share counts with up to 8 decimals", () => {
     expect(parseTradeQuantity("75.9878")?.value).toBe(75.9878);
@@ -263,7 +385,25 @@ describe("trade value readers", () => {
     expect(parseTradeAction("Fractional Buy")).toBe("BUY");
     expect(parseTradeAction("Market sell")).toBe("SELL");
     expect(parseTradeAction("Buy to cover sell")).toBeNull();
-    expect(parseTradeAction("Dividend")).toBeNull();
+    expect(parseTradeAction("Transfer")).toBeNull();
+  });
+
+  it("reads a cash dividend, and a reinvestment before a dividend or a buy", () => {
+    expect(parseTradeAction("Dividend")).toBe("DIVIDEND");
+    expect(parseTradeAction("Cash distribution")).toBe("DIVIDEND");
+    expect(parseTradeAction("Dividende")).toBe("DIVIDEND");
+    expect(parseTradeAction("Dividend reinvested")).toBe("REINVEST");
+    expect(parseTradeAction("DRIP buy")).toBe("REINVEST");
+    expect(parseTradeAction("Réinvestissement de dividendes")).toBe("REINVEST");
+    // A word that merely starts like one is not it.
+    expect(parseTradeAction("Dividendary")).toBeNull();
+    // A buy or a sell of a fund whose name holds a dividend word is that buy
+    // or sell, never a dividend an approved buy profile starts to book.
+    expect(
+      parseTradeAction("Bought 10 shares of Vanguard High Dividend Yield ETF"),
+    ).toBe("BUY");
+    expect(parseTradeAction("Sold Monthly Distribution Fund")).toBe("SELL");
+    expect(parseTradeAction("Dividend buy sell")).toBeNull();
   });
 
   it("reads the broker's local day and ignores the time", () => {
@@ -532,10 +672,25 @@ describe("validating a trade profile", () => {
     );
   });
 
-  it("requires action, symbol and quantity", () => {
+  it("requires action and symbol", () => {
     const input = valid();
-    delete (input.trade as Record<string, unknown>).symbol;
-    expect(codes(input)).toContain("trade.symbol:empty");
+    const section = input.trade as Record<string, unknown>;
+    delete section.symbol;
+    delete section.action;
+    expect(codes(input)).toEqual(
+      expect.arrayContaining(["trade.symbol:empty", "trade.action:empty"]),
+    );
+  });
+
+  it("accepts a profile without quantity: a cash dividend states none", () => {
+    const input = valid();
+    delete (input.trade as Record<string, unknown>).quantity;
+    expect(codes(input)).toEqual([]);
+    expect(
+      validateReceiptParserDefinition(
+        JSON.parse(JSON.stringify(WEALTHSIMPLE_DIVIDEND_DEFINITION)),
+      ).ok,
+    ).toBe(true);
   });
 
   it("requires a total or a price", () => {

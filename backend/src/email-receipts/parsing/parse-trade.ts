@@ -4,6 +4,7 @@ import { normalizeLine, traceMatch } from "./receipt-lines";
 import { matchReceiptLines, matchReceiptPattern } from "./receipt-glob";
 import {
   MAX_TRADE_QUANTITY_DECIMALS,
+  tradeActionMovesShares,
   type ParsedTrade,
   type ParsedTradeAction,
   type ParsedTradeCurrencySource,
@@ -101,17 +102,47 @@ export function parseTradeQuantity(
   return { units: read.units, value: Number(read.units) / 1e8 };
 }
 
-/** Whether the text names a buy or a sell (English or French); null when it names neither or both. */
+const REINVEST_WORDS = [
+  "reinvest",
+  "reinvested",
+  "reinvestment",
+  "drip",
+  "réinvestir",
+  "réinvesti",
+  "réinvestis",
+  "réinvestissement",
+  "reinvesti",
+  "reinvestissement",
+];
+const DIVIDEND_WORDS = [
+  "dividend",
+  "dividends",
+  "distribution",
+  "distributions",
+  "dividende",
+  "dividendes",
+];
+
+/**
+ * What the text says the trade is (English or French): a reinvested dividend
+ * when it names a reinvestment ("Dividend reinvested", "DRIP buy"); else a buy
+ * or a sell when it names exactly one of them, even beside a dividend word (a
+ * fund's name: "Bought 10 Vanguard High Dividend Yield"); else a cash dividend
+ * when it names a dividend or a distribution. Null when it names none of them,
+ * or both a buy and a sell.
+ */
 export function parseTradeAction(text: string): ParsedTradeAction | null {
   const words = text.toLowerCase().split(/[^a-zà-ÿ]+/);
+  if (REINVEST_WORDS.some((w) => words.includes(w))) return "REINVEST";
   const buy = ["buy", "bought", "achat", "acheté", "achete"].some((w) =>
     words.includes(w),
   );
   const sell = ["sell", "sold", "vente", "vendu"].some((w) =>
     words.includes(w),
   );
-  if (buy === sell) return null;
-  return buy ? "BUY" : "SELL";
+  if (buy !== sell) return buy ? "BUY" : "SELL";
+  if (buy) return null;
+  return DIVIDEND_WORDS.some((w) => words.includes(w)) ? "DIVIDEND" : null;
 }
 
 /**
@@ -199,7 +230,8 @@ function validDay(year: number, month: number, day: number): string | null {
  * Whether quantity times price agrees with the executed total. A price written
  * with `d` decimals is within half a unit of its last place, so the product may
  * be off by `quantity * 0.5 * 10^-d`, plus one cent for the total's own
- * rounding. Commission is in the total of a buy and out of a sell's proceeds.
+ * rounding. Commission is in the total of a buy (and of a reinvestment) and
+ * out of a sell's proceeds (and of a dividend's).
  * `priceUnits8` is the price in 1e-8 units, exactly as written.
  */
 export function tradeIsConsistent(input: {
@@ -210,10 +242,9 @@ export function tradeIsConsistent(input: {
   totalUnits: number;
   commissionUnits: number;
 }): boolean {
-  const gross =
-    input.action === "BUY"
-      ? input.totalUnits - input.commissionUnits
-      : input.totalUnits + input.commissionUnits;
+  const gross = commissionIsAdded(input.action)
+    ? input.totalUnits - input.commissionUnits
+    : input.totalUnits + input.commissionUnits;
   if (gross < 0) return false;
   // Both sides at 1e-16 of a currency unit: quantity (1e-8) * price (1e-8),
   // and the total (1e-4) scaled by 1e12.
@@ -226,6 +257,11 @@ export function tradeIsConsistent(input: {
     input.quantityUnits * (halfLastPlace === 0n ? 1n : halfLastPlace) +
     ONE_CENT_UNITS * 1_000_000_000_000n;
   return diff <= tolerance;
+}
+
+/** Whether a commission is added to the trade's total (a buy, a reinvestment) rather than taken from its proceeds (a sell, a dividend). */
+function commissionIsAdded(action: ParsedTradeAction): boolean {
+  return action === "BUY" || action === "REINVEST";
 }
 
 /** An amount field (total, commission): the first capture `{amount}` the trade grammar reads, as 1/10000 units. */
@@ -436,8 +472,9 @@ export function parseTradeLinesTraced(
   let reason: ParsedTradeReason | null = null;
   if (actionValue === null) reason = "trade_no_action";
   else if (symbol === null) reason = "trade_no_symbol";
-  else if (quantity === null) reason = "trade_no_quantity";
-  else if (total === null && price === null) reason = "trade_no_amount";
+  else if (quantity === null && tradeActionMovesShares(actionValue)) {
+    reason = "trade_no_quantity";
+  } else if (total === null && price === null) reason = "trade_no_amount";
   else if (accountId === null) {
     reason = decision.needsCurrency ? "trade_no_currency" : "trade_no_account";
   }
@@ -476,7 +513,8 @@ export function parseTradeLinesTraced(
     consistent,
     reason,
   };
-  // A sell whose price implies less than its commission has no total to propose.
+  // A sell whose price implies less than its commission, or a dividend priced
+  // per share without its share count, has no total to propose.
   const trade: ParsedTrade =
     read.complete && tradeExecutedTotalUnits(read) === null
       ? {
@@ -512,8 +550,10 @@ export function parseTradeLines(
 
 /**
  * The executed total a complete reading proposes, in 1/10000 units: the total
- * the email states, else the one its price implies (commission added to a buy,
- * taken from a sell), rounded half up to 1/10000. Null when neither is read.
+ * the email states, else the one its price implies (commission added to a buy
+ * or a reinvestment, taken from a sell or a dividend), rounded half up to
+ * 1/10000. Null when neither is read, and for a dividend that states its
+ * amount per share but not the shares it was paid on.
  * The one place this is decided, so the preview shows what the pipeline proposes.
  */
 export function tradeExecutedTotalUnits(trade: ParsedTrade): number | null {
@@ -524,8 +564,28 @@ export function tradeExecutedTotalUnits(trade: ParsedTrade): number | null {
     (quantity8 * BigInt(trade.price) + 50_000_000n) / QUANTITY_UNITS;
   const commission = BigInt(trade.commission ?? 0);
   const total =
-    trade.action === "SELL" ? gross - commission : gross + commission;
+    trade.action === null || commissionIsAdded(trade.action)
+      ? gross + commission
+      : gross - commission;
   return total < 0n ? null : Number(total);
+}
+
+/**
+ * Whether the auto-apply gate may book a reading without a person (the other
+ * conditions are the mailbox's, the profile's and the ledger's): a complete
+ * reading whose quantity times price agrees with its total, or a complete cash
+ * dividend that states nothing to cross-check. A reading whose figures
+ * disagree never auto-applies, and neither does a buy, sell or reinvestment
+ * that cannot be cross-checked.
+ */
+export function tradeMayAutoApply(trade: ParsedTrade): boolean {
+  if (!trade.complete) return false;
+  if (trade.consistent === true) return true;
+  return (
+    trade.consistent === null &&
+    trade.action !== null &&
+    !tradeActionMovesShares(trade.action)
+  );
 }
 
 /** The executed total as a decimal for the proposal: 1/10000 units to a number with at most 4 decimals. */

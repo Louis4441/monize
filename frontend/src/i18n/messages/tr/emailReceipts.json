@@ -93,7 +93,7 @@
         "automatic": "Yoklama sırasında, onaylı hiçbir ayrıştırıcının tamamen okuyamadığı eşleşmiş bir makbuz için yapay zekâya sorulur ve ayrıştırıcısı olmayan bir gönderen için ayrıştırıcı taslağı oluşturulur."
       },
       "autoApplyLabel": "Önerileri otomatik uygula",
-      "autoApplyHelp": "Varsayılan olarak kapalıdır. Bir öneri, ancak şunların hepsi geçerliyse sormadan uygulanır: onaylı bir profil e-postanın tamamını okudu, işlem bir sipariş numarası veya referansla ya da tam tutar ve alıcıyla tek bir adayla bulundu ve öneri kuruşu kuruşuna tutuyor. Bir işlem onayı, ancak işlem profili onaylıysa, işlemin tamamını okuduysa, fiyat adet ve toplamla uyuşuyorsa ve hesaplarınızda aynı işlem henüz yoksa sormadan kaydedilir. Geri kalan her şey onayınızı bekler.",
+      "autoApplyHelp": "Varsayılan olarak kapalıdır. Bir öneri, ancak şunların hepsi geçerliyse sormadan uygulanır: onaylı bir profil e-postanın tamamını okudu, işlem bir sipariş numarası veya referansla ya da tam tutar ve alıcıyla tek bir adayla bulundu ve öneri kuruşu kuruşuna tutuyor. Bir işlem onayı, ancak işlem profili onaylıysa, işlemin tamamını okuduysa, fiyat adet ve toplamla uyuşuyorsa (yalnızca tutarını belirten nakit temettüde kontrol edilecek bir şey yoktur) ve hesaplarınızda aynı işlem henüz yoksa sormadan kaydedilir. Geri kalan her şey onayınızı bekler.",
       "profileLimitLabel": "Profil önerilerini günlük yapay zekâ sınırına say",
       "profileLimitHelp": "Varsayılan olarak açıktır: bir profilin bir e-postadan önerdiği düzenleme, diğer yapay zekâ önerileri gibi yapay zekânın önerdiği değişikliklerin günlük sınırına sayılır. Saklanan çok sayıda e-posta sınırı tüketecekse bunu kapatın. Yalnızca profillerden gelen öneriler muaftır; her öneri yine de onayınızı bekler."
     },
@@ -377,7 +377,7 @@
       "receipt": "Sipariş makbuzu",
       "trade": "Aracı kurum işlemi",
       "receiptHelp": "Bir sipariş onayını okur ve onu ödeyen banka işlemini bulur.",
-      "tradeHelp": "Aracı kurumun işlem onayını okur ve bildirdiği yatırım işlemini, bir alım ya da satımı önerir."
+      "tradeHelp": "Aracı kurumun işlem onayını okur ve bildirdiği yatırım işlemini, bir alım, satım, nakit temettü ya da yeniden yatırılan temettüyü önerir."
     },
     "trade": {
       "guardsHeading": "Gönderenin hangi e-postalarını okur",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Bu satırlardan birini içeren e-posta bekletilir ve daha sonra yeniden okunur, örneğin kısmi gerçekleşme."
       },
       "fieldsHeading": "İşlem",
-      "fieldsHelp": "Alım ya da satım, sembol ve pay adedi zorunludur; ayrıca bir toplam ya da fiyat gerekir. Her alan desenleri satır başına bir tane alır ve sırayla dener.",
+      "fieldsHelp": "İşlem türü, sembol ve bir toplam ya da fiyat zorunludur; nakit temettü dışında pay adedi de zorunludur. İşlem türü metninden okunur: Dividend veya Distribution nakit temettü, Reinvest veya DRIP yeniden yatırılan temettü, aksi halde Buy veya Sell demektir. Her alan desenleri satır başına bir tane alır ve sırayla dener.",
       "fields": {
-        "tradeAction": "Alım veya satım desenleri",
+        "tradeAction": "İşlem türü desenleri",
         "tradeSymbol": "Sembol desenleri",
         "tradeQuantity": "Pay adedi desenleri",
         "tradeTotal": "İşlem toplamı desenleri",
@@ -403,7 +403,7 @@
         "tradeAccount": "Hesap desenleri"
       },
       "fieldHint": "{capture} değerini yakalamalıdır. Örnek: {example}",
-      "amountsHelp": "Toplam, gerçekleşen tutardır; alımda komisyon dahildir. Fiyat bir çapraz kontroldür ve e-posta toplam belirtmediğinde toplamı verir. Para birimini belirten bir tutar (US$, C$, USD, €) işlemin para birimini de belirler.",
+      "amountsHelp": "Toplam, gerçekleşen tutardır; alımda veya yeniden yatırılan temettüde komisyon dahildir, nakit temettüde ise ödenen tutardır. Fiyat (temettüde hisse başına tutar) bir çapraz kontroldür ve e-posta toplam belirtmediğinde adetle birlikte toplamı verir. Para birimini belirten bir tutar (US$, C$, USD, €) işlemin para birimini de belirler.",
       "rulesHeading": "Hesap kuralları",
       "rulesHelp": "İşlemin hangi hesaba kaydedileceği. Kurallar, hesap desenlerinin okuduğu hesap metnine karşı sırayla denenir ve uyan ilk kural kazanır; {star} herhangi bir metindir. Para birimi olan bir kural yalnızca o para birimindeki işleme uyar; bu yüzden aracı kurumun aynı yazdığı iki hesap, örneğin ikisi de RRSP olarak görünen CAD ve USD RRSP hesapları, aynı metinli ve farklı para birimli iki kuraldır. E-posta hesap metni göstermediğinde yalnızca metni {star} olan bir kural uyabilir. Gerisini varsayılan hesap alır.",
       "currencyOrder": "İşlemin para birimi sırayla şuradan alınır: tutarın kendisi bir tane belirtiyorsa oradan (US$, C$, USD, €), sonra aşağıdaki, e-postanın bir satırına uyan ilk para birimi işaretinden, sonra o sembol için menkul kıymetinizin para biriminden. Para birimi olan bir kural asla tahmin etmez: üçünden hiçbiri para birimini söylemezse e-posta hesaplardan birine kaydedilmek yerine sizi bekler.",
@@ -512,7 +512,7 @@
       "tag": "Etiket",
       "aiCategories": "Yapay zekâ kategorileri",
       "trade": "İşlem bölümü",
-      "tradeAction": "Alım veya satım desenleri",
+      "tradeAction": "İşlem türü desenleri",
       "tradeSymbol": "Sembol desenleri",
       "tradeQuantity": "Pay adedi desenleri",
       "tradeTotal": "İşlem toplamı desenleri",
@@ -630,7 +630,7 @@
         "waitIfLine": "Bekleme satırı",
         "reference": "Referans",
         "linkKey": "Bağlantı anahtarı",
-        "action": "Alım veya satım",
+        "action": "İşlem türü",
         "symbol": "Sembol",
         "quantity": "Pay",
         "price": "Fiyat",
@@ -1008,9 +1008,9 @@
       "no_html": "Bu ayrıştırıcı e-postanın HTML kısmını okur ve bu e-postada HTML yok.",
       "schema_org": "Ayrıştırıcıya gerek kalmadı: sipariş, e-postadaki yapılandırılmış verilerden (schema.org) okundu.",
       "item_amount_missing": "Bir kalemin tutarı yok ve e-postada ona verilecek tek bir toplam yok.",
-      "trade_no_action": "Ayrıştırıcı bu e-postada ne alım ne satım buldu.",
+      "trade_no_action": "Ayrıştırıcı bu e-postada alım, satım, temettü veya yeniden yatırım bulamadı.",
       "trade_no_symbol": "Ayrıştırıcı bu e-postada hisse kodu bulamadı.",
-      "trade_no_quantity": "Ayrıştırıcı bu e-postada adet bilgisi bulamadı.",
+      "trade_no_quantity": "Ayrıştırıcı bu e-postada alım, satım veya yeniden yatırılan temettü için gereken adet bilgisini bulamadı.",
       "trade_no_amount": "Ayrıştırıcı bu e-postada ne toplam ne de fiyat buldu.",
       "trade_no_account": "Ayrıştırıcı bu işlemin hangi hesaba ait olduğunu belirleyemedi.",
       "trade_exists": "Hesaplarınızda bu işlem zaten var, bu yüzden hiçbir şey önerilmedi.",
@@ -1078,10 +1078,10 @@
       "openButton": "Aç",
       "open": "{subject} e-postasını aç"
     },
-    "tradeTransactionSummary": "{date} tarihinde {total} karşılığında {quantity} {symbol} {action, select, BUY {alındı} other {satıldı}}.",
+    "tradeTransactionSummary": "{action, select, BUY {{date} tarihinde {total} karşılığında {quantity} {symbol} alındı.} SELL {{date} tarihinde {total} karşılığında {quantity} {symbol} satıldı.} DIVIDEND {{date} tarihinde {symbol} için {total} temettü.} REINVEST {{date} tarihinde temettü {total} karşılığında {quantity} {symbol} olarak yeniden yatırıldı.} other {{date} tarihinde {total} karşılığında {quantity} {symbol}.}}",
     "noTradeTransaction": "Henüz yok: işlem, önerisini onayladığınızda kaydedilir ya da defterinizde zaten olan bir işleme bağlanır.",
     "candidateShares": "{quantity} pay",
-    "tradeNoCandidates": "İşlem gününden bir hafta içinde bu hesap, yön ve sembole ait bağlanabilecek bir yatırım işlemi yok. İşlemi kendiniz girdiyseniz hesabını ve tarihini kontrol edin; aksi halde öneriyi inceleme kutusunda onaylayın.",
+    "tradeNoCandidates": "İşlem gününden bir hafta içinde bu hesap, işlem türü ve sembole ait bağlanabilecek bir yatırım işlemi yok. İşlemi kendiniz girdiyseniz hesabını ve tarihini kontrol edin; aksi halde öneriyi inceleme kutusunda onaylayın.",
     "aiTradeHeading": "Yapay zekâ ajanının önerdiği işlem",
     "aiTradeReader": "Yok: yapay zekâ ajanı bunu bir işlem olarak okuyor",
     "noAiTradeTransaction": "Henüz yok: yapay zekâ ajanının önerisini onayladığınızda işlem kaydedilir.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Yapay zekâ ile tanı",
     "tradeTitle": "Yapay zekâ ile işlem olarak tanı",
-    "tradeMessage": "Yapay zekâ bu e-postayı aracı kurum işlem onayı olarak okuyacak ve bildirdiği yatırım işlemini önerecek (hesap, alım veya satım, hisse kodu, adet ve toplam). Siz onaylayana kadar hiçbir şey kaydedilmez.",
+    "tradeMessage": "Yapay zekâ bu e-postayı aracı kurum işlem onayı olarak okuyacak ve bildirdiği yatırım işlemini önerecek (hesap, alım, satım, nakit temettü veya yeniden yatırılan temettü, hisse kodu, adet ve toplam). Siz onaylayana kadar hiçbir şey kaydedilmez.",
     "tradeConfirm": "İşlem olarak tanı",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "alıcı yok",
@@ -1166,7 +1166,7 @@
     "inboxLink": "Yapay zekâ inceleme kutusunu aç",
     "opened": "Sohbet, e-posta ekli olarak açıldı. Mesajı okuyun ve Gönder'e basın.",
     "chatPrompt": "Ekteki sipariş e-postasındaki ürünleri, miktarları ve fiyatları tanı; {date} tarihli işlemimi ({payee}, {amount}) her biri için bir kategoriyle ürünlere göre böl. {requestId} numaralı yapay zekâ inceleme isteğini üstlen ve önerini onun için gönder.",
-    "tradeChatPrompt": "Ekteki aracı kurum onay e-postasındaki işlemi tanıyın: hesap, alım mı satım mı, hisse kodu, adet, gerçekleşen toplam ve tarih. {requestId} yapay zekâ inceleme isteğini üstlenin ve işlemi onun için gönderin.",
+    "tradeChatPrompt": "Ekteki aracı kurum onay e-postasındaki işlemi tanıyın: hesap, alım mı, satım mı, nakit temettü mü yoksa yeniden yatırılan temettü mü olduğu, hisse kodu, adet (nakit temettüde belirtilmemiş olabilir), gerçekleşen toplam ve tarih. {requestId} yapay zekâ inceleme isteğini üstlenin ve işlemi onun için gönderin.",
     "tradeDetachesTransaction": "İşlem olarak okunduğunda bu e-posta artık {summary} ile eşleşmez: işlem kendi yatırım işlemini oluşturur."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Tarih: {date}",
       "parsedTotal": "Toplam: {total}",
       "parsedLines": "{count, plural, one {# satır} other {# satır}}",
-      "parsedTrade": "{action, select, BUY {Alır} other {Satar}}: {symbol} için {quantity} adet",
+      "parsedTrade": "{action, select, BUY {Alır: {symbol} için {quantity} adet} SELL {Satar: {symbol} için {quantity} adet} DIVIDEND {{symbol} için temettü öder} REINVEST {Temettüyü yeniden yatırır: {symbol} için {quantity} adet} other {{symbol} işlemi}}",
       "tradeInconsistent": "Fiyat toplamla uyuşmuyor, bu yüzden otomatik uygulanmayacak",
       "noExpectation": "Yok",
       "noMatch": "İşlem yok",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Alım} other {Satım}}: {symbol} için {quantity} adet, {total}, tarih {date}.",
+    "summary": "{action, select, BUY {Alım: {symbol} için {quantity} adet, {total}, tarih {date}.} SELL {Satım: {symbol} için {quantity} adet, {total}, tarih {date}.} DIVIDEND {{symbol} temettüsü: {total}, tarih {date}.} REINVEST {Temettünün yeniden yatırılması: {symbol} için {quantity} adet, {total}, tarih {date}.} other {{symbol}: {total}, tarih {date}.}}",
     "account": "E-postada belirtilen hesap: {account}",
     "priceMismatch": "Ortalama fiyat adet ve toplamla uyuşmuyor, bu yüzden bu işlem otomatik uygulanmayacak.",
+    "dividendMismatch": "Hisse başına tutar adet ve toplamla uyuşmuyor, bu yüzden bu temettü otomatik uygulanmayacak.",
+    "dividendShares": "{quantity} adet için ödendi",
+    "dividendPerShare": "E-postadaki hisse başına tutar: {price}",
     "incomplete": "Ayrıştırıcı bu e-postadan tam bir işlem okuyamadı.",
     "totalFromPrice": "fiyattan çıkan toplam",
     "dateUnknown": "e-postanın geldiği gün",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Menkul kıymet: {name}",
     "proposalAccount": "Hesap: {account}",
     "proposalPrice": "Fiyat: hisse başına {price}",
+    "proposalDividendPerShare": "Hisse başına tutar: {price}",
     "proposalCommission": "Komisyon: {commission}",
     "proposalReview": "Siz onaylayana kadar hiçbir şey kaydedilmez.",
     "proposalReviewLink": "Gelen kutusunda inceleyin",

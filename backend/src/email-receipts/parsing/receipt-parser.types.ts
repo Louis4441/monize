@@ -154,7 +154,10 @@ export const RECEIPT_LINES_SOURCES: readonly ReceiptLinesSource[] = [
  * tolerance inside the date window.
  */
 export type ReceiptMatchStrategy =
-  "reference" | "orderId" | "amount_payee" | "amount_date";
+  | "reference"
+  | "orderId"
+  | "amount_payee"
+  | "amount_date";
 export const RECEIPT_MATCH_STRATEGIES: readonly ReceiptMatchStrategy[] = [
   "reference",
   "orderId",
@@ -248,19 +251,21 @@ export interface ReceiptTradeCurrencyMarker {
  * transaction to create, not as a purchase paid from a bank transaction. Every
  * field is a list of entries read exactly like the receipt fields (a line
  * pattern or a labelled `{label, value, within}`); the capture each takes is in
- * brackets. `quantity`, `symbol`, `action` and one of `total`/`price` are
- * required; `commission`, `date` and `account` are optional.
+ * brackets. `symbol`, `action` and one of `total`/`price` are required;
+ * `quantity`, `commission`, `date` and `account` are optional. A buy, a sell
+ * or a reinvested dividend still needs its share count when the email is read
+ * (`trade_no_quantity`); a cash dividend needs none.
  */
 export interface ReceiptTradeDefinition {
-  /** The words that say the direction: `{action}` is searched for "buy" or "sell". */
+  /** The words that say the direction: `{action}` is searched for "buy", "sell", "dividend" or "reinvest". */
   action: ReceiptFieldEntry[];
   /** The ticker as the broker writes it: `{symbol}`. */
   symbol: ReceiptFieldEntry[];
-  /** The number of shares, fractions allowed: `{quantity}`. */
-  quantity: ReceiptFieldEntry[];
-  /** The executed total, the fact (commission included for a buy): `{amount}`. */
+  /** The number of shares, fractions allowed: `{quantity}`; a cash dividend needs none. */
+  quantity?: ReceiptFieldEntry[];
+  /** The executed total, the fact (commission included for a buy; a dividend's amount paid): `{amount}`. */
   total?: ReceiptFieldEntry[];
-  /** The average price per share, a cross-check and the fallback to the total: `{amount}`. */
+  /** The average price per share (a dividend's amount per share), a cross-check and the fallback to the total: `{amount}`. */
   price?: ReceiptFieldEntry[];
   /** The commission, when the email states one: `{amount}`. */
   commission?: ReceiptFieldEntry[];
@@ -553,8 +558,22 @@ export interface ReceiptTrace {
   items: ReceiptTraceItem[];
 }
 
-/** What a trade email says about the direction; the only two the pipeline creates. */
-export type ParsedTradeAction = "BUY" | "SELL";
+/**
+ * What a trade email reports, the only four the pipeline creates: a buy, a
+ * sell, a cash dividend (no shares move) and a reinvested dividend (shares
+ * bought with the distribution, no cash moves).
+ */
+export const PARSED_TRADE_ACTIONS = [
+  "BUY",
+  "SELL",
+  "DIVIDEND",
+  "REINVEST",
+] as const;
+export type ParsedTradeAction = (typeof PARSED_TRADE_ACTIONS)[number];
+
+/** Whether a trade action moves shares, so its reading needs a share count. */
+export const tradeActionMovesShares = (action: ParsedTradeAction): boolean =>
+  action !== "DIVIDEND";
 
 /** The first thing missing from a trade that is not complete. */
 export type ParsedTradeReason =
@@ -573,9 +592,10 @@ export type ParsedTradeCurrencySource = "amount" | "marker" | "security";
  * at most 8 decimals; `total`, `price` and `commission` are non-negative
  * integers in 1/10000 units; `date` is `YYYY-MM-DD`. `consistent` says whether
  * quantity times price agrees with the executed total (price rounding and one
- * cent allowed): null when the email states no price, so there is nothing to
- * cross-check. `complete` means the email stated everything a proposal needs;
- * only a complete AND consistent reading can auto-apply.
+ * cent allowed): null when the email does not state all three, so there is
+ * nothing to cross-check. `complete` means the email stated everything a
+ * proposal needs; only a complete reading that is consistent (or, for a cash
+ * dividend, not inconsistent) can auto-apply.
  */
 export interface ParsedTrade {
   action: ParsedTradeAction | null;

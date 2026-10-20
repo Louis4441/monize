@@ -161,7 +161,7 @@
     "notATradeRequest": "이 AI 검토 요청은 거래 요청이 아닙니다.",
     "tradeOnTradeRequest": "trade 필드는 거래 요청에만 응답합니다.",
     "tradeDateRequired": "거래에는 날짜(YYYY-MM-DD)가 필요합니다: 메일이 없어졌으므로 대신 쓸 날짜가 없습니다.",
-    "tradeInvalid": "거래에는 accountName, action(BUY 또는 SELL), symbol, quantity, totalAmount가 필요하며, 선택적으로 commission과 date(YYYY-MM-DD)를 지정할 수 있습니다.",
+    "tradeInvalid": "거래에는 accountName, action(BUY, SELL, DIVIDEND 또는 REINVEST), symbol, quantity(DIVIDEND는 선택), totalAmount가 필요하며, 선택적으로 commission과 date(YYYY-MM-DD)를 지정할 수 있습니다.",
     "tradeSecurityAmbiguous": "\"{{ symbol }}\"은(는) 여러 종목({{ list }})과 일치합니다. 종목 코드가 고유하도록 하나의 이름을 바꾸세요.",
     "tradeSecurityUnknown": "종목 코드가 \"{{ symbol }}\"인 종목이 없습니다. 종목을 추가한 뒤 메일을 다시 처리하세요.",
     "tagNamesInvalid": "제안에는 태그를 최대 {{ max }}개까지 추가할 수 있으며, 각 태그는 1자에서 {{ length }}자 사이여야 하고 제어 문자를 포함할 수 없습니다.",

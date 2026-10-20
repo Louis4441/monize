@@ -93,7 +93,7 @@
         "automatic": "Podczas sprawdzania skrzynki AI jest pytane o dopasowany paragon, którego żaden zatwierdzony parser nie odczytał w całości, i przygotowuje parser dla nadawcy, który go nie ma."
       },
       "autoApplyLabel": "Stosuj propozycje automatycznie",
-      "autoApplyHelp": "Domyślnie wyłączone. Propozycja jest stosowana bez pytania tylko wtedy, gdy spełnione jest wszystko naraz: zatwierdzony profil odczytał całą wiadomość, transakcję znaleziono po numerze zamówienia, po referencji albo po dokładnej kwocie i odbiorcy przy jednym kandydacie, a propozycja zgadza się co do grosza. Potwierdzenie transakcji jest księgowane bez pytania tylko wtedy, gdy jego profil transakcji jest zatwierdzony, odczytał całą transakcję, cena zgadza się z liczbą jednostek i sumą, a Twoje konta nie zawierają jeszcze takiej samej transakcji. Wszystko inne czeka na Twoją akceptację.",
+      "autoApplyHelp": "Domyślnie wyłączone. Propozycja jest stosowana bez pytania tylko wtedy, gdy spełnione jest wszystko naraz: zatwierdzony profil odczytał całą wiadomość, transakcję znaleziono po numerze zamówienia, po referencji albo po dokładnej kwocie i odbiorcy przy jednym kandydacie, a propozycja zgadza się co do grosza. Potwierdzenie transakcji jest księgowane bez pytania tylko wtedy, gdy jego profil transakcji jest zatwierdzony, odczytał całą transakcję, cena zgadza się z liczbą jednostek i sumą (dywidenda pieniężna, która podaje tylko swoją kwotę, nie ma czego sprawdzać), a Twoje konta nie zawierają jeszcze takiej samej transakcji. Wszystko inne czeka na Twoją akceptację.",
       "profileLimitLabel": "Wliczaj propozycje profili do dziennego limitu AI",
       "profileLimitHelp": "Domyślnie włączone: zmiana, którą profil proponuje na podstawie wiadomości, jest wliczana do dziennego limitu zmian proponowanych przez AI, jak każda inna propozycja AI. Wyłącz tę opcję, gdy duża partia zapisanych wiadomości w innym razie wyczerpałaby limit. Zwolnione są tylko propozycje z profili; każda propozycja nadal czeka na Twoją akceptację."
     },
@@ -377,7 +377,7 @@
       "receipt": "Paragon zamówienia",
       "trade": "Transakcja maklerska",
       "receiptHelp": "Odczytuje potwierdzenie zamówienia i znajduje transakcję bankową, którą je opłacono.",
-      "tradeHelp": "Odczytuje potwierdzenie transakcji od maklera i proponuje transakcję inwestycyjną, którą zgłasza, kupno lub sprzedaż."
+      "tradeHelp": "Odczytuje potwierdzenie transakcji od maklera i proponuje transakcję inwestycyjną, którą zgłasza: kupno, sprzedaż, dywidendę pieniężną lub reinwestowaną dywidendę."
     },
     "trade": {
       "guardsHeading": "Które wiadomości nadawcy odczytuje",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "Wiadomość z jednym z tych wierszy jest wstrzymywana i odczytywana ponownie później, na przykład częściowa realizacja."
       },
       "fieldsHeading": "Transakcja",
-      "fieldsHelp": "Kupno lub sprzedaż, symbol i liczba akcji są wymagane, a także suma lub cena. Każde pole przyjmuje wzorce, po jednym w wierszu, próbowane po kolei.",
+      "fieldsHelp": "Rodzaj transakcji, symbol oraz suma lub cena są wymagane, a także liczba akcji, z wyjątkiem dywidendy pieniężnej. Rodzaj jest odczytywany z tekstu: Dividend lub Distribution to dywidenda pieniężna, Reinvest lub DRIP to reinwestowana dywidenda, w przeciwnym razie Buy lub Sell. Każde pole przyjmuje wzorce, po jednym w wierszu, próbowane po kolei.",
       "fields": {
-        "tradeAction": "Wzorce kupna lub sprzedaży",
+        "tradeAction": "Wzorce rodzaju transakcji",
         "tradeSymbol": "Wzorce symbolu",
         "tradeQuantity": "Wzorce liczby akcji",
         "tradeTotal": "Wzorce sumy transakcji",
@@ -403,7 +403,7 @@
         "tradeAccount": "Wzorce konta"
       },
       "fieldHint": "Musi przechwytywać {capture}. Przykład: {example}",
-      "amountsHelp": "Suma to wykonana kwota, przy kupnie z prowizją. Cena służy do kontroli i daje sumę, gdy wiadomość jej nie podaje. Kwota, która podaje swoją walutę (US$, C$, USD, €), ustala też walutę transakcji.",
+      "amountsHelp": "Suma to wykonana kwota, przy kupnie lub reinwestowanej dywidendzie z prowizją; przy dywidendzie pieniężnej to wypłacona kwota. Cena (przy dywidendzie kwota na akcję) służy do kontroli i razem z liczbą akcji daje sumę, gdy wiadomość jej nie podaje. Kwota, która podaje swoją walutę (US$, C$, USD, €), ustala też walutę transakcji.",
       "rulesHeading": "Reguły konta",
       "rulesHelp": "Na które konto księgowana jest transakcja. Reguły są próbowane po kolei na tekście konta odczytanym przez wzorce konta, a wygrywa pierwsza pasująca; {star} oznacza dowolny tekst. Reguła z walutą dotyczy tylko transakcji w tej walucie, więc dwa konta zapisywane przez maklera tak samo, na przykład RRSP w CAD i RRSP w USD, oba pokazywane jako RRSP, to dwie reguły z tym samym tekstem i różnymi walutami. Gdy wiadomość nie podaje tekstu konta, może zadziałać tylko reguła z tekstem {star}. Resztę przejmuje konto domyślne.",
       "currencyOrder": "Waluta transakcji jest brana po kolei: z samej kwoty, gdy ją podaje (US$, C$, USD, €), potem z pierwszego znacznika waluty poniżej, który pasuje do wiersza wiadomości, potem z waluty Twojego papieru wartościowego dla tego symbolu. Reguła z walutą nigdy nie zgaduje: gdy żadne z trzech nie wskazuje waluty, wiadomość czeka na Ciebie, zamiast trafić na któreś z kont.",
@@ -512,7 +512,7 @@
       "tag": "Tag",
       "aiCategories": "Kategorie AI",
       "trade": "Sekcja transakcji",
-      "tradeAction": "Wzorce kupna lub sprzedaży",
+      "tradeAction": "Wzorce rodzaju transakcji",
       "tradeSymbol": "Wzorce symbolu",
       "tradeQuantity": "Wzorce liczby akcji",
       "tradeTotal": "Wzorce sumy transakcji",
@@ -630,7 +630,7 @@
         "waitIfLine": "Wiersz wstrzymujący",
         "reference": "Referencja",
         "linkKey": "Klucz powiązania",
-        "action": "Kupno lub sprzedaż",
+        "action": "Rodzaj transakcji",
         "symbol": "Symbol",
         "quantity": "Akcje",
         "price": "Cena",
@@ -1008,9 +1008,9 @@
       "no_html": "Ten parser odczytuje część HTML wiadomości, a ta wiadomość jej nie ma.",
       "schema_org": "Parser nie był potrzebny: zamówienie odczytano z danych ustrukturyzowanych (schema.org) zawartych w wiadomości.",
       "item_amount_missing": "Pozycja nie ma kwoty, a wiadomość nie podaje jednej sumy, którą można by jej przypisać.",
-      "trade_no_action": "Parser nie znalazł w tej wiadomości ani zakupu, ani sprzedaży.",
+      "trade_no_action": "Parser nie znalazł w tej wiadomości ani zakupu, ani sprzedaży, ani dywidendy, ani reinwestycji.",
       "trade_no_symbol": "Parser nie znalazł w tej wiadomości symbolu giełdowego.",
-      "trade_no_quantity": "Parser nie znalazł w tej wiadomości liczby jednostek.",
+      "trade_no_quantity": "Parser nie znalazł w tej wiadomości liczby jednostek, której wymaga kupno, sprzedaż lub reinwestowana dywidenda.",
       "trade_no_amount": "Parser nie znalazł w tej wiadomości ani sumy, ani ceny.",
       "trade_no_account": "Parser nie ustalił, którego konta dotyczy ta transakcja.",
       "trade_exists": "Twoje konta zawierają już tę transakcję, więc nic nie zaproponowano.",
@@ -1078,10 +1078,10 @@
       "openButton": "Otwórz",
       "open": "Otwórz e-mail {subject}"
     },
-    "tradeTransactionSummary": "{action, select, BUY {Kupiono} other {Sprzedano}} {quantity} {symbol} za {total} dnia {date}.",
+    "tradeTransactionSummary": "{action, select, BUY {Kupiono {quantity} {symbol} za {total} dnia {date}.} SELL {Sprzedano {quantity} {symbol} za {total} dnia {date}.} DIVIDEND {Dywidenda z {symbol} w kwocie {total} dnia {date}.} REINVEST {Reinwestowano dywidendę w {quantity} {symbol} za {total} dnia {date}.} other {{quantity} {symbol} za {total} dnia {date}.}}",
     "noTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji albo połączona z już istniejącą w księdze.",
     "candidateShares": "{quantity} akcji",
-    "tradeNoCandidates": "Żadna transakcja inwestycyjna z tego konta, w tym kierunku i z tym symbolem, w ciągu tygodnia od dnia transakcji, nie jest wolna do połączenia. Jeśli wprowadziłeś ją sam, sprawdź konto i datę; w przeciwnym razie zatwierdź propozycję w skrzynce przeglądu.",
+    "tradeNoCandidates": "Żadna transakcja inwestycyjna z tego konta, tego rodzaju i z tym symbolem, w ciągu tygodnia od dnia transakcji, nie jest wolna do połączenia. Jeśli wprowadziłeś ją sam, sprawdź konto i datę; w przeciwnym razie zatwierdź propozycję w skrzynce przeglądu.",
     "aiTradeHeading": "Transakcja proponowana przez agenta AI",
     "aiTradeReader": "Brak: agent AI odczytuje ją jako transakcję",
     "noAiTradeTransaction": "Jeszcze brak: transakcja zostanie zaksięgowana po zatwierdzeniu propozycji agenta AI.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "Rozpoznaj z AI",
     "tradeTitle": "Rozpoznaj jako transakcję z AI",
-    "tradeMessage": "AI przeczyta tę wiadomość jako potwierdzenie transakcji z domu maklerskiego i zaproponuje zgłaszaną w niej transakcję inwestycyjną (konto, kupno lub sprzedaż, symbol, jednostki i suma). Nic nie jest zapisywane, dopóki jej nie zatwierdzisz.",
+    "tradeMessage": "AI przeczyta tę wiadomość jako potwierdzenie transakcji z domu maklerskiego i zaproponuje zgłaszaną w niej transakcję inwestycyjną (konto, kupno, sprzedaż, dywidenda pieniężna lub reinwestowana dywidenda, symbol, jednostki i suma). Nic nie jest zapisywane, dopóki jej nie zatwierdzisz.",
     "tradeConfirm": "Rozpoznaj jako transakcję",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "brak odbiorcy",
@@ -1166,7 +1166,7 @@
     "inboxLink": "Otwórz skrzynkę przeglądów AI",
     "opened": "Otwarto czat z dołączoną wiadomością. Przeczytaj treść i naciśnij Wyślij.",
     "chatPrompt": "Rozpoznaj produkty, ilości i ceny w załączonej wiadomości z zamówieniem i podziel moją transakcję z {date} ({payee}, {amount}) według produktów, przypisując każdemu kategorię. Przejmij prośbę o przegląd AI {requestId} i prześlij do niej swoją propozycję.",
-    "tradeChatPrompt": "Rozpoznaj transakcję w załączonej wiadomości z potwierdzeniem od brokera: konto, czy to kupno, czy sprzedaż, symbol, jednostki, wykonaną sumę i datę. Przejmij żądanie przeglądu AI {requestId} i złóż dla niego transakcję.",
+    "tradeChatPrompt": "Rozpoznaj transakcję w załączonej wiadomości z potwierdzeniem od brokera: konto, czy to kupno, sprzedaż, dywidenda pieniężna czy reinwestowana dywidenda, symbol, jednostki (dywidenda pieniężna może ich nie podawać), wykonaną sumę i datę. Przejmij żądanie przeglądu AI {requestId} i złóż dla niego transakcję.",
     "tradeDetachesTransaction": "Odczytany jako transakcja, ten e-mail przestaje odpowiadać {summary}: transakcja tworzy własną transakcję inwestycyjną."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "Data: {date}",
       "parsedTotal": "Suma: {total}",
       "parsedLines": "{count, plural, one {# wiersz} few {# wiersze} many {# wierszy} other {# wierszy}}",
-      "parsedTrade": "{action, select, BUY {Kupuje} other {Sprzedaje}} {quantity} jedn. {symbol}",
+      "parsedTrade": "{action, select, BUY {Kupuje {quantity} jedn. {symbol}} SELL {Sprzedaje {quantity} jedn. {symbol}} DIVIDEND {Wypłaca dywidendę z {symbol}} REINVEST {Reinwestuje dywidendę w {quantity} jedn. {symbol}} other {Transakcja na {symbol}}}",
       "tradeInconsistent": "Cena nie zgadza się z sumą, więc nie zostanie zastosowana automatycznie",
       "noExpectation": "Brak",
       "noMatch": "Brak transakcji",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {Zakup} other {Sprzedaż}}: {quantity} jedn. {symbol} za {total}, z datą {date}.",
+    "summary": "{action, select, BUY {Zakup: {quantity} jedn. {symbol} za {total}, z datą {date}.} SELL {Sprzedaż: {quantity} jedn. {symbol} za {total}, z datą {date}.} DIVIDEND {Dywidenda z {symbol} w kwocie {total}, z datą {date}.} REINVEST {Reinwestycja dywidendy w {quantity} jedn. {symbol} za {total}, z datą {date}.} other {{symbol} za {total}, z datą {date}.}}",
     "account": "Konto podane w wiadomości: {account}",
     "priceMismatch": "Średnia cena nie zgadza się z liczbą jednostek i sumą, więc ta transakcja nie zostanie zastosowana automatycznie.",
+    "dividendMismatch": "Kwota na akcję nie zgadza się z liczbą jednostek i sumą, więc ta dywidenda nie zostanie zastosowana automatycznie.",
+    "dividendShares": "Wypłacona od {quantity} jedn.",
+    "dividendPerShare": "Kwota na akcję w wiadomości: {price}",
     "incomplete": "Parser nie odczytał z tej wiadomości kompletnej transakcji.",
     "totalFromPrice": "suma wynikająca z ceny",
     "dateUnknown": "dzień otrzymania wiadomości",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "Papier wartościowy: {name}",
     "proposalAccount": "Konto: {account}",
     "proposalPrice": "Cena: {price} za akcję",
+    "proposalDividendPerShare": "Kwota na akcję: {price}",
     "proposalCommission": "Prowizja: {commission}",
     "proposalReview": "Nic nie zostanie zaksięgowane, dopóki tego nie zatwierdzisz.",
     "proposalReviewLink": "Sprawdź w skrzynce",

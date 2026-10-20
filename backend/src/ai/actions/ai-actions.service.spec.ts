@@ -1127,6 +1127,32 @@ describe("AiActionsService", () => {
       expect(params).toEqual(expect.arrayContaining(["receipt-1"]));
     });
 
+    it("refuses a cash dividend the ledger gained since, matched by its amount as it moves no shares", async () => {
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({
+            aiReviewRequestId: TRADE_REQUEST,
+            action: InvestmentAction.DIVIDEND,
+            quantity: null,
+            price: null,
+            totalAmount: 12.34,
+          }),
+        ),
+      );
+      const options = investments.create.mock.calls[0][2];
+      const manager = txManager([{ id: "it-entered", claimed: false }]);
+      await expect(options.beforeWrite(manager)).rejects.toThrow(
+        /already has this trade/,
+      );
+      const [, params] = manager.query.mock.calls.find((c) =>
+        String(c[0]).includes("FROM investment_transactions"),
+      ) as [string, unknown[]];
+      expect(params).toEqual(
+        expect.arrayContaining(["DIVIDEND", false, "12.34"]),
+      );
+    });
+
     it("records the row it created on the email, in the write's own transaction", async () => {
       await service.confirm(
         USER,
@@ -1173,6 +1199,28 @@ describe("AiActionsService", () => {
         USER,
         TRADE_REQUEST,
       );
+    });
+
+    it("posts a dividend schedule from a card with no shares without the card's price, which is the whole amount", async () => {
+      const SCHEDULE = "80000000-0000-4000-8000-000000000001";
+      await service.confirm(
+        USER,
+        dtoFor(
+          createInvestmentDescriptor({
+            aiReviewRequestId: TRADE_REQUEST,
+            action: InvestmentAction.DIVIDEND,
+            quantity: null,
+            price: 12.34,
+            totalAmount: 12.34,
+            scheduledTransactionId: SCHEDULE,
+            scheduledDueDate: "2026-10-16",
+          }),
+        ),
+      );
+      const [, , postDto, options] = scheduled.post.mock.calls[0];
+      expect(postDto.investmentQuantity).toBeUndefined();
+      expect(postDto.investmentPrice).toBeUndefined();
+      expect(options.investmentFigures.totalAmount).toBe(12.34);
     });
 
     it("posts the schedule with the card's executed total and rate, and returns the row the post created", async () => {

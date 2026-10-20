@@ -18,6 +18,7 @@ import { SenderDomainCloud } from '@/components/email-receipts/SenderDomainCloud
 import { ParserEditorDialog } from '@/components/email-receipts/ParserEditorDialog';
 import { RecognizeWithAiDialog } from '@/components/email-receipts/RecognizeWithAiDialog';
 import { ReceiptStateBadge } from '@/components/email-receipts/ReceiptStateBadge';
+import { useBookedTradeSummary } from '@/components/email-receipts/useBookedTradeSummary';
 import { useParserDraftWithAi } from '@/components/email-receipts/useParserDraftWithAi';
 import { useProfileDiscardOffer } from '@/components/email-receipts/useProfileDiscardOffer';
 import { Badge } from '@/components/ui/Badge';
@@ -167,10 +168,10 @@ interface Notice {
  */
 export function EmailReceiptsManager() {
   const t = useTranslations('emailReceipts.receipts');
-  const tDetail = useTranslations('emailReceipts.detail');
   const tc = useTranslations('common');
   const { formatDate, formatDateTime } = useDateFormat();
-  const { formatCurrency, formatNumber, formatShareQuantity } = useNumberFormat();
+  const { formatCurrency, formatNumber } = useNumberFormat();
+  const bookedTradeSummary = useBookedTradeSummary();
   const { state: lookups, reload: reloadLookups } = useReceiptParserLookups();
 
   const router = useRouter();
@@ -887,13 +888,7 @@ export function EmailReceiptsManager() {
               // A trade email accounts for an investment transaction, never a bank one.
               const booked = receipt.isTrade ? (receipt.investmentTransaction ?? null) : null;
               const summary = booked
-                ? tDetail('tradeTransactionSummary', {
-                    action: booked.action === 'SELL' ? 'SELL' : 'BUY',
-                    quantity: formatShareQuantity(booked.quantity),
-                    symbol: booked.symbol,
-                    total: formatCurrency(booked.totalAmount, booked.currencyCode),
-                    date: formatDate(booked.date),
-                  })
+                ? bookedTradeSummary(booked)
                 : receipt.transaction && !receipt.isTrade
                   ? t('transactionSummary', {
                       date: formatDate(receipt.transaction.date),

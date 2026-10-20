@@ -11,6 +11,7 @@ import {
   emailDayOfUser,
   findTradeInLedger,
 } from "../../ai-review/trade-ledger";
+import type { TradeAction } from "../../ai-review/trade-action";
 import { roundMoney } from "../../common/round.util";
 import type { EmailReceiptParser } from "../entities/email-receipt-parser.entity";
 import type {
@@ -18,7 +19,10 @@ import type {
   EmailReceiptStatus,
 } from "../entities/email-receipt.entity";
 import { effectiveReceiptDate } from "../imap/forwarded-receipt";
-import { tradeExecutedTotalUnits } from "../parsing/parse-trade";
+import {
+  tradeExecutedTotalUnits,
+  tradeMayAutoApply,
+} from "../parsing/parse-trade";
 import type {
   ParsedTrade,
   ReceiptTradeDefinition,
@@ -141,7 +145,7 @@ export class EmailReceiptTradeService {
       const gate =
         context.mailboxAutoApply &&
         context.parser.status === "approved" &&
-        trade.consistent === true &&
+        tradeMayAutoApply(trade) &&
         !ledger.anyMatch;
       return outcome("review", null, request.id, gate ? done.action : null);
     } catch (error) {
@@ -165,9 +169,9 @@ export class EmailReceiptTradeService {
     trade: ParsedTrade,
     date: string,
   ): AiReviewTradeInput {
-    const quantity = trade.quantity as number;
+    const quantity = trade.quantity;
     const commission = (trade.commission ?? 0) / MONEY_UNITS;
-    const action = trade.action as "BUY" | "SELL";
+    const action = trade.action as TradeAction;
     // The executed total is the fact. An email that states only a price gives
     // the total its price implies (commission added to a buy, taken from a sell).
     const total = roundMoney(

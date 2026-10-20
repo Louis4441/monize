@@ -161,7 +161,7 @@
     "notATradeRequest": "Bu yapay zekâ inceleme isteği bir işlem isteği değildir.",
     "tradeOnTradeRequest": "trade alanı yalnızca bir işlem isteğini yanıtlar.",
     "tradeDateRequired": "İşlemin tarihi gerekir (YYYY-AA-GG): e-posta artık yok, bu yüzden yedek bir gün yok.",
-    "tradeInvalid": "İşlem için accountName, action (BUY veya SELL), symbol, quantity, totalAmount ve isteğe bağlı olarak commission ile date (YYYY-AA-GG) gerekir.",
+    "tradeInvalid": "İşlem için accountName, action (BUY, SELL, DIVIDEND veya REINVEST), symbol, quantity (DIVIDEND için isteğe bağlı), totalAmount ve isteğe bağlı olarak commission ile date (YYYY-AA-GG) gerekir.",
     "tradeSecurityAmbiguous": "\"{{ symbol }}\" birden çok menkul kıymetinizle eşleşiyor ({{ list }}). Kodun benzersiz olması için birinin adını değiştirin.",
     "tradeSecurityUnknown": "\"{{ symbol }}\" kodlu bir menkul kıymetiniz yok. Menkul kıymeti ekleyin, sonra e-postayı yeniden işleyin.",
     "tagNamesInvalid": "Bir öneri en fazla {{ max }} etiket ekleyebilir; her etiket 1 ile {{ length }} karakter uzunluğunda olmalı ve denetim karakteri içermemelidir.",

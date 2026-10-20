@@ -161,7 +161,7 @@
     "notATradeRequest": "このAIレビューリクエストは取引リクエストではありません。",
     "tradeOnTradeRequest": "tradeフィールドは取引リクエストにのみ応答します。",
     "tradeDateRequired": "取引には日付(YYYY-MM-DD)が必要です:メールがすでにないため、代わりの日がありません。",
-    "tradeInvalid": "取引には accountName、action(BUY または SELL)、symbol、quantity、totalAmount が必要で、任意で commission と date(YYYY-MM-DD)を指定できます。",
+    "tradeInvalid": "取引には accountName、action(BUY、SELL、DIVIDEND または REINVEST)、symbol、quantity(DIVIDEND では任意)、totalAmount が必要で、任意で commission と date(YYYY-MM-DD)を指定できます。",
     "tradeSecurityAmbiguous": "「{{ symbol }}」は複数の銘柄({{ list }})に一致します。ティッカーが一意になるよう、いずれかの名前を変更してください。",
     "tradeSecurityUnknown": "ティッカー「{{ symbol }}」の銘柄がありません。銘柄を追加してから、メールを再処理してください。",
     "tagNamesInvalid": "提案に追加できるタグは最大 {{ max }} 個で、各タグは 1 から {{ length }} 文字、制御文字は使えません。",

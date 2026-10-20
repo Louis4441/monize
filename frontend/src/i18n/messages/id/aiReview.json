@@ -38,14 +38,14 @@
     "transactionMissing": "Transaksi ini sudah tidak ada",
     "rule": "Aturan: {name}",
     "manualRequest": "Diminta secara manual",
-    "trade": "{action, select, BUY {Pembelian {quantity} saham {symbol}} other {Penjualan {quantity} saham {symbol}}}",
+    "trade": "{action, select, BUY {Pembelian {quantity} saham {symbol}} SELL {Penjualan {quantity} saham {symbol}} DIVIDEND {Dividen dari {symbol}} REINVEST {Reinvestasi dividen ke {quantity} saham {symbol}} other {Perdagangan {symbol}}}",
     "receiptInstruction": {
       "automatic": "Lengkapi transaksi ini dari email pesanan terlampir: pisahkan per item dengan kategori masing-masing, atau atur deskripsinya.",
       "chat": "Anda meminta email pesanan terlampir dikenali: pisahkan transaksi ini per produk dengan kategori masing-masing, atau atur deskripsinya.",
       "categorize": "Tetapkan kategori untuk setiap item email pesanan terlampir yang tidak dikategorikan aturan mana pun, lalu usulkan pemisahan transaksi ini atau atur deskripsinya.",
       "parsed": "Parser tersimpan membaca email pesanan dan mengusulkan baris kategori dan deskripsi ini untuk transaksi.",
       "trade": "Email konfirmasi perdagangan yang dibaca oleh profil tersimpan mengusulkan transaksi investasi ini. Periksa akun, sekuritas, jumlah saham, dan total pada pialang Anda sebelum menyetujui.",
-      "tradeChat": "Anda meminta konfirmasi perdagangan terlampir dikenali: usulkan transaksi investasi yang dilaporkannya."
+      "tradeChat": "Anda meminta konfirmasi perdagangan terlampir dikenali: usulkan transaksi investasi yang dilaporkannya, berupa pembelian, penjualan, dividen tunai, atau dividen yang diinvestasikan kembali."
     },
     "emailReceipt": "Struk surel: {subject} dari {sender}",
     "emailReceiptMissing": "Struk surel (surel telah dihapus)",

@@ -751,6 +751,33 @@ describe('EmailReceiptsManager', () => {
       expect(within(rowOf('Order open')).queryByRole('link', { name: /Bought/ })).not.toBeInTheDocument();
     });
 
+    it('names a booked dividend and a booked reinvestment as what they are, never as bought', async () => {
+      api.list.mockResolvedValue([
+        trade({
+          id: 'r-div',
+          subject: 'Order dividend',
+          displayState: 'applied',
+          investmentTransaction: { ...booked, id: 'it-2', action: 'DIVIDEND', quantity: 0, totalAmount: 12.34 },
+        }),
+        trade({
+          id: 'r-drip',
+          subject: 'Order reinvested',
+          displayState: 'applied',
+          investmentTransaction: { ...booked, id: 'it-3', action: 'REINVEST', quantity: 0.4688, totalAmount: 12.34 },
+        }),
+      ]);
+      await renderManager();
+      const dividend = rowOf('Order dividend');
+      expect(within(dividend).getByRole('link', { name: /^Dividend from XCNS of .*12\.34 on / })).toHaveAttribute(
+        'href',
+        '/investments?edit=it-2',
+      );
+      expect(within(dividend).queryByRole('link', { name: /Bought/ })).not.toBeInTheDocument();
+      const reinvested = rowOf('Order reinvested');
+      expect(within(reinvested).getByRole('link', { name: /^Reinvested a dividend in 0\.4688 XCNS for / })).toBeInTheDocument();
+      expect(within(reinvested).queryByRole('link', { name: /Bought/ })).not.toBeInTheDocument();
+    });
+
     it('marks no order email as a trade', async () => {
       await renderManager();
       expect(within(rowOf('Order proposed')).queryByText('Trade')).not.toBeInTheDocument();

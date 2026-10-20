@@ -2,9 +2,23 @@ import type { EntityManager } from "typeorm";
 import { returnedRows } from "../common/db/query-result";
 import { todayInTimezone } from "../common/date-utils";
 import { getEffectiveTimezoneOfUser } from "../common/users-by-timezone.util";
-import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
 import { escapeLikePattern } from "../transactions/transaction-search.util";
 import type { AiReviewTradeInput } from "./ai-review-work.types";
+import {
+  tradeInvestmentAction,
+  tradeMatchesOnQuantity,
+  type TradeAction,
+} from "./trade-action";
+
+/**
+ * What an investment transaction row `it` came to, as a trade email states it:
+ * its total, except a reinvestment's, whose row carries no cash total, so its
+ * shares at its price plus the commission.
+ */
+export const TRADE_ROW_AMOUNT_SQL = `CASE WHEN it.action = 'REINVEST'
+            THEN ROUND(COALESCE(it.quantity, 0) * COALESCE(it.price, 0)
+                       + COALESCE(it.commission, 0), 4)
+            ELSE it.total_amount END`;
 
 /** What the ledger already holds of one trade. */
 export interface TradeLedgerMatch {
@@ -16,16 +30,25 @@ export interface TradeLedgerMatch {
   /**
    * Whether any matching row exists, accounted for or not. A second identical
    * fill on the same day is proposed, but only a person approves it: the
-   * auto-apply gate requires none.
+   * auto-apply gate requires none. A dividend counts the same day's
+   * reinvestment of that security too, and the other way round: a broker on a
+   * DRIP may send one email for the payout and one for the shares it bought.
    */
   anyMatch: boolean;
 }
 
+/** The other way a broker reports one dividend payout. */
+const PAYOUT_COUNTERPART: Partial<Record<TradeAction, TradeAction>> = {
+  DIVIDEND: "REINVEST",
+  REINVEST: "DIVIDEND",
+};
+
 /**
- * The investment transactions with this trade's account, direction, day and
- * share count whose security is the given one, or the ticker or one of its
- * listings (`XCNS`, `XCNS.TO`), a VOID one excepted -- and which of them no email other than
- * `receiptId` accounts for (`email_receipts.investment_transaction_id`).
+ * The investment transactions with this trade's account, action, day and
+ * share count (a cash dividend's amount, as it moves no shares) whose security
+ * is the given one, or the ticker or one of its listings (`XCNS`, `XCNS.TO`),
+ * a VOID one excepted -- and which of them no email other than `receiptId`
+ * accounts for (`email_receipts.investment_transaction_id`).
  *
  * One function for every surface that asks "is this trade already booked": the
  * pipeline before it proposes, the card before it is shown or approved, the
@@ -36,12 +59,13 @@ export async function findTradeInLedger(
   userId: string,
   trade: Pick<
     AiReviewTradeInput,
-    "accountId" | "action" | "quantity" | "date"
+    "accountId" | "action" | "quantity" | "totalAmount" | "date"
   > &
     ({ symbol: string } | { securityId: string }),
   receiptId: string | null,
 ): Promise<TradeLedgerMatch> {
   const bySecurity = "securityId" in trade;
+  const byQuantity = tradeMatchesOnQuantity(trade.action);
   const rows = returnedRows<{ id: string; claimed: boolean }>(
     await m.query(
       `SELECT it.id,
@@ -58,7 +82,9 @@ export async function findTradeInLedger(
           AND it.action = $3
           AND it.transaction_date = $4::date
           AND it.status != 'VOID'
-          AND it.quantity = $5::numeric
+          AND (CASE WHEN $10::boolean
+                    THEN it.quantity = $5::numeric
+                    ELSE it.total_amount = $11::numeric END)
           AND (it.security_id = $9::uuid
                OR ($9::uuid IS NULL
                    AND (LOWER(s.symbol) = LOWER($6::text)
@@ -68,19 +94,51 @@ export async function findTradeInLedger(
       [
         userId,
         trade.accountId,
-        trade.action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL,
+        tradeInvestmentAction(trade.action),
         trade.date,
-        String(trade.quantity),
+        byQuantity && trade.quantity !== null ? String(trade.quantity) : null,
         bySecurity ? null : trade.symbol,
         bySecurity ? null : `${escapeLikePattern(trade.symbol)}.%`,
         receiptId,
         bySecurity ? trade.securityId : null,
+        byQuantity,
+        String(trade.totalAmount),
       ],
     ),
   );
+  const counterpart = PAYOUT_COUNTERPART[trade.action];
+  const payoutTwin =
+    rows.length === 0 && counterpart !== undefined
+      ? returnedRows<{ id: string }>(
+          await m.query(
+            `SELECT it.id
+               FROM investment_transactions it
+               JOIN securities s ON s.id = it.security_id
+              WHERE it.user_id = $1
+                AND it.account_id = $2
+                AND it.action = $3
+                AND it.transaction_date = $4::date
+                AND it.status != 'VOID'
+                AND (it.security_id = $7::uuid
+                     OR ($7::uuid IS NULL
+                         AND (LOWER(s.symbol) = LOWER($5::text)
+                              OR LOWER(s.symbol) LIKE LOWER($6::text))))
+              LIMIT 1`,
+            [
+              userId,
+              trade.accountId,
+              tradeInvestmentAction(counterpart),
+              trade.date,
+              bySecurity ? null : trade.symbol,
+              bySecurity ? null : `${escapeLikePattern(trade.symbol)}.%`,
+              bySecurity ? trade.securityId : null,
+            ],
+          ),
+        ).length > 0
+      : false;
   return {
     unclaimedId: rows.find((row) => !row.claimed)?.id ?? null,
-    anyMatch: rows.length > 0,
+    anyMatch: rows.length > 0 || payoutTwin,
   };
 }
 

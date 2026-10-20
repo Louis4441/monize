@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@/test/render';
 import { TradeReadingView } from './TradeReadingView';
-import { PARSED_TRADE } from './email-receipts-fixtures';
+import { PARSED_DIVIDEND, PARSED_TRADE } from './email-receipts-fixtures';
 import { readParsedTrade } from '@/types/email-receipts';
 
 const trade = (over: Record<string, unknown> = {}) => {
@@ -21,6 +21,49 @@ describe('TradeReadingView', () => {
   it('reads a sell', () => {
     render(<TradeReadingView trade={trade({ action: 'SELL' })} fallbackDate={null} />);
     expect(screen.getByText(/^Sell 75\.9878 shares of XCNS/)).toBeInTheDocument();
+  });
+
+  describe('a dividend', () => {
+    const dividend = (over: Record<string, unknown> = {}) => trade({ ...PARSED_DIVIDEND, ...over });
+
+    it('reads a cash dividend with no share count as complete, with the amount paid', () => {
+      render(<TradeReadingView trade={dividend()} fallbackDate={null} />);
+      expect(screen.getByText(/^Dividend from XCNS of 12\.34, dated /)).toBeInTheDocument();
+      expect(screen.queryByText('The profile could not read a complete trade from this email.')).not.toBeInTheDocument();
+      expect(screen.queryByText(/shares/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/a share/)).not.toBeInTheDocument();
+      // Nothing to cross-check is not a mismatch.
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    });
+
+    it('names the shares and the amount per share of a dividend that states them', () => {
+      render(<TradeReadingView trade={dividend({ quantity: 100, price: 1234 })} fallbackDate={null} />);
+      expect(screen.getByText(/^Dividend from XCNS of 12\.34/)).toBeInTheDocument();
+      expect(screen.getByText('Paid on 100 shares')).toBeInTheDocument();
+      expect(screen.getByText('Amount per share in the email: 0.1234')).toBeInTheDocument();
+      expect(screen.queryByText(/Average price/)).not.toBeInTheDocument();
+    });
+
+    it('warns that an amount per share that does not fit will not be applied automatically', () => {
+      render(<TradeReadingView trade={dividend({ quantity: 100, price: 9999, consistent: false })} fallbackDate={null} />);
+      expect(screen.getByRole('note')).toHaveTextContent('The amount per share does not match the shares and the total');
+    });
+
+    it('reads a reinvested dividend with its shares', () => {
+      render(<TradeReadingView trade={trade({ action: 'REINVEST' })} fallbackDate={null} />);
+      expect(screen.getByText(/^Reinvest a dividend in 75\.9878 shares of XCNS for 2,000\.00, dated /)).toBeInTheDocument();
+      expect(screen.getByText('Average price in the email: 26.3200 a share')).toBeInTheDocument();
+    });
+
+    it('still calls a buy, a sell or a reinvestment without shares incomplete', () => {
+      for (const action of ['BUY', 'SELL', 'REINVEST']) {
+        const { unmount } = render(
+          <TradeReadingView trade={trade({ action, quantity: null, consistent: null })} fallbackDate={null} />,
+        );
+        expect(screen.getByText('The profile could not read a complete trade from this email.')).toBeInTheDocument();
+        unmount();
+      }
+    });
   });
 
   it('dates the trade by the email when it states no date, and says so when even that is unknown', () => {
@@ -125,6 +168,13 @@ describe('readParsedTrade', () => {
   it('reads where the currency came from, and an unknown source as none', () => {
     expect(readParsedTrade({ ...PARSED_TRADE, currency: 'USD', currencySource: 'marker' })?.currencySource).toBe('marker');
     expect(readParsedTrade({ ...PARSED_TRADE, currency: 'USD', currencySource: 'guess' })?.currencySource).toBeNull();
+  });
+
+  it('reads every action a trade email reports, and a dividend with no share count', () => {
+    for (const action of ['BUY', 'SELL', 'DIVIDEND', 'REINVEST', null]) {
+      expect(readParsedTrade({ ...PARSED_TRADE, action })?.action).toBe(action);
+    }
+    expect(readParsedTrade(PARSED_DIVIDEND)).toEqual({ ...PARSED_DIVIDEND, currencySource: null });
   });
 
   it.each([

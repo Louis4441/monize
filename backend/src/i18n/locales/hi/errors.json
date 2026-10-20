@@ -161,7 +161,7 @@
     "notATradeRequest": "यह AI समीक्षा अनुरोध ट्रेड अनुरोध नहीं है।",
     "tradeOnTradeRequest": "trade फ़ील्ड केवल ट्रेड अनुरोध का उत्तर देता है।",
     "tradeDateRequired": "ट्रेड के लिए तारीख (YYYY-MM-DD) चाहिए: ईमेल अब नहीं है, इसलिए कोई वैकल्पिक दिन नहीं है।",
-    "tradeInvalid": "ट्रेड के लिए accountName, action (BUY या SELL), symbol, quantity, totalAmount और, वैकल्पिक रूप से, commission और date (YYYY-MM-DD) चाहिए।",
+    "tradeInvalid": "ट्रेड के लिए accountName, action (BUY, SELL, DIVIDEND या REINVEST), symbol, quantity (DIVIDEND के लिए वैकल्पिक), totalAmount और, वैकल्पिक रूप से, commission और date (YYYY-MM-DD) चाहिए।",
     "tradeSecurityAmbiguous": "\"{{ symbol }}\" आपकी कई सिक्योरिटी ({{ list }}) से मेल खाता है। टिकर अनोखा रहे, इसके लिए किसी एक का नाम बदलें।",
     "tradeSecurityUnknown": "आपके पास टिकर \"{{ symbol }}\" वाली कोई सिक्योरिटी नहीं है। सिक्योरिटी जोड़ें, फिर ईमेल को दोबारा प्रोसेस करें।",
     "tagNamesInvalid": "एक प्रस्ताव में अधिकतम {{ max }} टैग जुड़ सकते हैं, हर टैग 1 से {{ length }} वर्ण का, बिना नियंत्रण वर्ण के।",

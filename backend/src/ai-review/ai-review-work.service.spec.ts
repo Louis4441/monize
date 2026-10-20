@@ -1657,10 +1657,15 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
         { ...agentTrade, quantity: 1.123456789 },
         { ...agentTrade, totalAmount: 2000.00001 },
         { accountName: "RRSP" },
+        // Only a cash dividend may leave the shares out.
+        { ...agentTrade, quantity: undefined },
+        { ...agentTrade, action: "REINVEST", quantity: null },
       ]) {
         await expect(
           h.service.submit(USER, "agent-1", REQ, { trade: bad }),
-        ).rejects.toThrow(/accountName, action \(BUY or SELL\)/);
+        ).rejects.toThrow(
+          /accountName, action \(BUY, SELL, DIVIDEND or REINVEST\)/,
+        );
       }
       expect(h.accounts.resolveBrokerageByNameOrId).not.toHaveBeenCalled();
       expect(h.requests.submitProposal).not.toHaveBeenCalled();
@@ -1687,6 +1692,96 @@ describe("AiReviewWorkService trade requests (email_trade)", () => {
         USER,
         expect.objectContaining({ quantity: 75.9878, totalAmount: 2000 }),
       );
+    });
+
+    it("previews an agent's cash dividend without shares, as a DIVIDEND", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: {
+          ...agentTrade,
+          action: "DIVIDEND",
+          quantity: null,
+          totalAmount: 12.34,
+        },
+      });
+      expect(
+        h.investments.previewCreateInvestmentTransaction,
+      ).toHaveBeenCalledWith(
+        USER,
+        expect.objectContaining({
+          action: "DIVIDEND",
+          quantity: undefined,
+          totalAmount: 12.34,
+        }),
+      );
+    });
+
+    it("previews a reinvestment at the price its total implies, as its row carries no cash total", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: {
+          ...agentTrade,
+          action: "REINVEST",
+          quantity: 0.5,
+          totalAmount: 12.34,
+          commission: 0.34,
+        },
+      });
+      const [, input] =
+        h.investments.previewCreateInvestmentTransaction.mock.calls[0];
+      expect(input).toMatchObject({
+        action: "REINVEST",
+        quantity: 0.5,
+        price: 24,
+        commission: 0.34,
+      });
+      expect(input.totalAmount).toBeUndefined();
+    });
+
+    it("takes an agent's 0 shares of a cash dividend as none", async () => {
+      const h = tradeSetup();
+      h.requests.getForUser.mockResolvedValue(
+        tradeRequest({ claimedBy: "agent-1" }),
+      );
+      h.requests.submitProposal.mockResolvedValue(
+        tradeRequest({ status: "proposed" }),
+      );
+      h.accounts.resolveBrokerageByNameOrId.mockResolvedValue({
+        match: { id: ACCOUNT, name: "RRSP", currencyCode: "CAD" },
+        candidates: [],
+      });
+      await h.service.submit(USER, "agent-1", REQ, {
+        trade: {
+          ...agentTrade,
+          action: "DIVIDEND",
+          quantity: 0,
+          totalAmount: 5,
+        },
+      });
+      const [, input] =
+        h.investments.previewCreateInvestmentTransaction.mock.calls[0];
+      expect(input.quantity).toBeUndefined();
+      expect(input.totalAmount).toBe(5);
     });
 
     it("refuses the trade field on an ordinary request", async () => {

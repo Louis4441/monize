@@ -161,7 +161,7 @@
     "notATradeRequest": "Esta solicitud de revisión con IA no es una solicitud de operación.",
     "tradeOnTradeRequest": "El campo trade solo responde a una solicitud de operación.",
     "tradeDateRequired": "La operación necesita una fecha (AAAA-MM-DD): el correo ya no existe, así que no hay un día de respaldo.",
-    "tradeInvalid": "La operación necesita accountName, action (BUY o SELL), symbol, quantity, totalAmount y, opcionalmente, commission y date (AAAA-MM-DD).",
+    "tradeInvalid": "La operación necesita accountName, action (BUY, SELL, DIVIDEND o REINVEST), symbol, quantity (opcional para DIVIDEND), totalAmount y, opcionalmente, commission y date (AAAA-MM-DD).",
     "tradeSecurityAmbiguous": "«{{ symbol }}» coincide con varios de tus valores ({{ list }}). Cambia el nombre de uno para que el símbolo sea único.",
     "tradeSecurityUnknown": "No tienes ningún valor con el símbolo «{{ symbol }}». Añade el valor y vuelve a procesar el correo.",
     "tagNamesInvalid": "Una propuesta puede añadir hasta {{ max }} etiquetas de 1 a {{ length }} caracteres cada una, sin caracteres de control.",

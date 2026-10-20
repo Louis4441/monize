@@ -93,7 +93,7 @@
         "automatic": "승인된 프로필이 완전히 읽지 못한 일치한 영수증에 대해 확인 시 AI에 문의하고, 프로필이 없는 발신자에게는 프로필 초안을 작성합니다."
       },
       "autoApplyLabel": "제안 자동 적용",
-      "autoApplyHelp": "기본값은 꺼짐입니다. 제안은 다음이 모두 충족될 때만 묻지 않고 적용됩니다. 승인된 프로필이 메일 전체를 읽었고, 거래가 주문 번호나 참조 번호 또는 정확한 금액과 거래처로 후보 하나만 남은 상태에서 발견되었으며, 제안이 끝자리까지 정확히 맞아떨어질 때입니다. 거래 확인 메일은 해당 거래 프로필이 승인되었고, 거래 전체를 읽었으며, 가격이 수량과 합계와 맞고, 같은 거래가 아직 계좌에 없을 때만 묻지 않고 기록됩니다. 그 외는 모두 사용자의 승인을 기다립니다.",
+      "autoApplyHelp": "기본값은 꺼짐입니다. 제안은 다음이 모두 충족될 때만 묻지 않고 적용됩니다. 승인된 프로필이 메일 전체를 읽었고, 거래가 주문 번호나 참조 번호 또는 정확한 금액과 거래처로 후보 하나만 남은 상태에서 발견되었으며, 제안이 끝자리까지 정확히 맞아떨어질 때입니다. 거래 확인 메일은 해당 거래 프로필이 승인되었고, 거래 전체를 읽었으며, 가격이 수량과 합계와 맞고(금액만 밝힌 현금 배당금은 대조할 것이 없음), 같은 거래가 아직 계좌에 없을 때만 묻지 않고 기록됩니다. 그 외는 모두 사용자의 승인을 기다립니다.",
       "profileLimitLabel": "프로필 제안을 일일 AI 한도에 포함",
       "profileLimitHelp": "기본값은 켜짐입니다. 프로필이 메일에서 제안한 수정은 다른 AI 제안과 마찬가지로 AI가 제안하는 변경의 일일 한도에 포함됩니다. 저장된 메일이 대량으로 있어 한도가 소진될 때는 끄세요. 프로필의 제안만 제외되며, 모든 제안은 여전히 사용자의 승인을 기다립니다."
     },
@@ -377,7 +377,7 @@
       "receipt": "주문 영수증",
       "trade": "증권 거래",
       "receiptHelp": "주문 확인 메일을 읽고 그 대금을 치른 은행 거래를 찾습니다.",
-      "tradeHelp": "증권사의 체결 확인 메일을 읽고 거기에 적힌 투자 거래(매수 또는 매도)를 제안합니다."
+      "tradeHelp": "증권사의 체결 확인 메일을 읽고 거기에 적힌 투자 거래(매수, 매도, 현금 배당금 또는 배당금 재투자)를 제안합니다."
     },
     "trade": {
       "guardsHeading": "보낸 사람의 어떤 메일을 읽는지",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "이 줄 중 하나가 있는 메일은 보류했다가 나중에 다시 읽습니다. 예: 일부 체결."
       },
       "fieldsHeading": "거래",
-      "fieldsHelp": "매수 또는 매도, 종목 코드, 주식 수는 필수이며 합계나 가격도 필요합니다. 각 필드에는 패턴을 한 줄에 하나씩 적고, 순서대로 시도합니다.",
+      "fieldsHelp": "거래 유형, 종목 코드, 합계나 가격은 필수이며, 현금 배당금이 아니면 주식 수도 필수입니다. 거래 유형은 해당 텍스트에서 읽습니다. Dividend 또는 Distribution은 현금 배당금, Reinvest 또는 DRIP은 배당금 재투자, 그 외에는 Buy 또는 Sell입니다. 각 필드에는 패턴을 한 줄에 하나씩 적고, 순서대로 시도합니다.",
       "fields": {
-        "tradeAction": "매수 또는 매도 패턴",
+        "tradeAction": "거래 유형 패턴",
         "tradeSymbol": "종목 코드 패턴",
         "tradeQuantity": "주식 수 패턴",
         "tradeTotal": "거래 합계 패턴",
@@ -403,7 +403,7 @@
         "tradeAccount": "계좌 패턴"
       },
       "fieldHint": "{capture}을(를) 가져와야 합니다. 예: {example}",
-      "amountsHelp": "합계는 체결 금액이며 매수에는 수수료가 포함됩니다. 가격은 대조용이며, 메일에 합계가 없으면 가격으로 합계를 구합니다. 통화를 밝힌 금액(US$, C$, USD, €)은 거래의 통화도 정합니다.",
+      "amountsHelp": "합계는 체결 금액이며 매수와 배당금 재투자에는 수수료가 포함됩니다. 현금 배당금에서는 지급된 금액입니다. 가격(배당금에서는 주당 금액)은 대조용이며, 메일에 합계가 없으면 주식 수와 가격으로 합계를 구합니다. 통화를 밝힌 금액(US$, C$, USD, €)은 거래의 통화도 정합니다.",
       "rulesHeading": "계좌 규칙",
       "rulesHelp": "거래를 어느 계좌에 기록할지 정합니다. 규칙은 계좌 패턴이 읽은 계좌 텍스트에 대해 순서대로 시도되며, 처음 적용되는 규칙이 이깁니다. {star}는 아무 텍스트입니다. 통화가 있는 규칙은 그 통화의 거래에만 적용되므로, 증권사가 똑같이 표기하는 두 계좌(둘 다 RRSP로 표시되는 CAD RRSP와 USD RRSP 등)는 텍스트가 같고 통화가 다른 두 규칙이 됩니다. 메일에 계좌 텍스트가 없으면 텍스트가 {star}인 규칙만 적용될 수 있습니다. 나머지는 기본 계좌가 맡습니다.",
       "currencyOrder": "거래의 통화는 다음 순서로 정해집니다. 금액이 통화를 밝히면 그 통화(US$, C$, USD, €), 다음으로 메일의 줄과 일치하는 아래의 첫 통화 표시, 다음으로 그 종목 코드에 대한 내 증권의 통화입니다. 통화가 있는 규칙은 절대 추측하지 않습니다. 셋 중 어느 것도 통화를 알려 주지 않으면 메일은 어느 계좌에도 기록되지 않고 확인을 기다립니다.",
@@ -512,7 +512,7 @@
       "tag": "태그",
       "aiCategories": "AI 카테고리",
       "trade": "거래 섹션",
-      "tradeAction": "매수 또는 매도 패턴",
+      "tradeAction": "거래 유형 패턴",
       "tradeSymbol": "종목 코드 패턴",
       "tradeQuantity": "주식 수 패턴",
       "tradeTotal": "거래 합계 패턴",
@@ -630,7 +630,7 @@
         "waitIfLine": "보류 줄",
         "reference": "참조",
         "linkKey": "링크 키",
-        "action": "매수 또는 매도",
+        "action": "거래 유형",
         "symbol": "종목 코드",
         "quantity": "주식 수",
         "price": "가격",
@@ -1008,9 +1008,9 @@
       "no_html": "이 프로필은 메일의 HTML 부분을 읽는데 이 메일에는 없습니다.",
       "schema_org": "프로필이 필요하지 않았습니다. 주문은 메일의 구조화된 데이터(schema.org)에서 읽었습니다.",
       "item_amount_missing": "품목에 금액이 없고, 이메일에도 그 금액을 정할 단일 합계가 없습니다.",
-      "trade_no_action": "프로필이 이 메일에서 매수나 매도를 찾지 못했습니다.",
+      "trade_no_action": "프로필이 이 메일에서 매수, 매도, 배당금, 재투자 중 어느 것도 찾지 못했습니다.",
       "trade_no_symbol": "프로필이 이 메일에서 종목 코드를 찾지 못했습니다.",
-      "trade_no_quantity": "프로필이 이 메일에서 수량을 찾지 못했습니다.",
+      "trade_no_quantity": "프로필이 이 메일에서 수량을 찾지 못했습니다. 매수, 매도, 배당금 재투자에는 수량이 필요합니다.",
       "trade_no_amount": "프로필이 이 메일에서 합계도 가격도 찾지 못했습니다.",
       "trade_no_account": "프로필이 이 거래가 어느 계좌의 것인지 알아내지 못했습니다.",
       "trade_exists": "계좌에 이미 이 거래가 있어 아무것도 제안하지 않았습니다.",
@@ -1078,10 +1078,10 @@
       "openButton": "열기",
       "open": "메일 {subject} 열기"
     },
-    "tradeTransactionSummary": "{date}에 {symbol} {quantity}주를 {total}에 {action, select, BUY {매수} other {매도}}.",
+    "tradeTransactionSummary": "{action, select, BUY {{date}에 {symbol} {quantity}주를 {total}에 매수.} SELL {{date}에 {symbol} {quantity}주를 {total}에 매도.} DIVIDEND {{date}에 {symbol} 배당금 {total}.} REINVEST {{date}에 배당금을 {symbol} {quantity}주에 {total} 재투자.} other {{date}에 {symbol} {quantity}주, {total}.}}",
     "noTradeTransaction": "아직 없음: 제안을 승인하면 거래가 기록되거나, 원장에 이미 있는 거래에 연결됩니다.",
     "candidateShares": "{quantity}주",
-    "tradeNoCandidates": "거래일 전후 일주일 안에 이 계좌, 방향, 종목 코드로 연결할 수 있는 투자 거래가 없습니다. 직접 입력했다면 계좌와 날짜를 확인하고, 그렇지 않다면 검토함에서 제안을 승인하세요.",
+    "tradeNoCandidates": "거래일 전후 일주일 안에 이 계좌, 거래 유형, 종목 코드로 연결할 수 있는 투자 거래가 없습니다. 직접 입력했다면 계좌와 날짜를 확인하고, 그렇지 않다면 검토함에서 제안을 승인하세요.",
     "aiTradeHeading": "AI 에이전트가 제안하는 거래",
     "aiTradeReader": "없음: AI 에이전트가 거래로 읽습니다",
     "noAiTradeTransaction": "아직 없음: AI 에이전트의 제안을 승인하면 거래가 기록됩니다.",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "AI로 인식",
     "tradeTitle": "AI로 거래로 인식",
-    "tradeMessage": "AI가 이 메일을 증권사 거래 확인으로 읽고 보고된 투자 거래(계좌, 매수 또는 매도, 종목 코드, 수량, 합계)를 제안합니다. 승인하기 전에는 아무것도 저장되지 않습니다.",
+    "tradeMessage": "AI가 이 메일을 증권사 거래 확인으로 읽고 보고된 투자 거래(계좌, 매수, 매도, 현금 배당금 또는 배당금 재투자, 종목 코드, 수량, 합계)를 제안합니다. 승인하기 전에는 아무것도 저장되지 않습니다.",
     "tradeConfirm": "거래로 인식",
     "transactionSummary": "{date}, {amount}, {payee}",
     "noPayee": "수취인 없음",
@@ -1166,7 +1166,7 @@
     "inboxLink": "AI 검토 수신함 열기",
     "opened": "이메일을 첨부한 채로 채팅을 열었습니다. 메시지를 읽고 보내기를 누르세요.",
     "chatPrompt": "첨부한 주문 이메일의 상품, 수량, 가격을 인식하고, {date}의 내 거래({payee}, {amount})를 각각 카테고리를 지정해 상품별로 나눠 주세요. AI 검토 요청 {requestId}을(를) 맡아서 그에 대한 제안을 제출해 주세요.",
-    "tradeChatPrompt": "첨부된 증권사 확인 메일의 거래를 인식하세요: 계좌, 매수인지 매도인지, 종목 코드, 수량, 체결 합계, 날짜. AI 검토 요청 {requestId}를 맡고 그 거래를 제출하세요.",
+    "tradeChatPrompt": "첨부된 증권사 확인 메일의 거래를 인식하세요: 계좌, 매수, 매도, 현금 배당금, 배당금 재투자 중 무엇인지, 종목 코드, 수량(현금 배당금에는 없을 수 있음), 체결 합계, 날짜. AI 검토 요청 {requestId}를 맡고 그 거래를 제출하세요.",
     "tradeDetachesTransaction": "거래로 읽으면 이 이메일은 더 이상 {summary}에 대응되지 않습니다. 거래는 자체 투자 거래를 만듭니다."
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "날짜: {date}",
       "parsedTotal": "합계: {total}",
       "parsedLines": "{count, plural, one {#줄} other {#줄}}",
-      "parsedTrade": "{action, select, BUY {매수} other {매도}}: {symbol} {quantity}주",
+      "parsedTrade": "{action, select, BUY {매수: {symbol} {quantity}주} SELL {매도: {symbol} {quantity}주} DIVIDEND {{symbol} 배당금 지급} REINVEST {배당금 재투자: {symbol} {quantity}주} other {거래: {symbol}}}",
       "tradeInconsistent": "가격이 합계와 맞지 않아 자동으로 적용되지 않습니다",
       "noExpectation": "없음",
       "noMatch": "거래 없음",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {매수} other {매도}}: {symbol} {quantity}주, {total}, 날짜 {date}.",
+    "summary": "{action, select, BUY {매수: {symbol} {quantity}주, {total}, 날짜 {date}.} SELL {매도: {symbol} {quantity}주, {total}, 날짜 {date}.} DIVIDEND {{symbol} 배당금: {total}, 날짜 {date}.} REINVEST {배당금 재투자: {symbol} {quantity}주, {total}, 날짜 {date}.} other {{symbol}, {total}, 날짜 {date}.}}",
     "account": "메일에 적힌 계좌: {account}",
     "priceMismatch": "평균 가격이 수량과 합계와 맞지 않아 이 거래는 자동으로 적용되지 않습니다.",
+    "dividendMismatch": "주당 금액이 수량과 합계와 맞지 않아 이 배당금은 자동으로 적용되지 않습니다.",
+    "dividendShares": "{quantity}주에 대해 지급",
+    "dividendPerShare": "메일에 적힌 주당 금액: {price}",
     "incomplete": "프로필이 이 메일에서 완전한 거래를 읽지 못했습니다.",
     "totalFromPrice": "가격으로 계산한 합계",
     "dateUnknown": "메일이 도착한 날",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "종목: {name}",
     "proposalAccount": "계좌: {account}",
     "proposalPrice": "가격: 주당 {price}",
+    "proposalDividendPerShare": "주당 금액: {price}",
     "proposalCommission": "수수료: {commission}",
     "proposalReview": "승인하기 전에는 아무것도 기록되지 않습니다.",
     "proposalReviewLink": "받은편지함에서 검토",

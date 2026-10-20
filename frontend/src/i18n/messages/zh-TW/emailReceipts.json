@@ -93,7 +93,7 @@
         "automatic": "檢查信箱時，對於已比對但已核准的解析器無法完整讀取的收據，會詢問 AI；對於沒有解析器的寄件者，會起草解析器。"
       },
       "autoApplyLabel": "自動套用提議",
-      "autoApplyHelp": "預設為關閉。僅當以下條件全部成立時，提議才會不經詢問直接套用：已核准的設定檔讀取了整封郵件；透過訂單編號或參考號碼，或透過完全相符的金額和收款人找到了交易，且只有一個候選；提議的合計精確到最小貨幣單位。僅當交易設定檔已核准、讀取了完整的交易、價格與份數和合計相符，且您的帳戶中尚無相同的交易時，交易確認郵件才會不經詢問直接記帳。其他情況都會等待您的核准。",
+      "autoApplyHelp": "預設為關閉。僅當以下條件全部成立時，提議才會不經詢問直接套用：已核准的設定檔讀取了整封郵件；透過訂單編號或參考號碼，或透過完全相符的金額和收款人找到了交易，且只有一個候選；提議的合計精確到最小貨幣單位。僅當交易設定檔已核准、讀取了完整的交易、價格與份數和合計相符（只寫明金額的現金股利無需核對），且您的帳戶中尚無相同的交易時，交易確認郵件才會不經詢問直接記帳。其他情況都會等待您的核准。",
       "profileLimitLabel": "將設定檔的提議計入每日 AI 上限",
       "profileLimitHelp": "預設為開啟：設定檔根據郵件提出的修改，與其他 AI 提議一樣，計入 AI 提議變更的每日上限。如果大批已儲存的郵件會耗盡該上限，請將其關閉。只有來自設定檔的提議可免計；每則提議仍需等待您的核准。"
     },
@@ -377,7 +377,7 @@
       "receipt": "訂單收據",
       "trade": "證券交易",
       "receiptHelp": "讀取訂單確認郵件，並找到為其付款的銀行交易。",
-      "tradeHelp": "讀取券商的成交確認郵件，並提議其中報告的投資交易，即一筆買進或賣出。"
+      "tradeHelp": "讀取券商的成交確認郵件，並提議其中報告的投資交易：一筆買進、賣出、現金股利或股利再投資。"
     },
     "trade": {
       "guardsHeading": "讀取寄件者的哪些郵件",
@@ -391,9 +391,9 @@
         "waitIfLineHint": "包含其中一行的郵件會被暫緩，稍後再讀取，例如部分成交。"
       },
       "fieldsHeading": "交易",
-      "fieldsHelp": "買進或賣出、代碼和股數為必填，另需合計或價格。每個欄位每行一個模式，依序嘗試。",
+      "fieldsHelp": "交易類型、代碼以及合計或價格為必填，除現金股利外股數也必填。交易類型從其文字讀取：Dividend 或 Distribution 為現金股利，Reinvest 或 DRIP 為股利再投資，否則為 Buy 或 Sell。每個欄位每行一個模式，依序嘗試。",
       "fields": {
-        "tradeAction": "買進或賣出模式",
+        "tradeAction": "交易類型模式",
         "tradeSymbol": "代碼模式",
         "tradeQuantity": "股數模式",
         "tradeTotal": "交易合計模式",
@@ -403,7 +403,7 @@
         "tradeAccount": "帳戶模式"
       },
       "fieldHint": "必須擷取 {capture}。範例：{example}",
-      "amountsHelp": "合計是成交金額，買進時含手續費。價格用於核對，郵件未寫合計時由價格算出合計。註明貨幣的金額（US$、C$、USD、€）也決定交易的貨幣。",
+      "amountsHelp": "合計是成交金額，買進或股利再投資時含手續費；現金股利的合計是支付的金額。價格（股利為每股金額）用於核對，郵件未寫合計時由價格和股數算出合計。註明貨幣的金額（US$、C$、USD、€）也決定交易的貨幣。",
       "rulesHeading": "帳戶規則",
       "rulesHelp": "交易記入哪個帳戶。規則依序與帳戶模式讀取的帳戶文字比對，第一個適用的規則生效；{star} 表示任意文字。帶貨幣的規則只適用於該貨幣的交易，因此券商寫法相同的兩個帳戶，例如都顯示為 RRSP 的 CAD RRSP 和 USD RRSP，就是文字相同、貨幣不同的兩條規則。郵件未寫帳戶文字時，只有文字為 {star} 的規則可以適用。其餘的由預設帳戶處理。",
       "currencyOrder": "交易的貨幣依下列順序決定：金額本身註明貨幣時取該貨幣（US$、C$、USD、€），其次是下方第一個與郵件某行相符的貨幣標記，再次是您該代碼證券的貨幣。帶貨幣的規則從不猜測：三者都無法說明貨幣時，郵件會等待您處理，而不會記入任何一個帳戶。",
@@ -512,7 +512,7 @@
       "tag": "標籤",
       "aiCategories": "AI 類別",
       "trade": "交易部分",
-      "tradeAction": "買進或賣出模式",
+      "tradeAction": "交易類型模式",
       "tradeSymbol": "代碼模式",
       "tradeQuantity": "股數模式",
       "tradeTotal": "交易合計模式",
@@ -630,7 +630,7 @@
         "waitIfLine": "暫緩行",
         "reference": "參考號碼",
         "linkKey": "連結鍵",
-        "action": "買入或賣出",
+        "action": "交易類型",
         "symbol": "代碼",
         "quantity": "股數",
         "price": "價格",
@@ -1008,9 +1008,9 @@
       "no_html": "此解析器讀取郵件的 HTML 部分，而這封郵件沒有 HTML。",
       "schema_org": "無需解析器：訂單是從郵件中的結構化資料（schema.org）讀取的。",
       "item_amount_missing": "某個明細沒有金額，而郵件中也沒有可分配給它的單一合計。",
-      "trade_no_action": "解析器在這封郵件中找不到買入或賣出。",
+      "trade_no_action": "解析器在這封郵件中找不到買入、賣出、股利或再投資。",
       "trade_no_symbol": "解析器在這封郵件中找不到股票代號。",
-      "trade_no_quantity": "解析器在這封郵件中找不到份數。",
+      "trade_no_quantity": "解析器在這封郵件中找不到份數，而買入、賣出或股利再投資需要份數。",
       "trade_no_amount": "解析器在這封郵件中找不到合計，也找不到價格。",
       "trade_no_account": "解析器無法判斷這筆交易屬於哪個帳戶。",
       "trade_exists": "你的帳戶中已有這筆交易，因此沒有提出任何建議。",
@@ -1078,10 +1078,10 @@
       "openButton": "開啟",
       "open": "開啟郵件 {subject}"
     },
-    "tradeTransactionSummary": "{date} 以 {total} {action, select, BUY {買入} other {賣出}} {quantity} 股 {symbol}。",
+    "tradeTransactionSummary": "{action, select, BUY {{date} 以 {total} 買入 {quantity} 股 {symbol}。} SELL {{date} 以 {total} 賣出 {quantity} 股 {symbol}。} DIVIDEND {{date} 收到 {symbol} 的股利 {total}。} REINVEST {{date} 以 {total} 將股利再投資於 {quantity} 股 {symbol}。} other {{date} {quantity} 股 {symbol}，{total}。}}",
     "noTradeTransaction": "尚無：核准提議後會記帳這筆交易，或將其連結到帳本中已有的交易。",
     "candidateShares": "{quantity} 股",
-    "tradeNoCandidates": "在交易日前後一週內，沒有此帳戶、方向和代碼的可連結投資交易。如果您自己輸入過這筆交易，請檢查其帳戶和日期；否則請在審核收件匣中核准提議。",
+    "tradeNoCandidates": "在交易日前後一週內，沒有此帳戶、交易類型和代碼的可連結投資交易。如果您自己輸入過這筆交易，請檢查其帳戶和日期；否則請在審核收件匣中核准提議。",
     "aiTradeHeading": "AI 代理提議的交易",
     "aiTradeReader": "無：AI 代理將其視為交易讀取",
     "noAiTradeTransaction": "尚無：核准 AI 代理的提議後會記帳這筆交易。",
@@ -1145,7 +1145,7 @@
   "recognize": {
     "title": "用 AI 辨識",
     "tradeTitle": "用 AI 辨識為交易",
-    "tradeMessage": "AI 會把這封郵件當作券商的交易確認來讀取，並提出它所回報的投資交易（帳戶、買入或賣出、股票代號、份數和合計）。在你核准之前不會儲存任何內容。",
+    "tradeMessage": "AI 會把這封郵件當作券商的交易確認來讀取，並提出它所回報的投資交易（帳戶、買入、賣出、現金股利或股利再投資、股票代號、份數和合計）。在你核准之前不會儲存任何內容。",
     "tradeConfirm": "辨識為交易",
     "transactionSummary": "{date}，{amount}，{payee}",
     "noPayee": "無收款人",
@@ -1166,7 +1166,7 @@
     "inboxLink": "開啟 AI 審核收件匣",
     "opened": "已開啟聊天並附上該郵件。請閱讀訊息並按下「傳送」。",
     "chatPrompt": "請辨識所附訂單郵件中的商品、數量和價格，並將我 {date} 的交易（{payee}，{amount}）依商品拆分，並為每項指定類別。請認領 AI 審核請求 {requestId}，並為它提交你的提議。",
-    "tradeChatPrompt": "辨識所附券商確認郵件中的交易：帳戶、是買入還是賣出、股票代號、份數、成交合計和日期。領取 AI 審查請求 {requestId} 並為它提交這筆交易。",
+    "tradeChatPrompt": "辨識所附券商確認郵件中的交易：帳戶、是買入、賣出、現金股利還是股利再投資、股票代號、份數（現金股利可能沒有寫明）、成交合計和日期。領取 AI 審查請求 {requestId} 並為它提交這筆交易。",
     "tradeDetachesTransaction": "按交易讀取後，此郵件不再對應 {summary}：該交易會建立自己的投資交易。"
   },
   "hub": {
@@ -1377,7 +1377,7 @@
       "parsedDate": "日期：{date}",
       "parsedTotal": "合計：{total}",
       "parsedLines": "{count, plural, one {# 行} other {# 行}}",
-      "parsedTrade": "{action, select, BUY {買入} other {賣出}} {quantity} 份 {symbol}",
+      "parsedTrade": "{action, select, BUY {買入 {quantity} 份 {symbol}} SELL {賣出 {quantity} 份 {symbol}} DIVIDEND {發放 {symbol} 的股利} REINVEST {將股利再投資於 {quantity} 份 {symbol}} other {交易 {symbol}}}",
       "tradeInconsistent": "價格與合計不符，因此不會自動套用",
       "noExpectation": "無",
       "noMatch": "無交易",
@@ -1416,9 +1416,12 @@
     }
   },
   "trade": {
-    "summary": "{action, select, BUY {買入} other {賣出}}：{quantity} 份 {symbol}，金額 {total}，日期 {date}。",
+    "summary": "{action, select, BUY {買入：{quantity} 份 {symbol}，金額 {total}，日期 {date}。} SELL {賣出：{quantity} 份 {symbol}，金額 {total}，日期 {date}。} DIVIDEND {{symbol} 的股利：金額 {total}，日期 {date}。} REINVEST {股利再投資：{quantity} 份 {symbol}，金額 {total}，日期 {date}。} other {{symbol}，金額 {total}，日期 {date}。}}",
     "account": "郵件中註明的帳戶：{account}",
     "priceMismatch": "平均價格與份數和合計不符，因此這筆交易不會自動套用。",
+    "dividendMismatch": "每股金額與份數和合計不符，因此這筆股利不會自動套用。",
+    "dividendShares": "按 {quantity} 份支付",
+    "dividendPerShare": "郵件中的每股金額：{price}",
     "incomplete": "解析器無法從這封郵件中讀取完整的交易。",
     "totalFromPrice": "由價格推算出的合計",
     "dateUnknown": "郵件送達的當天",
@@ -1426,6 +1429,7 @@
     "proposalSecurity": "證券：{name}",
     "proposalAccount": "帳戶：{account}",
     "proposalPrice": "價格：每股 {price}",
+    "proposalDividendPerShare": "每股金額：{price}",
     "proposalCommission": "手續費：{commission}",
     "proposalReview": "在你核准之前不會記帳。",
     "proposalReviewLink": "在收件匣中審閱",

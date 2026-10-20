@@ -161,7 +161,7 @@
     "notATradeRequest": "Diese KI-Prüfanfrage ist keine Handelsanfrage.",
     "tradeOnTradeRequest": "Das Feld trade beantwortet nur eine Handelsanfrage.",
     "tradeDateRequired": "Der Handel braucht ein Datum (JJJJ-MM-TT): Die E-Mail ist nicht mehr da, es gibt also keinen Tag als Ersatz.",
-    "tradeInvalid": "Der Handel braucht accountName, action (BUY oder SELL), symbol, quantity, totalAmount und optional commission und date (JJJJ-MM-TT).",
+    "tradeInvalid": "Der Handel braucht accountName, action (BUY, SELL, DIVIDEND oder REINVEST), symbol, quantity (optional bei DIVIDEND), totalAmount und optional commission und date (JJJJ-MM-TT).",
     "tradeSecurityAmbiguous": "„{{ symbol }}“ passt zu mehreren deiner Wertpapiere ({{ list }}). Benenne eines um, damit das Börsenkürzel eindeutig ist.",
     "tradeSecurityUnknown": "Du hast kein Wertpapier mit dem Börsenkürzel „{{ symbol }}“. Füge das Wertpapier hinzu und verarbeite die E-Mail dann erneut.",
     "tagNamesInvalid": "Ein Vorschlag darf bis zu {{ max }} Tags enthalten, jeweils mit 1 bis {{ length }} Zeichen und ohne Steuerzeichen.",

@@ -161,7 +161,7 @@
     "notATradeRequest": "Permintaan tinjauan AI ini bukan permintaan perdagangan.",
     "tradeOnTradeRequest": "Bidang trade hanya menjawab permintaan perdagangan.",
     "tradeDateRequired": "Perdagangan memerlukan tanggal (YYYY-MM-DD): surelnya sudah tidak ada, jadi tidak ada hari cadangan.",
-    "tradeInvalid": "Perdagangan memerlukan accountName, action (BUY atau SELL), symbol, quantity, totalAmount dan, secara opsional, commission dan date (YYYY-MM-DD).",
+    "tradeInvalid": "Perdagangan memerlukan accountName, action (BUY, SELL, DIVIDEND atau REINVEST), symbol, quantity (opsional untuk DIVIDEND), totalAmount dan, secara opsional, commission dan date (YYYY-MM-DD).",
     "tradeSecurityAmbiguous": "\"{{ symbol }}\" cocok dengan beberapa sekuritas Anda ({{ list }}). Ubah nama salah satunya agar tickernya unik.",
     "tradeSecurityUnknown": "Anda tidak punya sekuritas dengan ticker \"{{ symbol }}\". Tambahkan sekuritasnya, lalu proses ulang surel.",
     "tagNamesInvalid": "Sebuah usulan dapat menambahkan hingga {{ max }} tag dengan panjang masing-masing 1 sampai {{ length }} karakter, tanpa karakter kontrol.",

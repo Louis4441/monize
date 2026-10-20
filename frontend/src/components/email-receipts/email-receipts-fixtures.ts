@@ -168,3 +168,17 @@ export const PARSED_TRADE = {
   consistent: true,
   reason: null,
 };
+
+/**
+ * A cash dividend as the API stores it: the email states only the amount paid
+ * (12.34, in 1/10000 units), so there is no share count, no price and nothing
+ * to cross-check, and the reading is still complete.
+ */
+export const PARSED_DIVIDEND = {
+  ...PARSED_TRADE,
+  action: 'DIVIDEND',
+  quantity: null,
+  total: 123_400,
+  price: null,
+  consistent: null,
+};

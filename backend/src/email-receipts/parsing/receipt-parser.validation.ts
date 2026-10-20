@@ -1156,9 +1156,11 @@ function checkTradeCurrencyMarkers(
 }
 
 /**
- * The `trade` section: `action`, `symbol` and `quantity` are required lists, at
- * least one of `total` and `price` must be present, and the account must be
- * decidable: `defaultAccountId`, or `account` entries with `accountRules`.
+ * The `trade` section: `action` and `symbol` are required lists, at least one
+ * of `total` and `price` must be present, and the account must be decidable:
+ * `defaultAccountId`, or `account` entries with `accountRules`. `quantity` is
+ * optional because a cash dividend states none; a buy, a sell or a
+ * reinvestment the profile reads without one is `trade_no_quantity`.
  */
 function checkTrade(
   value: unknown,
@@ -1173,7 +1175,7 @@ function checkTrade(
   const fields: [keyof ReceiptTradeDefinition, FieldCaptures, boolean][] = [
     ["action", captureOf("action"), true],
     ["symbol", captureOf("symbol"), true],
-    ["quantity", captureOf("quantity"), true],
+    ["quantity", captureOf("quantity"), false],
     ["total", AMOUNT_CAPTURES, false],
     ["price", AMOUNT_CAPTURES, false],
     ["commission", AMOUNT_CAPTURES, false],

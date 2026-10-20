@@ -1,3 +1,4 @@
+import type { TradeAction } from "../../ai-review/trade-action";
 import type { EmailReceiptMatchKind } from "../entities/email-receipt.entity";
 import type { EmailReceiptStatus } from "../entities/email-receipt.entity";
 import type { SchemaOrgOrder } from "../parsing/schema-org-order";
@@ -57,12 +58,13 @@ export interface EmailReceiptTradeProposal {
   accountName: string;
   /** `YYYY-MM-DD`. */
   date: string;
-  action: "BUY" | "SELL";
+  action: TradeAction;
   symbol: string;
   securityName: string | null;
-  quantity: number;
-  /** Per share, in the security's currency. */
-  price: number;
+  /** Null only for a cash dividend that states no share count. */
+  quantity: number | null;
+  /** Per share, in the security's currency; null only for a cash dividend. */
+  price: number | null;
   commission: number;
   /** In the security's currency. */
   totalAmount: number;

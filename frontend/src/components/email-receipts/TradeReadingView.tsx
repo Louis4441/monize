@@ -5,7 +5,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { accountStanding, type ReceiptParserAccountOption } from '@/hooks/useReceiptParserLookups';
 import { fromReceiptUnits } from '@/lib/email-receipts-format';
-import type { ParsedTrade } from '@/types/email-receipts';
+import { tradeActionMovesShares, type ParsedTrade } from '@/types/email-receipts';
 
 interface TradeReadingViewProps {
   trade: ParsedTrade;
@@ -26,7 +26,8 @@ interface TradeReadingViewProps {
 
 /**
  * What a profile with a `trade` section read from a brokerage confirmation: one
- * sentence naming the direction, the shares, the ticker and the executed total,
+ * sentence naming the action, the shares, the ticker and the executed total (a
+ * cash dividend names no shares: the email may state only the amount paid),
  * the account text the email printed and, when the average price does not fit the
  * shares and the total, why the trade will wait for a person.
  *
@@ -71,7 +72,13 @@ export function TradeReadingView({ trade, fallbackDate, showReason = false, acco
     );
   })();
 
-  if (!trade.complete || trade.action === null || trade.symbol === null || trade.quantity === null) {
+  // A cash dividend moves no shares, so a complete one may state none.
+  if (
+    !trade.complete ||
+    trade.action === null ||
+    trade.symbol === null ||
+    (trade.quantity === null && tradeActionMovesShares(trade.action))
+  ) {
     const reasonKey = trade.reason;
     return (
       <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
@@ -83,25 +90,30 @@ export function TradeReadingView({ trade, fallbackDate, showReason = false, acco
     );
   }
 
+  const dividend = trade.action === 'DIVIDEND';
   return (
     <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
       <p className="font-medium text-gray-900 dark:text-gray-100">
         {t('summary', {
           action: trade.action,
-          quantity: formatShareQuantity(trade.quantity),
+          // The dividend sentence names no shares; a known count is its own line below.
+          ...(trade.quantity !== null ? { quantity: formatShareQuantity(trade.quantity) } : {}),
           symbol: trade.symbol,
           // A trade read from its price alone has no stated total: the figure is then the price's.
           total: trade.total === null ? t('totalFromPrice') : money(trade.total, 2),
           date: tradeDate === null ? t('dateUnknown') : formatDate(tradeDate),
         })}
       </p>
-      {trade.price !== null && <p>{t('price', { price: money(trade.price, 4) })}</p>}
+      {dividend && trade.quantity !== null && <p>{t('dividendShares', { quantity: formatShareQuantity(trade.quantity) })}</p>}
+      {trade.price !== null && (
+        <p>{dividend ? t('dividendPerShare', { price: money(trade.price, 4) }) : t('price', { price: money(trade.price, 4) })}</p>
+      )}
       {currencyLine}
       {trade.accountText && <p>{t('account', { account: trade.accountText })}</p>}
       {accountLine}
       {trade.consistent === false && (
         <p role="note" className="text-amber-800 dark:text-amber-300">
-          {t('priceMismatch')}
+          {dividend ? t('dividendMismatch') : t('priceMismatch')}
         </p>
       )}
     </div>

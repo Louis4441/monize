@@ -1,4 +1,4 @@
-import { RECEIPT_TRADE_CHAT_INSTRUCTION } from "../pipeline/receipt-instructions";
+import { RECEIPT_TRADE_CHAT_INSTRUCTIONS } from "../pipeline/receipt-instructions";
 import {
   BadRequestException,
   ConflictException,
@@ -713,8 +713,10 @@ describe("EmailReceiptsService.get", () => {
     ]);
     const detail = await service.get(USER, ID);
     const [sql, params] = manager.query.mock.calls[0];
-    expect(sql).toContain("rq.instruction = $3");
-    expect(params).toEqual([USER, ID, RECEIPT_TRADE_CHAT_INSTRUCTION]);
+    expect(sql).toContain("rq.instruction = ANY($3::text[])");
+    // A request queued before the instruction named dividends is still "ai".
+    expect(params).toEqual([USER, ID, [...RECEIPT_TRADE_CHAT_INSTRUCTIONS]]);
+    expect(RECEIPT_TRADE_CHAT_INSTRUCTIONS).toHaveLength(2);
     expect(detail.tradeRequestSource).toBe("ai");
   });
 

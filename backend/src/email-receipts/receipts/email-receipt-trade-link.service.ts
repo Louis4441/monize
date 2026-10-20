@@ -7,11 +7,17 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
-import { emailDayOfUser } from "../../ai-review/trade-ledger";
+import {
+  tradeActionOf,
+  tradeInvestmentAction,
+} from "../../ai-review/trade-action";
+import {
+  emailDayOfUser,
+  TRADE_ROW_AMOUNT_SQL,
+} from "../../ai-review/trade-ledger";
 import { returnedRows } from "../../common/db/query-result";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { tr } from "../../i18n/translate";
-import { InvestmentAction } from "../../securities/entities/investment-transaction.entity";
 import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { escapeLikePattern } from "../../transactions/transaction-search.util";
 import { EmailReceipt } from "../entities/email-receipt.entity";
@@ -70,11 +76,11 @@ export class EmailReceiptTradeLinkService {
   ): Promise<EmailReceiptCandidateSummary[]> {
     const accountId = trade.accountId;
     const symbol = trade.symbol;
-    const action = trade.action;
+    const action = tradeActionOf(trade.action);
     if (
       typeof accountId !== "string" ||
       typeof symbol !== "string" ||
-      (action !== "BUY" && action !== "SELL")
+      action === null
     ) {
       return [];
     }
@@ -94,7 +100,7 @@ export class EmailReceiptTradeLinkService {
     }>(
       await m.query(
         `SELECT it.id, TO_CHAR(it.transaction_date, 'YYYY-MM-DD') AS date,
-                it.total_amount, s.currency_code, s.symbol, it.quantity,
+                ${TRADE_ROW_AMOUNT_SQL} AS total_amount, s.currency_code, s.symbol, it.quantity,
                 it.description
            FROM investment_transactions it
            JOIN securities s ON s.id = it.security_id
@@ -115,7 +121,7 @@ export class EmailReceiptTradeLinkService {
         [
           userId,
           accountId,
-          action === "BUY" ? InvestmentAction.BUY : InvestmentAction.SELL,
+          tradeInvestmentAction(action),
           day,
           CANDIDATE_WINDOW_DAYS,
           symbol,
@@ -275,16 +281,13 @@ export class EmailReceiptTradeLinkService {
         },
       );
 
-      if (
-        linked.security_id &&
-        (linked.action === InvestmentAction.BUY ||
-          linked.action === InvestmentAction.SELL)
-      ) {
+      const linkedAction = tradeActionOf(linked.action);
+      if (linked.security_id && linkedAction !== null) {
         const occurrence =
           await this.scheduled.findInvestmentOccurrenceForTrade(userId, {
             accountId: linked.account_id,
             securityId: linked.security_id,
-            action: linked.action,
+            action: tradeInvestmentAction(linkedAction),
             date: linked.date,
             commission: Number(linked.commission ?? 0),
           });
