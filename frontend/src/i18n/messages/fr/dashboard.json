@@ -49,6 +49,11 @@
     "nextMonth": "Mois suivant",
     "emptyAll": "Aucune facture, aucun dépôt ni virement actif planifié."
   },
+  "cashFlowForecast": {
+    "title": "Prévision de trésorerie",
+    "period": "Période de prévision",
+    "loadFailed": "Impossible de charger les transactions déjà datées après aujourd'hui, la prévision ne peut donc pas être affichée. Rechargez le tableau de bord pour réessayer."
+  },
   "gettingStarted": {
     "title": "Démarrage",
     "subtitle": "Configurez votre compte en quelques étapes rapides",

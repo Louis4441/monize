@@ -49,6 +49,11 @@
     "nextMonth": "下个月",
     "emptyAll": "没有已安排的有效账单、存入或转账。"
   },
+  "cashFlowForecast": {
+    "title": "现金流预测",
+    "period": "预测期间",
+    "loadFailed": "无法加载日期晚于今天的交易，因此无法显示预测。请重新加载仪表板后重试。"
+  },
   "gettingStarted": {
     "title": "快速入门",
     "subtitle": "几步即可完成账户设置",
