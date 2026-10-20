@@ -74,7 +74,7 @@ export class RecurringSummary {
 
   @ApiProperty({
     description:
-      "Months the window covers: the preset's length, or for `all` the whole months since the first matching payment (at least 1)",
+      "Months the estimate is spread over: the preset's length, capped at the months of the user's spending history; for `all`, that history (at least 1)",
   })
   monthCount: number;
 

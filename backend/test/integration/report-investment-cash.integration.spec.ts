@@ -1437,17 +1437,15 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       expect(oneYear.data).toEqual([
         expect.objectContaining({ payeeName: "Annual-ish", occurrences: 3 }),
       ]);
-      expect(oneYear.summary.monthCount).toBe(12);
-      expect(oneYear.summary.monthlyEstimate).toBe(15);
       expect(allTime.data).toEqual([
         expect.objectContaining({ payeeName: "Annual-ish", occurrences: 3 }),
       ]);
-      // All time spans from the first matching payment, ten months back (nine
-      // whole months when a month-end date rolled over into the next month).
-      expect([9, 10]).toContain(allTime.summary.monthCount);
-      expect(allTime.summary.monthlyEstimate).toBe(
-        Math.round((180 / allTime.summary.monthCount) * 10000) / 10000,
-      );
+      // The user's spending history began ten months back, so neither the
+      // year nor all time spreads the 180 over more months than that.
+      expect(allTime.summary.monthCount).toBe(10);
+      expect(allTime.summary.monthlyEstimate).toBe(18);
+      expect(oneYear.summary.monthCount).toBe(10);
+      expect(oneYear.summary.monthlyEstimate).toBe(18);
     });
 
     /**

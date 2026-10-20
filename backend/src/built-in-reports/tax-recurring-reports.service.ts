@@ -49,6 +49,19 @@ const INVESTMENT_EXCLUSION_NO_SPLITS = investmentExclusionSql({
  */
 const REPORTABLE_TX_AMOUNT = reportableTransactionAmountSql("t");
 
+/**
+ * The spending rows the recurrence analysis reads, for transaction alias `t`
+ * and account alias `a`. One definition so the analysis and the history start
+ * it is measured against count the same rows.
+ */
+function recurringSpendingRows(t: string, a: string): string {
+  return `${reportableTransactionAmountSql(t)} < 0
+        AND ${t}.is_transfer = false
+        AND (${t}.status IS NULL OR ${t}.status != 'VOID')
+        AND ${t}.parent_transaction_id IS NULL
+        AND ${investmentExclusionSql({ accountAlias: a, transactionAlias: t })}`;
+}
+
 /** Months each bounded recurring-expense window looks back. */
 const RECURRING_RANGE_MONTHS: Record<
   Exclude<RecurringExpenseRange, "all">,
@@ -85,12 +98,16 @@ function classifyFrequency(
   return "IRREGULAR";
 }
 
-/** Whole calendar months from one YYYY-MM-DD date to another, at least 1. */
-function wholeMonthsBetween(startYmd: string, endYmd: string): number {
-  const [sy, sm, sd] = startYmd.split("-").map(Number);
-  const [ey, em, ed] = endYmd.split("-").map(Number);
-  const months = (ey - sy) * 12 + (em - sm) - (ed < sd ? 1 : 0);
-  return Math.max(1, months);
+const DAYS_PER_MONTH = 365.25 / 12;
+
+/** Months from one YYYY-MM-DD date to another, to the nearest month, at least 1. */
+function monthsBetween(startYmd: string, endYmd: string): number {
+  const toUtc = (ymd: string) => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const days = (toUtc(endYmd) - toUtc(startYmd)) / 86_400_000;
+  return Math.max(1, Math.round(days / DAYS_PER_MONTH));
 }
 
 @Injectable()
@@ -281,7 +298,14 @@ export class TaxRecurringReportsService {
         COUNT(*)::int as occurrences,
         SUM(ABS(${REPORTABLE_TX_AMOUNT})) as total_amount,
         MAX(t.transaction_date) as last_transaction_date,
-        TO_CHAR(MIN(t.transaction_date), 'YYYY-MM-DD') as first_transaction_date
+        (
+          SELECT TO_CHAR(MIN(h.transaction_date), 'YYYY-MM-DD')
+          FROM transactions h
+          LEFT JOIN accounts ha ON ha.id = h.account_id
+          WHERE h.user_id = $1
+            AND h.transaction_date <= $3
+            AND ${recurringSpendingRows("h", "ha")}
+        ) as history_start
       FROM transactions t
       LEFT JOIN payees p ON p.id = t.payee_id
       LEFT JOIN categories c ON c.id = t.category_id
@@ -289,11 +313,7 @@ export class TaxRecurringReportsService {
       WHERE t.user_id = $1
         AND ($2::date IS NULL OR t.transaction_date >= $2::date)
         AND t.transaction_date <= $3
-        AND ${REPORTABLE_TX_AMOUNT} < 0
-        AND t.is_transfer = false
-        AND (t.status IS NULL OR t.status != 'VOID')
-        AND t.parent_transaction_id IS NULL
-        AND ${INVESTMENT_EXCLUSION_NO_SPLITS}
+        AND ${recurringSpendingRows("t", "a")}
         AND (COALESCE(p.name, t.payee_name) IS NOT NULL AND TRIM(COALESCE(p.name, t.payee_name)) != '')
       GROUP BY t.payee_id, LOWER(TRIM(COALESCE(p.name, t.payee_name))), COALESCE(p.name, t.payee_name), c.name, t.currency_code
       HAVING COUNT(*) >= $4
@@ -309,7 +329,8 @@ export class TaxRecurringReportsService {
       occurrences: number;
       total_amount: string;
       last_transaction_date: Date;
-      first_transaction_date: string;
+      /** The user's first spending row on or before the end date. */
+      history_start: string | null;
     }
 
     const rawResults: RawRecurring[] = await withScopedDb(
@@ -358,16 +379,21 @@ export class TaxRecurringReportsService {
       }
     }
 
-    // A bounded window spans its preset; `all` spans from the first payment
-    // that matched, which is where this analysis has data from.
-    let monthCount = 1;
-    if (range !== "all") {
-      monthCount = RECURRING_RANGE_MONTHS[range];
-    } else if (rawResults.length > 0) {
-      const firstDate = rawResults
-        .map((row) => row.first_transaction_date)
-        .reduce((a, b) => (b < a ? b : a));
-      monthCount = wholeMonthsBetween(firstDate, endDate);
+    // The estimate is spread over the months the window actually holds: a
+    // preset never claims more months than the user's spending history has
+    // (five years over eight months of data would understate it sevenfold),
+    // and `all` spans exactly that history.
+    const historyStart = rawResults[0]?.history_start ?? null;
+    const historyMonths =
+      historyStart !== null ? monthsBetween(historyStart, endDate) : null;
+    let monthCount: number;
+    if (range === "all") {
+      monthCount = historyMonths ?? 1;
+    } else {
+      monthCount = Math.min(
+        RECURRING_RANGE_MONTHS[range],
+        historyMonths ?? RECURRING_RANGE_MONTHS[range],
+      );
     }
 
     const data: RecurringExpenseItem[] = Array.from(payeeMerged.values()).map(
