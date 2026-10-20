@@ -169,6 +169,18 @@ destination. `null` there means the worker never classified it, so the file is
 not usable and the screen says exactly that rather than calling the share
 mixed.
 
+**Decisions recorded when the share target shipped (Phase 1).** The stash
+lifetime is one hour. A lone CSV is offered to Import; the review screen does
+not ask whether it is a bank statement or an investment export, the wizard's
+mapping step does. The share sheet is documented as Android only; desktop
+Chromium's installed-app share target works through the same code and stays
+unpromised. Not built, each its own proposal: attaching a shared file to an
+existing transaction (a transaction picker), and offering the document scan on
+the review screen before the New transaction destination (the scan pipeline
+exists; a shared file is staged as a plain file with no original, exactly as an
+unscanned upload is). Send to AI Assistant has shipped: `/share` routes to
+`/ai?share=<id>` with the same hand-off the wizard uses.
+
 ## The notification permission is asked for once, from a click
 
 `Notification.requestPermission()` appears in exactly one file -- `lib/push.ts`,

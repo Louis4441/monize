@@ -63,7 +63,7 @@ deployment.
 
 **One upload can write two objects.** A scanned document is stored as a pair --
 the enhanced image the user sees and the original photo it came from
-(`docs/future-plans/document-scanner.md`) -- written by one `create` call in one
+(`docs/specs/document-scanner.md`) -- written by one `create` call in one
 transaction. That changes the quantity below, not the mechanism: each object
 gets its own upload intent committed before any byte is written, each intent is
 cleared inside the metadata transaction, and the compensation path deletes
@@ -394,7 +394,7 @@ The subscription itself is instance-bound state, not portable user data: see
 ## 4b. The web-share stash is the device's, not the server's
 
 The Web Share Target stores the files the OS hands over in a Cache API store on
-the device (`docs/future-plans/pwa-web-share-target.md`). It is in this document
+the device (`docs/frontend/pwa-push-share.md`). It is in this document
 because it looks like an external side effect and is worth being explicit about
 *not* being one:
 

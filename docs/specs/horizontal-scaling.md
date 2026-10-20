@@ -1,15 +1,13 @@
 # Plan: Horizontal scaling and high availability
 
-> **Status: proposed. Nothing in this document has shipped.** It records what
-> stands between the current single-replica deployment and one where several
-> backend and frontend replicas serve one database behind an ordinary load
-> balancer, and the order in which to close that gap. PostgreSQL is the only
-> shared store in either mode: nothing here adds a dependency, and a
-> single-replica deployment keeps running exactly as it does today. An earlier
-> draft gave two ephemeral concerns (the HTTP throttler's counters and the
-> cross-replica wake-up channel) to an optional Redis; this revision keeps
-> them in PostgreSQL too, and says what that costs. Companion task list:
-> [`horizontal-scaling-tasks.md`](./horizontal-scaling-tasks.md).
+Shipped. Every task of the former task list is done: `CLUSTER_MODE` selects
+`single` (the default, the single-replica behaviour unchanged) or `multi`
+(several backend and frontend replicas serving one database behind an ordinary
+load balancer), and ADR 0005 records the decision. This document is kept as the
+specification: what stood between the two deployments, why PostgreSQL is the
+only shared store in either mode, and the order in which the gap was closed.
+The decision record is `docs/adr/0005-cluster-mode-on-postgresql-alone.md`,
+which wins where the two disagree.
 
 ## Goal
 
@@ -487,8 +485,8 @@ lacks an ID). Proposed wording:
 | 3 | WP2, WP5 (PostgreSQL bus), WP7 refusals, WP9 | `multi-only`: no effect unless `CLUSTER_MODE=multi` |
 | 4 | WP7 S3 backup target | `none` until selected |
 
-Every task lands behind `CLUSTER_MODE=single` unchanged; the task list's
-definition of done requires proving that.
+Every work package landed behind `CLUSTER_MODE=single` unchanged; each one's
+definition of done required proving that.
 
 One deployment obligation is not conditional on the mode and is worth stating
 here because WP9 is what makes it visible: a rolling deployment runs the

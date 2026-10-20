@@ -1,19 +1,21 @@
 # Calendar view for the Transactions and Investments pages
 
-Design for a month-grid calendar that can stand in for the register on the
-Transactions page and for the transactions section on the Investments page.
-Inspiration: the Quicken for Mac calendar (colour-coded transactions per day,
-actual daily balances for past dates and projected balances for future dates,
-a day's detail on click, and a per-day investment gain/loss summary). This is
-the approved-spec half of a two-document plan; the task list is
-[`calendar-view-tasks.md`](./calendar-view-tasks.md).
+Specification of the month-grid calendar that stands in for the register on
+the Transactions page and for the transactions section on the Investments
+page. Inspiration: the Quicken for Mac calendar (colour-coded transactions per
+day, actual daily balances for past dates and projected balances for future
+dates, a day's detail on click, and a per-day investment gain/loss summary).
+It shipped: the three backend read models and the `calendar_day_notes`
+migration landed in PR #1368 and the frontend, guard, integration and
+Playwright tasks followed on the same plan, each translating its own strings.
+The plan is retired and this document is kept as the specification the code
+is held to; the two items the plan deliberately left unbuilt are recorded
+under Follow-ups at the end.
 
 This document is the specification `docs/financial-calculation-contract.md`
 section 9 asks for: it reports money and reads two time series, so it carries
 the invariants, truth tables, numerical examples, missing-data policy and test
-matrix, and it is committed before any implementation. Per `CONTRIBUTING.md`
-it is also the proposal: nothing in the task list starts until a Discussion
-has agreed it.
+matrix, and it was committed before any implementation.
 
 The two choices the proposal asked the maintainer to confirm explicitly are
 settled, and the answer to both is the one this document already argued for:
@@ -708,7 +710,25 @@ server's day; blank vs unknown), `docs/backend/transactions-and-money.md` (the
 three read models), `docs/system-invariants.md` (INV-OCCURRENCE-003 and
 INV-CACHE-001 gain the calendar as a consumer; no new ID).
 
-## 14. Companion task list
+## 14. Follow-ups
 
-[`calendar-view-tasks.md`](./calendar-view-tasks.md) breaks this into
-one-session tasks with dependencies, deploy impact and acceptance.
+Two items from the retired task list were left open on purpose.
+
+- **M1: migrate the legacy grids onto `MonthGrid` (optional, its own
+  proposal).** Files: `frontend/src/app/bills/page.tsx`,
+  `frontend/src/components/reports/UpcomingBillsReport.tsx`,
+  `frontend/src/test/ui-conventions.test.ts` (baseline shrinks to empty),
+  `frontend/src/lib/scheduled-effective-amount.guard.test.ts` (the
+  bills-calendar exemption goes when the page reads `getOccurrences`),
+  `frontend/src/i18n/messages/*/bills.json` (`calendar.days.*` retired in
+  favour of `common.weekdaysMin`). Both grids render through `MonthGrid` and
+  honour `weekStartsOn`. The bills calendar switches from its browser-side
+  recurrence walk to `getOccurrences`, which is what lets its guard exemption
+  go. Behaviour otherwise unchanged; `bills.spec.ts` and `bills-filter.spec.ts`
+  are the gate.
+- **R1: report, do not build.** `getDailyInvestments` returns a subtotal as
+  `value` on an unpriced day (section 6.2). Now that B2 has shipped the
+  flags, file the contract violation with the maintainer as its own proposal
+  naming the four consumers (`InvestmentValueChart`, `PortfolioValueReport`,
+  `PortfolioValueWidget`, `portfolio-change-baseline.ts`); this specification
+  does not change `value`.

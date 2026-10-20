@@ -1,18 +1,13 @@
 # Exchange rate providers
 
-Design for taking exchange rates from more than one source: an ordered chain
-of FX providers behind one interface, configured per deployment, with
-Frankfurter (the ECB reference rates, no key, no request cap, history from
-1999) as the first provider added and Yahoo Finance kept as the second. The
-task list is
-[`exchange-rate-providers-tasks.md`](./exchange-rate-providers-tasks.md).
-This plan carries its own contracts, truth tables and recorded fixtures
-(sections 4 to 7) because there is no separate spec for it.
-
-Status: **done** (S1 and B1 to B6, F1, R1, and Q, the acceptance task, all
-merged); decisions agreed in the planning session and recorded on the
-tracking issue #1672. Each task was a sub-issue (#1673 to #1682), one PR
-each. The open questions in section 16 are answered below.
+Shipped (S1, B1 to B6, F1, R1 and the acceptance task Q are merged;
+`backend/src/currencies/providers/`, `FX_PROVIDERS` in `.env.example`). Kept
+as the specification: an ordered chain of FX providers behind one interface,
+configured per deployment, with Frankfurter (the ECB reference rates, no key,
+no request cap, history from 1999) first and Yahoo Finance second. This
+document carries its own contracts, truth tables and recorded fixtures
+(sections 4 to 7) because there is no other spec for it; the operator view is
+`docs/backend/securities-and-providers.md`.
 
 ## 1. Goal
 

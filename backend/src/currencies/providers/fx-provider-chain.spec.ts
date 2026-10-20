@@ -48,7 +48,7 @@ const P2_SERIES = [obs("CAD", "USD", "2024-01-02", 0.7522)];
 
 describe("FxProviderChain.dailySeries", () => {
   /**
-   * Section 5 of docs/future-plans/exchange-rate-providers.md, one row each.
+   * Section 5 of docs/specs/exchange-rate-providers.md, one row each.
    * "not asked" for P2 means P1 settled the window; "no" means the provider
    * carries neither code.
    */

@@ -1,4 +1,4 @@
--- Trade confirmations in email receipts (docs/future-plans/email-receipt-trades.md):
+-- Trade confirmations in email receipts (docs/specs/email-receipt-trades.md):
 -- a profile with a `trade` section reads a brokerage "order filled" email as ONE
 -- investment transaction to create, not as the purchase a bank transaction paid
 -- for. The reading is stored on the email in `trade`, and the proposal is a

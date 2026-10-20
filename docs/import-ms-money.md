@@ -189,7 +189,7 @@ every warning -- without importing anything.
 
 - `docs/ms-money-data-model.md` -- the `.mny` format reference: tables, codes,
   and the traps that produce plausible-looking wrong answers.
-- `docs/future-plans/mny-import.md` -- design, architecture decisions and the
+- `docs/specs/mny-import.md` -- design, architecture decisions and the
   task history.
 - `backend/src/import/mny/README.md` -- how the pipeline is layered and what it
   refuses to guess at.

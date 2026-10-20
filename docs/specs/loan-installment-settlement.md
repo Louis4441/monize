@@ -1,8 +1,8 @@
 # Spec: loan installment settlement
 
 Status: implemented (Q, the final task of the task list, closes the
-feature). The plan is `docs/future-plans/loan-installment-settlement.md`,
-the task list `docs/future-plans/loan-installment-settlement-tasks.md`.
+feature). The plan and its task list have been retired; this document is the
+record.
 Governs: issue #1589 (tracking) and its sub-issues #1590 to #1602, agreed in
 discussion #1486 and in the planning session recorded on #1589.
 Registers INV-LOAN-008 and INV-RULE-005 in `docs/system-invariants.md`

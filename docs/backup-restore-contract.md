@@ -967,6 +967,12 @@ line now — but the restore's shape is unchanged: its `express.raw` upload is b
 before any of our code runs, so making the restore stream is a different change from
 this one, and it is what would replace a measured multiple with a bound.
 
+**Still owed from the admission work (issue #1073):** a full-path restore
+measurement under a real cgroup memory limit (`/sys/fs/cgroup/memory.peak`
+read after each case, the in-process sample kept beside it). `PEAK_MULTIPLE`
+and `restoreProcessBaselineBytes` are estimates until that record is
+committed; every ceiling above is derived by dividing by the same estimate.
+
 ## 7. Automatic backups in the store
 
 **Who configures it, and where.** Automatic backup is a deployment/operator

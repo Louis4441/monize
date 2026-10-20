@@ -36,7 +36,7 @@ export const FRANKFURTER_CURRENCY_LIST_RETRY_MS = 5 * 60_000;
 
 /**
  * The currencies the public instance carried on 2026-10-07
- * (`docs/future-plans/exchange-rate-providers.md`, section 6.4). The adapter
+ * (`docs/specs/exchange-rate-providers.md`, section 6.4). The adapter
  * reads the instance's own list and uses this only when that list cannot be
  * fetched, so an outage at boot does not make it claim to carry nothing.
  */
@@ -138,7 +138,7 @@ function readCurrencyList(body: unknown): ReadonlySet<string> | null {
 /**
  * Exchange rates from Frankfurter, the ECB reference rates: no key, no
  * request cap, daily history from 1999-01-04, about thirty currencies.
- * `docs/future-plans/exchange-rate-providers.md` section 6 records the
+ * `docs/specs/exchange-rate-providers.md` section 6 records the
  * responses this adapter is built on.
  *
  * Three endpoints. `latest?base=B&symbols=Q1,Q2` and `{start}..{end}?base=B&

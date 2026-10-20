@@ -1,7 +1,7 @@
 # Microsoft Money (`.mny`) import
 
 Native TypeScript pipeline for importing complete Microsoft Money files. Design and task list:
-`docs/future-plans/mny-import.md`.
+`docs/specs/mny-import.md`.
 
 ```
 .mny upload -> msisam/msisam-decrypt.ts -> mdb-reader -> msisam/open-mny.ts

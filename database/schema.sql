@@ -437,7 +437,7 @@ CREATE TABLE transaction_attachments (
     -- Set on the unprocessed original of a scanned document, pointing at the
     -- visible (enhanced) attachment; NULL for every attachment a user sees.
     -- The link lives on the original so deleting the visible row cascades to
-    -- it. See docs/future-plans/document-scanner.md.
+    -- it. See docs/specs/document-scanner.md.
     original_of_attachment_id UUID NULL REFERENCES transaction_attachments(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_attachment_not_own_original
@@ -1964,7 +1964,7 @@ CREATE INDEX idx_investment_reports_user_id ON investment_reports(user_id);
 CREATE INDEX idx_investment_reports_user_favourite ON investment_reports(user_id, is_favourite);
 CREATE INDEX idx_investment_reports_user_sort ON investment_reports(user_id, sort_order);
 
--- Row-Level Security identity helpers (see docs/future-plans/row-level-security.md).
+-- Row-Level Security identity helpers (see docs/specs/row-level-security.md).
 --
 -- app.current_user_id -- effective user (the owner when a delegate is acting).
 -- app.real_user_id    -- authenticated identity (the delegate while acting);

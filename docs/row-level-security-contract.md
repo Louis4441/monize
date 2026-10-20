@@ -9,11 +9,9 @@ Read this before adding a table, exempting one, or reaching the database by any
 route other than `withScopedDb`.
 
 Operational material -- rollout stages, mode flips, monitoring, emergency
-rollback -- stays in `docs/future-plans/row-level-security-runbook.md`. The
-original design and the task record are
-`docs/future-plans/row-level-security.md` and
-`docs/future-plans/row-level-security-tasks.md`; both describe work that has
-since shipped, and where they disagree with this document, this document wins.
+rollback -- stays in `docs/rls-runbook.md`. The original design is
+`docs/specs/row-level-security.md`; it describes work that has since shipped,
+and where it disagrees with this document, this document wins.
 
 ## 1. What RLS is here
 
@@ -312,7 +310,7 @@ Two smaller consequences of being outside a transaction, both deliberate:
    horizontal-scaling plan reserved an optional Redis for exactly this message.
    Rejected, and recorded in the plan: another store to run, back up, secure and
    probe, for a channel PostgreSQL already has. See
-   `docs/future-plans/horizontal-scaling.md`.
+   `docs/specs/horizontal-scaling.md`.
 
 ### Review triggers
 

@@ -1,15 +1,13 @@
 # Plan: Database-Enforced Row-Level Security (RLS)
 
-> **Status: implemented, not yet enforced.** This is the original design
-> document, kept for its rationale and its rollout reasoning. Do not read it as
-> a description of future work: every code and migration task in
-> [`row-level-security-tasks.md`](./row-level-security-tasks.md) has landed,
-> including the enable migration (`123_rls_enable.sql`). What remains is the two
-> operational flips in
-> [`row-level-security-runbook.md`](./row-level-security-runbook.md). The
-> `docs/future-plans/` location is historical -- the files move to `docs/` when
-> enforcement ships -- and it has already misled a reviewer into reporting the
-> feature as unbuilt.
+Implemented. Every code and migration task of the former task list has landed
+(migrations 111-114, 118, 123, 132 and 134; `withScopedDb` in
+`backend/src/common/db/scoped-db.ts`). This document is kept as the design
+record, for its rationale and its rollout reasoning; do not read it as a
+description of future work. `docs/row-level-security-contract.md` is canonical
+and wins where the two disagree, and `docs/rls-runbook.md` holds the
+operational flips. Enforcement by default is still an open decision
+(issue #1065).
 
 ## Goal
 
@@ -326,7 +324,7 @@ Phased and independently revertible. The key structural choice: **privileges dro
 4. **Prod flip A -- privilege drop** (`RLS_MODE=enforce`; enable migration *not* yet deployed to prod): runtime becomes `monize_app`, but no table has RLS enabled, so row visibility is unchanged. The only bugs that can surface are privilege-class (`permission denied`, DDL) -- loud, greppable, and low-stakes. Revert: `RLS_MODE=shadow`.
 5. **Prod flip B -- enable RLS:** deploy the release containing `0NN+4_rls_enable.sql`. The only bugs that can surface now are context-class (zero rows). Emergency revert is unchanged and instant: `RLS_MODE=shadow` -- the owner role bypasses RLS even on enabled tables. Full policy removal remains available via the runbook's down-SQL.
 
-Flags: `RLS_MODE=off|shadow|enforce` selects GUC emission + runtime role in one enum; `DATABASE_APP_USER/PASSWORD` supply the unprivileged role (required for `enforce`, validated at startup). On Kubernetes the flips are a ConfigMap edit (`RLS_MODE`) plus a rollout restart, with `DATABASE_APP_PASSWORD` in the DB Secret and the role in the CNPG `Cluster` `managed.roles`. Document in root `CLAUDE.md`, `database/CLAUDE.md`, `.env.example`, and the runbook `docs/future-plans/row-level-security-runbook.md` (move it to `docs/rls.md` when the feature ships; it includes the manual down-SQL, since the migration runner is forward-only).
+Flags: `RLS_MODE=off|shadow|enforce` selects GUC emission + runtime role in one enum; `DATABASE_APP_USER/PASSWORD` supply the unprivileged role (required for `enforce`, validated at startup). On Kubernetes the flips are a ConfigMap edit (`RLS_MODE`) plus a rollout restart, with `DATABASE_APP_PASSWORD` in the DB Secret and the role in the CNPG `Cluster` `managed.roles`. Document in root `CLAUDE.md`, `database/CLAUDE.md`, `.env.example`, and the runbook `docs/rls-runbook.md` (it includes the manual down-SQL, since the migration runner is forward-only).
 
 i18n: RLS is backend/DB only. A `WITH CHECK` violation surfaces as a Postgres error; ensure `GlobalExceptionFilter` maps "new row violates row-level security policy" to a generic 403/404 (these should never reach users, because app-level filtering prevents hitting them) -- any new user-facing string there must be internationalized per project rules.
 
@@ -366,7 +364,7 @@ CREATE OR REPLACE FUNCTION app_bypass_rls() RETURNS boolean LANGUAGE sql STABLE 
 | GUC leaks across pooled requests | Yes (by construction) | The GUC is transaction-local (`SET LOCAL`): Postgres reverts it at COMMIT/ROLLBACK before the connection can serve anything else. No reset code exists to get wrong. |
 | Compromised app process sets `app.bypass_rls` | Partial | The GUC is only set by greppable helpers whose import is lint-allowlisted per module, never from user input (all queries parameterized). The owner-DataSource hardening removes even this path for admin. Note that nothing here is a *runtime* detection: a process already running our code with the helpers in scope is not observable from the application's own logs, which is why the mitigation is the static fence rather than an audit line. |
 | DB superuser / owner access (DBA, migrations) | By design exempt | Owner bypass is what lets migrations/seed/jobs operate; not a tenant-isolation threat. |
-| Stolen DB backup at rest | No | RLS is access-time, not at-rest. (Encryption-at-rest / the user-encryption plan addresses this.) |
+| Stolen DB backup at rest | No | RLS is access-time, not at-rest. (Encryption-at-rest / the [user-encryption plan](../future-plans/user-encryption.md) addresses this.) |
 
 ---
 
@@ -397,7 +395,7 @@ CREATE OR REPLACE FUNCTION app_bypass_rls() RETURNS boolean LANGUAGE sql STABLE 
 
 ## Estimated Scope
 
-- **New files (~7):** `scoped-db.ts`, `with-context.ts`, 5 RLS migrations (policies split from the enable; no grants migration -- grants live in db-init), the catalog-driven `rls-enforcement.integration.spec.ts`, ESLint restrictions (`with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban), `docs/rls.md` runbook. No new interceptor -- the existing `RequestContextInterceptor` ALS scope is reused (though C6 restructures its fire-and-forget calls into that scope).
+- **New files (~7):** `scoped-db.ts`, `with-context.ts`, 5 RLS migrations (policies split from the enable; no grants migration -- grants live in db-init), the catalog-driven `rls-enforcement.integration.spec.ts`, ESLint restrictions (`with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban), `docs/rls-runbook.md` runbook. No new interceptor -- the existing `RequestContextInterceptor` ALS scope is reused (though C6 restructures its fire-and-forget calls into that scope).
 - **Modified files (~95+):** ~80 domain service files (data access through `withScopedDb` -- measured: 86 files currently use `@InjectRepository`, 61 `createQueryRunner` sites, ~109 service files total; the R1-R7 task sums come to ~81 files -- an earlier "~40 services" figure understated this by half), `app.module.ts` (role selection, flag validation), `db-init.ts` (role + grants), `request-context.ts` (context interface extension incl. `realUserId`), admin/auth/cron/seeder paths, PAT + password-reset + OAuth bootstrap paths, `emergency-access-claim.controller.ts`, `backup.service.ts` (trigger-GUC swap replacing the `DISABLE TRIGGER` DDL), `database/schema.sql`, `integration-setup.ts`, `.env.example`, all `docker-compose*.yml`, `helm/values.yaml` + `helm/templates/configmap-backend.yaml` + the k8s overlay ConfigMap/Secret + CNPG `Cluster` manifest (`managed.roles`), root + `backend` + `database` CLAUDE.md.
 - **No new npm dependency** (homegrown transaction helper; `typeorm-transactional` deliberately avoided).
 - **DB objects:** 1 new role (provisioned by db-init or CNPG `managed.roles`), ~46 tables x (enable + policy), 3 helper functions + a GUC-aware replacement of `update_updated_at_column()`, grants + default privileges (applied idempotently by db-init).

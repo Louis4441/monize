@@ -606,7 +606,7 @@ export class TransactionSplitService {
    * statement, returning what each changed line held before the write so the
    * caller can record an undoable snapshot.
    *
-   * Invariants owned here (docs/future-plans/split-bulk-update.md):
+   * Invariants owned here (docs/specs/split-bulk-update.md):
    * - I2: only `kind = 'category'` rows are written; transfer and investment
    *   lines are never touched.
    * - I3: the pre-read joins back to `transactions` on `user_id`; the UPDATE

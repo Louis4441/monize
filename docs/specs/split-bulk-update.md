@@ -1,8 +1,10 @@
 # Split transactions in bulk update and `manage_transactions`
 
-Approved spec for letting split transactions be updated through the Transactions
-page bulk update tool and through the `manage_transactions` AI tool (AI
-Assistant and MCP, which share `backend/src/transactions/transaction-tool-prep.service.ts`).
+Shipped and kept as the specification: split transactions can be updated
+through the Transactions page bulk update tool and through the
+`manage_transactions` AI tool (AI Assistant and MCP, which share
+`backend/src/transactions/transaction-tool-prep.service.ts`). The invariants
+and truth tables below are the ones the code cites by name.
 
 ## Product decisions
 

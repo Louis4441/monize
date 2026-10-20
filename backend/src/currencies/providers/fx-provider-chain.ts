@@ -50,7 +50,7 @@ export interface FxProviderDescription {
  * provider answered with nothing" is kept apart from "the provider did not
  * answer" per provider, so an outage at the first provider is never recorded as
  * an empty window the second might have filled. The truth table is section 5
- * of `docs/future-plans/exchange-rate-providers.md`; `fx-provider-chain.spec.ts`
+ * of `docs/specs/exchange-rate-providers.md`; `fx-provider-chain.spec.ts`
  * holds every row of it.
  *
  * Built once by the factory in `currencies.module.ts`, which is why the class

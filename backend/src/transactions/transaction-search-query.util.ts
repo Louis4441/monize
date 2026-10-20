@@ -10,7 +10,7 @@ import {
  * Reads the Transactions search string as a list of AND-ed terms.
  *
  * The grammar, the field list and the value rules are
- * `docs/future-plans/advanced-search.md` sections 4.1, 4.2 and 7; this file
+ * `docs/specs/advanced-search.md` sections 4.1, 4.2 and 7; this file
  * is their one implementation. It is pure apart from the term-cap refusal:
  * no I/O, and no regular expression is built from the input.
  *

@@ -2,8 +2,8 @@ import { createHash } from "crypto";
 import { Unzip, UnzipInflate, UnzipPassThrough } from "fflate";
 
 /**
- * Reads the mail files out of an uploaded `.zip` (docs/future-plans/
- * email-receipts-archive-import.md decision 4). Nothing is written to disk and an
+ * Reads the mail files out of an uploaded `.zip` (archive-import decision 4,
+ * recorded in `backend/src/email-receipts/import/email-receipt-import.service.ts`). Nothing is written to disk and an
  * entry name is used only to choose the format, so a path in a name reaches
  * nothing.
  *

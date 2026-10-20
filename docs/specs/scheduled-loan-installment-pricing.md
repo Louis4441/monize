@@ -9,7 +9,7 @@ Registered as INV-LOAN-006 in `docs/system-invariants.md`.
 
 Sections 7 and 8 (the dated payment and the occurrence projection, issue
 #1637) are built by the tasks of
-`docs/future-plans/dated-loan-payment-tasks.md` and registered as INV-LOAN-009,
+the dated-loan-payment work (merged) and registered as INV-LOAN-009,
 `enforced` from that list's acceptance task (#1644).
 
 Read `docs/financial-calculation-contract.md` sections 1, 7 and 8, and
@@ -100,7 +100,7 @@ sync calls apart, so its preview and its write read one plan (section 7.5).
 The core reads two
 dated inputs from `loan_rate_changes`, through one function each:
 `datedAnnualRate`, the rate at `d` (section 1), and, from B1 of
-`docs/future-plans/dated-loan-payment-tasks.md`, `datedPaymentAmount` beside
+the dated-loan-payment work (merged), `datedPaymentAmount` beside
 it, the annuity payment at `d` (section 7.1). `resolveInstallmentCore`
 calls both with the one `asOfDate` the consumer prices at, so a consumer that
 prices through it dates both inputs or neither. The settlement calls the
@@ -134,7 +134,7 @@ date: the bank charges the installment for its due date, however many days
 the debit took (`docs/specs/loan-installment-settlement.md` decision 11). The
 settlement prices through the same core, `backend/src/loan-installments/`
 (extracted from `resolveInstallment` by B2 of
-`docs/future-plans/loan-installment-settlement-tasks.md`), and refuses a
+`docs/specs/loan-installment-settlement.md`), and refuses a
 missing rate or cadence where the posting path defaults them.
 
 The debt is read under the lock that authorizes the write, not merely inside
@@ -329,7 +329,7 @@ The recurrence gives `100.01 - 399.99 * 0.005 = 98.0101`; the invariant gives
 ### 5.1 The dated payment: the fixture
 
 The two timelines of issue #1637, the fixtures sections 7 and 8 and every task
-of `docs/future-plans/dated-loan-payment-tasks.md` copy. `ANNUITY` (monthly
+of the dated-loan-payment work (merged) copy. `ANNUITY` (monthly
 compounding), principal 100,000.00, 300 monthly payments, `payment_start_date`
 2023-02-03, `accounts.payment_amount` 584.59 (the annuity payment of 100,000.00
 over 300 months at 5.0 %, 584.5900), no standing extra. Recording the first
@@ -406,7 +406,7 @@ advanced after it (section 7.3).
   browser fallback -- so a boundary case discriminates on any runner rather
   than only on one whose `TZ` happens to sit on the wrong side of it.
 - Unit (dated payment, B1 to B3 of
-  `docs/future-plans/dated-loan-payment-tasks.md`): every row of table 7.4 (the
+  the dated-loan-payment work (merged)): every row of table 7.4 (the
   advancement and the settlement rows), 7.5 and 8.6 as a named case, the figures copied from this spec, not from
   the implementation's output; the shared `datedAnnuityPayment` asserted once
   for both callers (the advancement and the settlement); the sync's preview

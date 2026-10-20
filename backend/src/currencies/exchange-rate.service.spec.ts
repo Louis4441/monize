@@ -2553,7 +2553,7 @@ describe("ExchangeRateService", () => {
       // foreign-currency total in the report null long after a two-minute
       // outage ended. The chain reports such a window as not answered, whether
       // it was one symbol of one provider or every provider that fell silent
-      // (section 5 of `docs/future-plans/exchange-rate-providers.md`).
+      // (section 5 of `docs/specs/exchange-rate-providers.md`).
       chain.dailySeries.mockResolvedValue(NO_ANSWER);
 
       await service.ensureRatesForDate(

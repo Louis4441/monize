@@ -10,7 +10,7 @@
  * and an import of the Yahoo client under `currencies/` outside its adapter is
  * a provider question that bypassed the chain. Both are mechanical, so both are
  * held here rather than in a paragraph (`docs/guard-tests.md`; section 9 of
- * `docs/future-plans/exchange-rate-providers.md`).
+ * `docs/specs/exchange-rate-providers.md`).
  *
  * Production sources only. A spec's fixture of a stored row names the slug it
  * asserts, and the adapter's own spec types its double on the Yahoo client;

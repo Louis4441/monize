@@ -7,7 +7,7 @@ const SRC_ROOT = join(__dirname, "..");
  * INV-SEARCH-001: every surface that takes a transaction search string reads
  * it through one parser and one clause builder, and escapes it exactly once.
  *
- * Before the search syntax (docs/future-plans/advanced-search.md) five call
+ * Before the search syntax (docs/specs/advanced-search.md) five call
  * sites each escaped the string, wrapped it in `%...%` and bound three
  * parameters by hand, and the LLM totals path escaped it a second time, so a
  * search holding `%` gave the assistant totals that disagreed with its own

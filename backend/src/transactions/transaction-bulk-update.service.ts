@@ -56,7 +56,7 @@ export interface BulkUpdateResult {
   /**
    * Split lines recategorized across the batch's split parents. A sibling
    * count, never folded into `updated` (invariant I5,
-   * docs/future-plans/split-bulk-update.md). Omitted when zero.
+   * docs/specs/split-bulk-update.md). Omitted when zero.
    */
   splitLinesUpdated?: number;
 }
@@ -865,7 +865,7 @@ export class TransactionBulkUpdateService {
    * category UUIDs in the filter yields the descendant-expanded set (matching
    * the selection's own expansion); everything else -- ids mode, no category
    * filter, pseudo-ids only -- is unrestricted (`undefined` = all category
-   * lines), per Truth table A in docs/future-plans/split-bulk-update.md.
+   * lines), per Truth table A in docs/specs/split-bulk-update.md.
    */
   private async resolveCategoryRestriction(
     m: EntityManager,

@@ -21,7 +21,7 @@
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
 | U1 | Discussion approved; D1 to D4 answered; this plan merged | -- | none | [ ] |
-| U2 | Backend `import-preview` module: payee report, rule traces, fingerprint, selection check; bank sync switched to it with no behaviour change | U1, bank sync BS20 | inert | [ ] |
+| U2 | Backend `import-preview` module: payee report, rule traces, fingerprint, selection check; bank sync switched to it with no behaviour change | U1, bank sync BS20 | inert | [ ] (groundwork for bank sync exists: `backend/src/import-preview/`, bf8536215; not yet the shared module) |
 | U3 | Frontend `ImportPreviewTable` and `ImportPreviewSummary`; bank sync preview switched to them | U2 | inert | [ ] |
 | U4 | Exceptions per account and source (decision D1), migration | U1 | neutral | [ ] |
 | U5 | CSV: duplicate key and cut-off (csv-source-profiles P3), preview step, commit by fingerprint (P6) | U3, U4 | additive | [ ] |

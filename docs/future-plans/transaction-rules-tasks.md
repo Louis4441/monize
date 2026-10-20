@@ -38,7 +38,7 @@
 | B5 | Transfers: rule step in `writeTransferLegs`; `completeTransfer` merges tags | B4 | neutral | [x] |
 | B6 | Import: QIF / OFX / CSV processor and MNY `writeAll` | B4 | inert | [x] |
 | B7 | Guard: every insert site on `transactions` calls the applier or is exempt | B5, B6 | none | [x] |
-| B8 | Manual run: preview endpoint, commit endpoint, action history, reconciled skip; application trace and retention | B4 | inert | [x] retention cron open (needs a WITH_CONTEXT_ALLOWLIST decision) |
+| B8 | Manual run: preview endpoint, commit endpoint, action history, reconciled skip; application trace and retention | B4 | inert | [x] (retention cron: `transaction-rule-applications-retention.service.ts`) |
 | A1 | AI action types and builder; AI assistant tools | B8 | inert | [x] |
 | A2 | MCP tool `manage_transaction_rules` | A1 | inert | [x] |
 | F1 | Tools menu entry, rules API client, list page | B2 | inert | [x] |
@@ -46,7 +46,7 @@
 | F3 | Test panel and manual-run dialog | F2, B8 | inert | [x] |
 | F4 | Application history per rule (trace view) | F1, B8 | inert | [x] |
 | F5 | Expression mode (CEL-syntax view of the same tree, no new dependency) | F2 | inert | [x] |
-| R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [x] expiry cron open (same decision as B8) |
+| R1 | `ai_review_requests` table, enqueue from `request_ai_review` in the applier, expiry cron | D1, B4 | inert | [x] (expiry cron: `ai-review-requests-expiry.service.ts`) |
 | R2 | MCP and assistant tools: list, claim, submit proposal; proposal stored as a signed `PendingAiAction` | R1, A1 | inert | [x] |
 | R3 | Review inbox in the UI: pending, proposed (confirmation card), expired | R2, F1 | inert | [x] |
 | X1 | Glob captures: matcher, evaluator returns captures, validation of names and template references (design 10.1) | B1 | none | [x] |

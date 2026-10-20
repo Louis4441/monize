@@ -6,7 +6,7 @@ import {
 import type { SearchTerm } from "./transaction-search-query.util";
 
 /**
- * The SQL of the Transactions search (docs/future-plans/advanced-search.md).
+ * The SQL of the Transactions search (docs/specs/advanced-search.md).
  *
  * `buildTransactionSearchWhere` turns parsed terms into one WHERE condition.
  * A bare term matches across every user-visible field -- payee, category,

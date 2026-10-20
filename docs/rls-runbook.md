@@ -1,13 +1,14 @@
 # Row-Level Security (RLS) Runbook
 
-> **Status: implemented, not yet enforced.** Every code and migration task in
-> [`row-level-security-tasks.md`](./row-level-security-tasks.md) has landed: `withScopedDb` is the
-> only door to the database, every out-of-request path is context-wrapped, the policies are deployed
-> **inert**, and the enable migration (`123_rls_enable.sql`) is authored — it is flip B and must not
-> reach production until flip A has soaked (see Rollout). What remains is purely operational: the
-> flips below, executed by an operator. When enforcement ships, move this file to `docs/rls.md`.
-> Until the runtime is switched to the `monize_app` role, RLS policies are inert even where enabled,
-> because the app connects as the owner role, which bypasses policies on tables it owns.
+Operator runbook for the RLS rollout: the shadow soak, the staging enforce run and the two
+production flips (A, the privilege drop; B, the enable migration `123_rls_enable.sql`, which must
+not reach production until flip A has soaked -- see Rollout). It lives in `docs/` now that the code
+has shipped: `withScopedDb` is the only door to the database, every out-of-request path is
+context-wrapped and the policies are deployed inert. The contract is
+`docs/row-level-security-contract.md`, which wins where the two disagree; the design record is
+`docs/specs/row-level-security.md`. Until the runtime is switched to the `monize_app` role, RLS
+policies are inert even where enabled, because the app connects as the owner role, which bypasses
+policies on tables it owns.
 
 ## What RLS does here
 

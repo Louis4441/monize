@@ -18,7 +18,7 @@
  * mappings are keyed on. Every save path accepts it plus
  * `settle_loan_installment` (`isAcceptedActionType` in `rule-validation.ts`):
  * the action is typed, validated, referenced, planned and, since its write
- * path landed (B5 of `docs/future-plans/loan-installment-settlement-tasks.md`),
+ * path landed (B5 of `docs/specs/loan-installment-settlement.md`),
  * written with its occurrence claim, but it joins the mirrored list only with
  * the editor card that offers it (F1), so until then a rule carrying it is
  * written by hand, by the mortgage form (B7), the assistant or MCP (B8).

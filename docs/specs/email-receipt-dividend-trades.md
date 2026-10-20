@@ -1,7 +1,7 @@
 # Spec: dividends and reinvested dividends in trade profiles
 
 Status: **proposed**. Extends the trade-confirmation design,
-[`../future-plans/email-receipt-trades.md`](../future-plans/email-receipt-trades.md),
+[`email-receipt-trades.md`](./email-receipt-trades.md),
 which left dividends and reinvestments out of scope.
 
 Related: INV-RECEIPT-008 (a trade email creates an investment transaction only

@@ -16,7 +16,7 @@ import {
 
 /*
  * Fixtures. The first group is copied verbatim from section 6.1 of
- * `docs/future-plans/exchange-rate-providers.md`, recorded from the public
+ * `docs/specs/exchange-rate-providers.md`, recorded from the public
  * instance on 2026-10-07; the plan records only the shape or the date for
  * some cases, so the second group was recorded from the same instance on
  * 2026-10-12 for those, and is dated here. Neither group is edited by hand: a

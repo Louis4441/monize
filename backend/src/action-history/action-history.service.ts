@@ -1535,7 +1535,7 @@ export class ActionHistoryService {
 
       // Restore split-line categories if captured (bulk recategorization).
       // transaction_splits has no user_id, so the write is scoped through its
-      // parent transaction (invariant I3, docs/future-plans/split-bulk-update.md).
+      // parent transaction (invariant I3, docs/specs/split-bulk-update.md).
       if (Array.isArray(txData.splits)) {
         for (const split of txData.splits) {
           await manager.query(

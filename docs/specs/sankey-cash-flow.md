@@ -1,18 +1,14 @@
 # Sankey cash flow report
 
-Design for a built-in report that draws where money came from and where it
-went over a date range as a flow diagram: income categories into one Income
-node, out to expense categories (and their children), to savings and
-investment accounts, to debt payments, with what was unspent or drawn from
-balances closing the diagram. The task list is
-[`sankey-cash-flow-tasks.md`](./sankey-cash-flow-tasks.md).
-
-Status: **approved and built** (v1, issue #1490, which also answered K1 and
-K2 in section 13). It reports money and
-classifies transfer legs, which no report does outside the tag-key
-breakdown, so sections 4 to 8 are the specification
-`docs/financial-calculation-contract.md` section 9 asks for and section 5
-amends INV-REPORT-003.
+Shipped (v1, issue #1490, which also answered K1 and K2 in section 13) and
+kept as the specification: a built-in report that draws where money came from
+and where it went over a date range as a flow diagram, income categories into
+one Income node, out to expense categories (and their children), to savings
+and investment accounts, to debt payments, with what was unspent or drawn
+from balances closing the diagram. It reports money and classifies transfer
+legs, which no report does outside the tag-key breakdown, so sections 4 to 8
+are the specification `docs/financial-calculation-contract.md` section 9 asks
+for and section 5 amends INV-REPORT-003.
 
 ## 1. Goal
 
@@ -310,6 +306,9 @@ The catalog admits the five invariants of section 5 as `INV-SANKEY-001` to
   avoid double counting; a user who wants to see card payments as a flow
   takes the card out of scope and reads that node.
 
-## 14. Companion task list
+## 14. Follow-ups
 
-[`sankey-cash-flow-tasks.md`](./sankey-cash-flow-tasks.md).
+- **M1 (optional, separate proposal).** Migrate the other reports' drill-down
+  URLs onto `buildTransactionsHref` (decision 9): replace the per-report
+  `URLSearchParams` and template-string sites, one report per PR, shrink-only
+  against a baseline listing the current sites.

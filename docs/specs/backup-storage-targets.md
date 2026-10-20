@@ -5,7 +5,7 @@ target, so a deployment can keep its recovery points on object storage instead o
 on a per-pod disk. Written before the implementation, per
 `docs/financial-calculation-contract.md` section 7 and `AGENTS.md` ("a financial
 feature of any substance starts from a short approved spec"). The staged plan is
-task S2 of `docs/future-plans/horizontal-scaling-tasks.md`.
+task S2 of the horizontal-scaling plan, `docs/specs/horizontal-scaling.md` (WP7).
 
 **Status: approved.** The maintainer answered section 11 on 2026-09-19 and took
 the recommendation on all four questions; those answers are now part of the

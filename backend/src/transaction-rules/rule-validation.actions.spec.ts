@@ -99,7 +99,7 @@ describe("validateRuleDefinition: actions", () => {
 
   it("accepts settle_loan_installment on every save path, beside the mirrored list", () => {
     // Accepted since its write path landed (B5 of
-    // docs/future-plans/loan-installment-settlement-tasks.md): a stored rule
+    // docs/specs/loan-installment-settlement.md): a stored rule
     // can carry it, and a create, import or run that plans it writes the
     // split with its occurrence claim. It stays off RULE_ACTION_TYPES, the
     // list the editor mirrors, until the editor offers it (F1).

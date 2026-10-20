@@ -123,7 +123,7 @@ function safeName(name: string): string {
 }
 
 /**
- * The archive import (docs/future-plans/email-receipts-archive-import.md): the
+ * The archive import: the
  * messages of uploaded `.eml`, `.mbox`, `.msg` and `.zip` files are stored as rows of the
  * person's own mailbox through the poll's row builder and insert, under
  * `uid_validity` 0, then the stored-email part of a poll runs under the poll

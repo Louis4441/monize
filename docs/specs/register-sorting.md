@@ -1,10 +1,13 @@
 # Column sorting on the Transactions register
 
-Design for click-to-sort column headers on the Transactions page register
-(issue #521): any data column sorts, the date column sorts in either
+Specification of click-to-sort column headers on the Transactions page
+register (issue #521): any data column sorts, the date column sorts in either
 direction, and the running Balance column is shown only while the register
-is in date order. This is the approved-spec half of a two-document plan; the
-task list is [`register-sorting-tasks.md`](./register-sorting-tasks.md).
+is in date order. The code shipped in commits a3fcf73ce (`feat(transactions):
+let the register be sorted by any of its columns`) and d594603d1
+(`feat(transactions): make the register's column headers sort it`); the task
+list's boxes were never ticked, but the work is on `main`. The plan is
+retired and this document is kept as the specification the code is held to.
 
 This document is the specification `docs/financial-calculation-contract.md`
 section 9 asks for: it changes how a money figure (the running balance) is
@@ -596,7 +599,6 @@ Pre-existing, found while designing; each is its own proposal.
   meaningless without the walk that turns it into a column. The model gets the
   sort it asked for and no balance, which is the honest answer.
 
-## 15. Companion task list
+## 15. Follow-ups
 
-[`register-sorting-tasks.md`](./register-sorting-tasks.md) breaks this into
-one-session tasks with dependencies, deploy impact and acceptance.
+None.

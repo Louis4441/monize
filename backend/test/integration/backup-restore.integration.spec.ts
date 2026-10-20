@@ -777,7 +777,7 @@ describe("Backup export/restore round-trip (integration)", () => {
     },
   );
   /**
-   * A scan pair (`docs/future-plans/document-scanner.md`): the enhanced image a
+   * A scan pair (`docs/specs/document-scanner.md`): the enhanced image a
    * user sees, and the original photo it came from, linked by
    * `transaction_attachments.original_of_attachment_id` -- an immediate
    * self-referential FK, like `accounts.linked_loan_account_id` before it.

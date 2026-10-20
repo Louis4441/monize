@@ -1,7 +1,6 @@
 /**
- * Pure helpers for the archive import (docs/future-plans/email-receipts-archive-
- * import.md): which format an uploaded file is, and the split of an mbox file
- * (mboxo / mboxrd) into its messages. Nothing here reads a database or the
+ * Pure helpers for the archive import: which format an uploaded file is, and
+ * the split of an mbox file (mboxo / mboxrd) into its messages. Nothing here reads a database or the
  * network. The scan is linear over the bytes, line by line, with constant
  * patterns only: no regular expression is built from the input.
  */

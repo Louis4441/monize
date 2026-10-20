@@ -5,7 +5,7 @@
  * derived from it, `resolveFxProviders` admits exactly these tokens from
  * `FX_PROVIDERS`, and the frontend's label list is held to it by a contract
  * test. Adding a provider means one adapter file, one entry here and one line
- * in `.env.example` (`docs/future-plans/exchange-rate-providers.md`, section 4).
+ * in `.env.example` (`docs/specs/exchange-rate-providers.md`, section 4).
  */
 export const FX_PROVIDER_NAMES = ["frankfurter", "yahoo"] as const;
 

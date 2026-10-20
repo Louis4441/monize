@@ -1,11 +1,12 @@
 # Email receipts: trade confirmations create investment transactions
 
-Companion to [`email-receipts.md`](./email-receipts.md) (the feature this extends)
+Companion to [`email-receipts.md`](../future-plans/email-receipts.md) (the feature this extends)
 and `docs/financial-semantics.md` (how an investment transaction is booked).
 
-Status: **implemented on a fork branch, not approved upstream.** It extends a
-feature whose own discussion (kenlasko/monize#930) has no `approved-to-build`
-label; the maintainer decides whether and in what slices it merges.
+This extension shipped: it landed on `main` in PR #1497 (2026-10-09), with
+the migration `database/migrations/20261015170000_email_receipt_trades.sql`.
+The plan is retired and this document is kept as the specification the code
+is held to.
 
 ## 1. Goal
 
@@ -334,3 +335,7 @@ second is proposed, never auto-applied, and the person approving sees both.
 
 Not covered by a unit test: the migration against a real PostgreSQL
 (`scripts/verify-schema.sh`) and the integration suites, which need Docker.
+
+## 8. Follow-ups
+
+None.

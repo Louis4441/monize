@@ -4,9 +4,9 @@ Specification for the implementation of sovereign bond support proposed
 in discussion kenlasko/monize#1650: a small generic bond domain, and the Polish
 retail savings bonds as its first products (TOS, ROR, COI, EDO, OTS, DOR, ROS
 and ROD). Written before the implementation, per
-`docs/financial-calculation-contract.md` section 9. The plan and the task list
-are `docs/future-plans/sovereign-bonds.md` and
-`docs/future-plans/sovereign-bonds-tasks.md`; how to add another country is
+`docs/financial-calculation-contract.md` section 9. The engine's own
+specification (architecture, adapter contract, follow-ups) is
+`docs/specs/sovereign-bonds.md`; how to add another country is
 `docs/backend/bond-adapters.md`.
 
 Every product rule below is taken from the issue letters (*listy emisyjne*) of

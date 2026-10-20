@@ -10,7 +10,7 @@ import { extractTsComments } from "./repo-paths.util";
  * something -- an attempt budget, a replay window, a claim, a session -- N
  * replicas mean N answers, and the deployment quietly gets N times the limit it
  * wrote down. That is the whole of the horizontal-scaling work
- * (`docs/future-plans/horizontal-scaling.md`): the counters, the single-use
+ * (`docs/specs/horizontal-scaling.md`): the counters, the single-use
  * artifacts, the relay queue and the signing keys became rows.
  *
  * `db/derived-state-writers.guard.spec.ts` already scans the files containing an
@@ -153,7 +153,7 @@ function processLocalFields(): Field[] {
 /**
  * Every class-scope `Map`/`Set` in the tree that is allowed to stay per replica,
  * with the reason it is allowed. Seeded from the "Per-replica state that stays"
- * table in `docs/future-plans/horizontal-scaling.md`.
+ * table in `docs/specs/horizontal-scaling.md`.
  */
 const ALLOWED = new Map<string, string>([
   // -- Sockets and connections this process owns ---------------------------
