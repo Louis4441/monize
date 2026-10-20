@@ -63,22 +63,41 @@ function respond(data: ReturnType<typeof item>[], monthlyEstimate = 15) {
   });
 }
 
-/** A ResizeObserver that reports the given content box as soon as it observes. */
+/**
+ * A ResizeObserver that reports the given content box as soon as it observes,
+ * and returns a function that reports a new one later.
+ */
 function observeAs(width: number, height: number) {
+  const callbacks: Array<(width: number, height: number) => void> = [];
   vi.stubGlobal(
     'ResizeObserver',
     class {
       constructor(private readonly callback: ResizeObserverCallback) {}
       observe() {
-        this.callback(
-          [{ contentRect: { width, height } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
+        const report = (w: number, h: number) =>
+          this.callback(
+            [{ contentRect: { width: w, height: h } } as ResizeObserverEntry],
+            this as unknown as ResizeObserver,
+          );
+        callbacks.push(report);
+        report(width, height);
       }
       unobserve() {}
       disconnect() {}
     },
   );
+  return (w: number, h: number) => callbacks.forEach((report) => report(w, h));
+}
+
+function expectBoxesInside(boxes: HTMLElement[], width: number, height: number) {
+  for (const box of boxes) {
+    const left = parseFloat(box.style.left);
+    const top = parseFloat(box.style.top);
+    expect(left).toBeGreaterThanOrEqual(0);
+    expect(top).toBeGreaterThanOrEqual(0);
+    expect(left + parseFloat(box.style.width)).toBeLessThanOrEqual(width);
+    expect(top + parseFloat(box.style.height)).toBeLessThanOrEqual(height);
+  }
 }
 
 async function renderWidget() {
@@ -164,16 +183,22 @@ describe('RecurringExpensesWidget', () => {
       expect(within(callouts).getByText('Hydro')).toBeInTheDocument();
       expect(within(callouts).getByText('$900')).toBeInTheDocument();
       // Every box sits inside the measured area.
-      for (const box of boxes) {
-        const left = parseFloat(box.style.left);
-        const top = parseFloat(box.style.top);
-        expect(left).toBeGreaterThanOrEqual(0);
-        expect(top).toBeGreaterThanOrEqual(0);
-        expect(left + parseFloat(box.style.width)).toBeLessThanOrEqual(520);
-        expect(top + parseFloat(box.style.height)).toBeLessThanOrEqual(280);
-      }
+      expectBoxesInside(boxes, 520, 280);
       // No legend beneath it.
       expect(screen.queryByTestId('responsive-container')).not.toBeInTheDocument();
+    });
+
+    it('lays the boxes out again when the area shrinks', async () => {
+      const resize = observeAs(640, 360);
+      respond(TEN_PAYEES);
+      await renderWidget();
+      // The sized chart is out of the flow, so it cannot hold the area open.
+      expect(screen.getByTestId('recurring-chart-plot')).toHaveClass('absolute', 'inset-0');
+
+      act(() => resize(520, 260));
+
+      const callouts = screen.getByRole('list', { name: 'Top Recurring Expenses' });
+      expectBoxesInside(within(callouts).getAllByRole('listitem'), 520, 260);
     });
 
     it('opens the payee transactions from a box', async () => {

@@ -26,8 +26,11 @@ export interface CalloutPlacement {
   index: number;
   side: 'left' | 'right';
   box: CalloutBox;
-  /** The leader line: on the slice's rim, out along its middle, to the box. */
-  line: [CalloutPoint, CalloutPoint, CalloutPoint];
+  /**
+   * The leader line: on the slice's rim, out along its middle, then to the
+   * box -- directly, or around the donut where the direct line would cross it.
+   */
+  line: CalloutPoint[];
 }
 
 export interface CalloutLayout {
@@ -146,6 +149,44 @@ function stackColumn(items: Pending[], top: number, bottom: number, step: number
   return ys;
 }
 
+/** Shortest distance from `c` to the segment from `a` to `b`. */
+function distanceToSegment(c: CalloutPoint, a: CalloutPoint, b: CalloutPoint): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((c.x - a.x) * dx + (c.y - a.y) * dy) / lengthSq));
+  return Math.hypot(a.x + t * dx - c.x, a.y + t * dy - c.y);
+}
+
+/**
+ * The leader line from a slice to its box. The direct line from the elbow can
+ * cut across the donut: a slice handed to the other column, or one whose box
+ * was stacked far from it. That line is routed around instead -- out past the
+ * rim at the elbow's x (moving away from the centre keeps it outside), across
+ * above or below the donut, down the gap beside the box's column, and in.
+ */
+function leaderLine(
+  item: Pending,
+  end: CalloutPoint,
+  side: 'left' | 'right',
+  geometry: { cx: number; cy: number; outerRadius: number; elbow: number; leaderGap: number },
+): CalloutPoint[] {
+  const { cx, cy, outerRadius, elbow, leaderGap } = geometry;
+  if (distanceToSegment({ x: cx, y: cy }, item.elbow, end) > outerRadius + 1) {
+    return [item.anchor, item.elbow, end];
+  }
+  const clearY = item.elbow.y <= cy ? cy - outerRadius - elbow : cy + outerRadius + elbow;
+  const gapX = side === 'left' ? cx - outerRadius - leaderGap / 2 : cx + outerRadius + leaderGap / 2;
+  return [
+    item.anchor,
+    item.elbow,
+    { x: item.elbow.x, y: clearY },
+    { x: gapX, y: clearY },
+    { x: gapX, y: end.y },
+    end,
+  ];
+}
+
 /**
  * Lay out a donut with a callout box per value inside a `width` x `height`
  * area, or `null` when the boxes cannot all fit at a readable size.
@@ -216,7 +257,8 @@ export function layoutCallouts(
     ordered.forEach((item, i) => {
       const box = { x: side === 'left' ? leftX : rightX, y: ys[i], width: boxWidth, height: boxHeight };
       const end = { x: side === 'left' ? box.x + box.width : box.x, y: box.y + boxHeight / 2 };
-      placements.push({ index: item.index, side, box, line: [item.anchor, item.elbow, end] });
+      const line = leaderLine(item, end, side, { cx, cy, outerRadius, elbow, leaderGap });
+      placements.push({ index: item.index, side, box, line });
     });
   }
 

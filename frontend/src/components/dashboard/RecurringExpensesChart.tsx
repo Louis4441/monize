@@ -116,18 +116,23 @@ export function RecurringExpensesChart({ slices, view, onSliceClick }: Recurring
       >
         {layout && size ? (
           <>
-            <PieChart width={size.width} height={size.height}>
-              <Pie
-                {...pieProps}
-                cx={layout.cx}
-                cy={layout.cy}
-                innerRadius={layout.innerRadius}
-                outerRadius={layout.outerRadius}
-              >
-                {cells}
-              </Pie>
-              {tooltip}
-            </PieChart>
+            {/* Out of the flow like everything else in the area: a chart drawn
+                at the measured size and left in the flow would hold the area
+                at that size, so it could grow with the card but never shrink. */}
+            <div data-testid="recurring-chart-plot" className="absolute inset-0">
+              <PieChart width={size.width} height={size.height}>
+                <Pie
+                  {...pieProps}
+                  cx={layout.cx}
+                  cy={layout.cy}
+                  innerRadius={layout.innerRadius}
+                  outerRadius={layout.outerRadius}
+                >
+                  {cells}
+                </Pie>
+                {tooltip}
+              </PieChart>
+            </div>
             <svg
               className="pointer-events-none absolute inset-0"
               width={size.width}
