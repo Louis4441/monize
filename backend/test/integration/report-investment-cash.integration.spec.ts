@@ -1411,6 +1411,45 @@ describe("built-in reports and investment cash accounts (integration)", () => {
       ]);
     });
 
+    it("widens the recurring window with the range, and leaves all unbounded", async () => {
+      for (const months of [8, 9, 10]) {
+        await createEmbeddedInvestmentParent({
+          date: monthsBeforeToday(months),
+          ordinaryAmount: -60,
+          investmentAmount: -500,
+          payeeName: "Annual-ish",
+        });
+      }
+
+      const [sixMonths, oneYear, allTime] = [
+        await withUserContext(userId, () =>
+          taxRecurring.getRecurringExpenses(userId, 3),
+        ),
+        await withUserContext(userId, () =>
+          taxRecurring.getRecurringExpenses(userId, 3, "1y"),
+        ),
+        await withUserContext(userId, () =>
+          taxRecurring.getRecurringExpenses(userId, 3, "all"),
+        ),
+      ];
+
+      expect(sixMonths.data).toEqual([]);
+      expect(oneYear.data).toEqual([
+        expect.objectContaining({ payeeName: "Annual-ish", occurrences: 3 }),
+      ]);
+      expect(oneYear.summary.monthCount).toBe(12);
+      expect(oneYear.summary.monthlyEstimate).toBe(15);
+      expect(allTime.data).toEqual([
+        expect.objectContaining({ payeeName: "Annual-ish", occurrences: 3 }),
+      ]);
+      // All time spans from the first matching payment, ten months back (nine
+      // whole months when a month-end date rolled over into the next month).
+      expect([9, 10]).toContain(allTime.summary.monthCount);
+      expect(allTime.summary.monthlyEstimate).toBe(
+        Math.round((180 / allTime.summary.monthCount) * 10000) / 10000,
+      );
+    });
+
     /**
      * The declared exception (branch audit DR-001): the duplicate finder's
      * subject is the stored row, so a split parent entered twice is a duplicate

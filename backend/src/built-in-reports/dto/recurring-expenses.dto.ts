@@ -11,6 +11,31 @@ export const RECURRING_EXPENSE_FREQUENCIES = [
 export type RecurringExpenseFrequency =
   (typeof RECURRING_EXPENSE_FREQUENCIES)[number];
 
+/**
+ * The look-back windows the analysis accepts, ending today. `all` has no lower
+ * bound. The default, `6m`, is the window the report has always used.
+ */
+export const RECURRING_EXPENSE_RANGES = [
+  "6m",
+  "1y",
+  "2y",
+  "5y",
+  "all",
+] as const;
+
+export type RecurringExpenseRange = (typeof RECURRING_EXPENSE_RANGES)[number];
+
+export const DEFAULT_RECURRING_EXPENSE_RANGE: RecurringExpenseRange = "6m";
+
+export function isRecurringExpenseRange(
+  value: unknown,
+): value is RecurringExpenseRange {
+  return (
+    typeof value === "string" &&
+    (RECURRING_EXPENSE_RANGES as readonly string[]).includes(value)
+  );
+}
+
 export class RecurringExpenseItem {
   @ApiProperty()
   payeeName: string;
@@ -41,8 +66,17 @@ export class RecurringSummary {
   @ApiProperty()
   totalRecurring: number;
 
-  @ApiProperty()
+  @ApiProperty({
+    description:
+      "totalRecurring spread over the months the window covers (monthCount)",
+  })
   monthlyEstimate: number;
+
+  @ApiProperty({
+    description:
+      "Months the window covers: the preset's length, or for `all` the whole months since the first matching payment (at least 1)",
+  })
+  monthCount: number;
 
   @ApiProperty()
   uniquePayees: number;

@@ -1354,6 +1354,7 @@ describe("BuiltInReportsService", () => {
       expect(result.summary).toEqual({
         totalRecurring: 0,
         monthlyEstimate: 0,
+        monthCount: 6,
         uniquePayees: 0,
       });
     });

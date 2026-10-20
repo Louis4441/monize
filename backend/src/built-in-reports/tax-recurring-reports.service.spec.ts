@@ -459,6 +459,7 @@ describe("TaxRecurringReportsService", () => {
       expect(result.summary).toEqual({
         totalRecurring: 0,
         monthlyEstimate: 0,
+        monthCount: 6,
         uniquePayees: 0,
       });
     });
@@ -718,6 +719,130 @@ describe("TaxRecurringReportsService", () => {
       const result = await service.getRecurringExpenses(mockUserId);
 
       expect(result.data[0].categoryName).toBeNull();
+    });
+
+    describe("range", () => {
+      const row = (overrides: Record<string, unknown>) => ({
+        payee_id: "p-1",
+        payee_name_normalized: "netflix",
+        payee_name: "Netflix",
+        category_name: null,
+        currency_code: "USD",
+        occurrences: 12,
+        total_amount: "180.00",
+        last_transaction_date: new Date("2026-10-01"),
+        first_transaction_date: "2025-11-01",
+        ...overrides,
+      });
+
+      beforeEach(() => {
+        jest.useFakeTimers({ now: new Date(2026, 9, 20, 12) });
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it("keeps the six-month window by default", async () => {
+        scopedManager.query.mockResolvedValue([]);
+
+        await service.getRecurringExpenses(mockUserId);
+
+        const params = scopedManager.query.mock.calls[0][1];
+        expect(params[1]).toBe("2026-04-20");
+        expect(params[2]).toBe("2026-10-20");
+      });
+
+      it.each([
+        ["1y", "2025-10-20", 12],
+        ["2y", "2024-10-20", 24],
+        ["5y", "2021-10-20", 60],
+      ] as const)(
+        "bounds %s at %s and spreads the total over %i months",
+        async (range, startDate, months) => {
+          scopedManager.query.mockResolvedValue([
+            row({ total_amount: String(months * 15) }),
+          ]);
+
+          const result = await service.getRecurringExpenses(
+            mockUserId,
+            3,
+            range,
+          );
+
+          expect(scopedManager.query.mock.calls[0][1][1]).toBe(startDate);
+          expect(result.summary.monthCount).toBe(months);
+          expect(result.summary.monthlyEstimate).toBe(15);
+        },
+      );
+
+      it("leaves all unbounded and spans from the first matching payment", async () => {
+        scopedManager.query.mockResolvedValue([
+          row({ first_transaction_date: "2024-03-25", total_amount: "450" }),
+          row({
+            payee_id: "p-2",
+            payee_name_normalized: "gym",
+            payee_name: "Gym",
+            first_transaction_date: "2023-10-20",
+            total_amount: "990",
+          }),
+        ]);
+
+        const result = await service.getRecurringExpenses(mockUserId, 3, "all");
+
+        expect(scopedManager.query.mock.calls[0][1][1]).toBeNull();
+        // 2023-10-20 to 2026-10-20 is 36 whole months.
+        expect(result.summary.monthCount).toBe(36);
+        expect(result.summary.monthlyEstimate).toBe(40);
+      });
+
+      it("counts at least one month when everything is this month", async () => {
+        scopedManager.query.mockResolvedValue([
+          row({ first_transaction_date: "2026-10-05", total_amount: "50" }),
+        ]);
+
+        const result = await service.getRecurringExpenses(mockUserId, 3, "all");
+
+        expect(result.summary.monthCount).toBe(1);
+        expect(result.summary.monthlyEstimate).toBe(50);
+      });
+
+      it("returns a zero estimate for all with nothing matched", async () => {
+        scopedManager.query.mockResolvedValue([]);
+
+        const result = await service.getRecurringExpenses(mockUserId, 3, "all");
+
+        expect(result.summary.monthlyEstimate).toBe(0);
+      });
+
+      it("scales the frequency thresholds by the window length", async () => {
+        // Over five years: 60 payments is monthly, 260 weekly, 130 biweekly,
+        // 30 occasional (one every two months), 10 irregular.
+        scopedManager.query.mockResolvedValue([
+          row({ payee_name_normalized: "m", payee_name: "M", occurrences: 60 }),
+          row({
+            payee_name_normalized: "w",
+            payee_name: "W",
+            occurrences: 260,
+          }),
+          row({
+            payee_name_normalized: "b",
+            payee_name: "B",
+            occurrences: 130,
+          }),
+          row({ payee_name_normalized: "o", payee_name: "O", occurrences: 30 }),
+          row({ payee_name_normalized: "i", payee_name: "I", occurrences: 10 }),
+        ]);
+
+        const result = await service.getRecurringExpenses(mockUserId, 3, "5y");
+
+        const byName = new Map(result.data.map((d) => [d.payeeName, d]));
+        expect(byName.get("M")!.frequency).toBe("MONTHLY");
+        expect(byName.get("W")!.frequency).toBe("WEEKLY");
+        expect(byName.get("B")!.frequency).toBe("BIWEEKLY");
+        expect(byName.get("O")!.frequency).toBe("OCCASIONAL");
+        expect(byName.get("I")!.frequency).toBe("IRREGULAR");
+      });
     });
 
     it("calls currency service with correct user id", async () => {
