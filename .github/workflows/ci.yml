@@ -651,6 +651,10 @@ jobs:
           # We explicitly don't provide HTTPS out-of-the-box since most users self-host in environments where HTTPS is terminated at a reverse proxy, and we provide guidance on how to securely configure this in our docs. 
           # We also have some known exception messages that contain payee names which would otherwise be flagged as potential secrets, but we have determined that the risk of these being exploited is low and the value of having the full exception message in our logs outweighs the risk.
           skip-rule: "javascript_lang_logger_leak,javascript_express_https_protocol_missing,javascript_lang_exception" 
+          # .trail/ is the Trail tool's own hook and learning notes: developer tooling
+          # that never ships in an image or runs in the app, so its findings are not
+          # Monize's attack surface.
+          skip-path: ".trail"
           # Exclude some false positives and low-risk findings that we are aware of and have accepted for now.
           # Each entry has a "review-by" date; the bearer-exceptions-review workflow
           # opens an issue when any entry is past due, so exceptions don't become permanent debt.
