@@ -1205,7 +1205,7 @@ Enforcement         backend/src/currencies/providers/fx-provider-chain.ts asks
                     stored value differs (IS DISTINCT FROM in the ON CONFLICT
                     clause).
 Test                The section 5 truth table of
-                    docs/future-plans/exchange-rate-providers.md as named cases
+                    docs/specs/exchange-rate-providers.md as named cases
                     in fx-provider-chain.spec.ts (in particular: first provider
                     did not answer, second answered empty -> answered false);
                     exchange-rate.service.spec.ts with the chain faked (the
@@ -1221,7 +1221,7 @@ Test                The section 5 truth table of
 Status              enforced -- the chain, the service on it, the source
                     guard and the currency lookup on the chain are on main
                     (tasks B1, B2 and B5 of
-                    docs/future-plans/exchange-rate-providers-tasks.md), the
+                    docs/specs/exchange-rate-providers.md), the
                     default order is frankfurter,yahoo (task R1), and the
                     section 5 truth table cases are named in
                     fx-provider-chain.spec.ts.
@@ -1980,7 +1980,7 @@ Statement           A transfer leg appears in a report only as a NAMED FLOW, and
                       accounts", or an inflow "From savings & investments",
                       "Borrowed" or "From other accounts", decided by the
                       counterpart account's type
-                      (docs/future-plans/sankey-cash-flow.md sections 3-5).
+                      (docs/specs/sankey-cash-flow.md sections 3-5).
                     Each leg counts once, by its own account and its own sign.
                     Without one of those two, a report excludes transfers
                     exactly as before. Transfers never enter income, expenses or
@@ -2016,7 +2016,7 @@ expenses, never as one of them.
 
 ### INV-SANKEY-001 -- the Cash Flow Sankey closes
 
-The design (`docs/future-plans/sankey-cash-flow.md`) names these five SANKEY-001
+The design (`docs/specs/sankey-cash-flow.md`) names these five SANKEY-001
 to SANKEY-005; the catalog prefixes them like every other entry.
 
 ```text
@@ -2790,7 +2790,7 @@ Source of truth     scheduled_transaction_postings (one row per claimed
 Enforcement         The write path (B5), the chronological fold and the
                     import ordering (B6), and the rule creation on the
                     mortgage and loan-setup paths (B7) are all built
-                    (docs/future-plans/loan-installment-settlement-tasks.md).
+                    (docs/specs/loan-installment-settlement.md).
                     The mechanism: idx_stp_occurrence,
                     claimed with INSERT ... ON CONFLICT DO NOTHING RETURNING id
                     by post() and by claimLoanOccurrence
@@ -4031,7 +4031,7 @@ logical operation key `(scheduledTransactionId, occurrenceDate)` that simply was
 not persisted -- and it now is, as scheduled_transaction_postings.
 
 A second writer of the same key, and release on delete (B5 of
-`docs/future-plans/loan-installment-settlement-tasks.md`, spec section 4.6):
+`docs/specs/loan-installment-settlement.md`, spec section 4.6):
 a `settle_loan_installment` rule claims an occurrence a bank row paid through
 the same `INSERT ... ON CONFLICT DO NOTHING RETURNING id` (INV-LOAN-008), so a
 bill post and a settlement of one slot cannot both succeed. And `post()` now
@@ -5452,7 +5452,7 @@ Enforcement         Two independent layers, and only one of them is code.
                     (2) Operator, documentation only: the s3:PutObject +
                     s3:AbortMultipartUpload token on a versioned, object-locked
                     bucket is described in docs/specs/backup-off-machine.md
-                    section 4 and docs/future-plans/backup-off-machine.md, and
+                    section 4 and docs/specs/backup-off-machine.md, and
                     nothing in this repository can observe the policy a
                     deployment actually issued. That half is why this entry is
                     partial rather than enforced.
@@ -7235,7 +7235,7 @@ Source of truth     the transactions ledger (datedLoanDebt) and the pass's own
                     plan; docs/specs/loan-installment-settlement.md sections 7.2
                     and 9.4.
 Enforcement         Built (B6 of
-                    docs/future-plans/loan-installment-settlement-tasks.md):
+                    docs/specs/loan-installment-settlement.md):
                     loadCandidateUnits takes direction "ASC" when a rule of
                     the run carries the action and "DESC" otherwise
                     (TransactionRulesRunService.plan, rule-run-candidates.ts),
@@ -7604,7 +7604,7 @@ Status              enforced
 
 ## Transaction search
 
-Design: `docs/future-plans/advanced-search.md` (sections 4 and 5). The
+Design: `docs/specs/advanced-search.md` (sections 4 and 5). The
 syntax is one string read the same way by the register, its totals, bulk
 update and the AI tools.
 

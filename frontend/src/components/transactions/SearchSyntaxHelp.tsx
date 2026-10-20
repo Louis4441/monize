@@ -18,7 +18,7 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 const POPOVER_WIDTH = 320;
 
 /**
- * The search syntax, one example per line (docs/future-plans/advanced-search.md,
+ * The search syntax, one example per line (docs/specs/advanced-search.md,
  * section 4). The example is the literal text a reader types, so it is not
  * translated; the explanation beside it is.
  */

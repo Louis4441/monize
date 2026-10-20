@@ -7,12 +7,12 @@ new transaction is labelled (tags, category, payee). A rule never moves money.
 This is the design half of a two-document plan; the task list is
 [`transaction-rules-tasks.md`](./transaction-rules-tasks.md).
 
-Status: **proposal**. It is not approved. The discussion that carries this
-proposal must get the `approved-to-build` label before any task in the task
-list starts (`CONTRIBUTING.md`). Sections 5 to 9 are the specification that
-`docs/financial-calculation-contract.md` section 9 asks for, because a rule
-writes to the ledger (it does not change amounts, but it changes what a report
-counts in a category).
+Status: **mostly built** (25 of 28 tasks merged; `backend/src/transaction-rules/`,
+`frontend/src/app/rules`, the retention and expiry crons). Open: X4 (import
+preview shows rule effects for QIF, OFX and CSV; bank sync has it through
+`backend/src/import-preview/rule-trace.ts`), E1 (the E2E journey: create a rule,
+import a QIF, see the tag) and S1 (the `approved-to-build` label on the
+discussion, never applied although the work shipped).
 
 ## 1. Goal
 

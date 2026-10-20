@@ -1,10 +1,14 @@
-# Native Microsoft Money (.mny) Import: Assessment and Agent Task List
+# Native Microsoft Money (.mny) Import: design record
 
-> Design + task breakdown for importing complete Microsoft Money `.mny` files through the Import
-> Transactions wizard, using only Monize-native TypeScript (no Python, no Java, no mdbtools, no
-> shell pipelines). Supersedes the approach in PR #192 (`poc/import-from-dotmny`) while preserving
-> everything that proof of concept learned. Written 2026-07 after a full review of PR #192, its
-> comment thread, issue #173, and external research into the .mny format.
+> Shipped (phases M0 to M4; `backend/src/import/mny/`, the Import wizard's
+> `.mny` path, `e2e/tests/import-mny.spec.ts`). Kept as the specification and
+> decision record for the importer: the assessment, the architecture decisions
+> (ADR-1 onward) and the as-built findings. The operator guide is
+> `docs/import-ms-money.md` and the data model is `docs/ms-money-data-model.md`.
+> Written 2026-07 after a full review of PR #192 (`poc/import-from-dotmny`), its
+> comment thread, issue #173, and external research into the .mny format; the
+> remaining optional item is the synthetic fixture (M4.6) and the two open
+> questions in section 12 wait on a real file.
 
 ## 1. Summary
 
@@ -1115,6 +1119,6 @@ wizard simply gains capability per phase.
   https://github.com/jahlborn/jackcessencrypt
 - sunriise (hung-le) — the Java exporter the PoC shelled out to; useful cross-reference for
   format behavior: https://github.com/hung-le/sunriise2-misc
-- In-repo: `docs/future-plans/row-level-security-tasks.md` (task-list conventions this document
+- In-repo: `docs/specs/row-level-security.md` (task-list conventions this document
   follows), `ms_money_portfolio_columns.md` (Money Portfolio Manager column semantics),
   `backend/src/import/` (wizard/import architecture being extended).

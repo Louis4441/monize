@@ -12,7 +12,7 @@ import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
  * entry points, seeders, bootstrap hooks, admin, backup, the MCP transport,
  * and the interceptor that seeds request scope) -- every entry wraps an
  * out-of-request call path or a genuinely cross-user sweep documented in
- * docs/future-plans/row-level-security-tasks.md (C1-C4, C6, R6/R7).
+ * docs/specs/row-level-security.md (tasks C1-C4, C6, R6/R7 of its retired task list).
  */
 const WITH_CONTEXT_ALLOWLIST = [
   "src/accounts/accounts.service.ts",

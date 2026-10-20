@@ -16,7 +16,7 @@ import {
 
 /**
  * The one door from a search string to a query (INV-SEARCH-001,
- * `docs/future-plans/advanced-search.md`). Every surface that takes a search
+ * `docs/specs/advanced-search.md`). Every surface that takes a search
  * string reads it here: the user's number and date formats are loaded, the
  * string is parsed once, and the clause is applied with the caller's aliases,
  * grain and parameter prefix. Escaping happens inside the builder; callers

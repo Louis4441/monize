@@ -9604,7 +9604,7 @@ describe("TransactionsService", () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    // Truth table B (docs/future-plans/split-bulk-update.md): a split parent's
+    // Truth table B (docs/specs/split-bulk-update.md): a split parent's
     // categories live on its lines and its amount must equal their sum, so a
     // category or amount change is refused unless a complete replacement
     // splits array accompanies the edit; parent fields change freely.

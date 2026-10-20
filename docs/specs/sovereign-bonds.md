@@ -1,6 +1,11 @@
 # Sovereign Bonds: Plan
 
-> Spec: [`docs/specs/polish-retail-bonds.md`](../specs/polish-retail-bonds.md). Task list: [`sovereign-bonds-tasks.md`](./sovereign-bonds-tasks.md). Adding a country: [`docs/backend/bond-adapters.md`](../backend/bond-adapters.md). Origin: discussion kenlasko/monize#1650.
+Shipped in WMP/monize#24 (origin: discussion kenlasko/monize#1650) and kept as
+the specification of the country-agnostic bond engine: its assumptions,
+architecture, the adapter contract, the global-readiness seams and the
+second-country check. The Polish products and their formulas are
+[`docs/specs/polish-retail-bonds.md`](./polish-retail-bonds.md); adding a
+country is [`docs/backend/bond-adapters.md`](../backend/bond-adapters.md).
 
 ## Goal
 
@@ -145,3 +150,25 @@ Per PR, the "Required before you push" list in `AGENTS.md`. PR 1 touches a
 migration, so it also runs `npm run migration:lint`, `scripts/verify-schema.sh`,
 `node scripts/check-migration-prefixes.mjs`, and `npm run build && npm run
 test:integration`.
+
+## Follow-ups
+
+Open after WMP/monize#24; none blocks the Polish products.
+
+- A valuation dated after the newest published observation shows `null` for a
+  started period (INV-BOND-002). Offer a projected value for a future `asOf`,
+  labelled as projected, instead of only naming what is missing.
+- Assumptions 3 and 4 of spec section 10 (the first day of an early
+  redemption, 24 December as a statutory day off) rest on a legal reading, not
+  on a published dated example; confirm them against an early redemption
+  statement. Assumptions 1 and 2 are confirmed by the Ministry's own examples.
+- Ministry announced period rates have no machine-readable source yet; the
+  table is filled by hand or by a later fetcher.
+- Series sold before 2024-01 (`TEMPLATE_NOT_VALIDATED`): the fetch and the
+  manual entry both refuse a sale month earlier than the product's `validFrom`
+  (`backend/src/bonds/adapters/pl/templates/`), so a person holding one needs
+  the template validated against that period's issue letter first.
+- The next countries, in the order of the "Phases" table's 6+ row, by
+  `docs/backend/bond-adapters.md`. The United States is worked through in its
+  section 7 and in the "Second-country example" section above: new primitives
+  for I and EE bonds, none for Treasury bills, no change to the Polish rules.

@@ -1,5 +1,10 @@
 # Plan: Cross-Owner Transfers (delegate's own account <-> account shared with them)
 
+This design shipped: every task of its task list was completed on branch
+`claude/cross-owner-transfers-5ig0bn` and the feature is in release 1.14.0
+(`docs/release-notes/1.14.0.md`). The plan is retired and this document is
+kept as the specification the code is held to.
+
 ## Goal
 
 Let a delegate move money between an account they **own** and an account **shared with them** via Shared Access. Today: Person A grants Person B full access to Account A; Person B cannot transfer funds from their own Account B to Account A. This plan makes that possible, from either context (B acting as A, or B in their own context), gated on B holding the matching write grant (`can_create` / `can_edit` / `can_delete`) on the shared account.
@@ -148,7 +153,7 @@ CREATE POLICY transactions_isolation ON transactions
 
 ### Phase 6 -- Tests & i18n
 
-See the companion task list ([`cross-owner-transfers-tasks.md`](./cross-owner-transfers-tasks.md)) for the per-task test matrix. Highlights:
+The per-task test matrix lived in the retired task list. Highlights:
 
 - Integration must prove the reshare-reconnect is **stateless**: share -> transfer -> unshare -> verify masking + frozen lock -> reshare -> full cross-leg edit works with no writes in between.
 - Guard spec must prove the own-account bypass applies to transfer decorators only (`@DelegatedAccountParam` still blocks).
@@ -184,3 +189,7 @@ See the companion task list ([`cross-owner-transfers-tasks.md`](./cross-owner-tr
 - `backend/src/transactions/transaction-tool-prep.service.ts`
 - `frontend/src/components/transactions/TransferTransactionFields.tsx`, `TransactionForm.tsx`, `frontend/src/lib/accounts.ts`
 - `database/migrations/` (next free number), `database/schema.sql`
+
+## Follow-ups
+
+None.

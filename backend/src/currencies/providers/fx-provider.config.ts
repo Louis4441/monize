@@ -3,7 +3,7 @@ import { FX_PROVIDER_NAMES, FxProviderName } from "./fx-provider.interface";
 /**
  * The providers asked when `FX_PROVIDERS` is unset or empty, in order.
  * Frankfurter (ECB reference rates) first, Yahoo second
- * (`docs/future-plans/exchange-rate-providers.md`, decision 2). Set
+ * (`docs/specs/exchange-rate-providers.md`, decision 2). Set
  * `FX_PROVIDERS=yahoo,frankfurter` to restore the previous order.
  */
 export const DEFAULT_FX_PROVIDERS: readonly FxProviderName[] = [

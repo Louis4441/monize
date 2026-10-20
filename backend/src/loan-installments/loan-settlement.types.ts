@@ -6,7 +6,7 @@ import { currencyMinorUnitDecimals } from "../common/currency-minor-unit.util";
  * installment is planned and recorded in (`docs/specs/loan-installment-settlement.md`,
  * sections 5, 8, 10 and 11). Pure data: the planner (`plan-loan-settlement.ts`)
  * produces them, the rules engine (B4, B5 of
- * `docs/future-plans/loan-installment-settlement-tasks.md`) carries them to
+ * `docs/specs/loan-installment-settlement.md`) carries them to
  * the trace, the fingerprint and the claim's `pricing` column.
  *
  * Nothing here imports a service: this module is part of the neutral loan core

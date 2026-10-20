@@ -1,6 +1,6 @@
 # Adding a country's bonds
 
-Read this before "add <country>'s bonds", a new bond product, or a new engine primitive. The engine is global; a country is an adapter, and nearly every product is data. The rules that hold it are in `docs/system-invariants.md` (INV-BOND-001 to INV-BOND-009); the Polish products and their formulas are `docs/specs/polish-retail-bonds.md`; the plan is `docs/future-plans/sovereign-bonds.md`.
+Read this before "add <country>'s bonds", a new bond product, or a new engine primitive. The engine is global; a country is an adapter, and nearly every product is data. The rules that hold it are in `docs/system-invariants.md` (INV-BOND-001 to INV-BOND-009); the Polish products and their formulas are `docs/specs/polish-retail-bonds.md`; the engine specification is `docs/specs/sovereign-bonds.md`.
 
 ## 1. The model
 

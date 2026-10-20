@@ -1,12 +1,13 @@
 # Document scanner for attachments
 
-Design for the first part of Discussion #1292: an optional, deterministic
-"scan" step that turns a phone photo of a receipt, invoice or agreement into a
-clean document image before it is attached to a transaction, while keeping the
-original photo. The second part of that discussion (a PWA share target) is a
-separate plan and is not covered here.
-
-Companion task list: [`document-scanner-tasks.md`](./document-scanner-tasks.md).
+Shipped (the first part of Discussion #1292; `frontend/src/lib/document-scanner/`,
+`useDocumentScanner.ts`, migration `20260906235944_attachment_scan_original_link.sql`,
+INV-ATTACHMENT-001 and INV-ATTACHMENT-002). Kept as the specification: an
+optional, deterministic "scan" step that turns a phone photo of a receipt,
+invoice or agreement into a clean document image before it is attached to a
+transaction, while keeping the original photo. The second part of that
+discussion, the PWA share target, has also shipped and is described in
+`docs/frontend/pwa-push-share.md`.
 
 ## Context
 

@@ -26,7 +26,7 @@ import {
  * `FxProviderChain`, the one door every provider question goes through
  * (INV-FX-005). An unknown name throws `FxProviderConfigError` and the
  * application does not start, naming the valid names, rather than running on a
- * list the operator did not write (`docs/future-plans/exchange-rate-providers.md`,
+ * list the operator did not write (`docs/specs/exchange-rate-providers.md`,
  * decision 11). The `Record` is typed over `FxProviderName`, so a name added to
  * `FX_PROVIDER_NAMES` without an adapter here fails to compile.
  *

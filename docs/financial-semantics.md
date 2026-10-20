@@ -94,7 +94,7 @@ neither.
 
 The Cash Flow Sankey report (`backend/src/built-in-reports/cash-flow-sankey.service.ts`,
 arithmetic in `cash-flow-sankey-assembly.ts`) is the one surface that draws a
-transfer leg as a flow. Its rules, from `docs/future-plans/sankey-cash-flow.md`:
+transfer leg as a flow. Its rules, from `docs/specs/sankey-cash-flow.md`:
 
 1. **Scope is a set of cash-flow accounts.** By default every open `CHEQUING`,
    `SAVINGS`, `CASH`, `CREDIT_CARD` and `LINE_OF_CREDIT` account (never an

@@ -24,7 +24,7 @@
  * the rules cannot see -- the reason is mandatory:
  *   -- migration-lint-disable-next-line insert-without-on-conflict: reason
  *
- * See docs/database-migrations.md and docs/future-plans/mny-import.md (B1).
+ * See docs/database-migrations.md and docs/specs/mny-import.md (B1).
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, dirname, basename } from "node:path";

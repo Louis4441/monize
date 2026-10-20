@@ -451,7 +451,7 @@ export interface DuplicateTransactionsResponse {
   };
 }
 
-// Cash Flow Sankey types (docs/future-plans/sankey-cash-flow.md section 6)
+// Cash Flow Sankey types (docs/specs/sankey-cash-flow.md section 6)
 export type CashFlowSankeyDepth = 1 | 2;
 
 export interface CashFlowSankeyParams extends ReportQueryParams {

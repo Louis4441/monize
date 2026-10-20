@@ -262,7 +262,7 @@ The login page pre-fills `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD` from that modu
 
 ## A link from a report to Transactions is `buildTransactionsHref`
 
-`buildTransactionsHref` (`frontend/src/lib/transactions-href.ts`) writes the parameters `useTransactionFilters` reads (`categoryId` including the `SPECIAL_CATEGORY_FILTER_IDS` pseudo-ids, `categoryType`, `accountIds`, `startDate`, `endDate`) through `URLSearchParams`. The Cash Flow Sankey uses it; the other reports still build their own URLs and migrate onto it in a separate cleanup (task M1 of `docs/future-plans/sankey-cash-flow-tasks.md`).
+`buildTransactionsHref` (`frontend/src/lib/transactions-href.ts`) writes the parameters `useTransactionFilters` reads (`categoryId` including the `SPECIAL_CATEGORY_FILTER_IDS` pseudo-ids, `categoryType`, `accountIds`, `startDate`, `endDate`) through `URLSearchParams`. The Cash Flow Sankey uses it; the other reports still build their own URLs and migrate onto it in a separate cleanup (follow-up M1 in `docs/specs/sankey-cash-flow.md` section 14).
 
 ## A clickable table row -- `useLongPress({ onClick })`
 

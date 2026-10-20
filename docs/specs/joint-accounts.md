@@ -1,5 +1,10 @@
 # Plan: Joint Accounts (native visibility of shared accounts)
 
+This design shipped: the spec and task list landed in PR #1027, every task of
+the task list is done, and the feature is in release 1.14.0
+(`docs/release-notes/1.14.0.md`). The plan is retired and this document is
+kept as the specification the code is held to.
+
 ## Goal
 
 Let an account owner mark any of their accounts as a **joint account** for one or more other
@@ -140,7 +145,6 @@ and top-payees panels from them and rendered all three empty beside a populated 
 `/transactions/tag-key-breakdown` stays owner-only on purpose -- tags are personal, and a joint row
 never carries the grantee's.
 
-## Companion task list
+## Follow-ups
 
-See [`joint-accounts-tasks.md`](./joint-accounts-tasks.md) for the per-task breakdown, dependency
-order, deploy-impact classes and acceptance criteria.
+None.

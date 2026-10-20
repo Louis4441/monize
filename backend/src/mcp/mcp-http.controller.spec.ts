@@ -1310,7 +1310,7 @@ describe("McpHttpController", () => {
   });
 
   /**
-   * M1 (`docs/future-plans/horizontal-scaling-tasks.md`) asked whether a 2025-era
+   * M1 (`docs/specs/horizontal-scaling.md`, WP6) asked whether a 2025-era
    * session can be re-created on another replica from a persisted
    * `session_id -> user_id` row. It cannot, and these two SDK facts are why.
    * They are pinned here rather than written down only in prose: an SDK upgrade

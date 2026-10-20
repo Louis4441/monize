@@ -793,7 +793,7 @@ export async function resolveInstallmentCore(
     };
   }
   // Still owed to the settlement planner (B3/B4 of
-  // `docs/future-plans/loan-installment-settlement-tasks.md`): refusing an
+  // `docs/specs/loan-installment-settlement.md`): refusing an
   // unknown cadence. `periodicRateFor` defaults it to DEFAULT_PERIODS_PER_YEAR
   // for every purpose, this one included, until the planner checks
   // `periodsPerYearForStoredFrequency` itself before calling the tail.

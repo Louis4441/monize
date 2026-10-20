@@ -29,7 +29,7 @@ import {
 
 /**
  * The search clause builder against real PostgreSQL: the truth tables of
- * `docs/future-plans/advanced-search.md` section 8 at both grains, the
+ * `docs/specs/advanced-search.md` section 8 at both grains, the
  * reference key's SQL against its TypeScript twin, and INV-SEARCH-002 --
  * a single bare term finds exactly the transactions the single-term clause
  * every call site uses today finds.

@@ -1,5 +1,10 @@
 # Plan: Investment Account Consolidation (one visible account per brokerage/cash pair)
 
+This design shipped: every task of its task list was completed on branch
+`claude/investment-account-consolidation-8x3lvz`, answering GitHub discussion
+#903. The plan is retired and this document is kept as the specification the
+code is held to.
+
 ## Goal
 
 An investment account pair -- an `INVESTMENT_BROKERAGE` account and its linked `INVESTMENT_CASH`
@@ -367,7 +372,6 @@ rule. Import-wizard account pickers keep raw names.
 - `backend/src/accounts/accounts.service.ts` -- close/reopen symmetry, holdings guard, rename propagation
 - `backend/src/securities/portfolio-calculation.service.ts` -- `unpricedHoldingsCount`, the contract-critical backend addition
 
-## Companion task list
+## Follow-ups
 
-See [`investment-account-consolidation-tasks.md`](./investment-account-consolidation-tasks.md)
-for the per-task breakdown, dependency order, deploy-impact classes and acceptance criteria.
+None.

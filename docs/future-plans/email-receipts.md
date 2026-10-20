@@ -5,11 +5,10 @@ task list) and `docs/specs/email-receipt-matching.md` (the
 matching and proposal arithmetic: truth tables, numerical examples, missing-data
 policy, test matrix).
 
-Status: **implemented on a fork branch, not approved upstream.** Discussion
-kenlasko/monize#930 proposes the feature; the maintainer has not given it the
-`approved-to-build` label. The branch author asked for the whole feature in one
-branch. The maintainer decides whether it merges, in what slices, and the open
-questions in section 12.
+Status: **on `main`** since PR #1497 (2026-10-09), with #1756, #1770 and #1771
+after it; `backend/src/email-receipts/`. Open: E1 (the E2E test against a
+GreenMail container, not yet in `docker-compose.e2e.yml`) and the open questions
+in section 12, which the maintainer decides.
 
 ## 1. Goal
 
@@ -29,7 +28,7 @@ user chose that.
 
 A brokerage's trade-confirmation email is the other half of the same idea (it
 has no bank transaction to enrich; it IS the missing transaction):
-[`email-receipt-trades.md`](./email-receipt-trades.md).
+[`email-receipt-trades.md`](../specs/email-receipt-trades.md).
 
 Out of scope for this branch: receipt photos and OCR (a vision pass over an
 image attachment), more than one mailbox per user, POP3, and attaching the
@@ -199,7 +198,7 @@ section 10.5).
     the visible text, has no such limit.
 
     Archived mail (`.eml`, `.mbox`, `.zip`, Outlook `.msg`) is imported through
-    the same row builder; see `email-receipts-archive-import.md`.
+    the same row builder (`backend/src/email-receipts/import/`).
 
 ## 3a. OAuth2 login (Google, Microsoft 365)
 
@@ -1104,8 +1103,7 @@ section 3a.
   stays limited to one to 25 emails (five per sender, five senders) and never works on a filter.
   The filter also takes `excludeStatuses`, `excludeDomains`, `receivedFrom` and
   `receivedTo`, and `POST /email-receipts/bulk/count`, `bulk/reprocess` and
-  `bulk/approvable` act on the same selection (`receiptSelectionClause`); the plan
-  is `docs/future-plans/email-receipts-bulk-actions.md`.
+  `bulk/approvable` act on the same selection (`receiptSelectionClause`).
 - `/ai-reviews`: an `email_receipt` row shows the sender and subject instead of
   the rule name, and a `pending` one says it waits for an AI agent (with a link
   to the AI settings). An `email_parser_draft` row reads "Parser draft from N

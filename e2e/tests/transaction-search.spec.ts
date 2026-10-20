@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures';
 import { createAccount, createTransaction } from '../helpers/factories';
 import { uniqueId } from '../helpers/api';
 
-// The transaction search syntax (docs/future-plans/advanced-search.md): the
+// The transaction search syntax (docs/specs/advanced-search.md): the
 // cheque-number case from Discussion #1723, the line that says how a search
 // was read, and the syntax help writing an example into the box. Seeded
 // through the API; the account filter in the URL scopes the register to these

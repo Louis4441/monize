@@ -14,7 +14,7 @@ import { E2E_DEFAULT_PASSWORD } from '../helpers/credentials';
  * Everything else in this suite runs against one backend, where a counter in a
  * `Map` and a counter in a row behave identically -- which is exactly why the
  * horizontal-scaling defects were invisible for so long
- * (`docs/future-plans/horizontal-scaling.md`). These tests are the only place
+ * (`docs/specs/horizontal-scaling.md`). These tests are the only place
  * in the repository where a second replica actually answers a browser, so they
  * are the only place a regression to process-local state shows up as a failing
  * user-visible outcome rather than as an integration test about a table.

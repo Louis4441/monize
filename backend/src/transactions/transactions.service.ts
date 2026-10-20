@@ -915,7 +915,7 @@ export class TransactionsService {
    *
    * Transfers are still rejected here: their linked legs need the dedicated
    * edit flow. Split transactions are editable per Truth table B in
-   * docs/future-plans/split-bulk-update.md: parent fields (payee, date,
+   * docs/specs/split-bulk-update.md: parent fields (payee, date,
    * description) change freely, and a category or amount change is allowed
    * only when a complete replacement splits array accompanies the edit
    * (`splitsAccompany`), because a split parent's categories live on its lines

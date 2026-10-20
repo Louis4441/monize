@@ -1,17 +1,16 @@
 # Advanced transaction search
 
-Design for giving the one transaction search string a small, documented
+Specification of the one transaction search string's small, documented
 query syntax: field qualifiers, exact match, wildcards, quoted phrases,
-negation, and amount and date comparisons, with no regular expressions. Proposed
-in answer to Discussion #1723, which asked for a dedicated exact "Ref #"
-filter because searching `#10` returns cheques 100, 101, 110 and 1010 and
-every amount or memo containing "10". The task list is
-[`advanced-search-tasks.md`](./advanced-search-tasks.md).
-
-Status: **done** (2026-10-13). B1 to F2 are merged (#1729 to #1734), with the
-review fixes in #1736 and #1742; F3 and Q land in #1741. The decisions in
-section 3 were agreed in the planning session of 2026-10-12; section 13
-records how each open question was answered.
+negation, and amount and date comparisons, with no regular expressions.
+Proposed in answer to Discussion #1723, which asked for a dedicated exact
+"Ref #" filter because searching `#10` returned cheques 100, 101, 110 and
+1010 and every amount or memo containing "10". It shipped on 2026-10-13 in
+PRs #1729 to #1734, with the review fixes in #1736 and #1742 and the E2E and
+release note in #1741; the decisions in section 3 were agreed in the planning
+session of 2026-10-12 and section 13 records how each open question was
+answered. The plan is retired and this document is kept as the specification
+the code is held to.
 
 **Answer to the Discussion:** `ref:=10`, or the shorthand `#10`, returns
 cheque 10 and nothing else.
@@ -431,3 +430,7 @@ task Q.
    (a category change still rewrites the lines the category filter picks,
    not the lines the search matched, as before the syntax); every term
    of a search must hold on the same line.
+
+## 14. Follow-ups
+
+None.
