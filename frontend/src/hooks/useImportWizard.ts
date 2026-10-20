@@ -1001,6 +1001,7 @@ export function useImportWizard() {
               accountName: targetAccount?.name || 'Unknown',
               imported: result.imported,
               skipped: result.skipped,
+              skippedRows: result.skippedRows,
               errors: result.errors,
               errorMessages: result.errorMessages,
               loanAccountsNeedingSetup: result.loanAccountsNeedingSetup,
