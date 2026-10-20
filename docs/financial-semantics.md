@@ -576,6 +576,8 @@ alone left every consumer free to pick the wrong occurrence and be confidently
 wrong about a number that was itself correct. INV-OCCURRENCE-003 in
 `docs/system-invariants.md` records the enforcement.
 
+An occurrence that fell due and was neither posted nor skipped is still owed. Posting and skipping both advance `next_due_date` past the slot, and every expansion walks from there, so an occurrence that comes back dated before a projection's first day is one the user still has to pay or collect. Both balance projections apply it on their first day rather than dropping it: the cash-flow forecast on today, the account balance forecast on tomorrow, because its today is the posted balance. Each projection says how many it carried. Dropping it showed a balance that only held if the bill was never paid. That is the opposite of a forecast, and the gap grew with every day the bill stayed unposted (discussion #1784). The occurrence keeps every other rule: its effective amount and date, its share of `occurrences_remaining`, the schedule's `end_date`, and the withholding when it cannot be priced. The projection knows an occurrence is settled only through `next_due_date`: a bill paid by entering a plain transaction, with its occurrence left unposted, is counted a second time on the first day until that occurrence is posted or skipped.
+
 ## 8. Import and restore: zero, null, absent
 
 The MS Money importer is deliberately not uniform, and the distinction is worth
