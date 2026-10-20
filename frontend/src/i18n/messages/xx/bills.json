@@ -39,6 +39,7 @@
     "scheduledCount": "[XX-{count, plural, one {# scheduled transaction} other {# scheduled transactions}} in forecast-XX]",
     "tooltipTransactions": "[XX-Transactions:-XX]",
     "tooltipMore": "[XX-+{count} more-XX]",
+    "tooltipOverdue": "[XX-Includes {count, plural, one {# overdue scheduled transaction} other {# overdue scheduled transactions}}-XX]",
     "noData": "[XX-No data to display-XX]",
     "noAccounts": "[XX-No accounts found-XX]",
     "noScheduled": "[XX-No scheduled transactions-XX]",

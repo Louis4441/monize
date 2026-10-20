@@ -45,5 +45,6 @@
     "missingRate": "[XX-{name}: the exchange rate this occurrence settles at is not available, so the amount it will post is unknown.-XX]",
     "crossCurrencyTransfer": "[XX-{name}: a transfer arriving from an account in {from} while this account is in {to}. The amount that lands here is set when the transfer posts, so it cannot be projected in advance.-XX]",
     "howToFix": "[XX-To fix a missing rate: open Currencies and refresh the rates, or check that the security and its settlement account carry the currencies you expect.-XX]"
-  }
+  },
+  "forecastOverdue": "[XX-Includes {count, plural, one {# overdue scheduled transaction} other {# overdue scheduled transactions}}-XX]"
 }
