@@ -20,6 +20,9 @@ export interface DonutCalloutSlice {
 
 export type DonutCalloutView = 'callouts' | 'legend';
 
+/** Pixels, or a percentage string as Recharts' Pie reads one. */
+type PieRadius = number | string;
+
 interface DonutCalloutChartProps<T extends DonutCalloutSlice> {
   slices: readonly T[];
   view: DonutCalloutView;
@@ -35,10 +38,11 @@ interface DonutCalloutChartProps<T extends DonutCalloutSlice> {
   legendValues?: boolean;
   legendColumnsClassName?: string;
   /**
-   * The legend view's donut, in pixels or as a share of the area. Default
-   * 55% / 85%, the callout view's proportions.
+   * The legend view's donut, in pixels or as Recharts' percentage string (a
+   * share of the area's smaller half). Default 55% / 85%, the callout view's
+   * proportions.
    */
-  legendRadii?: { inner: number | `${number}%`; outer: number | `${number}%` };
+  legendRadii?: { inner: PieRadius; outer: PieRadius };
   /** Height classes of the legend view's chart area. */
   legendAreaClassName?: string;
 }
@@ -79,7 +83,7 @@ function useElementSize<T extends HTMLElement>() {
 }
 
 /** A Recharts radius (pixels or a share of the area's smaller half) in pixels. */
-function radiusInPixels(radius: number | `${number}%`, size: Size): number {
+function radiusInPixels(radius: PieRadius, size: Size): number {
   if (typeof radius === 'number') return radius;
   return (parseFloat(radius) / 100) * (Math.min(size.width, size.height) / 2);
 }
