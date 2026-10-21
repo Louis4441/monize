@@ -8,14 +8,18 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { chartSeriesColor } from '@/lib/chart-colors';
+import { RecurringExpenseItem } from '@/types/built-in-reports';
+import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
 import { WidgetSegmentedControl } from './WidgetSegmentedControl';
-import { RecurringExpensesChart, RecurringSlice } from './RecurringExpensesChart';
+import { DonutCalloutChart, DonutCalloutSlice } from './DonutCalloutChart';
 import { RECURRING_EXPENSES_DEFAULT, RECURRING_RANGES, RecurringConfig } from './widget-config';
 
 const WIDGET_ID = 'recurring-expenses';
 const MIN_OCCURRENCE_OPTIONS = [2, 3, 4, 5, 6];
+
+type RecurringSlice = DonutCalloutSlice & { item: RecurringExpenseItem };
 
 interface RecurringExpensesWidgetProps {
   isLoading: boolean;
@@ -24,7 +28,7 @@ interface RecurringExpensesWidgetProps {
 export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetProps) {
   const t = useTranslations('dashboard');
   const router = useRouter();
-  const { formatCurrencyCompact } = useNumberFormat();
+  const { formatCurrency, formatCurrencyCompact } = useNumberFormat();
   const { config, updateConfig } = useWidgetConfig<RecurringConfig>(
     WIDGET_ID,
     RECURRING_EXPENSES_DEFAULT,
@@ -37,18 +41,21 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
 
   const chartData = useMemo<RecurringSlice[]>(
     () =>
-      (response?.data ?? []).slice(0, 10).map((item, index) => ({
-        ...item,
-        color: chartSeriesColor(index),
-      })),
-    [response],
+      (response?.data ?? []).slice(0, 10).map((item, index) => {
+        const payeeId = item.payeeId;
+        return {
+          key: payeeId || item.payeeName,
+          name: item.payeeName,
+          value: item.totalAmount,
+          color: chartSeriesColor(index),
+          onClick: payeeId ? () => router.push(`/transactions?payeeId=${payeeId}`) : undefined,
+          item,
+        };
+      }),
+    [response, router],
   );
 
   const monthlyEstimate = response?.summary.monthlyEstimate ?? 0;
-
-  const handleSliceClick = (payeeId: string | null) => {
-    if (payeeId) router.push(`/transactions?payeeId=${payeeId}`);
-  };
 
   const rangeLabel = (range: string) =>
     t(`widgets.rangeLabels.${range}` as Parameters<typeof t>[0]);
@@ -107,19 +114,27 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
       ) : chartData.length === 0 ? (
         <WidgetMessage>{t('recurringExpenses.empty')}</WidgetMessage>
       ) : (
-        <>
-          <RecurringExpensesChart
-            slices={chartData}
-            view={config.view}
-            onSliceClick={handleSliceClick}
-          />
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm flex-shrink-0">
-            <span className="text-gray-500 dark:text-gray-400">{t('recurringExpenses.monthlyEstimate')}</span>
-            <span className="font-semibold text-gray-900 dark:text-gray-100">
-              {formatCurrencyCompact(monthlyEstimate)}
-            </span>
-          </div>
-        </>
+        <DonutCalloutChart
+          slices={chartData}
+          view={config.view}
+          label={t('recurringExpenses.title')}
+          formatValue={(value) => formatCurrencyCompact(value)}
+          // The estimate is what the slices come to a month, so it belongs in
+          // the donut's hole rather than in a row under the chart.
+          center={{
+            label: t('recurringExpenses.monthlyEstimate'),
+            value: formatCurrencyCompact(monthlyEstimate),
+          }}
+          renderTooltip={(slice) => (
+            <ChartTooltipPanel>
+              <p className="font-medium text-gray-900 dark:text-gray-100">{slice.name}</p>
+              <p className="text-gray-600 dark:text-gray-400">{formatCurrency(slice.value)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t('recurringExpenses.occurrences', { count: slice.item.occurrences })}
+              </p>
+            </ChartTooltipPanel>
+          )}
+        />
       )}
     </WidgetCard>
   );

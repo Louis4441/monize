@@ -6,7 +6,7 @@ import {
   DEFAULT_CALLOUT_OPTIONS,
   layoutCallouts,
   sliceMidAngles,
-} from './recurring-callout-layout';
+} from './donut-callout-layout';
 
 const TEN = [500, 320, 240, 180, 120, 90, 60, 40, 25, 10];
 

@@ -150,7 +150,9 @@
     "other": "Other",
     "insideOther": "{count, plural, one {# category in Other} other {# categories in Other}}",
     "topLevelOnly": "Top level categories",
-    "topLevelOnlyHint": "Count subcategories against their parent"
+    "topLevelOnlyHint": "Count subcategories against their parent",
+    "viewCallouts": "Labels",
+    "viewLegend": "Legend"
   },
   "incomeExpenses": {
     "title": "Income vs Expenses",

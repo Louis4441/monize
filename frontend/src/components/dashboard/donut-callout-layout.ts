@@ -1,7 +1,7 @@
 /**
- * Geometry for the Top Recurring Expenses widget's callout view: a donut in the
- * middle, one labelled box per slice in a column on either side, and a leader
- * line from each slice to its box.
+ * Geometry for a dashboard donut's callout view (Top Recurring Expenses,
+ * Expenses by Category): a donut in the middle, one labelled box per slice in a
+ * column on either side, and a leader line from each slice to its box.
  *
  * Pure so the guarantees the view makes can be tested without a browser: no two
  * boxes overlap, nothing leaves the measured area, and when the area is too
