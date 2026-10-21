@@ -150,7 +150,9 @@
     "other": "[XX-Other-XX]",
     "insideOther": "[XX-{count, plural, one {# category in Other} other {# categories in Other}}-XX]",
     "topLevelOnly": "[XX-Top level categories-XX]",
-    "topLevelOnlyHint": "[XX-Count subcategories against their parent-XX]"
+    "topLevelOnlyHint": "[XX-Count subcategories against their parent-XX]",
+    "viewCallouts": "[XX-Labels-XX]",
+    "viewLegend": "[XX-Legend-XX]"
   },
   "incomeExpenses": {
     "title": "[XX-Income vs Expenses-XX]",

@@ -150,7 +150,9 @@
     "other": "Diğer",
     "insideOther": "{count, plural, other {Diğer içinde # kategori}}",
     "topLevelOnly": "Üst düzey kategoriler",
-    "topLevelOnlyHint": "Alt kategorileri üst kategorisinde say"
+    "topLevelOnlyHint": "Alt kategorileri üst kategorisinde say",
+    "viewCallouts": "Etiketler",
+    "viewLegend": "Gösterge"
   },
   "incomeExpenses": {
     "title": "Gelir ve Giderler",

@@ -150,7 +150,9 @@
     "other": "Otros",
     "insideOther": "{count, plural, one {# categoría en Otros} other {# categorías en Otros}}",
     "topLevelOnly": "Categorías principales",
-    "topLevelOnlyHint": "Contar las subcategorías en su categoría principal"
+    "topLevelOnlyHint": "Contar las subcategorías en su categoría principal",
+    "viewCallouts": "Etiquetas",
+    "viewLegend": "Leyenda"
   },
   "incomeExpenses": {
     "title": "Ingresos vs Gastos",

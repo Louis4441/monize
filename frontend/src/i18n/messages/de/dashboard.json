@@ -150,7 +150,9 @@
     "other": "Sonstiges",
     "insideOther": "{count, plural, one {# Kategorie unter Sonstige} other {# Kategorien unter Sonstige}}",
     "topLevelOnly": "Oberkategorien",
-    "topLevelOnlyHint": "Unterkategorien der Oberkategorie zurechnen"
+    "topLevelOnlyHint": "Unterkategorien der Oberkategorie zurechnen",
+    "viewCallouts": "Beschriftungen",
+    "viewLegend": "Legende"
   },
   "incomeExpenses": {
     "title": "Einnahmen vs. Ausgaben",

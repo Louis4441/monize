@@ -150,7 +150,9 @@
     "other": "Outros",
     "insideOther": "{count, plural, one {# categoria em Outros} other {# categorias em Outros}}",
     "topLevelOnly": "Categorias principais",
-    "topLevelOnlyHint": "Contar as subcategorias na categoria principal"
+    "topLevelOnlyHint": "Contar as subcategorias na categoria principal",
+    "viewCallouts": "Rótulos",
+    "viewLegend": "Legenda"
   },
   "incomeExpenses": {
     "title": "Receitas vs Despesas",

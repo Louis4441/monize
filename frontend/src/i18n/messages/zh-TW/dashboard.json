@@ -150,7 +150,9 @@
     "other": "其他",
     "insideOther": "{count, plural, other {其他中有 # 個類別}}",
     "topLevelOnly": "頂層類別",
-    "topLevelOnlyHint": "將子類別計入其父類別"
+    "topLevelOnlyHint": "將子類別計入其父類別",
+    "viewCallouts": "標籤",
+    "viewLegend": "圖例"
   },
   "incomeExpenses": {
     "title": "收入與支出",
