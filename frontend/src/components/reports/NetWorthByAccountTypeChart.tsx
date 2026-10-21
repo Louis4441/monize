@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { AccountType } from '@/types/account';
+import { isLiabilityAccountType, type AccountType } from '@/types/account';
 import type { MonthlyNetWorth } from '@/types/net-worth';
 import { chartColors } from '@/lib/chart-colors';
 import {
@@ -70,7 +70,11 @@ function NetWorthByAccountTypeTooltip({
 }: TooltipBodyProps) {
   const point = active ? (payload?.[0]?.payload as NetWorthByAccountTypePoint | undefined) : undefined;
   if (!point) return null;
-  const rows = types.filter((type) => point.byAccountType?.[type] !== undefined);
+  // Only what the month holds: a type at zero this month contributes nothing.
+  const rows = types.filter((type) => {
+    const value = point.byAccountType?.[type];
+    return value !== undefined && value !== 0;
+  });
   return (
     <ChartTooltipPanel>
       <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">{point.name}</p>
@@ -159,6 +163,10 @@ export function NetWorthByAccountTypeChart({
             stackId="net-worth"
             name={typeLabel(type)}
             fill={netWorthAccountTypeColor(type)}
+            // The legend names the asset types the bars are made of; what is
+            // owed is read from the tooltip and the net worth line, not the
+            // bars, so it takes no legend entry.
+            legendType={isLiabilityAccountType(type) ? 'none' : undefined}
           />
         ))}
         {types.length === 0 && (

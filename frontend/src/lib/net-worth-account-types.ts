@@ -37,7 +37,9 @@ export function netWorthAccountTypeColor(type: AccountType): string {
 }
 
 /**
- * The account types any month of the series holds, in stacking order. Empty
+ * The account types any month of the series holds a non-zero amount in, in
+ * stacking order. A type that is zero in every month (an emptied or paid-off
+ * account) has nothing to draw, so it gets no bar and no legend entry. Empty
  * when no month carries the breakdown (an older backend mid-deploy), which the
  * chart reads as "draw net worth alone".
  */
@@ -46,8 +48,8 @@ export function netWorthAccountTypes(
 ): AccountType[] {
   const present = new Set<AccountType>();
   for (const month of months) {
-    for (const type of Object.keys(month.byAccountType ?? {})) {
-      present.add(type as AccountType);
+    for (const [type, value] of Object.entries(month.byAccountType ?? {})) {
+      if (value !== undefined && value !== 0) present.add(type as AccountType);
     }
   }
   return NET_WORTH_ACCOUNT_TYPE_ORDER.filter((type) => present.has(type));

@@ -17,6 +17,15 @@ describe('netWorthAccountTypes', () => {
     ).toEqual(['CHEQUING', 'INVESTMENT', 'MORTGAGE']);
   });
 
+  it('leaves out a type that is zero in every month, but keeps one held in any month', () => {
+    expect(
+      netWorthAccountTypes([
+        { byAccountType: { CHEQUING: 10, SAVINGS: 0, CREDIT_CARD: 0 } },
+        { byAccountType: { CHEQUING: 12, SAVINGS: 0, CREDIT_CARD: -40 } },
+      ]),
+    ).toEqual(['CHEQUING', 'CREDIT_CARD']);
+  });
+
   it('is empty when no month carries the breakdown', () => {
     expect(netWorthAccountTypes([{}, { byAccountType: undefined }])).toEqual([]);
   });

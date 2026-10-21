@@ -7,8 +7,14 @@ const tooltipPoint = vi.hoisted(() => ({ current: null as unknown }));
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
   ComposedChart: ({ children }: any) => <div data-testid="composed-chart">{children}</div>,
-  Bar: ({ name, fill, dataKey }: any) => (
-    <div data-testid="bar" data-name={name} data-fill={fill} data-key={typeof dataKey === 'string' ? dataKey : 'fn'} />
+  Bar: ({ name, fill, dataKey, legendType }: any) => (
+    <div
+      data-testid="bar"
+      data-name={name}
+      data-fill={fill}
+      data-key={typeof dataKey === 'string' ? dataKey : 'fn'}
+      data-legend={legendType ?? ''}
+    />
   ),
   Line: ({ children, name, legendType }: any) => (
     <div data-testid="line" data-name={name ?? ''} data-legend={legendType ?? ''}>{children}</div>
@@ -87,6 +93,35 @@ describe('NetWorthByAccountTypeChart', () => {
     tooltipPoint.current = months[0];
     renderChart();
     expect(screen.queryByText('Credit Card')).not.toBeInTheDocument();
+  });
+
+  it('names only the asset types in the legend', () => {
+    tooltipPoint.current = null;
+    renderChart();
+    const legendOf = (name: string) =>
+      screen.getAllByTestId('bar').find((bar) => bar.getAttribute('data-name') === name)!.getAttribute('data-legend');
+    expect(legendOf('Chequing')).toBe('');
+    expect(legendOf('Investment')).toBe('');
+    expect(legendOf('Credit Card')).toBe('none');
+    expect(legendOf('Mortgage')).toBe('none');
+  });
+
+  it('draws no series for an account type that is zero in every month', () => {
+    tooltipPoint.current = null;
+    renderChart({
+      data: months.map((month) => ({
+        ...month,
+        byAccountType: { ...month.byAccountType, SAVINGS: 0 },
+      })),
+    });
+    expect(screen.getAllByTestId('bar').map((bar) => bar.getAttribute('data-name'))).not.toContain('Savings');
+  });
+
+  it('leaves a type at zero in the hovered month out of its tooltip', () => {
+    tooltipPoint.current = { ...months[1], byAccountType: { ...months[1].byAccountType, CREDIT_CARD: 0 } };
+    renderChart();
+    expect(screen.queryByText('Credit Card')).not.toBeInTheDocument();
+    expect(screen.getByText('Mortgage')).toBeInTheDocument();
   });
 
   it('draws net worth alone when the response carries no breakdown', () => {
