@@ -7,13 +7,12 @@ const tooltipPoint = vi.hoisted(() => ({ current: null as unknown }));
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
   ComposedChart: ({ children }: any) => <div data-testid="composed-chart">{children}</div>,
-  Bar: ({ name, fill, dataKey, legendType }: any) => (
+  Bar: ({ name, fill, dataKey }: any) => (
     <div
       data-testid="bar"
       data-name={name}
       data-fill={fill}
       data-key={typeof dataKey === 'string' ? dataKey : 'fn'}
-      data-legend={legendType ?? ''}
     />
   ),
   Line: ({ children, name, legendType }: any) => (
@@ -95,17 +94,6 @@ describe('NetWorthByAccountTypeChart', () => {
     expect(screen.queryByText('Credit Card')).not.toBeInTheDocument();
   });
 
-  it('names only the asset types in the legend', () => {
-    tooltipPoint.current = null;
-    renderChart();
-    const legendOf = (name: string) =>
-      screen.getAllByTestId('bar').find((bar) => bar.getAttribute('data-name') === name)!.getAttribute('data-legend');
-    expect(legendOf('Chequing')).toBe('');
-    expect(legendOf('Investment')).toBe('');
-    expect(legendOf('Credit Card')).toBe('none');
-    expect(legendOf('Mortgage')).toBe('none');
-  });
-
   it('draws no series for an account type that is zero in every month', () => {
     tooltipPoint.current = null;
     renderChart({
@@ -122,6 +110,18 @@ describe('NetWorthByAccountTypeChart', () => {
     renderChart();
     expect(screen.queryByText('Credit Card')).not.toBeInTheDocument();
     expect(screen.getByText('Mortgage')).toBeInTheDocument();
+  });
+
+  it('draws one solid net worth bar a month in the net worth style, breakdown or not', () => {
+    tooltipPoint.current = months[1];
+    renderChart({ barStyle: 'netWorth' });
+    const bars = screen.getAllByTestId('bar');
+    expect(bars).toHaveLength(1);
+    expect(bars[0]).toHaveAttribute('data-key', 'netWorth');
+    expect(screen.queryByTestId('line')).not.toBeInTheDocument();
+    // Its tooltip is the month's net worth alone.
+    expect(screen.queryByText('Chequing')).not.toBeInTheDocument();
+    expect(screen.getByText('Net Worth').nextSibling).toHaveTextContent('$70000');
   });
 
   it('draws net worth alone when the response carries no breakdown', () => {

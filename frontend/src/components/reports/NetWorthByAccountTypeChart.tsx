@@ -14,15 +14,22 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { isLiabilityAccountType, type AccountType } from '@/types/account';
+import type { AccountType } from '@/types/account';
 import type { MonthlyNetWorth } from '@/types/net-worth';
 import { chartColors } from '@/lib/chart-colors';
 import {
+  NET_WORTH_LINE_COLOR,
   netWorthAccountTypeColor,
   netWorthAccountTypes,
   netWorthStackTop,
 } from '@/lib/net-worth-account-types';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
+
+/**
+ * How the bars are drawn: one solid bar of net worth a month, or stacked by
+ * the account types that make it up.
+ */
+export type NetWorthBarStyle = 'netWorth' | 'accountType';
 
 /** One month as the chart draws it. */
 export interface NetWorthByAccountTypePoint {
@@ -36,6 +43,8 @@ export interface NetWorthByAccountTypePoint {
 
 interface NetWorthByAccountTypeChartProps {
   data: readonly NetWorthByAccountTypePoint[];
+  /** Default `accountType`. */
+  barStyle?: NetWorthBarStyle;
   formatCurrency: (value: number) => string;
   /** The x-axis tick label for a point's `key`. */
   formatXTick: (key: string) => string;
@@ -102,16 +111,18 @@ function NetWorthByAccountTypeTooltip({
 }
 
 /**
- * Net worth month by month as bars stacked by account type: what is held
- * stacks up from zero and what is owed down from it, each type in its own
- * colour, with net worth itself drawn as a line across them. Shared by the
+ * Net worth month by month as bars, in one of two styles. Stacked by account
+ * type, what is held stacks up from zero and what is owed down from it, each
+ * type in its own colour, with net worth itself drawn as a line across them.
+ * Solid, each month is one bar of net worth in the theme accent. Shared by the
  * Net Worth Over Time report and the dashboard widget.
  *
  * Every figure is the server's (`MonthlyNetWorth.byAccountType`). A response
- * without the breakdown (an older backend mid-deploy) draws net worth alone.
+ * without the breakdown (an older backend mid-deploy) draws the solid bars.
  */
 export function NetWorthByAccountTypeChart({
   data,
+  barStyle = 'accountType',
   formatCurrency,
   formatXTick,
   xTicks,
@@ -123,7 +134,8 @@ export function NetWorthByAccountTypeChart({
 }: NetWorthByAccountTypeChartProps) {
   const t = useTranslations('reports');
   const tCommon = useTranslations('common');
-  const types = netWorthAccountTypes(data);
+  // The solid style is the chart with no types to stack.
+  const types = barStyle === 'accountType' ? netWorthAccountTypes(data) : [];
   const typeLabel = (type: AccountType) => tCommon(`accountTypes.${type}`);
   const netWorthLabel = t('netWorth.seriesNetWorth');
 
@@ -163,10 +175,10 @@ export function NetWorthByAccountTypeChart({
             stackId="net-worth"
             name={typeLabel(type)}
             fill={netWorthAccountTypeColor(type)}
-            // The legend names the asset types the bars are made of; what is
-            // owed is read from the tooltip and the net worth line, not the
-            // bars, so it takes no legend entry.
-            legendType={isLiabilityAccountType(type) ? 'none' : undefined}
+            // A hairline of the card between segments: neighbouring steps of
+            // one ramp are close in colour, and the gap keeps them apart.
+            stroke={chartColors.surface}
+            strokeWidth={1}
           />
         ))}
         {types.length === 0 && (
@@ -176,9 +188,9 @@ export function NetWorthByAccountTypeChart({
           <Line
             dataKey="netWorth"
             name={netWorthLabel}
-            stroke={chartColors.primary}
+            stroke={NET_WORTH_LINE_COLOR}
             strokeWidth={2}
-            dot={{ r: 3, fill: chartColors.primary, stroke: chartColors.surface, strokeWidth: 1 }}
+            dot={{ r: 3, fill: NET_WORTH_LINE_COLOR, stroke: chartColors.surface, strokeWidth: 1 }}
             isAnimationActive={false}
           />
         )}
@@ -186,7 +198,9 @@ export function NetWorthByAccountTypeChart({
           // Invisible: it only carries the labels to the top of each bar,
           // where net worth is printed whatever the bar is made of.
           <Line
-            dataKey={(point: NetWorthByAccountTypePoint) => netWorthStackTop(point)}
+            dataKey={(point: NetWorthByAccountTypePoint) =>
+              types.length === 0 ? point.netWorth : netWorthStackTop(point)
+            }
             stroke="none"
             dot={false}
             activeDot={false}

@@ -1,6 +1,7 @@
 import type { AccountType } from '@/types/account';
 import type { MonthlyNetWorth } from '@/types/net-worth';
-import { chartColors, chartSeriesColorAsidePrimary } from '@/lib/chart-colors';
+import { chartColors } from '@/lib/chart-colors';
+import { isLiabilityAccountType } from '@/types/account';
 
 /**
  * The Net Worth Over Time bar chart, stacked by account type: which types to
@@ -27,14 +28,42 @@ export const NET_WORTH_ACCOUNT_TYPE_ORDER: readonly AccountType[] = [
 ];
 
 /**
- * One account type's colour, fixed by its place in the order so a type keeps
- * its colour whichever others a reader holds. The categorical palette skips
- * the accent, which the net worth line beside the bars is drawn in.
+ * How strongly each step of a ramp holds its base colour, the rest being the
+ * card behind the chart: the first type in its group at full strength, each
+ * later one paler. Mixing toward the card rather than toward white keeps the
+ * ramp legible in dark mode too, where paler means closer to the dark card.
+ */
+const RAMP_STRENGTHS = ['100%', '78%', '58%', '42%', '30%'] as const;
+
+/** `base` at `strength` (a CSS percentage), the rest the chart's card colour. */
+function rampStep(base: string, strength: (typeof RAMP_STRENGTHS)[number]): string {
+  if (strength === '100%') return base;
+  return `color-mix(in srgb, ${base} ${strength}, ${chartColors.surface})`;
+}
+
+/**
+ * One account type's colour, drawn from the active theme: what is held is a
+ * ramp of the theme accent, what is owed a ramp of its expense colour, so the
+ * bars read as the theme's own and the two sides of zero never share a hue.
+ * Each type keeps its step whichever others a reader holds, since the step is
+ * fixed by the type's place in the order. OTHER is neutral, as an unclassified
+ * series is everywhere else.
  */
 export function netWorthAccountTypeColor(type: AccountType): string {
   if (type === 'OTHER') return chartColors.neutral;
-  return chartSeriesColorAsidePrimary(NET_WORTH_ACCOUNT_TYPE_ORDER.indexOf(type));
+  const liability = isLiabilityAccountType(type);
+  const group = NET_WORTH_ACCOUNT_TYPE_ORDER.filter(
+    (t) => t !== 'OTHER' && isLiabilityAccountType(t) === liability,
+  );
+  const step = RAMP_STRENGTHS[Math.min(group.indexOf(type), RAMP_STRENGTHS.length - 1)];
+  return rampStep(liability ? chartColors.expense : chartColors.primary, step);
 }
+
+/**
+ * The net worth line across the stacked bars. Not the accent: the asset bars
+ * are a ramp of it, and a line in their own colour would vanish into them.
+ */
+export const NET_WORTH_LINE_COLOR = chartColors.axis;
 
 /**
  * The account types any month of the series holds a non-zero amount in, in
