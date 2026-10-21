@@ -1190,7 +1190,10 @@
     "colMonth": "Tháng",
     "colAssets": "Tài sản",
     "colLiabilities": "Nợ",
-    "colNetWorth": "Giá trị ròng"
+    "colNetWorth": "Giá trị ròng",
+    "barStyle": "Kiểu cột",
+    "barStyleNetWorth": "Tài sản ròng",
+    "barStyleAccountType": "Theo loại tài khoản"
   },
   "portfolioValue": {
     "highestValue": "Giá trị cao nhất",

@@ -1190,7 +1190,10 @@
     "colMonth": "Mes",
     "colAssets": "Activos",
     "colLiabilities": "Pasivos",
-    "colNetWorth": "Patrimonio neto"
+    "colNetWorth": "Patrimonio neto",
+    "barStyle": "Estilo de barras",
+    "barStyleNetWorth": "Patrimonio neto",
+    "barStyleAccountType": "Por tipo de cuenta"
   },
   "portfolioValue": {
     "highestValue": "Valor más alto",

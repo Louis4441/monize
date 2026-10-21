@@ -1190,7 +1190,10 @@
     "colMonth": "月份",
     "colAssets": "資產",
     "colLiabilities": "負債",
-    "colNetWorth": "資產淨值"
+    "colNetWorth": "資產淨值",
+    "barStyle": "長條樣式",
+    "barStyleNetWorth": "資產淨值",
+    "barStyleAccountType": "依帳戶類型"
   },
   "portfolioValue": {
     "highestValue": "最高價值",

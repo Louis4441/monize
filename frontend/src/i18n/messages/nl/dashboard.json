@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Nettowaarde",
     "empty": "Nog geen nettowaardegegevens beschikbaar.",
-    "past12Months": "Afgelopen 12 maanden",
-    "viewReport": "Volledig rapport bekijken"
+    "barStyle": "Staafstijl",
+    "barStyleNetWorth": "Nettowaarde",
+    "barStyleAccountType": "Per rekeningtype",
+    "loadFailed": "De geschiedenis van je nettowaarde kon niet worden geladen. Laad het dashboard opnieuw om het nogmaals te proberen."
   },
   "assetsVsLiabilities": {
     "title": "Activa versus passiva",
@@ -140,7 +142,9 @@
     "current": "Huidig",
     "netWorthLabel": "Nettowaarde",
     "assets": "Activa",
-    "liabilities": "Passiva"
+    "liabilities": "Passiva",
+    "viewCallouts": "Labels",
+    "viewLegend": "Legenda"
   },
   "expensesPieChart": {
     "title": "Uitgaven per categorie",
@@ -190,6 +194,7 @@
     "accounts": "Rekeningen",
     "chartType": "Grafiektype",
     "view": "Weergave",
+    "viewCalloutsHint": "Labels hebben een breder scherm nodig. Waar ze niet passen, wordt de legenda getoond.",
     "displayName": "Weergavenaam",
     "description": "Beschrijving",
     "descriptionPlaceholder": "Voeg een optionele beschrijving toe",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Alle",
       "1w": "1W",

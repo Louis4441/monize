@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "[XX-Net Worth-XX]",
     "empty": "[XX-No net worth data available yet.-XX]",
-    "past12Months": "[XX-Past 12 months-XX]",
-    "viewReport": "[XX-View full report-XX]"
+    "barStyle": "[XX-Bar style-XX]",
+    "barStyleNetWorth": "[XX-Net worth-XX]",
+    "barStyleAccountType": "[XX-By account type-XX]",
+    "loadFailed": "[XX-Couldn't load your net worth history. Reload the dashboard to try again.-XX]"
   },
   "assetsVsLiabilities": {
     "title": "[XX-Assets vs Liabilities-XX]",
@@ -140,7 +142,9 @@
     "current": "[XX-Current-XX]",
     "netWorthLabel": "[XX-Net Worth-XX]",
     "assets": "[XX-Assets-XX]",
-    "liabilities": "[XX-Liabilities-XX]"
+    "liabilities": "[XX-Liabilities-XX]",
+    "viewCallouts": "[XX-Labels-XX]",
+    "viewLegend": "[XX-Legend-XX]"
   },
   "expensesPieChart": {
     "title": "[XX-Expenses by Category-XX]",
@@ -190,6 +194,7 @@
     "accounts": "[XX-Accounts-XX]",
     "chartType": "[XX-Chart type-XX]",
     "view": "[XX-View-XX]",
+    "viewCalloutsHint": "[XX-Labels need a wider screen. Where they don't fit, the legend is shown.-XX]",
     "displayName": "[XX-Display name-XX]",
     "description": "[XX-Description-XX]",
     "descriptionPlaceholder": "[XX-Add an optional description-XX]",
@@ -202,6 +207,7 @@
       "1y": "[XX-1Y-XX]",
       "2y": "[XX-2Y-XX]",
       "5y": "[XX-5Y-XX]",
+      "10y": "[XX-10Y-XX]",
       "ytd": "[XX-YTD-XX]",
       "all": "[XX-All-XX]"
     }

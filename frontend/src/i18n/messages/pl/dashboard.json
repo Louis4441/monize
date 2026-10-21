@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Wartość netto",
     "empty": "Brak danych o wartości netto.",
-    "past12Months": "Ostatnie 12 miesięcy",
-    "viewReport": "Zobacz pełny raport"
+    "barStyle": "Styl słupków",
+    "barStyleNetWorth": "Wartość netto",
+    "barStyleAccountType": "Według typu konta",
+    "loadFailed": "Nie udało się wczytać historii wartości netto. Odśwież pulpit, aby spróbować ponownie."
   },
   "assetsVsLiabilities": {
     "title": "Aktywa a zobowiązania",
@@ -140,7 +142,9 @@
     "current": "Bieżące",
     "netWorthLabel": "Wartość netto",
     "assets": "Aktywa",
-    "liabilities": "Zobowiązania"
+    "liabilities": "Zobowiązania",
+    "viewCallouts": "Etykiety",
+    "viewLegend": "Legenda"
   },
   "expensesPieChart": {
     "title": "Wydatki według kategorii",
@@ -190,6 +194,7 @@
     "accounts": "Konta",
     "chartType": "Typ wykresu",
     "view": "Widok",
+    "viewCalloutsHint": "Etykiety wymagają szerszego ekranu. Gdy się nie mieszczą, wyświetlana jest legenda.",
     "displayName": "Nazwa wyświetlana",
     "description": "Opis",
     "descriptionPlaceholder": "Dodaj opcjonalny opis",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Wszystkie",
       "1w": "1T",

@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Nilai Bersih",
     "empty": "Belum ada data nilai bersih yang tersedia.",
-    "past12Months": "12 bulan terakhir",
-    "viewReport": "Lihat laporan lengkap"
+    "barStyle": "Gaya batang",
+    "barStyleNetWorth": "Nilai bersih",
+    "barStyleAccountType": "Menurut jenis akun",
+    "loadFailed": "Tidak dapat memuat riwayat nilai bersih Anda. Muat ulang dasbor untuk mencoba lagi."
   },
   "assetsVsLiabilities": {
     "title": "Aset vs Liabilitas",
@@ -140,7 +142,9 @@
     "current": "Saat ini",
     "netWorthLabel": "Nilai Bersih",
     "assets": "Aset",
-    "liabilities": "Liabilitas"
+    "liabilities": "Liabilitas",
+    "viewCallouts": "Label",
+    "viewLegend": "Keterangan"
   },
   "expensesPieChart": {
     "title": "Pengeluaran per Kategori",
@@ -190,6 +194,7 @@
     "accounts": "Akun",
     "chartType": "Tipe Grafik",
     "view": "Tampilan",
+    "viewCalloutsHint": "Label memerlukan layar yang lebih lebar. Jika tidak muat, keterangan yang ditampilkan.",
     "displayName": "Nama tampilan",
     "description": "Deskripsi",
     "descriptionPlaceholder": "Tambahkan deskripsi opsional",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Semua",
       "1w": "1M",

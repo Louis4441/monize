@@ -54,7 +54,9 @@ vi.mock('@/lib/utils', async (importActual) => ({
 }));
 
 vi.mock('@/components/ui/DateRangeSelector', () => ({
-  DateRangeSelector: () => <div data-testid="date-range-selector" />,
+  DateRangeSelector: ({ ranges }: any) => (
+    <div data-testid="date-range-selector" data-ranges={(ranges ?? []).join(',')} />
+  ),
 }));
 
 vi.mock('recharts', () => ({
@@ -280,6 +282,60 @@ describe('NetWorthReport', () => {
     expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
     // One stacked series per account type held.
     expect(screen.getAllByTestId('bar')).toHaveLength(3);
+  });
+
+  it('switches the bar view to one solid net worth bar a month and persists the choice', async () => {
+    mockGetMonthly.mockResolvedValue([
+      {
+        month: '2024-01-01',
+        assets: 55000,
+        liabilities: 10000,
+        netWorth: 45000,
+        byAccountType: { CHEQUING: 5000, INVESTMENT: 50000, CREDIT_CARD: -10000 },
+      },
+      {
+        month: '2024-06-01',
+        assets: 60000,
+        liabilities: 9000,
+        netWorth: 51000,
+        byAccountType: { CHEQUING: 6000, INVESTMENT: 54000, CREDIT_CARD: -9000 },
+      },
+    ]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
+    });
+    const group = screen.getByRole('group', { name: 'Bar style' });
+    expect(screen.getByRole('button', { name: 'By account type' })).toHaveAttribute('aria-pressed', 'true');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Net worth' }));
+    });
+    expect(screen.getAllByTestId('bar')).toHaveLength(1);
+    expect(window.localStorage.getItem('reports.net-worth.barStyle')).toBe('"netWorth"');
+    expect(group).toBeInTheDocument();
+  });
+
+  it('offers the bar style only in the bar view', async () => {
+    mockGetMonthly.mockResolvedValue([
+      { month: '2024-01-01', assets: 50000, liabilities: 10000, netWorth: 40000 },
+      { month: '2024-06-01', assets: 55000, liabilities: 9000, netWorth: 46000 },
+    ]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('line'));
+    });
+    expect(screen.queryByRole('group', { name: 'Bar style' })).not.toBeInTheDocument();
+  });
+
+  it('offers a ten-year window', async () => {
+    mockGetMonthly.mockResolvedValue([]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId('date-range-selector')).toHaveAttribute('data-ranges', '1y,2y,5y,10y,all');
+    });
   });
 
   it('switches to the 100% stacked composition view and persists the choice', async () => {

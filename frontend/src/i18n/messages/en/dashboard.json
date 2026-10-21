@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Net Worth",
     "empty": "No net worth data available yet.",
-    "past12Months": "Past 12 months",
-    "viewReport": "View full report"
+    "barStyle": "Bar style",
+    "barStyleNetWorth": "Net worth",
+    "barStyleAccountType": "By account type",
+    "loadFailed": "Couldn't load your net worth history. Reload the dashboard to try again."
   },
   "assetsVsLiabilities": {
     "title": "Assets vs Liabilities",
@@ -140,7 +142,9 @@
     "current": "Current",
     "netWorthLabel": "Net Worth",
     "assets": "Assets",
-    "liabilities": "Liabilities"
+    "liabilities": "Liabilities",
+    "viewCallouts": "Labels",
+    "viewLegend": "Legend"
   },
   "expensesPieChart": {
     "title": "Expenses by Category",
@@ -190,6 +194,7 @@
     "accounts": "Accounts",
     "chartType": "Chart type",
     "view": "View",
+    "viewCalloutsHint": "Labels need a wider screen. Where they don't fit, the legend is shown.",
     "displayName": "Display name",
     "description": "Description",
     "descriptionPlaceholder": "Add an optional description",
@@ -202,6 +207,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "All"
     }

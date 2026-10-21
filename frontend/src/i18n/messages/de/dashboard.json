@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Reinvermögen",
     "empty": "Noch keine Reinvermögensdaten verfügbar.",
-    "past12Months": "Letzte 12 Monate",
-    "viewReport": "Vollständigen Bericht anzeigen"
+    "barStyle": "Balkenstil",
+    "barStyleNetWorth": "Reinvermögen",
+    "barStyleAccountType": "Nach Kontotyp",
+    "loadFailed": "Der Verlauf Ihres Reinvermögens konnte nicht geladen werden. Laden Sie das Dashboard neu, um es erneut zu versuchen."
   },
   "assetsVsLiabilities": {
     "title": "Aktiva vs. Verbindlichkeiten",
@@ -140,7 +142,9 @@
     "current": "Aktuell",
     "netWorthLabel": "Reinvermögen",
     "assets": "Aktiva",
-    "liabilities": "Verbindlichkeiten"
+    "liabilities": "Verbindlichkeiten",
+    "viewCallouts": "Beschriftungen",
+    "viewLegend": "Legende"
   },
   "expensesPieChart": {
     "title": "Ausgaben nach Kategorie",
@@ -190,6 +194,7 @@
     "accounts": "Konten",
     "chartType": "Diagrammtyp",
     "view": "Ansicht",
+    "viewCalloutsHint": "Beschriftungen brauchen einen breiteren Bildschirm. Wo sie nicht passen, wird die Legende angezeigt.",
     "displayName": "Anzeigename",
     "description": "Beschreibung",
     "descriptionPlaceholder": "Optionale Beschreibung hinzufügen",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Alle",
       "1w": "1W",

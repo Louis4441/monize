@@ -20,7 +20,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
 import { WidgetSegmentedControl } from './WidgetSegmentedControl';
-import { DonutCalloutChart, DonutCalloutSlice } from './DonutCalloutChart';
+import { DonutCalloutChart, DonutCalloutSlice, DonutCalloutViewHint } from './DonutCalloutChart';
 import {
   EXPENSES_PIE_DEFAULT,
   SPENDING_RANGES,
@@ -241,6 +241,7 @@ export function ExpensesPieChart({ accounts, isLoading }: ExpensesPieChartProps)
             { value: 'legend', label: t('expensesPieChart.viewLegend') },
           ]}
         />
+        <DonutCalloutViewHint />
       </WidgetConfigRow>
     </>
   );

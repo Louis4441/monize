@@ -1190,7 +1190,10 @@
     "colMonth": "Mês",
     "colAssets": "Ativos",
     "colLiabilities": "Passivos",
-    "colNetWorth": "Valor Líquido"
+    "colNetWorth": "Valor Líquido",
+    "barStyle": "Estilo das barras",
+    "barStyleNetWorth": "Valor líquido",
+    "barStyleAccountType": "Por tipo de conta"
   },
   "portfolioValue": {
     "highestValue": "Valor Mais Alto",

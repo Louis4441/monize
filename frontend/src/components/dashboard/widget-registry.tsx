@@ -213,7 +213,7 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
     titleSection: 'netWorth',
     iconType: 'line',
     defaultEnabled: true,
-    render: (ctx) => <NetWorthChart data={ctx.netWorthData} isLoading={ctx.isLoading} />,
+    render: (ctx) => <NetWorthChart isLoading={ctx.isLoading} />,
   },
   {
     id: 'assets-liabilities',

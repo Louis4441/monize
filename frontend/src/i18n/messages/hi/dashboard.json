@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "शुद्ध संपत्ति",
     "empty": "अभी कोई शुद्ध संपत्ति डेटा उपलब्ध नहीं।",
-    "past12Months": "पिछले 12 महीने",
-    "viewReport": "पूरी रिपोर्ट देखें"
+    "barStyle": "बार शैली",
+    "barStyleNetWorth": "शुद्ध संपत्ति",
+    "barStyleAccountType": "खाता प्रकार के अनुसार",
+    "loadFailed": "आपकी शुद्ध संपत्ति का इतिहास लोड नहीं हो सका। फिर से प्रयास करने के लिए डैशबोर्ड पुनः लोड करें।"
   },
   "assetsVsLiabilities": {
     "title": "संपत्ति बनाम देनदारियां",
@@ -140,7 +142,9 @@
     "current": "वर्तमान",
     "netWorthLabel": "शुद्ध संपत्ति",
     "assets": "संपत्ति",
-    "liabilities": "देनदारियां"
+    "liabilities": "देनदारियां",
+    "viewCallouts": "लेबल",
+    "viewLegend": "संकेत"
   },
   "expensesPieChart": {
     "title": "श्रेणी के अनुसार व्यय",
@@ -190,6 +194,7 @@
     "accounts": "खाते",
     "chartType": "चार्ट प्रकार",
     "view": "दृश्य",
+    "viewCalloutsHint": "लेबल के लिए चौड़ी स्क्रीन चाहिए। जहाँ वे फ़िट नहीं होते, वहाँ संकेत दिखाया जाता है।",
     "displayName": "प्रदर्शन नाम",
     "description": "विवरण",
     "descriptionPlaceholder": "एक वैकल्पिक विवरण जोड़ें",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "सभी",
       "1w": "1H",

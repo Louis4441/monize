@@ -4,6 +4,7 @@ import {
   netWorthAccountTypeColor,
   netWorthAccountTypes,
   netWorthStackTop,
+  NET_WORTH_LINE_COLOR,
 } from './net-worth-account-types';
 import { chartColors } from './chart-colors';
 
@@ -17,18 +18,44 @@ describe('netWorthAccountTypes', () => {
     ).toEqual(['CHEQUING', 'INVESTMENT', 'MORTGAGE']);
   });
 
+  it('leaves out a type that is zero in every month, but keeps one held in any month', () => {
+    expect(
+      netWorthAccountTypes([
+        { byAccountType: { CHEQUING: 10, SAVINGS: 0, CREDIT_CARD: 0 } },
+        { byAccountType: { CHEQUING: 12, SAVINGS: 0, CREDIT_CARD: -40 } },
+      ]),
+    ).toEqual(['CHEQUING', 'CREDIT_CARD']);
+  });
+
   it('is empty when no month carries the breakdown', () => {
     expect(netWorthAccountTypes([{}, { byAccountType: undefined }])).toEqual([]);
   });
 });
 
 describe('netWorthAccountTypeColor', () => {
-  it('gives every type its own colour, never the net worth line accent', () => {
+  it('gives every type its own colour', () => {
     const colours = NET_WORTH_ACCOUNT_TYPE_ORDER.map(netWorthAccountTypeColor);
     expect(new Set(colours).size).toBe(colours.length);
-    expect(colours).not.toContain(chartColors.primary);
-    expect(colours).not.toContain('var(--chart-1)');
     expect(netWorthAccountTypeColor('OTHER')).toBe(chartColors.neutral);
+  });
+
+  it('draws what is held from the theme accent and what is owed from its expense colour', () => {
+    expect(netWorthAccountTypeColor('CHEQUING')).toBe(chartColors.primary);
+    expect(netWorthAccountTypeColor('CREDIT_CARD')).toBe(chartColors.expense);
+    for (const type of ['SAVINGS', 'CASH', 'INVESTMENT', 'ASSET'] as const) {
+      expect(netWorthAccountTypeColor(type)).toMatch(/^color-mix\(in srgb, var\(--chart-primary\) \d+%, var\(--chart-surface\)\)$/);
+    }
+    for (const type of ['LINE_OF_CREDIT', 'LOAN', 'MORTGAGE'] as const) {
+      expect(netWorthAccountTypeColor(type)).toMatch(/^color-mix\(in srgb, var\(--chart-expense\) \d+%, var\(--chart-surface\)\)$/);
+    }
+    // No literal colour: every step follows the active theme.
+    for (const type of NET_WORTH_ACCOUNT_TYPE_ORDER) {
+      expect(netWorthAccountTypeColor(type)).not.toMatch(/#[0-9a-f]{3,8}/i);
+    }
+  });
+
+  it('keeps the net worth line off the accent the asset bars are drawn from', () => {
+    expect(NET_WORTH_LINE_COLOR).not.toBe(chartColors.primary);
   });
 });
 

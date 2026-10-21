@@ -1190,7 +1190,10 @@
     "colMonth": "Monat",
     "colAssets": "Aktiva",
     "colLiabilities": "Verbindlichkeiten",
-    "colNetWorth": "Reinvermögen"
+    "colNetWorth": "Reinvermögen",
+    "barStyle": "Balkenstil",
+    "barStyleNetWorth": "Reinvermögen",
+    "barStyleAccountType": "Nach Kontotyp"
   },
   "portfolioValue": {
     "highestValue": "Höchstwert",

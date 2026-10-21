@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "资产净值",
     "empty": "暂无资产净值数据。",
-    "past12Months": "过去 12 个月",
-    "viewReport": "查看完整报告"
+    "barStyle": "柱形样式",
+    "barStyleNetWorth": "资产净值",
+    "barStyleAccountType": "按账户类型",
+    "loadFailed": "无法加载资产净值历史记录。请重新加载仪表板后重试。"
   },
   "assetsVsLiabilities": {
     "title": "资产与负债",
@@ -140,7 +142,9 @@
     "current": "当前",
     "netWorthLabel": "资产净值",
     "assets": "资产",
-    "liabilities": "负债"
+    "liabilities": "负债",
+    "viewCallouts": "标签",
+    "viewLegend": "图例"
   },
   "expensesPieChart": {
     "title": "按科目划分的支出",
@@ -190,6 +194,7 @@
     "accounts": "账户",
     "chartType": "图表类型",
     "view": "视图",
+    "viewCalloutsHint": "标签需要更宽的屏幕。放不下时将显示图例。",
     "displayName": "显示名称",
     "description": "描述",
     "descriptionPlaceholder": "添加可选描述",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "全部",
       "1w": "1周",

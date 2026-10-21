@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "資產淨值",
     "empty": "尚無資產淨值資料。",
-    "past12Months": "過去 12 個月",
-    "viewReport": "查看完整報告"
+    "barStyle": "長條樣式",
+    "barStyleNetWorth": "資產淨值",
+    "barStyleAccountType": "依帳戶類型",
+    "loadFailed": "無法載入資產淨值歷史記錄。請重新載入儀表板後再試一次。"
   },
   "assetsVsLiabilities": {
     "title": "資產與負債",
@@ -140,7 +142,9 @@
     "current": "目前",
     "netWorthLabel": "資產淨值",
     "assets": "資產",
-    "liabilities": "負債"
+    "liabilities": "負債",
+    "viewCallouts": "標籤",
+    "viewLegend": "圖例"
   },
   "expensesPieChart": {
     "title": "依類別支出",
@@ -190,6 +194,7 @@
     "accounts": "科目",
     "chartType": "圖表類型",
     "view": "檢視",
+    "viewCalloutsHint": "標籤需要更寬的螢幕。放不下時會顯示圖例。",
     "displayName": "顯示名稱",
     "description": "描述",
     "descriptionPlaceholder": "新增選填的描述",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "全部",
       "1w": "1週",

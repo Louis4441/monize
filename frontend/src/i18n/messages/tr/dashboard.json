@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Net Değer",
     "empty": "Henüz net değer verisi yok.",
-    "past12Months": "Son 12 ay",
-    "viewReport": "Tam raporu görüntüle"
+    "barStyle": "Çubuk stili",
+    "barStyleNetWorth": "Net değer",
+    "barStyleAccountType": "Hesap türüne göre",
+    "loadFailed": "Net değer geçmişiniz yüklenemedi. Tekrar denemek için panoyu yeniden yükleyin."
   },
   "assetsVsLiabilities": {
     "title": "Varlıklar ve Borçlar",
@@ -140,7 +142,9 @@
     "current": "Güncel",
     "netWorthLabel": "Net Değer",
     "assets": "Varlıklar",
-    "liabilities": "Borçlar"
+    "liabilities": "Borçlar",
+    "viewCallouts": "Etiketler",
+    "viewLegend": "Gösterge"
   },
   "expensesPieChart": {
     "title": "Kategoriye Göre Giderler",
@@ -190,6 +194,7 @@
     "accounts": "Hesaplar",
     "chartType": "Grafik türü",
     "view": "Görünüm",
+    "viewCalloutsHint": "Etiketler daha geniş bir ekran gerektirir. Sığmadıkları yerde gösterge gösterilir.",
     "displayName": "Görünen ad",
     "description": "Açıklama",
     "descriptionPlaceholder": "İsteğe bağlı bir açıklama ekleyin",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Tümü",
       "1w": "1H",

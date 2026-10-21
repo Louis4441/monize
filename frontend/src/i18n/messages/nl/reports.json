@@ -1190,7 +1190,10 @@
     "colMonth": "Maand",
     "colAssets": "Activa",
     "colLiabilities": "Passiva",
-    "colNetWorth": "Nettowaarde"
+    "colNetWorth": "Nettowaarde",
+    "barStyle": "Staafstijl",
+    "barStyleNetWorth": "Nettowaarde",
+    "barStyleAccountType": "Per rekeningtype"
   },
   "portfolioValue": {
     "highestValue": "Hoogste waarde",

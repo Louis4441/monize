@@ -1190,7 +1190,10 @@
     "colMonth": "Miesiąc",
     "colAssets": "Aktywa",
     "colLiabilities": "Zobowiązania",
-    "colNetWorth": "Wartość netto"
+    "colNetWorth": "Wartość netto",
+    "barStyle": "Styl słupków",
+    "barStyleNetWorth": "Wartość netto",
+    "barStyleAccountType": "Według typu konta"
   },
   "portfolioValue": {
     "highestValue": "Najwyższa wartość",

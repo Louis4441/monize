@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Tài sản ròng",
     "empty": "Chưa có dữ liệu tài sản ròng.",
-    "past12Months": "12 tháng qua",
-    "viewReport": "Xem báo cáo đầy đủ"
+    "barStyle": "Kiểu cột",
+    "barStyleNetWorth": "Tài sản ròng",
+    "barStyleAccountType": "Theo loại tài khoản",
+    "loadFailed": "Không thể tải lịch sử tài sản ròng của bạn. Hãy tải lại bảng điều khiển để thử lại."
   },
   "assetsVsLiabilities": {
     "title": "Tài sản và nợ phải trả",
@@ -140,7 +142,9 @@
     "current": "Hiện tại",
     "netWorthLabel": "Tài sản ròng",
     "assets": "Tài sản",
-    "liabilities": "Nợ phải trả"
+    "liabilities": "Nợ phải trả",
+    "viewCallouts": "Nhãn",
+    "viewLegend": "Chú giải"
   },
   "expensesPieChart": {
     "title": "Chi tiêu theo danh mục",
@@ -190,6 +194,7 @@
     "accounts": "Tài khoản",
     "chartType": "Loại biểu đồ",
     "view": "Chế độ xem",
+    "viewCalloutsHint": "Nhãn cần màn hình rộng hơn. Khi không đủ chỗ, chú giải sẽ được hiển thị.",
     "displayName": "Tên hiển thị",
     "description": "Mô tả",
     "descriptionPlaceholder": "Thêm mô tả tùy chọn",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Tất cả",
       "1w": "1T",

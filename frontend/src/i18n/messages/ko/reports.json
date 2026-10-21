@@ -1190,7 +1190,10 @@
     "colMonth": "월",
     "colAssets": "자산",
     "colLiabilities": "부채",
-    "colNetWorth": "순자산가액"
+    "colNetWorth": "순자산가액",
+    "barStyle": "막대 스타일",
+    "barStyleNetWorth": "순자산",
+    "barStyleAccountType": "계좌 유형별"
   },
   "portfolioValue": {
     "highestValue": "최고 가치",

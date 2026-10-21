@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Patrimônio Líquido",
     "empty": "Ainda não existem dados de patrimônio líquido disponíveis.",
-    "past12Months": "Últimos 12 meses",
-    "viewReport": "Ver relatório completo"
+    "barStyle": "Estilo das barras",
+    "barStyleNetWorth": "Patrimônio líquido",
+    "barStyleAccountType": "Por tipo de conta",
+    "loadFailed": "Não foi possível carregar o histórico do seu patrimônio líquido. Recarregue o painel para tentar novamente."
   },
   "assetsVsLiabilities": {
     "title": "Ativos vs Passivos",
@@ -140,7 +142,9 @@
     "current": "Atual",
     "netWorthLabel": "Patrimônio Líquido",
     "assets": "Ativos",
-    "liabilities": "Passivos"
+    "liabilities": "Passivos",
+    "viewCallouts": "Rótulos",
+    "viewLegend": "Legenda"
   },
   "expensesPieChart": {
     "title": "Despesas por Categoria",
@@ -190,6 +194,7 @@
     "accounts": "Contas",
     "chartType": "Tipo de gráfico",
     "view": "Visualização",
+    "viewCalloutsHint": "Os rótulos precisam de uma tela mais larga. Onde não cabem, a legenda é exibida.",
     "displayName": "Nome de exibição",
     "description": "Descrição",
     "descriptionPlaceholder": "Adicione uma descrição opcional",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Tudo",
       "1w": "1S",

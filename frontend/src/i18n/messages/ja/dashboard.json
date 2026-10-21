@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "純資産",
     "empty": "純資産データがまだありません。",
-    "past12Months": "過去12ヶ月",
-    "viewReport": "レポートの全体を見る"
+    "barStyle": "棒の表示",
+    "barStyleNetWorth": "純資産",
+    "barStyleAccountType": "口座の種類別",
+    "loadFailed": "純資産の履歴を読み込めませんでした。ダッシュボードを再読み込みしてもう一度お試しください。"
   },
   "assetsVsLiabilities": {
     "title": "資産 対 負債",
@@ -140,7 +142,9 @@
     "current": "現在",
     "netWorthLabel": "純資産",
     "assets": "資産",
-    "liabilities": "負債"
+    "liabilities": "負債",
+    "viewCallouts": "ラベル",
+    "viewLegend": "凡例"
   },
   "expensesPieChart": {
     "title": "カテゴリ別支出",
@@ -190,6 +194,7 @@
     "accounts": "口座",
     "chartType": "グラフの種類",
     "view": "表示",
+    "viewCalloutsHint": "ラベルには広い画面が必要です。収まらない場合は凡例が表示されます。",
     "displayName": "表示名",
     "description": "説明",
     "descriptionPlaceholder": "任意の説明を追加",
@@ -200,6 +205,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "すべて",
       "1w": "1週",

@@ -6,6 +6,7 @@
  */
 
 import type { ForecastPeriod } from '@/lib/forecast';
+import type { NetWorthBarStyle } from '@/components/reports/NetWorthByAccountTypeChart';
 import { RECURRING_EXPENSE_RANGES, type RecurringExpenseRange } from '@/types/built-in-reports';
 
 /** Range presets offered by the transaction-based spending/income widgets. */
@@ -32,6 +33,8 @@ export const PORTFOLIO_RANGES = [
 ] as const;
 /** Range presets for the recurring expenses widget (the analysis' own windows). */
 export const RECURRING_RANGES = RECURRING_EXPENSE_RANGES;
+/** Range presets for the net worth widget: whole years of months. */
+export const NET_WORTH_RANGES = ['1y', '2y', '5y', '10y'] as const;
 /** Range presets for the weekend/weekday widget. */
 export const WEEKEND_RANGES = ['1m', '3m', '6m', '1y'] as const;
 
@@ -137,6 +140,25 @@ export interface RecurringConfig {
   view: 'callouts' | 'legend';
 }
 
+/**
+ * Assets vs Liabilities settings. `view` names the two slices either in boxes
+ * beside the donut with a line to each slice (`callouts`, which falls back to
+ * the legend where the widget is too small for the boxes) or in a legend
+ * under it.
+ */
+export interface AssetsLiabilitiesConfig {
+  view: 'callouts' | 'legend';
+}
+
+/**
+ * Net Worth settings: how many years of months to draw, and whether the bars
+ * are one solid bar of net worth or stacked by account type.
+ */
+export interface NetWorthConfig {
+  range: (typeof NET_WORTH_RANGES)[number];
+  barStyle: NetWorthBarStyle;
+}
+
 export interface WeekendConfig {
   range: string;
   view: 'overview' | 'byDay';
@@ -194,6 +216,18 @@ export const RECURRING_EXPENSES_DEFAULT: RecurringConfig = {
   minOccurrences: 3,
   range: '6m',
   view: 'callouts',
+};
+
+// Twelve months is the window the widget always drew; stacked by account
+// type is the bar it draws today.
+export const NET_WORTH_DEFAULT: NetWorthConfig = {
+  range: '1y',
+  barStyle: 'accountType',
+};
+
+// The legend is what the widget always showed.
+export const ASSETS_LIABILITIES_DEFAULT: AssetsLiabilitiesConfig = {
+  view: 'legend',
 };
 
 export const WEEKEND_WEEKDAY_DEFAULT: WeekendConfig = {
