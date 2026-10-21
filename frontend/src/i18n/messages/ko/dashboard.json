@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "순자산가액",
     "empty": "아직 순자산가액 데이터가 없습니다.",
-    "past12Months": "지난 12개월",
-    "viewReport": "전체 보고서 보기"
+    "barStyle": "막대 스타일",
+    "barStyleNetWorth": "순자산",
+    "barStyleAccountType": "계좌 유형별",
+    "loadFailed": "순자산 내역을 불러오지 못했습니다. 대시보드를 새로 고쳐 다시 시도해 주세요."
   },
   "assetsVsLiabilities": {
     "title": "자산 대 부채",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "전체",
       "1w": "1주",

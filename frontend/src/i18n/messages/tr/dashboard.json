@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Net Değer",
     "empty": "Henüz net değer verisi yok.",
-    "past12Months": "Son 12 ay",
-    "viewReport": "Tam raporu görüntüle"
+    "barStyle": "Çubuk stili",
+    "barStyleNetWorth": "Net değer",
+    "barStyleAccountType": "Hesap türüne göre",
+    "loadFailed": "Net değer geçmişiniz yüklenemedi. Tekrar denemek için panoyu yeniden yükleyin."
   },
   "assetsVsLiabilities": {
     "title": "Varlıklar ve Borçlar",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Tümü",
       "1w": "1H",

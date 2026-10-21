@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "资产净值",
     "empty": "暂无资产净值数据。",
-    "past12Months": "过去 12 个月",
-    "viewReport": "查看完整报告"
+    "barStyle": "柱形样式",
+    "barStyleNetWorth": "资产净值",
+    "barStyleAccountType": "按账户类型",
+    "loadFailed": "无法加载资产净值历史记录。请重新加载仪表板后重试。"
   },
   "assetsVsLiabilities": {
     "title": "资产与负债",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "全部",
       "1w": "1周",

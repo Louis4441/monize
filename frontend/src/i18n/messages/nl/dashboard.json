@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Nettowaarde",
     "empty": "Nog geen nettowaardegegevens beschikbaar.",
-    "past12Months": "Afgelopen 12 maanden",
-    "viewReport": "Volledig rapport bekijken"
+    "barStyle": "Staafstijl",
+    "barStyleNetWorth": "Nettowaarde",
+    "barStyleAccountType": "Per rekeningtype",
+    "loadFailed": "De geschiedenis van je nettowaarde kon niet worden geladen. Laad het dashboard opnieuw om het nogmaals te proberen."
   },
   "assetsVsLiabilities": {
     "title": "Activa versus passiva",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Alle",
       "1w": "1W",

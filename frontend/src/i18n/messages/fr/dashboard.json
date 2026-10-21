@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Valeur nette",
     "empty": "Aucune donnée de valeur nette disponible pour l'instant.",
-    "past12Months": "12 derniers mois",
-    "viewReport": "Voir le rapport complet"
+    "barStyle": "Style des barres",
+    "barStyleNetWorth": "Valeur nette",
+    "barStyleAccountType": "Par type de compte",
+    "loadFailed": "Impossible de charger l'historique de votre valeur nette. Rechargez le tableau de bord pour réessayer."
   },
   "assetsVsLiabilities": {
     "title": "Actifs et passifs",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Tout",
       "1w": "1S",

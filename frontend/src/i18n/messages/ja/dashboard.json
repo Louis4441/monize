@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "純資産",
     "empty": "純資産データがまだありません。",
-    "past12Months": "過去12ヶ月",
-    "viewReport": "レポートの全体を見る"
+    "barStyle": "棒の表示",
+    "barStyleNetWorth": "純資産",
+    "barStyleAccountType": "口座の種類別",
+    "loadFailed": "純資産の履歴を読み込めませんでした。ダッシュボードを再読み込みしてもう一度お試しください。"
   },
   "assetsVsLiabilities": {
     "title": "資産 対 負債",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "すべて",
       "1w": "1週",

@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Nilai Bersih",
     "empty": "Belum ada data nilai bersih yang tersedia.",
-    "past12Months": "12 bulan terakhir",
-    "viewReport": "Lihat laporan lengkap"
+    "barStyle": "Gaya batang",
+    "barStyleNetWorth": "Nilai bersih",
+    "barStyleAccountType": "Menurut jenis akun",
+    "loadFailed": "Tidak dapat memuat riwayat nilai bersih Anda. Muat ulang dasbor untuk mencoba lagi."
   },
   "assetsVsLiabilities": {
     "title": "Aset vs Liabilitas",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Semua",
       "1w": "1M",

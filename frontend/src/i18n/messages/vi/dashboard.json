@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "Tài sản ròng",
     "empty": "Chưa có dữ liệu tài sản ròng.",
-    "past12Months": "12 tháng qua",
-    "viewReport": "Xem báo cáo đầy đủ"
+    "barStyle": "Kiểu cột",
+    "barStyleNetWorth": "Tài sản ròng",
+    "barStyleAccountType": "Theo loại tài khoản",
+    "loadFailed": "Không thể tải lịch sử tài sản ròng của bạn. Hãy tải lại bảng điều khiển để thử lại."
   },
   "assetsVsLiabilities": {
     "title": "Tài sản và nợ phải trả",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "Tất cả",
       "1w": "1T",

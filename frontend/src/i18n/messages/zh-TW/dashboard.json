@@ -131,8 +131,10 @@
   "netWorth": {
     "title": "資產淨值",
     "empty": "尚無資產淨值資料。",
-    "past12Months": "過去 12 個月",
-    "viewReport": "查看完整報告"
+    "barStyle": "長條樣式",
+    "barStyleNetWorth": "資產淨值",
+    "barStyleAccountType": "依帳戶類型",
+    "loadFailed": "無法載入資產淨值歷史記錄。請重新載入儀表板後再試一次。"
   },
   "assetsVsLiabilities": {
     "title": "資產與負債",
@@ -202,6 +204,7 @@
       "1y": "1Y",
       "2y": "2Y",
       "5y": "5Y",
+      "10y": "10Y",
       "ytd": "YTD",
       "all": "全部",
       "1w": "1週",
