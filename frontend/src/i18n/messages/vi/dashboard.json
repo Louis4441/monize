@@ -150,7 +150,9 @@
     "other": "Khác",
     "insideOther": "{count, plural, other {# danh mục trong Khác}}",
     "topLevelOnly": "Danh mục cấp cao nhất",
-    "topLevelOnlyHint": "Tính danh mục con vào danh mục cha"
+    "topLevelOnlyHint": "Tính danh mục con vào danh mục cha",
+    "viewCallouts": "Nhãn",
+    "viewLegend": "Chú giải"
   },
   "incomeExpenses": {
     "title": "Thu nhập và Chi tiêu",

@@ -150,7 +150,9 @@
     "other": "अन्य",
     "insideOther": "{count, plural, one {अन्य में # श्रेणी} other {अन्य में # श्रेणियाँ}}",
     "topLevelOnly": "शीर्ष स्तर की श्रेणियाँ",
-    "topLevelOnlyHint": "उपश्रेणियों को उनकी मूल श्रेणी में गिनें"
+    "topLevelOnlyHint": "उपश्रेणियों को उनकी मूल श्रेणी में गिनें",
+    "viewCallouts": "लेबल",
+    "viewLegend": "संकेत"
   },
   "incomeExpenses": {
     "title": "आय बनाम व्यय",

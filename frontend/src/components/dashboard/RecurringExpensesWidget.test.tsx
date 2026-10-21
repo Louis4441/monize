@@ -128,6 +128,50 @@ describe('RecurringExpensesWidget', () => {
     expect(screen.getByText('6M')).toBeInTheDocument();
   });
 
+  it('puts the monthly estimate in the donut, in either view', async () => {
+    for (const view of ['callouts', 'legend'] as const) {
+      configState.current = { minOccurrences: 3, range: '6m', view };
+      respond(TEN_PAYEES, 42);
+      let unmount = () => {};
+      await act(async () => {
+        ({ unmount } = render(<RecurringExpensesWidget isLoading={false} />));
+      });
+      const area = screen.getByTestId('donut-chart-area');
+      expect(within(area).getByText('Monthly estimate')).toBeInTheDocument();
+      expect(within(area).getByText('$42')).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('bounds the estimate by the hole it sits in', async () => {
+    observeAs(520, 280);
+    respond(TEN_PAYEES, 42);
+    await renderWidget();
+    const caption = within(screen.getByTestId('donut-chart-area')).getByText('Monthly estimate');
+    const maxWidth = parseFloat((caption.parentElement as HTMLElement).style.maxWidth);
+    // Inside the hole of the smallest donut a centre figure asks for, and
+    // wide enough for a compact figure and its marker.
+    expect(maxWidth).toBeLessThanOrEqual(2 * 96 * 0.55);
+    expect(maxWidth).toBeGreaterThanOrEqual(90);
+  });
+
+  it('writes the estimate in compact notation in the callout view only', async () => {
+    observeAs(520, 280);
+    respond(TEN_PAYEES, 123456);
+    await renderWidget();
+    const area = screen.getByTestId('donut-chart-area');
+    expect(within(area).getByText('$123.5K')).toBeInTheDocument();
+    expect(within(area).queryByText('$123456')).not.toBeInTheDocument();
+  });
+
+  it('writes the estimate in full in the legend view', async () => {
+    configState.current = { minOccurrences: 3, range: '6m', view: 'legend' };
+    observeAs(520, 280);
+    respond(TEN_PAYEES, 123456);
+    await renderWidget();
+    expect(within(screen.getByTestId('donut-chart-area')).getByText('$123456')).toBeInTheDocument();
+  });
+
   it('asks for the configured range', async () => {
     configState.current = { minOccurrences: 4, range: '5y', view: 'legend' };
     respond([item('Netflix', 'p1', 90)]);
@@ -193,7 +237,7 @@ describe('RecurringExpensesWidget', () => {
       respond(TEN_PAYEES);
       await renderWidget();
       // The sized chart is out of the flow, so it cannot hold the area open.
-      expect(screen.getByTestId('recurring-chart-plot')).toHaveClass('absolute', 'inset-0');
+      expect(screen.getByTestId('donut-chart-plot')).toHaveClass('absolute', 'inset-0');
 
       act(() => resize(520, 260));
 

@@ -48,6 +48,33 @@ describe("FavouriteAccounts", () => {
     expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
+  it("links the title to the Accounts page in every state", () => {
+    const favourite = [
+      {
+        id: "1",
+        name: "Checking",
+        currentBalance: 1500,
+        currencyCode: "CAD",
+        isFavourite: true, favouriteSortOrder: 0,
+        isClosed: false,
+      },
+    ] as any[];
+    for (const [accounts, isLoading] of [
+      [[], true],
+      [[], false],
+      [favourite, false],
+    ] as const) {
+      const { unmount } = render(
+        <FavouriteAccounts accounts={accounts as any[]} isLoading={isLoading} />,
+      );
+      expect(screen.getByRole("link", { name: "Favourite Accounts" })).toHaveAttribute(
+        "href",
+        "/accounts",
+      );
+      unmount();
+    }
+  });
+
   it("renders empty state when no favourites", () => {
     render(<FavouriteAccounts accounts={[]} isLoading={false} />);
     expect(screen.getByText(/No favourite accounts yet/)).toBeInTheDocument();

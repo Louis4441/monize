@@ -150,7 +150,9 @@
     "other": "Autre",
     "insideOther": "{count, plural, one {# catégorie dans Autres} other {# catégories dans Autres}}",
     "topLevelOnly": "Catégories de premier niveau",
-    "topLevelOnlyHint": "Compter les sous-catégories dans leur catégorie parente"
+    "topLevelOnlyHint": "Compter les sous-catégories dans leur catégorie parente",
+    "viewCallouts": "Étiquettes",
+    "viewLegend": "Légende"
   },
   "incomeExpenses": {
     "title": "Revenus et dépenses",

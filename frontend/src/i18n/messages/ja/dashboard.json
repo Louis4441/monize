@@ -150,7 +150,9 @@
     "other": "その他",
     "insideOther": "{count, plural, other {その他に# カテゴリ}}",
     "topLevelOnly": "最上位カテゴリ",
-    "topLevelOnlyHint": "サブカテゴリを親カテゴリに集計します"
+    "topLevelOnlyHint": "サブカテゴリを親カテゴリに集計します",
+    "viewCallouts": "ラベル",
+    "viewLegend": "凡例"
   },
   "incomeExpenses": {
     "title": "収入 対 支出",

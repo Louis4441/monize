@@ -78,10 +78,14 @@ export interface RangeAccountsConfig {
 /**
  * Expenses by Category adds a rollup choice: with `topLevelOnly` a subcategory's
  * spend is counted against its top-level ancestor, so the chart answers "which
- * part of my budget" rather than listing every leaf.
+ * part of my budget" rather than listing every leaf. `view` names the top ten
+ * categories in boxes beside the donut (`callouts`, which falls back to the
+ * legend where the widget is too small for the boxes), or eleven in a legend
+ * under it.
  */
 export interface ExpensesPieConfig extends RangeAccountsConfig {
   topLevelOnly: boolean;
+  view: 'callouts' | 'legend';
 }
 
 /**
@@ -203,6 +207,7 @@ export const EXPENSES_PIE_DEFAULT: ExpensesPieConfig = {
   range: '1m',
   accountIds: [],
   topLevelOnly: false,
+  view: 'legend',
 };
 
 /**

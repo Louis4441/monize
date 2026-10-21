@@ -807,4 +807,60 @@ describe('SankeyNodeShape', () => {
     expect(shape.querySelector('rect')?.getAttribute('stroke-dasharray')).toBe('3 2');
     expect(shape.getAttribute('role')).toBeNull();
   });
+
+  it('draws the hub without a label', () => {
+    render(
+      <svg>
+        <SankeyNodeShape
+          x={100}
+          y={10}
+          width={12}
+          height={200}
+          payload={drawn({ id: 'hub', name: 'Income', kind: 'hub', column: 'hub' })}
+          colorFor={() => 'var(--chart-primary)'}
+          onSelect={vi.fn()}
+          canSelect={() => false}
+          unknownLabel="Unknown"
+          maxLabelWidth={88}
+        />
+      </svg>,
+    );
+
+    const shape = screen.getByTestId('sankey-node-hub');
+    expect(shape.querySelector('rect')).not.toBeNull();
+    expect(shape.querySelector('text')).toBeNull();
+    expect(shape).not.toHaveTextContent('Income');
+  });
+
+  it('cuts a label longer than its gutter, and leaves a short one whole', () => {
+    const long = 'Home maintenance and improvements';
+    render(
+      <svg>
+        <SankeyNodeShape
+          payload={drawn({ id: 'expense:long', name: long })}
+          colorFor={() => 'var(--chart-expense)'}
+          onSelect={vi.fn()}
+          canSelect={() => false}
+          unknownLabel="Unknown"
+          fontSize={11}
+          maxLabelWidth={88}
+        />
+        <SankeyNodeShape
+          payload={drawn({ id: 'expense:short', name: 'Rent' })}
+          colorFor={() => 'var(--chart-expense)'}
+          onSelect={vi.fn()}
+          canSelect={() => false}
+          unknownLabel="Unknown"
+          fontSize={11}
+          maxLabelWidth={88}
+        />
+      </svg>,
+    );
+
+    const cut = screen.getByTestId('sankey-node-expense:long').querySelector('text')!.textContent!;
+    expect(cut.endsWith('\u2026')).toBe(true);
+    expect(long.startsWith(cut.slice(0, -1))).toBe(true);
+    expect(screen.getByTestId('sankey-node-expense:short')).toHaveTextContent('Rent');
+  });
 });
+

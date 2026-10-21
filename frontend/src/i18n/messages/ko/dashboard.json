@@ -150,7 +150,9 @@
     "other": "기타",
     "insideOther": "{count, plural, other {기타에 # 카테고리}}",
     "topLevelOnly": "최상위 카테고리",
-    "topLevelOnlyHint": "하위 카테고리를 상위 카테고리에 합산합니다"
+    "topLevelOnlyHint": "하위 카테고리를 상위 카테고리에 합산합니다",
+    "viewCallouts": "레이블",
+    "viewLegend": "범례"
   },
   "incomeExpenses": {
     "title": "수입 대 지출",

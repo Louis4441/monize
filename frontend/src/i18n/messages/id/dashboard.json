@@ -150,7 +150,9 @@
     "other": "Lainnya",
     "insideOther": "{count, plural, other {# kategori dalam Lainnya}}",
     "topLevelOnly": "Kategori tingkat atas",
-    "topLevelOnlyHint": "Hitung subkategori pada induknya"
+    "topLevelOnlyHint": "Hitung subkategori pada induknya",
+    "viewCallouts": "Label",
+    "viewLegend": "Keterangan"
   },
   "incomeExpenses": {
     "title": "Pendapatan vs Pengeluaran",

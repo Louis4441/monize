@@ -150,7 +150,9 @@
     "other": "Overig",
     "insideOther": "{count, plural, one {# categorie in Overig} other {# categorieën in Overig}}",
     "topLevelOnly": "Hoofdcategorieën",
-    "topLevelOnlyHint": "Subcategorieën bij hun hoofdcategorie tellen"
+    "topLevelOnlyHint": "Subcategorieën bij hun hoofdcategorie tellen",
+    "viewCallouts": "Labels",
+    "viewLegend": "Legenda"
   },
   "incomeExpenses": {
     "title": "Inkomsten versus uitgaven",

@@ -61,6 +61,8 @@ vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
   AreaChart: ({ children }: any) => <div data-testid="area-chart">{children}</div>,
   BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
+  ComposedChart: ({ children }: any) => <div data-testid="composed-chart">{children}</div>,
+  Line: ({ children }: any) => <div>{children}</div>,
   Area: () => null,
   Bar: ({ children }: any) => <div data-testid="bar">{children}</div>,
   LabelList: ({ formatter, angle }: any) => (
@@ -206,7 +208,7 @@ describe('NetWorthReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
   });
 
   it('handles recalculate error', async () => {
@@ -234,7 +236,7 @@ describe('NetWorthReport', () => {
     await act(async () => {
       fireEvent.click(screen.getByText('bar'));
     });
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
     await act(async () => {
       fireEvent.click(screen.getByText('line'));
     });
@@ -250,8 +252,34 @@ describe('NetWorthReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
     expect(screen.queryByTestId('area-chart')).not.toBeInTheDocument();
+  });
+
+  it('stacks the bar view by account type from the server breakdown', async () => {
+    mockGetMonthly.mockResolvedValue([
+      {
+        month: '2024-01-01',
+        assets: 55000,
+        liabilities: 10000,
+        netWorth: 45000,
+        byAccountType: { CHEQUING: 5000, INVESTMENT: 50000, CREDIT_CARD: -10000 },
+      },
+      {
+        month: '2024-06-01',
+        assets: 60000,
+        liabilities: 9000,
+        netWorth: 51000,
+        byAccountType: { CHEQUING: 6000, INVESTMENT: 54000, CREDIT_CARD: -9000 },
+      },
+    ]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
+    // One stacked series per account type held.
+    expect(screen.getAllByTestId('bar')).toHaveLength(3);
   });
 
   it('switches to the 100% stacked composition view and persists the choice', async () => {
@@ -350,7 +378,7 @@ describe('NetWorthReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
     expect(screen.queryByTestId('label-list')).not.toBeInTheDocument();
   });
 

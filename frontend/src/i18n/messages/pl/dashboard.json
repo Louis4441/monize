@@ -150,7 +150,9 @@
     "other": "Inne",
     "insideOther": "{count, plural, one {# kategoria w Inne} few {# kategorie w Inne} many {# kategorii w Inne} other {# kategorii w Inne}}",
     "topLevelOnly": "Kategorie nadrzędne",
-    "topLevelOnlyHint": "Licz podkategorie w kategorii nadrzędnej"
+    "topLevelOnlyHint": "Licz podkategorie w kategorii nadrzędnej",
+    "viewCallouts": "Etykiety",
+    "viewLegend": "Legenda"
   },
   "incomeExpenses": {
     "title": "Przychody a wydatki",
