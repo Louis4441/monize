@@ -98,6 +98,8 @@ Four rules make the two halves one honest series, and each one exists because it
 - **A single-currency scope converts nothing and reports in its own currency**, not in the reader's preference. That is what makes one account's calendar agree with its own register's balance column to the cent, and it is why `missingRatePairs` is always empty there.
 - **An account that cannot be answered is an unknown component, never a smaller total.** `FxAggregate.addUnknown()` carries an account whose forecast was withheld whole (`BalanceForecastService`'s rule, issue #1247) or that this caller cannot project at all -- today, a joint account, whose forecast belongs to its owner's identity and which the response names in `forecast.unforecastableAccountIds`. The day's `total` is then `null` with `knownSubtotal` holding what WAS known, which may only be printed under a caption that says it is partial.
 
+**The projection half does not annotate overdue occurrences.** `getBalanceForecast` carries an occurrence that fell due and was never posted or skipped onto tomorrow (discussion #1784), and this read model takes its `points` and drops its `overdue`, so a calendar day total can step down on tomorrow with nothing saying why. That is a known gap, not a rule: summing `overdue` per scope into the response is the fix when a surface needs to explain the step.
+
 The date range is bounded by `CALENDAR_RANGE_MAX_DAYS` (`common/validators/calendar-range.validator.ts`), which every calendar DTO reads so the cap cannot drift apart per endpoint: an unbounded range walks a per-day series over every account in scope and asks the forecast to expand every schedule to the horizon.
 
 ## The register's sort field is a list, not a string, and only one query may order by a joined column

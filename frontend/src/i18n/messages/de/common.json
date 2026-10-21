@@ -270,5 +270,8 @@
     "normal": "Normal",
     "compact": "Kompakt",
     "dense": "Dicht"
+  },
+  "scheduledOverdue": {
+    "included": "Enthält {count, plural, one {# überfällige terminierte Buchung} other {# überfällige terminierte Buchungen}}"
   }
 }

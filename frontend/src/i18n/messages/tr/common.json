@@ -270,5 +270,8 @@
     "normal": "Normal",
     "compact": "Kompakt",
     "dense": "Yoğun"
+  },
+  "scheduledOverdue": {
+    "included": "{count, plural, one {# vadesi geçmiş zamanlanmış işlem} other {# vadesi geçmiş zamanlanmış işlem}} dahil"
   }
 }

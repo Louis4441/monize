@@ -270,5 +270,8 @@
     "normal": "सामान्य",
     "compact": "संक्षिप्त",
     "dense": "घना"
+  },
+  "scheduledOverdue": {
+    "included": "{count, plural, one {# अतिदेय निर्धारित लेनदेन} other {# अतिदेय निर्धारित लेनदेन}} शामिल"
   }
 }

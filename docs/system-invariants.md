@@ -4298,6 +4298,43 @@ Cumulative series   A projected balance is cumulative, so an occurrence nobody c
                     applies no rate -- so the destination's projection reports it
                     rather than adding a foreign number (INV-FX-001's rule applied
                     to a projection).
+Overdue             An occurrence dated before a projection's first day that the
+                    expansion still returns was neither posted nor skipped -- both
+                    advance next_due_date, and the walk starts there -- so it is
+                    owed, and both projections apply it on their first day
+                    instead of dropping it (discussion #1784). The cash-flow
+                    forecast (lib/forecast.ts, generateOccurrences with
+                    carryOverdue) lands it on today, its first point, tagged
+                    overdueOriginalDate; the tooltip counts them through
+                    countOverdueOccurrences, keyed on schedule and slot so the two
+                    legs of a transfer count once. The account balance forecast
+                    expands from overdueCarryFrom(today) and places each occurrence
+                    through forecastLanding (accounts/balance-forecast.util.ts): today's
+                    point is the posted balance, so the first projected day is
+                    tomorrow; a bill due today lands there too but is not overdue.
+                    BalanceForecastResult.overdue {date, count, amount} names
+                    them, null when there are none or the series is withheld; the
+                    detail chart marks the day (useOverdueForecastMarkers) and the
+                    projected-balance note says how many. Which date decides is
+                    the date the occurrence falls, so an override that moves an
+                    overdue slot into the window applies it there, unmarked, and
+                    one that moves an occurrence into the past makes it overdue.
+                    Overdue occurrences spend occurrencesRemaining and stop at
+                    endDate like any other, an unpriceable one withholds the
+                    series like any other, and both walks stop after 2000 steps
+                    (OCCURRENCE_WALK_GUARD, MAX_OCCURRENCE_STEPS). Only the last
+                    OVERDUE_CARRY_DAYS (31) are carried, the same constant on both
+                    sides: an older occurrence is read as a forgotten schedule and
+                    dropped. BudgetsService.getUpcomingBills counts from the same
+                    day. getForecastSummary's startingBalance is the first point
+                    less what it carried, so it matches the account's balance.
+                    The calendar's daily totals carry them unannotated.
+                    getProjectedBalanceAtDate, the posting dialog's balance
+                    before, does not carry them. Pinned by forecast.test.ts
+                    (`overdue occurrences`), balance-forecast.util.spec.ts
+                    (forecastLanding), balance-forecast.service.spec.ts
+                    (`occurrences already due and still unposted`) and
+                    budgets.service.spec.ts (getUpcomingBills).
 Known scope         Two client-side expansions remain, both named in the frontend
                     guard's exemption list with their reasons: `lib/forecast.ts`
                     (the cash-flow forecast, which resolves each occurrence

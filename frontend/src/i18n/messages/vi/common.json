@@ -270,5 +270,8 @@
     "normal": "Bình thường",
     "compact": "Thu gọn",
     "dense": "Dày đặc"
+  },
+  "scheduledOverdue": {
+    "included": "Bao gồm {count, plural, one {# giao dịch theo lịch quá hạn} other {# giao dịch theo lịch quá hạn}}"
   }
 }

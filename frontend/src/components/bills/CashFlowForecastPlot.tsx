@@ -26,6 +26,7 @@ import {
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { Account } from '@/types/account';
+import { countOverdueOccurrences } from '@/lib/forecast';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import type {
@@ -48,6 +49,7 @@ function CashFlowTooltip({
   lines?: CashFlowForecastAccountLine[];
 }) {
   const t = useTranslations('bills');
+  const tc = useTranslations('common');
   if (active && payload?.[0]) {
     const data = payload[0].payload;
     const balances = data.balances ?? {};
@@ -57,6 +59,9 @@ function CashFlowTooltip({
       (line) => typeof balances[line.accountId] === 'number',
     );
     const accountNames = new Map(lines.map((line) => [line.accountId, line.name]));
+    // Overdue occurrences land on the first day (discussion #1784); saying so is what
+    // keeps that day's drop from reading as a mistake.
+    const overdueCount = countOverdueOccurrences(data.transactions);
     return (
       <ChartTooltipPanel>
         <div className="max-w-xs">
@@ -75,6 +80,11 @@ function CashFlowTooltip({
           >
             {formatValue(data.balance)}
           </p>
+          {overdueCount > 0 && (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              {tc('scheduledOverdue.included', { count: overdueCount })}
+            </p>
+          )}
           {accountRows.length > 0 && (
             <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-0.5">
               {accountRows.map((line) => (

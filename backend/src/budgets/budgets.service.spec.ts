@@ -30,6 +30,7 @@ import { ScheduledTransactionOverride } from "../scheduled-transactions/entities
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { addDaysYMD, getMonthEndYMD, todayYMD } from "../common/date-utils";
+import { OVERDUE_CARRY_DAYS } from "../common/scheduled-occurrences";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   createScopedDbMocks,
@@ -2123,6 +2124,39 @@ describe("BudgetsService", () => {
       expect(result[0].amount).toBe(15.99);
       expect(result[1].name).toBe("Internet");
       expect(result[1].amount).toBe(79.99);
+    });
+
+    // Discussion #1784: a bill still unposted within OVERDUE_CARRY_DAYS is owed
+    // and counted; one older than that is read as forgotten.
+    it("getUpcomingBills counts a recent overdue bill and leaves a forgotten one out", async () => {
+      const stQb = createMockQueryBuilder({
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: "st-1",
+            name: "Netflix",
+            amount: -15.99,
+            frequency: "ONCE",
+            nextDueDate: addDaysYMD(todayYMD(), -OVERDUE_CARRY_DAYS),
+            categoryId: "cat-ent",
+          },
+          {
+            id: "st-2",
+            name: "Internet",
+            amount: -79.99,
+            frequency: "ONCE",
+            nextDueDate: addDaysYMD(todayYMD(), -OVERDUE_CARRY_DAYS - 1),
+            categoryId: "cat-util",
+          },
+        ]),
+      });
+      scheduledTransactionsRepository.createQueryBuilder.mockReturnValue(stQb);
+
+      const result = await service.getUpcomingBills(
+        "user-1",
+        addDaysYMD(todayYMD(), 7),
+      );
+
+      expect(result.map((bill) => bill.name)).toEqual(["Netflix"]);
     });
 
     it("getUpcomingBills returns empty array when no bills are due", async () => {

@@ -33,6 +33,7 @@ import {
   resolveCategorySpent,
 } from "./budget-spending.util";
 import { formatDateYMD, todayYMD } from "../common/date-utils";
+import { overdueCarryFrom } from "../common/scheduled-occurrences";
 import { roundMoney, sumMoney } from "../common/round.util";
 import {
   convertingTotal,
@@ -462,8 +463,12 @@ export class BudgetsService {
   }
 
   /**
-   * The next occurrence of every outflow schedule due between today and
-   * `periodEnd`, priced at what it would actually cost today.
+   * The next occurrence of every outflow schedule due by `periodEnd`, priced at
+   * what it would actually cost today. An occurrence that fell due in the last
+   * `OVERDUE_CARRY_DAYS` and was neither posted nor skipped is still owed, so it
+   * is the schedule's next one, listed on the date it was due: the balance
+   * forecasts apply it too (discussion #1784), and safe-to-spend must not count
+   * money a late bill will take.
    *
    * Both halves come from the one occurrence contract (issue #1247). The
    * occurrence matters as much as the amount: reading the schedule template meant
@@ -475,11 +480,10 @@ export class BudgetsService {
     userId: string,
     periodEnd: string,
   ): Promise<UpcomingBill[]> {
-    const todayStr = todayYMD();
     const occurrences = await this.occurrences.findOccurrences(
       userId,
       {
-        from: todayStr,
+        from: overdueCarryFrom(todayYMD()),
         through: periodEnd,
         // One row per schedule, which is the shape this list has always had.
         maxOccurrences: 1,
