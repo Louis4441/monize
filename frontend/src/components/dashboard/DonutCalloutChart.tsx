@@ -33,7 +33,15 @@ interface DonutCalloutChartProps<T extends DonutCalloutSlice> {
   /** Body of the hover tooltip for one slice. */
   renderTooltip: (slice: T) => ReactNode;
   /** The aggregate drawn in the donut's hole. */
-  center?: { label: ReactNode; value: ReactNode };
+  center?: {
+    label: ReactNode;
+    value: ReactNode;
+    /**
+     * The same figure in compact notation ("$123.5K"), drawn in the callout
+     * view, whose hole is the smallest the layout allows. Defaults to `value`.
+     */
+    compactValue?: ReactNode;
+  };
   /** Show each slice's value at its legend row's end. Default true. */
   legendValues?: boolean;
   legendColumnsClassName?: string;
@@ -56,9 +64,12 @@ interface Size {
  * The callout view needs a hole wide enough for the centre figure: a box
  * column that leaves only the smallest donut would squeeze it to a few
  * characters, so a chart with a centre asks for a larger donut and falls back
- * to the legend where that does not fit.
+ * to the legend where that does not fit. At 96 the hole leaves the figure
+ * about 95px, which holds a compact total and its partial marker ("$123.5K*")
+ * at the figure's size; a dashboard card on a large screen still fits the
+ * boxes beside it.
  */
-const WITH_CENTER_OPTIONS: Partial<CalloutLayoutOptions> = { minRadius: 80 };
+const WITH_CENTER_OPTIONS: Partial<CalloutLayoutOptions> = { minRadius: 96 };
 
 /** Share of the hole's diameter the centre figure may use, keeping it off the ring. */
 const CENTER_WIDTH_SHARE = 0.9;
@@ -167,7 +178,7 @@ export function DonutCalloutChart<T extends DonutCalloutSlice>({
   const centerFigure = center && (
     <DonutCenterTotal
       label={center.label}
-      value={center.value}
+      value={layout ? (center.compactValue ?? center.value) : center.value}
       maxWidth={holeDiameter === null ? undefined : Math.floor(holeDiameter * CENTER_WIDTH_SHARE)}
     />
   );

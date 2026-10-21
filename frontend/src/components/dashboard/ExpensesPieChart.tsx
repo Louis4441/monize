@@ -74,7 +74,7 @@ function ExpensesPieTooltip({ slice, totalExpenses, formatCurrency, formatPercen
 export function ExpensesPieChart({ accounts, isLoading }: ExpensesPieChartProps) {
   const t = useTranslations('dashboard');
   const router = useRouter();
-  const { formatCurrencyCompact: formatCurrency, formatPercent } = useNumberFormat();
+  const { formatCurrencyCompact: formatCurrency, formatCurrencyTight, formatPercent } = useNumberFormat();
   const { config, updateConfig } = useWidgetConfig<ExpensesPieConfig>(
     WIDGET_ID,
     EXPENSES_PIE_DEFAULT,
@@ -286,6 +286,13 @@ export function ExpensesPieChart({ accounts, isLoading }: ExpensesPieChartProps)
               value: (
                 <PartialTotal total={spendingTotal} displayCurrency={displayCurrency}>
                   {formatCurrency(totalExpenses)}
+                </PartialTotal>
+              ),
+              // The callout view's hole is the smallest; a six-figure total in
+              // full would run onto the ring there.
+              compactValue: (
+                <PartialTotal total={spendingTotal} displayCurrency={displayCurrency}>
+                  {formatCurrencyTight(totalExpenses)}
                 </PartialTotal>
               ),
             }}

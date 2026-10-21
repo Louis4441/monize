@@ -356,8 +356,10 @@ describe('ExpensesPieChart', () => {
         expect(parseFloat(box.style.left) + parseFloat(box.style.width)).toBeLessThanOrEqual(560);
         expect(parseFloat(box.style.top) + parseFloat(box.style.height)).toBeLessThanOrEqual(300);
       }
-      // The total stays in the hole.
-      expect(screen.getByText('$1050.00')).toBeInTheDocument();
+      // The total stays in the hole, compact so it fits the callout view's
+      // smaller one.
+      expect(screen.getByText('$1.1K')).toBeInTheDocument();
+      expect(screen.queryByText('$1050.00')).not.toBeInTheDocument();
     });
 
     it('opens a category from its box, and Other into the four it merged', async () => {

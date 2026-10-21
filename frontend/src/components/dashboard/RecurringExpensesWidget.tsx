@@ -28,7 +28,7 @@ interface RecurringExpensesWidgetProps {
 export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetProps) {
   const t = useTranslations('dashboard');
   const router = useRouter();
-  const { formatCurrency, formatCurrencyCompact } = useNumberFormat();
+  const { formatCurrency, formatCurrencyCompact, formatCurrencyTight } = useNumberFormat();
   const { config, updateConfig } = useWidgetConfig<RecurringConfig>(
     WIDGET_ID,
     RECURRING_EXPENSES_DEFAULT,
@@ -124,6 +124,7 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
           center={{
             label: t('recurringExpenses.monthlyEstimate'),
             value: formatCurrencyCompact(monthlyEstimate),
+            compactValue: formatCurrencyTight(monthlyEstimate),
           }}
           renderTooltip={(slice) => (
             <ChartTooltipPanel>
