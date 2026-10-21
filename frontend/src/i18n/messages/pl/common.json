@@ -270,5 +270,8 @@
     "normal": "Normalna",
     "compact": "Kompaktowa",
     "dense": "Gęsta"
+  },
+  "scheduledOverdue": {
+    "included": "Zawiera {count, plural, one {# zaległą zaplanowaną transakcję} few {# zaległe zaplanowane transakcje} many {# zaległych zaplanowanych transakcji} other {# zaległej zaplanowanej transakcji}}"
   }
 }

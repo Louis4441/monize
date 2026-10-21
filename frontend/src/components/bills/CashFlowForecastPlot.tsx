@@ -49,6 +49,7 @@ function CashFlowTooltip({
   lines?: CashFlowForecastAccountLine[];
 }) {
   const t = useTranslations('bills');
+  const tc = useTranslations('common');
   if (active && payload?.[0]) {
     const data = payload[0].payload;
     const balances = data.balances ?? {};
@@ -81,7 +82,7 @@ function CashFlowTooltip({
           </p>
           {overdueCount > 0 && (
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              {t('forecast.tooltipOverdue', { count: overdueCount })}
+              {tc('scheduledOverdue.included', { count: overdueCount })}
             </p>
           )}
           {accountRows.length > 0 && (

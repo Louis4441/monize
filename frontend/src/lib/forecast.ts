@@ -137,6 +137,15 @@ interface Occurrence {
 const MAX_OCCURRENCE_STEPS = 2000;
 
 /**
+ * How many days before the forecast's first day an occurrence that was neither
+ * posted nor skipped is still carried as owed (discussion #1784). Older ones are
+ * read as forgotten and left out, so a stale schedule moves the forecast by at
+ * most this window's occurrences. The backend uses the same window
+ * (`OVERDUE_CARRY_DAYS` in `backend/src/common/scheduled-occurrences.ts`).
+ */
+export const OVERDUE_CARRY_DAYS = 31;
+
+/**
  * Does this override carry an embedded investment split? Such an override is
  * FX-sensitive (issue #1167 F5-2) and projects its server-resolved
  * `investmentForecastAmount`, not its stale stored `amount`.
@@ -163,11 +172,12 @@ interface OverrideLookup {
  * Uses override data (amount, date) from futureOverrides for each occurrence.
  *
  * With `carryOverdue`, an occurrence whose date (after any override) is before
- * `startDate` is not dropped but placed ON `startDate` and marked with its slot
- * (discussion #1784). Posting or skipping an occurrence advances `nextDueDate`,
- * so every slot walked from there is one nobody has posted or skipped: the bill
- * is still owed, and a forecast that left it out showed money that will not be
- * there. The cash-flow forecasts carry; `getProjectedBalanceAtDate` does not.
+ * `startDate`, by at most `OVERDUE_CARRY_DAYS`, is not dropped but placed ON
+ * `startDate` and marked with its slot (discussion #1784). Posting or skipping
+ * an occurrence advances `nextDueDate`, so every slot walked from there is one
+ * nobody has posted or skipped: the bill is still owed, and a forecast that left
+ * it out showed money that will not be there. The cash-flow forecasts carry;
+ * `getProjectedBalanceAtDate` does not.
  */
 function generateOccurrences(
   transaction: ScheduledTransaction,
@@ -182,10 +192,14 @@ function generateOccurrences(
   const startTime = startDate.getTime();
   const endTime = endDate.getTime();
   const startKey = formatDateKey(startDate);
+  const carryFrom = new Date(startDate);
+  carryFrom.setDate(carryFrom.getDate() - OVERDUE_CARRY_DAYS);
+  const carryFromTime = carryFrom.getTime();
 
   // Where an occurrence falling on `effectiveTime` lands in this window, or
   // `null` when it is outside it. Before the window it is overdue: carried onto
-  // the first day when asked to, and only while the window has a first day.
+  // the first day when asked to, only while the window has a first day, and
+  // only from the last `OVERDUE_CARRY_DAYS`.
   const place = (
     effectiveTime: number,
     effectiveKey: string,
@@ -194,6 +208,7 @@ function generateOccurrences(
     if (effectiveTime > endTime) return null;
     if (effectiveTime >= startTime) return { date: effectiveKey };
     if (!carryOverdue || startTime > endTime) return null;
+    if (effectiveTime < carryFromTime) return null;
     return { date: startKey, overdueOriginalDate: slotKey };
   };
   const txEndDate = transaction.endDate ? parseLocalDate(transaction.endDate) : null;
@@ -1026,6 +1041,14 @@ export function countOverdueOccurrences(transactions: ForecastTransaction[]): nu
   return keys.size;
 }
 
+/** The net of the overdue occurrences a forecast point carries. */
+function overdueNet(transactions: ForecastTransaction[]): number {
+  return transactions.reduce(
+    (sum, tx) => (tx.overdueOriginalDate !== undefined ? sum + tx.amount : sum),
+    0,
+  );
+}
+
 /**
  * Get summary statistics from forecast data
  */
@@ -1041,7 +1064,11 @@ export function getForecastSummary(dataPoints: ForecastDataPoint[]) {
   }
 
   const balances = dataPoints.map(d => d.balance);
-  const startingBalance = balances[0];
+  // "Starting" is where the forecast starts from, before the overdue occurrences
+  // it applies on its first day (discussion #1784): those are a projection, and
+  // the figure has to match the balance the account shows.
+  const startingBalance =
+    Math.round((balances[0] - overdueNet(dataPoints[0].transactions)) * 100) / 100;
   const endingBalance = balances[balances.length - 1];
   const minBalance = Math.min(...balances);
   const maxBalance = Math.max(...balances);

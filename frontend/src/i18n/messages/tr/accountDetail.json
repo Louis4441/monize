@@ -45,6 +45,5 @@
     "missingRate": "{name}: bu kaydın uzlaştığı döviz kuru bulunamadı, bu nedenle tutar bilinmiyor.",
     "crossCurrencyTransfer": "{name}: bu hesap {to} biriminde iken {from} biriminde bir hesaptan gelen bir aktarım. Buraya girecek tutar aktarım işlenirken belirlenir, bu yüzden önceden öngörülemez.",
     "howToFix": "Eksik kuru düzeltmek için: Para Birimleri'ni açıp kurları yenileyin ya da menkul kıymetin ve uzlaşma hesabının beklediğiniz para birimlerinde olduğunu doğrulayın."
-  },
-  "forecastOverdue": "{count, plural, one {# vadesi geçmiş zamanlanmış işlem} other {# vadesi geçmiş zamanlanmış işlem}} dahil"
+  }
 }

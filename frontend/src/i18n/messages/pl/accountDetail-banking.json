@@ -3,7 +3,6 @@
     "currentBalance": "Bieżące saldo",
     "projectedBalance": "Prognozowane saldo",
     "projectedNote": "Za 90 dni",
-    "projectedNoteOverdue": "Za 90 dni, zawiera {count, plural, one {# zaległa zaplanowana transakcja} few {# zaległe zaplanowane transakcje} many {# zaległych zaplanowanych transakcji} other {# zaległej zaplanowanej transakcji}}",
     "moneyIn": "Wpływy",
     "moneyOut": "Wydatki",
     "thisMonth": "W tym miesiącu",

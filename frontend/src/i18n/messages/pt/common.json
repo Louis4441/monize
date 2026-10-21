@@ -270,5 +270,8 @@
     "normal": "Normal",
     "compact": "Compacto",
     "dense": "Denso"
+  },
+  "scheduledOverdue": {
+    "included": "Inclui {count, plural, one {# transação agendada em atraso} other {# transações agendadas em atraso}}"
   }
 }

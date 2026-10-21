@@ -39,7 +39,6 @@
     "scheduledCount": "{count, plural, one {# zamanlanmış işlem} other {# zamanlanmış işlem}} tahmin içinde",
     "tooltipTransactions": "İşlemler:",
     "tooltipMore": "+{count} daha",
-    "tooltipOverdue": "{count, plural, one {# vadesi geçmiş zamanlanmış işlem} other {# vadesi geçmiş zamanlanmış işlem}} dahil",
     "noData": "Görüntülenecek veri yok",
     "noAccounts": "Hesap bulunamadı",
     "noScheduled": "Zamanlanmış işlem yok",

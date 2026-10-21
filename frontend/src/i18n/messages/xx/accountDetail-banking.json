@@ -3,7 +3,6 @@
     "currentBalance": "[XX-Current Balance-XX]",
     "projectedBalance": "[XX-Projected Balance-XX]",
     "projectedNote": "[XX-In 90 days-XX]",
-    "projectedNoteOverdue": "[XX-In 90 days, includes {count, plural, one {# overdue scheduled transaction} other {# overdue scheduled transactions}}-XX]",
     "moneyIn": "[XX-Money In-XX]",
     "moneyOut": "[XX-Money Out-XX]",
     "thisMonth": "[XX-This month-XX]",

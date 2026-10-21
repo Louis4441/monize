@@ -270,5 +270,8 @@
     "normal": "標準",
     "compact": "コンパクト",
     "dense": "密集"
+  },
+  "scheduledOverdue": {
+    "included": "期限超過のスケジュール済み取引 {count, plural, one {# 件} other {# 件}}を含む"
   }
 }

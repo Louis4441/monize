@@ -4298,8 +4298,8 @@ Overdue             An occurrence dated before a projection's first day that the
                     overdueOriginalDate; the tooltip counts them through
                     countOverdueOccurrences, keyed on schedule and slot so the two
                     legs of a transfer count once. The account balance forecast
-                    expands with no lower bound and places each occurrence through
-                    forecastLanding (accounts/balance-forecast.util.ts): today's
+                    expands from overdueCarryFrom(today) and places each occurrence
+                    through forecastLanding (accounts/balance-forecast.util.ts): today's
                     point is the posted balance, so the first projected day is
                     tomorrow; a bill due today lands there too but is not overdue.
                     BalanceForecastResult.overdue {date, count, amount} names
@@ -4312,12 +4312,19 @@ Overdue             An occurrence dated before a projection's first day that the
                     Overdue occurrences spend occurrencesRemaining and stop at
                     endDate like any other, an unpriceable one withholds the
                     series like any other, and both walks stop after 2000 steps
-                    (OCCURRENCE_WALK_GUARD, MAX_OCCURRENCE_STEPS).
+                    (OCCURRENCE_WALK_GUARD, MAX_OCCURRENCE_STEPS). Only the last
+                    OVERDUE_CARRY_DAYS (31) are carried, the same constant on both
+                    sides: an older occurrence is read as a forgotten schedule and
+                    dropped. BudgetsService.getUpcomingBills counts from the same
+                    day. getForecastSummary's startingBalance is the first point
+                    less what it carried, so it matches the account's balance.
+                    The calendar's daily totals carry them unannotated.
                     getProjectedBalanceAtDate, the posting dialog's balance
                     before, does not carry them. Pinned by forecast.test.ts
                     (`overdue occurrences`), balance-forecast.util.spec.ts
-                    (forecastLanding) and balance-forecast.service.spec.ts
-                    (`occurrences already due and still unposted`).
+                    (forecastLanding), balance-forecast.service.spec.ts
+                    (`occurrences already due and still unposted`) and
+                    budgets.service.spec.ts (getUpcomingBills).
 Known scope         Two client-side expansions remain, both named in the frontend
                     guard's exemption list with their reasons: `lib/forecast.ts`
                     (the cash-flow forecast, which resolves each occurrence

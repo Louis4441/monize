@@ -3,7 +3,6 @@
     "currentBalance": "現在残高",
     "projectedBalance": "予測残高",
     "projectedNote": "90日後",
-    "projectedNoteOverdue": "90日後、期限超過のスケジュール済み取引 {count, plural, one {# 件} other {# 件}}を含む",
     "moneyIn": "入金",
     "moneyOut": "出金",
     "thisMonth": "今月",

@@ -6,6 +6,7 @@ import {
   buildMultiAccountForecast,
   countOverdueOccurrences,
   getForecastSummary,
+  OVERDUE_CARRY_DAYS,
   getProjectedBalanceAtDate,
   FORECAST_PERIOD_DAYS,
   FORECAST_PERIOD_LABELS,
@@ -1522,6 +1523,28 @@ describe('buildForecast', () => {
       expect(result.missingCurrencies.length).toBeGreaterThan(0);
     });
 
+    it(`carries only the last ${OVERDUE_CARRY_DAYS} days of a forgotten schedule`, () => {
+      const accounts = [makeAccount({ currentBalance: 5000 })];
+      const transactions = [makeScheduled({
+        nextDueDate: '2024-11-01',
+        amount: -1,
+        frequency: 'DAILY',
+      })];
+      const result = forecastPoints(accounts, transactions, 'week', 'all');
+      // Dec 15 to Jan 14 are carried, and Jan 15 is due on time.
+      expect(countOverdueOccurrences(result[0].transactions)).toBe(OVERDUE_CARRY_DAYS);
+      expect(result[0].balance).toBe(5000 - OVERDUE_CARRY_DAYS - 1);
+    });
+
+    it('carries an occurrence exactly at the edge of the window', () => {
+      const accounts = [makeAccount({ currentBalance: 5000 })];
+      const edge = makeScheduled({ nextDueDate: '2024-12-15', amount: -100, frequency: 'ONCE' });
+      const beyond = makeScheduled({ id: 'st-2', nextDueDate: '2024-12-14', amount: -100, frequency: 'ONCE' });
+      const result = forecastPoints(accounts, [edge, beyond], 'week', 'all');
+      expect(countOverdueOccurrences(result[0].transactions)).toBe(1);
+      expect(result[0].balance).toBe(4900);
+    });
+
     it('bounds the catch-up walk at 2000 steps, as the server does', () => {
       const accounts = [makeAccount({ currentBalance: 5000 })];
       const transactions = [makeScheduled({
@@ -1530,8 +1553,9 @@ describe('buildForecast', () => {
         frequency: 'DAILY',
       })];
       const result = forecastPoints(accounts, transactions, 'week', 'all');
-      expect(countOverdueOccurrences(result[0].transactions)).toBe(2000);
-      expect(result[0].balance).toBe(3000);
+      // The walk stops in mid-2020, long before the carry window opens.
+      expect(countOverdueOccurrences(result[0].transactions)).toBe(0);
+      expect(result[0].balance).toBe(5000);
     });
   });
 
@@ -1747,6 +1771,20 @@ describe('getForecastSummary', () => {
     expect(summary.minBalance).toBe(1000);
     expect(summary.maxBalance).toBe(1000);
     expect(summary.goesNegative).toBe(false);
+  });
+
+  it('starts from the balance before the overdue occurrences carried onto the first day', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2025, 0, 15));
+    try {
+      const accounts = [makeAccount({ currentBalance: 5000 })];
+      const transactions = [makeScheduled({ nextDueDate: '2025-01-10', amount: -500, frequency: 'ONCE' })];
+      const points = buildForecast(accounts, transactions, 'month', 'all').points;
+      expect(points[0].balance).toBe(4500);
+      expect(getForecastSummary(points).startingBalance).toBe(5000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('detects goesNegative as false when min balance is exactly zero', () => {

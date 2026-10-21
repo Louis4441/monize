@@ -45,6 +45,5 @@
     "missingRate": "{name}: a taxa de câmbio em que esta ocorrência é liquidada não está disponível, então o valor é desconhecido.",
     "crossCurrencyTransfer": "{name}: uma transferência chegando de uma conta em {from} enquanto esta conta está em {to}. O valor que entra aqui é definido no momento do lançamento, então não pode ser projetado com antecedência.",
     "howToFix": "Para corrigir uma taxa ausente: abra Moedas e atualize as taxas, ou verifique se o ativo e sua conta de liquidação estão nas moedas que você espera."
-  },
-  "forecastOverdue": "Inclui {count, plural, one {# transação agendada em atraso} other {# transações agendadas em atraso}}"
+  }
 }

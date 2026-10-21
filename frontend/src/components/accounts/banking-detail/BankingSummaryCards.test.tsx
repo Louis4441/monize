@@ -68,7 +68,7 @@ describe('BankingSummaryCards', () => {
         overdue={{ date: '2026-03-02', count: 2, amount: -300 }}
       />,
     );
-    expect(screen.getByText('In 90 days, includes 2 overdue scheduled transactions')).toBeInTheDocument();
+    expect(screen.getByText('Includes 2 overdue scheduled transactions')).toBeInTheDocument();
   });
 
   it('keeps the plain note when nothing is overdue', () => {

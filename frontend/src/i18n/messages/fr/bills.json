@@ -39,7 +39,6 @@
     "scheduledCount": "{count, plural, one {# transaction récurrente} other {# transactions récurrentes}} dans la prévision",
     "tooltipTransactions": "Transactions :",
     "tooltipMore": "+{count} de plus",
-    "tooltipOverdue": "Inclut {count, plural, one {# transaction récurrente en retard} other {# transactions récurrentes en retard}}",
     "noData": "Aucune donnée à afficher",
     "noAccounts": "Aucun compte trouvé",
     "noScheduled": "Aucune transaction récurrente",

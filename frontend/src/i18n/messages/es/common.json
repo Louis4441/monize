@@ -270,5 +270,8 @@
     "normal": "Normal",
     "compact": "Compacto",
     "dense": "Denso"
+  },
+  "scheduledOverdue": {
+    "included": "Incluye {count, plural, one {# transacción planificada vencida} other {# transacciones planificadas vencidas}}"
   }
 }

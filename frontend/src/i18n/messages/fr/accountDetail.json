@@ -45,6 +45,5 @@
     "missingRate": "{name} : le taux de change de règlement de cette échéance n'est pas disponible, le montant est donc inconnu.",
     "crossCurrencyTransfer": "{name} : un virement arrivant d'un compte en {from} alors que ce compte est en {to}. Le montant reçu ici est fixé lors de l'enregistrement du virement et ne peut donc pas être projeté à l'avance.",
     "howToFix": "Pour corriger un taux manquant : ouvrez Devises et actualisez les taux, ou vérifiez que le titre et son compte de règlement portent bien les devises attendues."
-  },
-  "forecastOverdue": "Inclut {count, plural, one {# transaction récurrente en retard} other {# transactions récurrentes en retard}}"
+  }
 }

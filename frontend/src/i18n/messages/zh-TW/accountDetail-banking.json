@@ -3,7 +3,6 @@
     "currentBalance": "目前結餘",
     "projectedBalance": "預估結餘",
     "projectedNote": "90 天後",
-    "projectedNoteOverdue": "90 天後，包含 {count, plural, one {# 筆} other {# 筆}}逾期排程交易",
     "moneyIn": "收入",
     "moneyOut": "支出",
     "thisMonth": "本月",

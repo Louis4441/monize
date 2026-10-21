@@ -39,7 +39,6 @@
     "scheduledCount": "预测中有 {count, plural, one {# 笔} other {# 笔}}定期交易",
     "tooltipTransactions": "交易：",
     "tooltipMore": "+{count} 项",
-    "tooltipOverdue": "包含 {count, plural, one {# 笔} other {# 笔}}逾期定期交易",
     "noData": "无数据可显示",
     "noAccounts": "未找到账户",
     "noScheduled": "无定期交易",

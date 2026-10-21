@@ -655,7 +655,7 @@ describe("BalanceForecastService", () => {
 
     it("stops at the schedule's endDate, overdue slots included", async () => {
       scheduledRepo.find.mockResolvedValue([
-        rent({ nextDueDate: "2024-05-20", endDate: "2024-06-30" }),
+        rent({ frequency: "WEEKLY", endDate: "2024-06-30" }),
       ]);
 
       const result = await service.getBalanceForecast("user-1", "acc-1", 60);
@@ -668,6 +668,42 @@ describe("BalanceForecastService", () => {
         date: "2024-07-09",
         count: 2,
         amount: -400,
+      });
+    });
+
+    // Today is 2024-07-08, so the window opens on 2024-06-07: May 20 is read as
+    // forgotten and only June 20 is still owed.
+    it("carries only the occurrences of the last OVERDUE_CARRY_DAYS", async () => {
+      scheduledRepo.find.mockResolvedValue([
+        rent({ nextDueDate: "2024-05-20" }),
+      ]);
+
+      const result = await service.getBalanceForecast("user-1", "acc-1", 30);
+
+      expect(result.points).toEqual([
+        { date: "2024-07-08", balance: 1000 },
+        { date: "2024-07-09", balance: 800 },
+        { date: "2024-07-20", balance: 600 },
+      ]);
+      expect(result.overdue).toEqual({
+        date: "2024-07-09",
+        count: 1,
+        amount: -200,
+      });
+    });
+
+    it("carries an occurrence on the first day of the window, not the day before", async () => {
+      scheduledRepo.find.mockResolvedValue([
+        rent({ frequency: "ONCE", nextDueDate: "2024-06-07" }),
+        rent({ id: "st-2", frequency: "ONCE", nextDueDate: "2024-06-06" }),
+      ]);
+
+      const result = await service.getBalanceForecast("user-1", "acc-1", 30);
+
+      expect(result.overdue).toEqual({
+        date: "2024-07-09",
+        count: 1,
+        amount: -200,
       });
     });
 

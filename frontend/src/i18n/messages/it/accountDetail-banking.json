@@ -3,7 +3,6 @@
     "currentBalance": "Saldo attuale",
     "projectedBalance": "Saldo previsto",
     "projectedNote": "Tra 90 giorni",
-    "projectedNoteOverdue": "Tra 90 giorni, include {count, plural, one {# transazione pianificata scaduta} other {# transazioni pianificate scadute}}",
     "moneyIn": "Entrate",
     "moneyOut": "Uscite",
     "thisMonth": "Questo mese",

@@ -3,7 +3,6 @@
     "currentBalance": "현재 잔액",
     "projectedBalance": "예상 잔액",
     "projectedNote": "90일 후",
-    "projectedNoteOverdue": "90일 후, 연체된 예정 거래 {count, plural, one {#건} other {#건}} 포함",
     "moneyIn": "입금",
     "moneyOut": "출금",
     "thisMonth": "이번 달",

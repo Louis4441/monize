@@ -39,7 +39,6 @@
     "scheduledCount": "{count, plural, one {# giao dịch theo lịch} other {# giao dịch theo lịch}} trong dự báo",
     "tooltipTransactions": "Giao dịch:",
     "tooltipMore": "+{count} thêm",
-    "tooltipOverdue": "Bao gồm {count, plural, one {# giao dịch theo lịch quá hạn} other {# giao dịch theo lịch quá hạn}}",
     "noData": "Không có dữ liệu để hiển thị",
     "noAccounts": "Không tìm thấy tài khoản",
     "noScheduled": "Không có giao dịch theo lịch",

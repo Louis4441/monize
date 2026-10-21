@@ -52,6 +52,7 @@ export function BankingSummaryCards({
   onInterestClick,
 }: BankingSummaryCardsProps) {
   const t = useTranslations('accountDetail-banking');
+  const tc = useTranslations('common');
   const { formatCurrency, formatPercentTrimmed } = useNumberFormat();
   const currency = account.currencyCode;
   const currentBalance = Number(account.currentBalance) || 0;
@@ -72,9 +73,16 @@ export function BankingSummaryCards({
         ),
       valueClass: projectedBalance === null ? undefined : signClass(projectedBalance),
       note:
-        projectedBalance !== null && overdue !== null
-          ? t('summary.projectedNoteOverdue', { count: overdue.count })
-          : t('summary.projectedNote'),
+        projectedBalance !== null && overdue !== null ? (
+          <>
+            {t('summary.projectedNote')}
+            <span className="block">
+              {tc('scheduledOverdue.included', { count: overdue.count })}
+            </span>
+          </>
+        ) : (
+          t('summary.projectedNote')
+        ),
     },
     {
       label: t('summary.moneyIn'),

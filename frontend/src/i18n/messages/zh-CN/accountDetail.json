@@ -45,6 +45,5 @@
     "missingRate": "{name}：找不到这笔到期项目的结算汇率，因此金额未知。",
     "crossCurrencyTransfer": "{name}：本账户为 {to}，而这是一笔来自 {from} 账户的转账。到账金额在转账记账时才确定，因此无法提前预测。",
     "howToFix": "缺少汇率时的处理：打开“货币”页面刷新汇率，或检查该证券及其结算账户的币种是否符合预期。"
-  },
-  "forecastOverdue": "包含 {count, plural, one {# 笔} other {# 笔}}逾期定期交易"
+  }
 }

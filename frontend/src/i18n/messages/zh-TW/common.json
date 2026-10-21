@@ -270,5 +270,8 @@
     "normal": "一般",
     "compact": "緊密",
     "dense": "密集"
+  },
+  "scheduledOverdue": {
+    "included": "包含 {count, plural, one {# 筆} other {# 筆}}逾期排程交易"
   }
 }

@@ -349,7 +349,7 @@ describe('BankingDetailView', () => {
     });
     await renderView();
     await waitFor(() =>
-      expect(screen.getByText('In 90 days, includes 2 overdue scheduled transactions')).toBeInTheDocument(),
+      expect(screen.getByText('Includes 2 overdue scheduled transactions')).toBeInTheDocument(),
     );
     const markers = JSON.parse(
       screen.getByTestId('balance-history-chart').getAttribute('data-markers') as string,

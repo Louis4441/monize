@@ -22,6 +22,7 @@ import {
 } from "./balance-forecast.util";
 import { roundMoney } from "../common/round.util";
 import { addDaysYMD, todayYMD } from "../common/date-utils";
+import { overdueCarryFrom } from "../common/scheduled-occurrences";
 import { tr } from "../i18n/translate";
 import { withScopedDb } from "../common/db/scoped-db";
 import { LEDGER_MOVEMENT_PREDICATE } from "../common/ledger-balance.sql";
@@ -158,12 +159,12 @@ export class BalanceForecastService {
     // disagree with the cash-flow forecast, the budget or the register about
     // which occurrence falls when and what it costs (issue #1247).
     //
-    // No lower bound: an occurrence already due and still unposted is owed, and
-    // `forecastLanding` applies it on the first projected day rather than on
-    // today's anchor, which stays the fact it is (discussion #1784). The walk
-    // starts at `next_due_date` and stops after `OCCURRENCE_WALK_GUARD` steps,
-    // which is what bounds a schedule left overdue for years.
+    // From `OVERDUE_CARRY_DAYS` back: an occurrence already due and still
+    // unposted is owed, and `forecastLanding` applies it on the first projected
+    // day rather than on today's anchor, which stays the fact it is (discussion
+    // #1784). An older one is read as forgotten and left out.
     const occurrences = await this.occurrences.expand(userId, candidates, {
+      from: overdueCarryFrom(today),
       through: horizon,
     });
 

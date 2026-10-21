@@ -45,6 +45,5 @@
     "missingRate": "{name}: không có tỷ giá thanh toán cho lần phát sinh này, nên số tiền là chưa xác định.",
     "crossCurrencyTransfer": "{name}: một chuyển khoản đến từ tài khoản bằng {from} trong khi tài khoản này bằng {to}. Số tiền vào đây được xác định khi chuyển khoản được ghi nhận, nên không thể dự báo trước.",
     "howToFix": "Cách xử lý khi thiếu tỷ giá: mở Tiền tệ và làm mới tỷ giá, hoặc kiểm tra chứng khoán và tài khoản thanh toán của nó có đúng loại tiền bạn mong đợi."
-  },
-  "forecastOverdue": "Bao gồm {count, plural, one {# giao dịch theo lịch quá hạn} other {# giao dịch theo lịch quá hạn}}"
+  }
 }

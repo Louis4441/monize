@@ -270,5 +270,8 @@
     "normal": "Normal",
     "compact": "Kompak",
     "dense": "Padat"
+  },
+  "scheduledOverdue": {
+    "included": "Termasuk {count, plural, one {# transaksi terjadwal lewat jatuh tempo} other {# transaksi terjadwal lewat jatuh tempo}}"
   }
 }

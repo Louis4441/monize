@@ -270,5 +270,8 @@
     "normal": "[XX-Normal-XX]",
     "compact": "[XX-Compact-XX]",
     "dense": "[XX-Dense-XX]"
+  },
+  "scheduledOverdue": {
+    "included": "[XX-Includes {count, plural, one {# overdue scheduled transaction} other {# overdue scheduled transactions}}-XX]"
   }
 }

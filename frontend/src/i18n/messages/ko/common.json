@@ -270,5 +270,8 @@
     "normal": "보통",
     "compact": "컴팩트",
     "dense": "조밀"
+  },
+  "scheduledOverdue": {
+    "included": "연체된 예정 거래 {count, plural, one {#건} other {#건}} 포함"
   }
 }

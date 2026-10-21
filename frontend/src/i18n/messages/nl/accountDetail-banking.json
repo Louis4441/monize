@@ -3,7 +3,6 @@
     "currentBalance": "Huidig saldo",
     "projectedBalance": "Geprojecteerd saldo",
     "projectedNote": "Over 90 dagen",
-    "projectedNoteOverdue": "Over 90 dagen, inclusief {count, plural, one {# achterstallige geplande transactie} other {# achterstallige geplande transacties}}",
     "moneyIn": "Inkomend geld",
     "moneyOut": "Uitgaand geld",
     "thisMonth": "Deze maand",

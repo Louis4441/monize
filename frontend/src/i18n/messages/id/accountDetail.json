@@ -45,6 +45,5 @@
     "missingRate": "{name}: nilai tukar penyelesaian kejadian ini tidak tersedia, jadi jumlahnya tidak diketahui.",
     "crossCurrencyTransfer": "{name}: transfer masuk dari rekening dalam {from} sementara rekening ini dalam {to}. Jumlah yang masuk di sini ditetapkan saat transfer dicatat, jadi tidak dapat diproyeksikan lebih dulu.",
     "howToFix": "Untuk memperbaiki nilai tukar yang hilang: buka Mata Uang dan segarkan kursnya, atau periksa apakah efek dan rekening penyelesaiannya memakai mata uang yang Anda harapkan."
-  },
-  "forecastOverdue": "Termasuk {count, plural, one {# transaksi terjadwal lewat jatuh tempo} other {# transaksi terjadwal lewat jatuh tempo}}"
+  }
 }

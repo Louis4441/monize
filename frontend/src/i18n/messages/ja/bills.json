@@ -39,7 +39,6 @@
     "scheduledCount": "予測に {count, plural, one {# 件のスケジュール済み取引} other {# 件のスケジュール済み取引}} があります",
     "tooltipTransactions": "取引：",
     "tooltipMore": "+{count} 件以上",
-    "tooltipOverdue": "期限超過のスケジュール済み取引 {count, plural, one {# 件} other {# 件}}を含む",
     "noData": "表示するデータがありません",
     "noAccounts": "勘定科目が見つかりません",
     "noScheduled": "スケジュール済み取引がありません",
