@@ -4,6 +4,7 @@ import { render } from '@/test/render';
 import { CashFlowForecastWidget } from './CashFlowForecastWidget';
 import type { CashFlowForecastConfig } from './widget-config';
 import type { Account } from '@/types/account';
+import type { ScheduledTransaction } from '@/types/scheduled-transaction';
 
 vi.mock('recharts', async () => (await import('@/test/recharts-mock')).rechartsMock());
 
@@ -138,6 +139,61 @@ describe('CashFlowForecastWidget', () => {
     // future row in it.
     expect(screen.getByText('Starting').nextElementSibling).toHaveTextContent('CAD 1000.00');
     expect(screen.getByText('Ending').nextElementSibling).toHaveTextContent('CAD 600.00');
+  });
+
+  // Discussion #1784: an occurrence due before today and neither posted nor
+  // skipped is still owed, so the widget's forecast applies it on today, as the
+  // Bills & Deposits chart does.
+  describe('overdue scheduled occurrences', () => {
+    const overdueBill = (overrides: Partial<ScheduledTransaction> = {}) =>
+      ({
+        id: 'st-hydro',
+        name: 'Hydro',
+        amount: -250,
+        frequency: 'ONCE',
+        nextDueDate: daysAhead(-5),
+        isActive: true,
+        isTransfer: false,
+        transferAccountId: null,
+        isSplit: false,
+        splits: [],
+        endDate: null,
+        occurrencesRemaining: null,
+        nextOverride: null,
+        accountId: 'acc-chq',
+        ...overrides,
+      }) as ScheduledTransaction;
+
+    it('applies the overdue occurrence on today without moving the starting figure', async () => {
+      await renderWidget({ accounts: [ACCOUNTS[0]], scheduledTransactions: [overdueBill()] });
+
+      const { points } = forecastSpies.buildForecast.mock.results.at(-1)!.value;
+      expect(points[0].date).toBe(daysAhead(0));
+      expect(points[0].transactions).toEqual([
+        expect.objectContaining({ amount: -250, overdueOriginalDate: daysAhead(-5) }),
+      ]);
+      // Starting is the balance the account shows; the overdue bill and the
+      // future-dated rent are both in the ending figure.
+      expect(screen.getByText('Starting').nextElementSibling).toHaveTextContent('CAD 1000.00');
+      expect(screen.getByText('Ending').nextElementSibling).toHaveTextContent('CAD 350.00');
+    });
+
+    it('applies it on today in the one-line-per-account view too', async () => {
+      configState.current = { period: 'month', accountIds: ['acc-chq', 'acc-sav'] };
+      await renderWidget({ scheduledTransactions: [overdueBill({ accountId: 'acc-sav' })] });
+
+      const { points } = forecastSpies.buildMultiAccountForecast.mock.results.at(-1)!.value;
+      expect(points[0].date).toBe(daysAhead(0));
+      expect(points[0].balances['acc-sav']).toBe(4750);
+      expect(points[0].transactions).toEqual([
+        expect.objectContaining({
+          accountId: 'acc-sav',
+          amount: -250,
+          overdueOriginalDate: daysAhead(-5),
+        }),
+      ]);
+      expect(screen.getByText('Starting').nextElementSibling).toHaveTextContent('CAD 6000.00');
+    });
   });
 
   it('waits for the dashboard to load before fetching, and shows a placeholder', async () => {
