@@ -140,7 +140,9 @@
     "current": "Actual",
     "netWorthLabel": "Patrimonio neto",
     "assets": "Activos",
-    "liabilities": "Pasivos"
+    "liabilities": "Pasivos",
+    "viewCallouts": "Etiquetas",
+    "viewLegend": "Leyenda"
   },
   "expensesPieChart": {
     "title": "Gastos por categoría",

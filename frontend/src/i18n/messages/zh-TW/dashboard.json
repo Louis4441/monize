@@ -140,7 +140,9 @@
     "current": "目前",
     "netWorthLabel": "資產淨值",
     "assets": "資產",
-    "liabilities": "負債"
+    "liabilities": "負債",
+    "viewCallouts": "標籤",
+    "viewLegend": "圖例"
   },
   "expensesPieChart": {
     "title": "依類別支出",

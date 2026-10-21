@@ -140,7 +140,9 @@
     "current": "Aktuell",
     "netWorthLabel": "Reinvermögen",
     "assets": "Aktiva",
-    "liabilities": "Verbindlichkeiten"
+    "liabilities": "Verbindlichkeiten",
+    "viewCallouts": "Beschriftungen",
+    "viewLegend": "Legende"
   },
   "expensesPieChart": {
     "title": "Ausgaben nach Kategorie",

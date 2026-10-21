@@ -140,7 +140,9 @@
     "current": "Bieżące",
     "netWorthLabel": "Wartość netto",
     "assets": "Aktywa",
-    "liabilities": "Zobowiązania"
+    "liabilities": "Zobowiązania",
+    "viewCallouts": "Etykiety",
+    "viewLegend": "Legenda"
   },
   "expensesPieChart": {
     "title": "Wydatki według kategorii",

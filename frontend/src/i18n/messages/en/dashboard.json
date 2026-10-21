@@ -140,7 +140,9 @@
     "current": "Current",
     "netWorthLabel": "Net Worth",
     "assets": "Assets",
-    "liabilities": "Liabilities"
+    "liabilities": "Liabilities",
+    "viewCallouts": "Labels",
+    "viewLegend": "Legend"
   },
   "expensesPieChart": {
     "title": "Expenses by Category",

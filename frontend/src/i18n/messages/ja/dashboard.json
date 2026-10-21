@@ -140,7 +140,9 @@
     "current": "現在",
     "netWorthLabel": "純資産",
     "assets": "資産",
-    "liabilities": "負債"
+    "liabilities": "負債",
+    "viewCallouts": "ラベル",
+    "viewLegend": "凡例"
   },
   "expensesPieChart": {
     "title": "カテゴリ別支出",

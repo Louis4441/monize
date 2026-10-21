@@ -140,7 +140,9 @@
     "current": "Atual",
     "netWorthLabel": "Patrimônio Líquido",
     "assets": "Ativos",
-    "liabilities": "Passivos"
+    "liabilities": "Passivos",
+    "viewCallouts": "Rótulos",
+    "viewLegend": "Legenda"
   },
   "expensesPieChart": {
     "title": "Despesas por Categoria",

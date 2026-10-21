@@ -140,7 +140,9 @@
     "current": "현재",
     "netWorthLabel": "순자산가액",
     "assets": "자산",
-    "liabilities": "부채"
+    "liabilities": "부채",
+    "viewCallouts": "레이블",
+    "viewLegend": "범례"
   },
   "expensesPieChart": {
     "title": "카테고리별 지출",

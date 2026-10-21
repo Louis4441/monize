@@ -140,7 +140,9 @@
     "current": "当前",
     "netWorthLabel": "资产净值",
     "assets": "资产",
-    "liabilities": "负债"
+    "liabilities": "负债",
+    "viewCallouts": "标签",
+    "viewLegend": "图例"
   },
   "expensesPieChart": {
     "title": "按科目划分的支出",

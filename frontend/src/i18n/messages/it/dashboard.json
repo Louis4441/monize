@@ -140,7 +140,9 @@
     "current": "Attuale",
     "netWorthLabel": "Patrimonio netto",
     "assets": "Attività",
-    "liabilities": "Passività"
+    "liabilities": "Passività",
+    "viewCallouts": "Etichette",
+    "viewLegend": "Legenda"
   },
   "expensesPieChart": {
     "title": "Uscite per categoria",

@@ -1618,11 +1618,10 @@ describe("a panel card is the shared Card surface", () => {
     "/src/components/layout/ActionHistoryPanel.tsx",
     "/src/components/payees/detail/PayeeRecurringPanel.tsx",
     "/src/components/reconcile/ReconciliationReminderBadge.tsx",
-    // Both keep an inline surface for their chart TOOLTIP -- a floating panel
-    // with its own stronger shadow, not the widget card. Their widget
-    // surfaces now come from CARD_CLASS; the tooltip shape is hand-rolled in
-    // ~44 files and is a separate drift from this one.
-    "/src/components/dashboard/AssetsVsLiabilities.tsx",
+    // Keeps an inline surface for its chart TOOLTIP -- a floating panel with
+    // its own stronger shadow, not the widget card. Its widget surface now
+    // comes from CARD_CLASS; the tooltip shape is hand-rolled in ~44 files
+    // and is a separate drift from this one.
     "/src/components/dashboard/NetWorthChart.tsx",
     "/src/components/reports/AccountBalancesReport.tsx",
     "/src/components/reports/BillPaymentHistoryReport.tsx",

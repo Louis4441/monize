@@ -1,19 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@/test/render';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, fireEvent, screen, within } from '@testing-library/react';
+import { render } from '@/test/render';
 import { AssetsVsLiabilities } from './AssetsVsLiabilities';
+import type { AssetsLiabilitiesConfig } from './widget-config';
 import { MonthlyNetWorth } from '@/types/net-worth';
 
-const mockPush = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-}));
+vi.mock('recharts', async () => (await import('@/test/recharts-mock')).rechartsMock());
 
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  PieChart: ({ children }: any) => <div data-testid="pie-chart">{children}</div>,
-  Pie: ({ children }: any) => <div data-testid="pie">{children}</div>,
-  Cell: () => <div data-testid="cell" />,
-  Tooltip: () => null,
+const updateConfig = vi.fn();
+const configState: { current: AssetsLiabilitiesConfig } = { current: { view: 'legend' } };
+vi.mock('@/hooks/useWidgetConfig', () => ({
+  useWidgetConfig: () => ({ config: configState.current, updateConfig }),
 }));
 
 vi.mock('@/hooks/useNumberFormat', async () => {
@@ -22,17 +19,42 @@ vi.mock('@/hooks/useNumberFormat', async () => {
     useNumberFormat: () => ({
       ...numberFormatMockDefaults(),
       formatCurrencyCompact: (n: number) => `$${n.toFixed(0)}`,
+      formatCurrencyTight: (n: number) => `$${(n / 1000).toFixed(1)}K`,
     }),
   };
 });
+
 const months: MonthlyNetWorth[] = [
   { month: '2026-04-01', assets: 90000, liabilities: 40000, netWorth: 50000 },
   { month: '2026-05-01', assets: 120000, liabilities: 30000, netWorth: 90000 },
 ];
 
+/** A ResizeObserver that reports the given content box as soon as it observes. */
+function observeAs(width: number, height: number) {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe() {
+        this.callback(
+          [{ contentRect: { width, height } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+}
+
 describe('AssetsVsLiabilities', () => {
   beforeEach(() => {
-    mockPush.mockClear();
+    updateConfig.mockReset();
+    configState.current = { view: 'legend' };
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders loading skeleton with title', () => {
@@ -49,13 +71,9 @@ describe('AssetsVsLiabilities', () => {
   it('uses the latest month for the assets/liabilities split and net worth', () => {
     render(<AssetsVsLiabilities data={months} isLoading={false} />);
     // Latest month (May): assets 120000, liabilities 30000, net 90000
-    expect(screen.getByText('$120000')).toBeInTheDocument();
-    expect(screen.getByText('$30000')).toBeInTheDocument();
-    expect(screen.getByText('$90000')).toBeInTheDocument();
-    expect(screen.getByText('Assets')).toBeInTheDocument();
-    expect(screen.getByText('Liabilities')).toBeInTheDocument();
-    // One Cell per non-zero slice.
-    expect(screen.getAllByTestId('cell')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /^Assets/ })).toHaveTextContent('$120000');
+    expect(screen.getByRole('button', { name: /^Liabilities/ })).toHaveTextContent('$30000');
+    expect(within(screen.getByTestId('donut-chart-area')).getByText('$90000')).toBeInTheDocument();
   });
 
   it('omits a zero-valued slice (no liabilities)', () => {
@@ -65,9 +83,23 @@ describe('AssetsVsLiabilities', () => {
         isLoading={false}
       />,
     );
-    expect(screen.getAllByTestId('cell')).toHaveLength(1);
-    expect(screen.getByText('Assets')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Assets/ })).toBeInTheDocument();
     expect(screen.queryByText('Liabilities')).not.toBeInTheDocument();
+  });
+
+  it('puts net worth inside the donut, compact in the callout view and in full in the legend', () => {
+    observeAs(520, 280);
+    for (const [view, figure] of [
+      ['callouts', '$90.0K'],
+      ['legend', '$90000'],
+    ] as const) {
+      configState.current = { view };
+      const { unmount } = render(<AssetsVsLiabilities data={months} isLoading={false} />);
+      const area = screen.getByTestId('donut-chart-area');
+      expect(within(area).getByText('Net Worth')).toBeInTheDocument();
+      expect(within(area).getByText(figure)).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it('renders negative net worth in red', () => {
@@ -77,7 +109,7 @@ describe('AssetsVsLiabilities', () => {
         isLoading={false}
       />,
     );
-    const netEl = screen.getByText('$-15000');
+    const netEl = within(screen.getByTestId('donut-chart-area')).getByText('$-15000');
     expect(netEl.className).toContain('text-red');
   });
 
@@ -87,5 +119,39 @@ describe('AssetsVsLiabilities', () => {
       'href',
       '/reports/net-worth',
     );
+  });
+
+  describe('callout view', () => {
+    beforeEach(() => {
+      configState.current = { view: 'callouts' };
+    });
+
+    it('draws a box per slice beside the chart when they fit', () => {
+      observeAs(520, 280);
+      render(<AssetsVsLiabilities data={months} isLoading={false} />);
+      const callouts = screen.getByRole('list', { name: 'Assets vs Liabilities' });
+      expect(within(callouts).getAllByRole('listitem')).toHaveLength(2);
+      expect(within(callouts).getByText('Assets')).toBeInTheDocument();
+      expect(within(callouts).getByText('$120000')).toBeInTheDocument();
+      expect(within(callouts).getByText('$30000')).toBeInTheDocument();
+      // No legend beneath it.
+      expect(screen.queryByRole('button', { name: /^Assets/ })).not.toBeInTheDocument();
+    });
+
+    it('falls back to the legend where the boxes would not fit', () => {
+      observeAs(240, 240);
+      render(<AssetsVsLiabilities data={months} isLoading={false} />);
+      expect(screen.queryByRole('list', { name: 'Assets vs Liabilities' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Assets/ })).toHaveTextContent('$120000');
+    });
+  });
+
+  it('switches between labels and legend in its settings', async () => {
+    render(<AssetsVsLiabilities data={months} isLoading={false} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Configure Assets vs Liabilities' }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Labels' }));
+    expect(updateConfig).toHaveBeenCalledWith({ view: 'callouts' });
   });
 });

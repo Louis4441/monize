@@ -140,7 +140,9 @@
     "current": "Поточне",
     "netWorthLabel": "Чисті активи",
     "assets": "Активи",
-    "liabilities": "Зобов'язання"
+    "liabilities": "Зобов'язання",
+    "viewCallouts": "Підписи",
+    "viewLegend": "Умовні позначення"
   },
   "expensesPieChart": {
     "title": "Витрати за категоріями",

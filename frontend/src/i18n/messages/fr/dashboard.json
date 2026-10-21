@@ -140,7 +140,9 @@
     "current": "Actuel",
     "netWorthLabel": "Valeur nette",
     "assets": "Actifs",
-    "liabilities": "Passifs"
+    "liabilities": "Passifs",
+    "viewCallouts": "Étiquettes",
+    "viewLegend": "Légende"
   },
   "expensesPieChart": {
     "title": "Dépenses par catégorie",

@@ -140,7 +140,9 @@
     "current": "Güncel",
     "netWorthLabel": "Net Değer",
     "assets": "Varlıklar",
-    "liabilities": "Borçlar"
+    "liabilities": "Borçlar",
+    "viewCallouts": "Etiketler",
+    "viewLegend": "Gösterge"
   },
   "expensesPieChart": {
     "title": "Kategoriye Göre Giderler",

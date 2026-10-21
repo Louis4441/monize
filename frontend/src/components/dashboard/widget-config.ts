@@ -137,6 +137,16 @@ export interface RecurringConfig {
   view: 'callouts' | 'legend';
 }
 
+/**
+ * Assets vs Liabilities settings. `view` names the two slices either in boxes
+ * beside the donut with a line to each slice (`callouts`, which falls back to
+ * the legend where the widget is too small for the boxes) or in a legend
+ * under it.
+ */
+export interface AssetsLiabilitiesConfig {
+  view: 'callouts' | 'legend';
+}
+
 export interface WeekendConfig {
   range: string;
   view: 'overview' | 'byDay';
@@ -194,6 +204,11 @@ export const RECURRING_EXPENSES_DEFAULT: RecurringConfig = {
   minOccurrences: 3,
   range: '6m',
   view: 'callouts',
+};
+
+// The legend is what the widget always showed.
+export const ASSETS_LIABILITIES_DEFAULT: AssetsLiabilitiesConfig = {
+  view: 'legend',
 };
 
 export const WEEKEND_WEEKDAY_DEFAULT: WeekendConfig = {

@@ -140,7 +140,9 @@
     "current": "Hiện tại",
     "netWorthLabel": "Tài sản ròng",
     "assets": "Tài sản",
-    "liabilities": "Nợ phải trả"
+    "liabilities": "Nợ phải trả",
+    "viewCallouts": "Nhãn",
+    "viewLegend": "Chú giải"
   },
   "expensesPieChart": {
     "title": "Chi tiêu theo danh mục",

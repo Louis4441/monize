@@ -140,7 +140,9 @@
     "current": "Huidig",
     "netWorthLabel": "Nettowaarde",
     "assets": "Activa",
-    "liabilities": "Passiva"
+    "liabilities": "Passiva",
+    "viewCallouts": "Labels",
+    "viewLegend": "Legenda"
   },
   "expensesPieChart": {
     "title": "Uitgaven per categorie",

@@ -140,7 +140,9 @@
     "current": "Saat ini",
     "netWorthLabel": "Nilai Bersih",
     "assets": "Aset",
-    "liabilities": "Liabilitas"
+    "liabilities": "Liabilitas",
+    "viewCallouts": "Label",
+    "viewLegend": "Keterangan"
   },
   "expensesPieChart": {
     "title": "Pengeluaran per Kategori",

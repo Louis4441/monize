@@ -140,7 +140,9 @@
     "current": "[XX-Current-XX]",
     "netWorthLabel": "[XX-Net Worth-XX]",
     "assets": "[XX-Assets-XX]",
-    "liabilities": "[XX-Liabilities-XX]"
+    "liabilities": "[XX-Liabilities-XX]",
+    "viewCallouts": "[XX-Labels-XX]",
+    "viewLegend": "[XX-Legend-XX]"
   },
   "expensesPieChart": {
     "title": "[XX-Expenses by Category-XX]",

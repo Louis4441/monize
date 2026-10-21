@@ -140,7 +140,9 @@
     "current": "Текущее",
     "netWorthLabel": "Чистая стоимость",
     "assets": "Активы",
-    "liabilities": "Обязательства"
+    "liabilities": "Обязательства",
+    "viewCallouts": "Подписи",
+    "viewLegend": "Условные обозначения"
   },
   "expensesPieChart": {
     "title": "Расходы по категориям",
