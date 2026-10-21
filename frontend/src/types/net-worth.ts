@@ -1,8 +1,17 @@
+import type { AccountType } from '@/types/account';
+
 export interface MonthlyNetWorth {
   month: string; // "2023-01-01"
   assets: number;
   liabilities: number;
   netWorth: number;
+  /**
+   * What each account type contributes to `netWorth`: an asset type's value,
+   * a liability type's owed amount negated, so the entries sum to `netWorth`
+   * (to rounding). Only the types the month holds appear. Optional because a
+   * response from an older backend mid-deploy does not carry it.
+   */
+  byAccountType?: Partial<Record<AccountType, number>>;
 }
 
 export interface MonthlyInvestmentValue {

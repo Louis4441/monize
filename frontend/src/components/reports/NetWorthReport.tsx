@@ -16,7 +16,6 @@ import {
   Legend,
   ReferenceLine,
   ReferenceDot,
-  LabelList,
 } from 'recharts';
 import { chartColors } from '@/lib/chart-colors';
 import { netWorthApi } from '@/lib/net-worth';
@@ -30,6 +29,7 @@ import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
+import { NetWorthByAccountTypeChart } from '@/components/reports/NetWorthByAccountTypeChart';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
@@ -158,6 +158,19 @@ export function NetWorthReport() {
       NetWorth: Math.round(d.netWorth),
     })),
   [monthlyData, formatChartDate]);
+
+  // The bar view's points: the same months, keyed by the raw ISO month the
+  // axis formats, with the server's per-account-type split.
+  const accountTypeData = useMemo(
+    () =>
+      monthlyData.map((d, i) => ({
+        key: d.month,
+        name: chartData[i].name,
+        netWorth: chartData[i].NetWorth,
+        byAccountType: d.byAccountType,
+      })),
+    [monthlyData, chartData],
+  );
 
   const summary = useMemo(() => {
     if (chartData.length === 0) return { current: 0, change: 0, changePercent: 0 };
@@ -451,6 +464,20 @@ export function NetWorthReport() {
           </div>
         ) : (
           <div ref={chartRef} className="h-96">
+            {chartType === 'bar' ? (
+              // Stacked by account type: what each type adds to (or, owed,
+              // takes from) net worth, with net worth itself as the line.
+              <NetWorthByAccountTypeChart
+                data={accountTypeData}
+                formatCurrency={formatCurrency}
+                formatXTick={formatXAxisTick}
+                xTicks={xAxisTicks}
+                formatYTick={formatCurrencyAxis}
+                valueLabels={showBarLabels ? (barLabelsVertical ? 'vertical' : 'horizontal') : undefined}
+                formatValueLabel={formatCurrencyLabel}
+                margin={{ top: showBarLabels ? (barLabelsVertical ? 52 : 22) : 10, right: 10, left: 0, bottom: 0 }}
+              />
+            ) : (
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               {chartType === 'line' ? (
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -507,7 +534,7 @@ export function NetWorthReport() {
                   />
                 )}
               </AreaChart>
-              ) : chartType === 'stacked' ? (
+              ) : (
               <BarChart data={chartData} stackOffset="expand" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} vertical={false} />
                 <XAxis
@@ -526,44 +553,9 @@ export function NetWorthReport() {
                 <Bar dataKey="Assets" stackId="networth" fill={chartColors.income} name={t('netWorth.colAssets')} />
                 <Bar dataKey="Liabilities" stackId="networth" fill={chartColors.expense} name={t('netWorth.colLiabilities')} radius={[4, 4, 0, 0]} />
               </BarChart>
-              ) : (
-              <BarChart data={chartData} margin={{ top: showBarLabels ? (barLabelsVertical ? 52 : 22) : 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} vertical={false} />
-                <XAxis
-                  dataKey="sortKey"
-                  tick={{ fontSize: 12 }}
-                  {...(xAxisTicks ? { ticks: xAxisTicks } : {})}
-                  tickFormatter={formatXAxisTick}
-                />
-                <YAxis
-                  domain={yAxisDomain}
-                  tickFormatter={formatCurrencyAxis}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip content={<NetWorthTooltip formatCurrency={formatCurrency} />} />
-                <Legend />
-                <ReferenceLine y={0} stroke={chartColors.axis} strokeDasharray="3 3" />
-                <Bar dataKey="NetWorth" fill={chartColors.primary} name={t('netWorth.seriesNetWorth')} radius={[4, 4, 0, 0]}>
-                  {showBarLabels && (
-                    <LabelList
-                      dataKey="NetWorth"
-                      position="top"
-                      angle={barLabelsVertical ? -90 : 0}
-                      offset={barLabelsVertical ? 6 : 5}
-                      textAnchor={barLabelsVertical ? 'start' : 'middle'}
-                      formatter={(value: unknown) => formatCurrencyLabel(Number(value))}
-                      style={{
-                        fill: chartColors.axis,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        ...(barLabelsVertical && { dominantBaseline: 'central' as const }),
-                      }}
-                    />
-                  )}
-                </Bar>
-              </BarChart>
               )}
             </ResponsiveContainer>
+            )}
           </div>
         )}
       </div>

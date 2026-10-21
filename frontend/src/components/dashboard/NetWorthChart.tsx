@@ -10,7 +10,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  LabelList,
 } from 'recharts';
 import { chartColors } from '@/lib/chart-colors';
 import { MonthlyNetWorth } from '@/types/net-worth';
@@ -18,33 +17,9 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
+import { NetWorthByAccountTypeChart } from '@/components/reports/NetWorthByAccountTypeChart';
 import { WidgetHeading } from './widget-meta';
 import { CARD_CLASS } from '@/components/ui/Card';
-
-type YDomain = [number | ((dataMin: number) => number), number | 'auto'];
-
-function NetWorthTooltip({
-  active,
-  payload,
-  formatCurrency,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: { name: string; netWorth: number } }>;
-  formatCurrency: (v: number) => string;
-}) {
-  if (active && payload && payload.length) {
-    const d = payload[0].payload;
-    return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-        <p className="font-medium text-gray-900 dark:text-gray-100">{d.name}</p>
-        <p className="text-sm text-blue-600 dark:text-blue-400">
-          {formatCurrency(d.netWorth)}
-        </p>
-      </div>
-    );
-  }
-  return null;
-}
 
 function NetWorthCompositionTooltip({
   active,
@@ -105,10 +80,12 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
       // Raw YYYY-MM keeps the X-axis category stable and locale-independent;
       // the tick formatter localizes it to a short month for display.
       month: d.month,
+      key: d.month,
       name: formatChartDate(`${d.month}-01`, 'MMM yyyy'),
       netWorth: Math.round(d.netWorth),
       assets: Math.round(d.assets),
       liabilities: Math.round(d.liabilities),
+      byAccountType: d.byAccountType,
     })),
   [data, formatChartDate]);
 
@@ -119,24 +96,6 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
     const change = current - initial;
     const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
     return { current, change, changePercent };
-  }, [chartData]);
-
-  // A 0-anchored axis flattens every bar to nearly the same height; use a tight
-  // domain padded below the minimum so month-to-month differences are visible.
-  const yAxisDomain = useMemo<YDomain>(() => {
-    const anchoredAtZero: YDomain = [(min: number) => Math.min(0, min), 'auto'];
-    if (chartData.length === 0) return anchoredAtZero;
-
-    const values = chartData.map((d) => d.netWorth);
-    const minValue = Math.min(...values);
-    const maxValue = Math.max(...values);
-    const range = maxValue - minValue;
-    if (range === 0) return anchoredAtZero;
-
-    const rawMin = minValue - range * 0.15;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(rawMin) || 1)));
-    const niceMin = Math.floor(rawMin / magnitude) * magnitude;
-    return [niceMin, 'auto'];
   }, [chartData]);
 
   if (isLoading) {
@@ -198,8 +157,8 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
         </div>
       </div>
       <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-          {chartType === 'stacked' ? (
+        {chartType === 'stacked' ? (
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <BarChart data={chartData} stackOffset="expand" margin={{ top: 12, right: 12, left: 12, bottom: 0 }}>
               <YAxis hide domain={[0, 1]} />
               <XAxis
@@ -217,35 +176,20 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
               <Bar dataKey="assets" stackId="nw" fill={chartColors.income} />
               <Bar dataKey="liabilities" stackId="nw" fill={chartColors.expense} radius={[4, 4, 0, 0]} />
             </BarChart>
-          ) : (
-            <BarChart data={chartData} margin={{ top: 52, right: 12, left: 12, bottom: 0 }}>
-              <YAxis hide domain={yAxisDomain} />
-              <XAxis
-                dataKey="month"
-                tick={{ fill: chartColors.axis, fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                interval="preserveStartEnd"
-                tickFormatter={(value: string) => formatChartDate(`${value}-01`, 'MMM')}
-              />
-              <Tooltip
-                content={<NetWorthTooltip formatCurrency={formatCurrency} />}
-                cursor={{ fill: chartColors.grid, fillOpacity: 0.35 }}
-              />
-              <Bar dataKey="netWorth" fill={chartColors.primary} radius={[4, 4, 0, 0]}>
-                <LabelList
-                  dataKey="netWorth"
-                  position="top"
-                  angle={-90}
-                  offset={6}
-                  textAnchor="start"
-                  formatter={(value: unknown) => formatCurrencyLabel(Number(value))}
-                  style={{ fill: chartColors.axis, fontSize: 11, fontWeight: 600, dominantBaseline: 'central' }}
-                />
-              </Bar>
-            </BarChart>
-          )}
-        </ResponsiveContainer>
+          </ResponsiveContainer>
+        ) : (
+          // Stacked by account type: what each type adds to (or, owed, takes
+          // from) net worth, with net worth itself as the line across them.
+          <NetWorthByAccountTypeChart
+            data={chartData}
+            formatCurrency={formatCurrency}
+            formatXTick={(value) => formatChartDate(`${value}-01`, 'MMM')}
+            fontSize={11}
+            valueLabels="vertical"
+            formatValueLabel={formatCurrencyLabel}
+            margin={{ top: 52, right: 12, left: 12, bottom: 0 }}
+          />
+        )}
       </div>
       <button
         onClick={() => router.push('/reports/net-worth')}

@@ -10,10 +10,17 @@ vi.mock('next/navigation', () => ({
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
   BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
-  Bar: ({ children }: any) => <div data-testid="bar">{children}</div>,
+  ComposedChart: ({ children, stackOffset }: any) => (
+    <div data-testid="composed-chart" data-stack-offset={stackOffset}>{children}</div>
+  ),
+  Bar: ({ children, name }: any) => <div data-testid="bar" data-name={name}>{children}</div>,
+  Line: ({ children, name }: any) => <div data-testid="line" data-name={name}>{children}</div>,
   LabelList: ({ formatter }: any) => (
     <div data-testid="label-list">{formatter ? String(formatter(1000)) : ''}</div>
   ),
+  Legend: () => <div data-testid="legend" />,
+  CartesianGrid: () => null,
+  ReferenceLine: () => null,
   XAxis: () => null,
   YAxis: ({ domain }: any) => (
     <div data-testid="y-axis" data-domain={JSON.stringify(domain)} />
@@ -88,7 +95,7 @@ describe('NetWorthChart', () => {
     ] as any[];
 
     render(<NetWorthChart data={data} isLoading={false} />);
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
     expect(screen.getByText('Past 12 months')).toBeInTheDocument();
     expect(screen.getByText('View full report')).toBeInTheDocument();
     expect(screen.getByText('$15000')).toBeInTheDocument();
@@ -125,7 +132,7 @@ describe('NetWorthChart', () => {
     ] as any[];
 
     render(<NetWorthChart data={data} isLoading={false} />);
-    // The Bar renders a LabelList child that formats each value via
+    // A LabelList at the top of each bar formats each value via
     // formatCurrencyLabel (mocked here as `$<value>`).
     expect(screen.getByTestId('label-list')).toBeInTheDocument();
     expect(screen.getByText('$1000')).toBeInTheDocument();
@@ -208,51 +215,37 @@ describe('NetWorthChart', () => {
     expect(currentEl.className).toContain('text-red');
   });
 
-  it('uses a tight Y-axis domain above 0 on desktop to surface differences', () => {
-    setMobile(false);
+  it('stacks the bars by account type, with a legend and the net worth line', () => {
     const data = [
-      { month: '2024-01-01', netWorth: 500000 },
-      { month: '2024-06-01', netWorth: 520000 },
+      {
+        month: '2024-01-01',
+        assets: 210000,
+        liabilities: 150000,
+        netWorth: 60000,
+        byAccountType: { CHEQUING: 5000, INVESTMENT: 205000, MORTGAGE: -150000 },
+      },
+      {
+        month: '2024-02-01',
+        assets: 214000,
+        liabilities: 149000,
+        netWorth: 65000,
+        byAccountType: { CHEQUING: 4000, SAVINGS: 5000, INVESTMENT: 205000, MORTGAGE: -149000 },
+      },
     ] as any[];
 
     render(<NetWorthChart data={data} isLoading={false} />);
-    const domain = JSON.parse(
-      screen.getByTestId('y-axis').getAttribute('data-domain') as string,
-    );
-    // Lower bound is a concrete number padded below the minimum (not 0).
-    expect(typeof domain[0]).toBe('number');
-    expect(domain[0]).toBeGreaterThan(0);
-    expect(domain[0]).toBeLessThan(500000);
-    expect(domain[1]).toBe('auto');
-  });
-
-  it('uses a tight Y-axis domain above 0 on mobile to surface differences', () => {
-    setMobile(true);
-    const data = [
-      { month: '2024-01-01', netWorth: 500000 },
-      { month: '2024-06-01', netWorth: 520000 },
-    ] as any[];
-
-    render(<NetWorthChart data={data} isLoading={false} />);
-    const domain = JSON.parse(
-      screen.getByTestId('y-axis').getAttribute('data-domain') as string,
-    );
-    // Lower bound is a concrete number padded below the minimum (not 0).
-    expect(typeof domain[0]).toBe('number');
-    expect(domain[0]).toBeGreaterThan(0);
-    expect(domain[0]).toBeLessThan(500000);
-    expect(domain[1]).toBe('auto');
-  });
-
-  it('falls back to the anchored domain when all values are equal', () => {
-    const data = [
-      { month: '2024-01-01', netWorth: 500000 },
-      { month: '2024-06-01', netWorth: 500000 },
-    ] as any[];
-
-    render(<NetWorthChart data={data} isLoading={false} />);
-    const domain = screen.getByTestId('y-axis').getAttribute('data-domain');
-    expect(domain).toBe('[null,"auto"]');
+    // Liabilities stack below zero, assets above it.
+    expect(screen.getByTestId('composed-chart')).toHaveAttribute('data-stack-offset', 'sign');
+    expect(screen.getAllByTestId('bar').map((bar) => bar.getAttribute('data-name'))).toEqual([
+      'Chequing',
+      'Savings',
+      'Investment',
+      'Mortgage',
+    ]);
+    expect(screen.getByTestId('legend')).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId('line').some((line) => line.getAttribute('data-name') === 'Net Worth'),
+    ).toBe(true);
   });
 
   it('handles single data point correctly', () => {
@@ -263,6 +256,6 @@ describe('NetWorthChart', () => {
     render(<NetWorthChart data={data} isLoading={false} />);
     // Single data point: change = 0, percent = 0
     expect(screen.getByText('$10000')).toBeInTheDocument();
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
   });
 });

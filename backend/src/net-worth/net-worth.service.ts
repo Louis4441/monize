@@ -813,7 +813,7 @@ export class NetWorthService {
     // model gets what the database holds, with the same completeness flags and
     // the same named pairs it would get for any other gap, and no HTTP request
     // to a provider is made on an LLM's behalf.
-    return this.getMonthlyNetWorth(
+    const months = await this.getMonthlyNetWorth(
       userId,
       resolvedStart,
       resolvedEnd,
@@ -822,6 +822,9 @@ export class NetWorthService {
         fetchMissing: false,
       },
     );
+    // The per-account-type split is drawing data for the chart; the tools'
+    // shape stays the three figures and their completeness.
+    return months.map(({ byAccountType: _byAccountType, ...month }) => month);
   }
 
   async getMonthlyNetWorth(
@@ -845,6 +848,13 @@ export class NetWorthService {
       fxComplete: boolean;
       /** `"JPY->USD"` for each pair with no available rate. */
       missingRatePairs: string[];
+      /**
+       * What each account type contributes to `netWorth`: an asset type's
+       * value, a liability type's owed amount negated, so the entries sum to
+       * `netWorth` (to rounding). Only the types the month holds appear.
+       * Subtotals of what converted under the same `fxComplete` as the rest.
+       */
+      byAccountType: Partial<Record<AccountType, number>>;
     }[]
   > {
     await this.ensurePopulated(userId);
@@ -918,13 +928,19 @@ export class NetWorthService {
     netWorth: number;
     fxComplete: boolean;
     missingRatePairs: string[];
+    byAccountType: Partial<Record<AccountType, number>>;
   }[] {
     // Aggregate by month. Assets and liabilities each accumulate through an
     // FxAggregate so a month containing a component with no available rate
     // reports an unknown total instead of a plausible wrong one (P5-009).
+    // Each account type's signed contribution accumulates the same way.
     const monthMap = new Map<
       string,
-      { assets: FxAggregate; liabilities: FxAggregate }
+      {
+        assets: FxAggregate;
+        liabilities: FxAggregate;
+        byAccountType: Map<AccountType, FxAggregate>;
+      }
     >();
 
     for (const s of snapshots) {
@@ -934,6 +950,7 @@ export class NetWorthService {
         monthMap.set(monthKey, {
           assets: new FxAggregate(),
           liabilities: new FxAggregate(),
+          byAccountType: new Map(),
         });
       }
       const entry = monthMap.get(monthKey)!;
@@ -968,14 +985,21 @@ export class NetWorthService {
       );
 
       const accountType = s.account_type as AccountType;
+      if (!entry.byAccountType.has(accountType)) {
+        entry.byAccountType.set(accountType, new FxAggregate());
+      }
+      const typeTotal = entry.byAccountType.get(accountType)!;
       if (LIABILITY_TYPES.includes(accountType)) {
-        entry.liabilities.add(
-          converted === null ? null : Math.abs(converted),
+        const owed = converted === null ? null : Math.abs(converted);
+        entry.liabilities.add(owed, s.currency_code, defaultCurrency);
+        typeTotal.add(
+          owed === null ? null : -owed,
           s.currency_code,
           defaultCurrency,
         );
       } else {
         entry.assets.add(converted, s.currency_code, defaultCurrency);
+        typeTotal.add(converted, s.currency_code, defaultCurrency);
       }
     }
 
@@ -1006,6 +1030,12 @@ export class NetWorthService {
           // missing rate silently became 1:1.
           fxComplete: missingRatePairs.length === 0,
           missingRatePairs,
+          byAccountType: Object.fromEntries(
+            [...data.byAccountType].map(([type, total]) => [
+              type,
+              Math.round(total.knownSubtotal),
+            ]),
+          ),
         };
       });
   }
