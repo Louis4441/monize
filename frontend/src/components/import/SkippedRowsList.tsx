@@ -17,19 +17,25 @@ interface SkippedRowsListProps {
   rows: ImportSkippedRow[] | undefined;
   /** Show at most this many rows, then how many more there are. */
   limit?: number;
+  /**
+   * How many rows the import skipped in all (`skipped`). The server names only
+   * the first of them, so the count of the rest comes from here.
+   */
+  total?: number;
 }
 
 /**
  * The rows an import left out, each with its date, amount, payee and why, so
  * a person can check them against the file.
  */
-export function SkippedRowsList({ rows, limit = DEFAULT_LIMIT }: SkippedRowsListProps) {
+export function SkippedRowsList({ rows, limit = DEFAULT_LIMIT, total }: SkippedRowsListProps) {
   const t = useTranslations('import');
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
 
   if (!rows || rows.length === 0) return null;
   const shown = rows.slice(0, limit);
+  const more = Math.max(total ?? rows.length, rows.length) - shown.length;
 
   const describe = (row: ImportSkippedRow) => {
     const values = {
@@ -51,9 +57,7 @@ export function SkippedRowsList({ rows, limit = DEFAULT_LIMIT }: SkippedRowsList
         {shown.map((row, i) => (
           <li key={i}>{describe(row)}</li>
         ))}
-        {rows.length > shown.length && (
-          <li>{t('complete.andMoreSkipped', { count: rows.length - shown.length })}</li>
-        )}
+        {more > 0 && <li>{t('complete.andMoreSkipped', { count: more })}</li>}
       </ul>
     </div>
   );

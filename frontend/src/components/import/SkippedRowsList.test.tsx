@@ -83,4 +83,26 @@ describe('SkippedRowsList', () => {
     expect(screen.queryByText(/Payee 4/)).not.toBeInTheDocument();
     expect(screen.getByText('...and 2 more skipped rows')).toBeInTheDocument();
   });
+
+  it('counts the skipped rows the server did not name', () => {
+    // The server names the first 50 skipped rows and counts all of them.
+    const rows = Array.from({ length: 50 }, (_, i) => row({ payee: `Payee ${i + 1}` }));
+    render(<SkippedRowsList rows={rows} total={120} />);
+
+    expect(screen.getByText(/Payee 50 /)).toBeInTheDocument();
+    expect(screen.getByText('...and 70 more skipped rows')).toBeInTheDocument();
+  });
+
+  it('counts the rest from the total under a limit', () => {
+    const rows = Array.from({ length: 50 }, (_, i) => row({ payee: `Payee ${i + 1}` }));
+    render(<SkippedRowsList rows={rows} total={120} limit={3} />);
+
+    expect(screen.getByText('...and 117 more skipped rows')).toBeInTheDocument();
+  });
+
+  it('adds no count when the total is every named row', () => {
+    render(<SkippedRowsList rows={[row(), row()]} total={2} />);
+
+    expect(screen.queryByText(/more skipped rows/)).not.toBeInTheDocument();
+  });
 });

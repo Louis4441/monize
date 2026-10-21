@@ -3,7 +3,12 @@ import { Account } from "../accounts/entities/account.entity";
 import { applyAccountBalanceDelta } from "../accounts/accounts.service";
 import { roundMoney } from "../common/round.util";
 import { TransactionRule } from "../transaction-rules/transaction-rule.entity";
-import { ImportResultDto, ImportSkipReason } from "./dto/import.dto";
+import {
+  ImportResultDto,
+  ImportSkipReason,
+  SKIPPED_ROWS_LIMIT,
+} from "./dto/import.dto";
+import type { HeldBankRow } from "./ofx-external-id";
 import {
   BondProgramCache,
   inferSeriesForDate,
@@ -95,6 +100,12 @@ export interface ImportContext {
    *  used to distinguish genuinely different transfers that share date/amount/account. */
   transferDupCounts: Map<string, number>;
   /**
+   * The account's rows holding a bank id the file carries (`loadHeldExternalIds`),
+   * read once before the first row and kept current as rows take a key. Empty
+   * for a file with no bank ids.
+   */
+  heldExternalIds: Map<string, HeldBankRow>;
+  /**
    * The user's enabled rules with trigger "import", loaded once per file by
    * the import service (design 6.3). Absent or empty means no rule runs.
    */
@@ -118,7 +129,8 @@ export function bondStateOf(ctx: ImportContext): ImportBondState {
 
 /**
  * Count a row the import left out and name it in the result. Every `skipped`
- * increment goes through here, so the count and `skippedRows` cannot disagree.
+ * increment goes through here, so `skippedRows` is always the first
+ * `SKIPPED_ROWS_LIMIT` of the rows `skipped` counts.
  */
 export function recordSkippedRow(
   importResult: ImportResultDto,
@@ -127,6 +139,7 @@ export function recordSkippedRow(
   currencyCode: string,
 ): void {
   importResult.skipped++;
+  if (importResult.skippedRows.length >= SKIPPED_ROWS_LIMIT) return;
   importResult.skippedRows.push({
     date: row.date,
     amount: row.amount,
@@ -134,6 +147,48 @@ export function recordSkippedRow(
     payee: row.payee ?? "",
     reason,
   });
+}
+
+/** The result counters one row's processing can raise before it fails. */
+const ROW_COUNTERS = [
+  "categoriesCreated",
+  "accountsCreated",
+  "payeesCreated",
+  "securitiesCreated",
+  "bondRowsWithoutSeries",
+  "transactionsChangedByRules",
+] as const;
+
+export type RowCounterSnapshot = Pick<
+  ImportResultDto,
+  (typeof ROW_COUNTERS)[number]
+>;
+
+/** The row counters as they stand, taken before a row is processed. */
+export function snapshotRowCounters(
+  importResult: ImportResultDto,
+): RowCounterSnapshot {
+  return Object.fromEntries(
+    ROW_COUNTERS.map((field) => [field, importResult[field]]),
+  ) as RowCounterSnapshot;
+}
+
+/**
+ * Put the row counters back after a row's savepoint was rolled back: the
+ * payee or rule change a counter announced was rolled back with it.
+ */
+export function restoreRowCounters(
+  importResult: ImportResultDto,
+  snapshot: RowCounterSnapshot,
+): void {
+  // The optional counters are absent until a row raises them.
+  const counters: Partial<Record<(typeof ROW_COUNTERS)[number], number>> =
+    importResult;
+  for (const field of ROW_COUNTERS) {
+    const value = snapshot[field];
+    if (value === undefined) delete counters[field];
+    else counters[field] = value;
+  }
 }
 
 /**

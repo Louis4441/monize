@@ -54,8 +54,11 @@ import {
 import {
   ImportContext,
   recordSkippedRow,
+  restoreRowCounters,
+  snapshotRowCounters,
   updateAccountBalance,
 } from "./import-context";
+import { loadHeldExternalIds } from "./ofx-external-id";
 import { isExternalIdConflict } from "../transactions/transaction-external-id";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
 import { ImportPostProcessingService } from "./import-post-processing.service";
@@ -453,6 +456,8 @@ export class ImportService {
             settledScheduleIds,
             importResult,
             transferDupCounts: new Map(),
+            // A QIF file carries no bank ids.
+            heldExternalIds: new Map(),
             importRules,
           };
 
@@ -477,6 +482,7 @@ export class ImportService {
             try {
               const savepointName = `tx_import_${txIndex}`;
               await manager.query(`SAVEPOINT ${savepointName}`);
+              const counters = snapshotRowCounters(importResult);
               try {
                 if (isInvestment) {
                   await this.investmentProcessor.processTransaction(ctx, qifTx);
@@ -486,6 +492,7 @@ export class ImportService {
                 await manager.query(`RELEASE SAVEPOINT ${savepointName}`);
               } catch (error) {
                 await manager.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                restoreRowCounters(importResult, counters);
                 importResult.errors++;
                 importResult.errorMessages.push(
                   `Error importing transaction ${txIndex}/${block.transactions.length} in "${block.accountName}" on ${qifTx.date}: ${error.message}`,
@@ -1345,6 +1352,14 @@ export class ImportService {
           settledScheduleIds,
           importResult,
           transferDupCounts: new Map<string, number>(),
+          // One lookup for every bank id the file carries, not one per row.
+          heldExternalIds: isInvestment
+            ? new Map()
+            : await loadHeldExternalIds(
+                manager,
+                accountId,
+                result.transactions,
+              ),
           // The user's import-trigger rules, once for the whole file (design
           // 6.3). An investment file has no regular rows to evaluate.
           importRules: isInvestment
@@ -1410,6 +1425,7 @@ export class ImportService {
           try {
             const savepointName = `tx_import_${txIndex}`;
             await manager.query(`SAVEPOINT ${savepointName}`);
+            const counters = snapshotRowCounters(importResult);
             try {
               if (isInvestment) {
                 await this.investmentProcessor.processTransaction(ctx, qifTx);
@@ -1419,6 +1435,9 @@ export class ImportService {
               await manager.query(`RELEASE SAVEPOINT ${savepointName}`);
             } catch (error) {
               await manager.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+              // The payee the row created and the rule change it counted were
+              // rolled back with it, so their counters go back too.
+              restoreRowCounters(importResult, counters);
               if (isExternalIdConflict(error)) {
                 // Another writer committed a row holding this row's bank id
                 // after the processor's lookup missed it; the unique index

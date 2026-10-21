@@ -443,8 +443,11 @@ Enforcement         Partial unique index idx_transactions_account_external_id
                     resolved (findOwnTransferByExternalId). An OFX import
                     writes the same column (ofx:<FITID>, ofxExternalId) and
                     skips a row whose key the account holds on a row of the
-                    same date and amount; an insert the index refuses rolls
-                    back to the row's savepoint and counts as skipped.
+                    same date and amount; a keyed transfer row takes its key
+                    over on a recorded transfer of its signature that has
+                    none (a conditional update on external_id IS NULL) and is
+                    skipped as that transfer; an insert the index refuses
+                    rolls back to the row's savepoint and counts as skipped.
 Concurrency scope   account
 Retry semantics     Safe to repeat whole: a create, a transfer or a bulk batch
                     sent again returns the committed rows as existing. The key
@@ -467,8 +470,8 @@ Required tests      Integration against real PostgreSQL: the index refuses a
                     (backend/test/integration/transaction-external-id.integration.spec.ts);
                     unit: the lookup, the race path and the transfer refusals
                     (backend/src/transactions/transactions.service.spec.ts);
-                    the OFX import's skip and race path against real
-                    PostgreSQL
+                    the OFX import's skip, key takeover and race path
+                    against real PostgreSQL
                     (backend/test/integration/ofx-import-fitid.integration.spec.ts).
 Status              partial -- the index holds one row per account and key,
                     but two paths take a key away from the account it was

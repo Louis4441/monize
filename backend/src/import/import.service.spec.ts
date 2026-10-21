@@ -3215,6 +3215,9 @@ describe("ImportService", () => {
         const sqls = mockQueryRunner.query.mock.calls.map((call) => call[0]);
         expect(sqls).toContain("ROLLBACK TO SAVEPOINT tx_import_1");
         expect(sqls).toContain("RELEASE SAVEPOINT tx_import_2");
+        // Each row created its payee, and the first one's was rolled back with
+        // it, so only the second counts.
+        expect(result.payeesCreated).toBe(1);
       });
 
       it("still reports a violation of another constraint as an error", async () => {

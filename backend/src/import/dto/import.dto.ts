@@ -347,6 +347,12 @@ export class ImportSkippedRowDto {
   reason: ImportSkipReason;
 }
 
+/**
+ * How many skipped rows the result names. `skipped` keeps the full count; the
+ * import screen shows at most this many and counts the rest.
+ */
+export const SKIPPED_ROWS_LIMIT = 50;
+
 export class ImportResultDto {
   @ApiProperty()
   imported: number;
@@ -356,8 +362,7 @@ export class ImportResultDto {
 
   @ApiProperty({
     type: [ImportSkippedRowDto],
-    description:
-      "Every row counted in `skipped`, in the order the import reached it, so a person can see which rows of the file were not written and why",
+    description: `The first ${SKIPPED_ROWS_LIMIT} rows counted in \`skipped\`, in the order the import reached them, so a person can see which rows of the file were not written and why. \`skipped\` keeps the full count.`,
   })
   skippedRows: ImportSkippedRowDto[];
 

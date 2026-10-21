@@ -88,6 +88,7 @@ describe("ImportInvestmentProcessorService", () => {
       settledScheduleIds: new Set(),
       importResult: makeImportResult(),
       transferDupCounts: new Map(),
+      heldExternalIds: new Map(),
       ...overrides,
     };
   };

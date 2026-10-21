@@ -132,20 +132,24 @@ function extractBlocks(
 }
 
 /**
- * Drop the `FITID` of every row whose `FITID` another row of the same file
- * also carries. The specification makes a `FITID` unique per account, but some
- * banks give several rows the same one, and keying on it would skip every row
- * after the first as already imported. Such rows import without a key, as
- * every OFX row did before the import read it.
+ * The rows with the `FITID` dropped from every row whose `FITID` another row of
+ * the same file also carries. The specification makes a `FITID` unique per
+ * account, but some banks give several rows the same one, and keying on it
+ * would skip every row after the first as already imported. Such rows import
+ * without a key, as every OFX row did before the import read it.
  */
-function dropRepeatedFitIds(transactions: QifTransaction[]): void {
+function dropRepeatedFitIds(
+  transactions: readonly QifTransaction[],
+): QifTransaction[] {
   const seen = new Map<string, number>();
   for (const tx of transactions) {
     if (tx.fitId) seen.set(tx.fitId, (seen.get(tx.fitId) ?? 0) + 1);
   }
-  for (const tx of transactions) {
-    if (tx.fitId && (seen.get(tx.fitId) ?? 0) > 1) delete tx.fitId;
-  }
+  return transactions.map((tx) => {
+    if (!tx.fitId || (seen.get(tx.fitId) ?? 0) <= 1) return tx;
+    const { fitId: _repeated, ...withoutFitId } = tx;
+    return withoutFitId;
+  });
 }
 
 /**
@@ -264,12 +268,10 @@ export function parseOfx(content: string): QifParseResult {
     transactions.push(tx);
   }
 
-  dropRepeatedFitIds(transactions);
-
   return {
     accountType,
     accountName: "",
-    transactions,
+    transactions: dropRepeatedFitIds(transactions),
     categories: [],
     transferAccounts: Array.from(transferAccountNames),
     securities: [],

@@ -86,6 +86,7 @@ describe("ImportRegularProcessorService import rules", () => {
       securitiesCreated: 0,
     } as ImportResultDto,
     transferDupCounts: new Map(),
+    heldExternalIds: new Map(),
     importRules: rules,
     ...over,
   });

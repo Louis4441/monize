@@ -231,6 +231,63 @@ describe("OFX import deduplicated by FITID (integration)", () => {
     ]);
   });
 
+  it("imports the new transfer whatever its place among identical ones already imported", async () => {
+    const toSavings = (fitId: string) =>
+      row(fitId, "20260115", "-100.00", "Savings", "XFER");
+    const savings = [{ originalName: "Savings", accountId: savingsId }];
+    await importOfx(ofx(toSavings("X1"), toSavings("X2")), checkingId, savings);
+
+    // The new row comes first, before the two the account holds.
+    const next = await importOfx(
+      ofx(toSavings("X3"), toSavings("X1"), toSavings("X2")),
+      checkingId,
+      savings,
+    );
+
+    expect(next.imported).toBe(1);
+    expect(next.skippedRows.map((r) => r.reason)).toEqual([
+      "alreadyImported",
+      "alreadyImported",
+    ]);
+    expect((await stored()).map((r) => r.external_id).sort()).toEqual([
+      "ofx:X1",
+      "ofx:X2",
+      "ofx:X3",
+    ]);
+    expect(await balance()).toBe(700);
+  });
+
+  it("gives the other account's statement row its bank id on the transfer leg the first import created", async () => {
+    await importOfx(
+      ofx(row("C1", "20260115", "-100.00", "Savings", "XFER")),
+      checkingId,
+      [{ originalName: "Savings", accountId: savingsId }],
+    );
+    expect((await stored(savingsId)).map((r) => r.external_id)).toEqual([null]);
+    const fromChecking = [{ originalName: "Checking", accountId: checkingId }];
+    const SAVINGS_STATEMENT = ofx(
+      row("S1", "20260115", "100.00", "Checking", "XFER"),
+    );
+
+    const first = await importOfx(SAVINGS_STATEMENT, savingsId, fromChecking);
+
+    expect(first.imported).toBe(0);
+    expect(first.skippedRows.map((r) => r.reason)).toEqual([
+      "duplicateTransfer",
+    ]);
+    expect((await stored(savingsId)).map((r) => r.external_id)).toEqual([
+      "ofx:S1",
+    ]);
+    expect(await balance(savingsId)).toBe(1100);
+
+    // The next download of the savings statement is skipped by its key.
+    const again = await importOfx(SAVINGS_STATEMENT, savingsId, fromChecking);
+
+    expect(again.skippedRows.map((r) => r.reason)).toEqual(["alreadyImported"]);
+    expect(await stored(savingsId)).toHaveLength(1);
+    expect(await balance(savingsId)).toBe(1100);
+  });
+
   it("imports every row of a file that gives two rows the same bank id", async () => {
     const result = await importOfx(
       ofx(
@@ -246,11 +303,15 @@ describe("OFX import deduplicated by FITID (integration)", () => {
   it("counts a row whose bank id another writer committed after the check as skipped, and keeps the rest of the file", async () => {
     await importOfx(ofx(GROCERY));
     // The other writer's row is already committed when this import reaches
-    // the unique index: the pre-insert check is made to miss it, so only the
-    // index can stop the copy.
+    // the unique index: the keys read before the first row are made to miss
+    // it, so only the index can stop the copy.
+    const processRow = processor.processTransaction.bind(processor);
     jest
-      .spyOn(processor as never, "rowHoldingExternalId")
-      .mockResolvedValue(null as never);
+      .spyOn(processor, "processTransaction")
+      .mockImplementation((ctx, tx) => {
+        ctx.heldExternalIds.clear();
+        return processRow(ctx, tx);
+      });
 
     const result = await importOfx(ofx(GROCERY, FUEL));
 
