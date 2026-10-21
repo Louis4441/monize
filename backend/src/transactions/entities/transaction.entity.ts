@@ -198,9 +198,11 @@ export class Transaction {
   linkedTransaction: Transaction | null;
 
   /**
-   * The caller's own key for a row created through the API, unique per
-   * account (`idx_transactions_account_external_id`). A create that repeats a
-   * key returns the row that already holds it; see `transaction-external-id.ts`.
+   * The caller's own key for a row created through the API, or the bank's id
+   * for a row imported from an OFX file (`ofx:<FITID>`), unique per account
+   * (`idx_transactions_account_external_id`). A create that repeats a key
+   * returns the row that already holds it, and an import skips the row; see
+   * `transaction-external-id.ts`.
    */
   @Column({ type: "varchar", name: "external_id", length: 255, nullable: true })
   externalId: string | null;

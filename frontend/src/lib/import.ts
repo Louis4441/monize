@@ -399,9 +399,24 @@ export interface ImportCsvRequest {
   dateFormat?: DateFormat;
 }
 
+/** Why the import left a row of the file out (`ImportSkipReason` on the server). */
+export type ImportSkipReason = 'alreadyImported' | 'duplicateTransfer';
+
+/** One row counted in `skipped`, as the file gave it. */
+export interface ImportSkippedRow {
+  date: string;
+  amount: number;
+  /** The currency of the account the row was imported into. */
+  currencyCode: string;
+  payee: string;
+  reason: ImportSkipReason;
+}
+
 export interface ImportResult {
   imported: number;
   skipped: number;
+  /** Every row counted in `skipped`, in the order the import reached it. */
+  skippedRows?: ImportSkippedRow[];
   errors: number;
   errorMessages: string[];
   categoriesCreated: number;

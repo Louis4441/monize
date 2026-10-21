@@ -77,6 +77,7 @@ describe("ImportRegularProcessorService import rules", () => {
     importResult: {
       imported: 0,
       skipped: 0,
+      skippedRows: [],
       errors: 0,
       errorMessages: [],
       categoriesCreated: 0,
@@ -85,6 +86,7 @@ describe("ImportRegularProcessorService import rules", () => {
       securitiesCreated: 0,
     } as ImportResultDto,
     transferDupCounts: new Map(),
+    heldExternalIds: new Map(),
     importRules: rules,
     ...over,
   });

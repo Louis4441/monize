@@ -13,6 +13,7 @@ import {
 import {
   ImportContext,
   bondStateOf,
+  recordSkippedRow,
   resolveImportedSeriesMemo,
   updateAccountBalance,
 } from "./import-context";
@@ -426,7 +427,12 @@ export class ImportInvestmentProcessorService {
       const seenSoFar = ctx.transferDupCounts.get(sigKey) || 0;
       ctx.transferDupCounts.set(sigKey, seenSoFar + 1);
       if (existingCount > 0 && seenSoFar + 1 <= existingCount) {
-        ctx.importResult.skipped++;
+        recordSkippedRow(
+          ctx.importResult,
+          qifTx,
+          "duplicateTransfer",
+          ctx.account.currencyCode,
+        );
         return;
       }
     }

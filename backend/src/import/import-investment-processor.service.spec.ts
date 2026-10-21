@@ -21,6 +21,7 @@ describe("ImportInvestmentProcessorService", () => {
   const makeImportResult = (): ImportResultDto => ({
     imported: 0,
     skipped: 0,
+    skippedRows: [],
     errors: 0,
     errorMessages: [],
     categoriesCreated: 0,
@@ -87,6 +88,7 @@ describe("ImportInvestmentProcessorService", () => {
       settledScheduleIds: new Set(),
       importResult: makeImportResult(),
       transferDupCounts: new Map(),
+      heldExternalIds: new Map(),
       ...overrides,
     };
   };
@@ -1941,6 +1943,15 @@ describe("ImportInvestmentProcessorService", () => {
 
       expect(ctx.importResult.skipped).toBe(1);
       expect(ctx.importResult.imported).toBe(0);
+      expect(ctx.importResult.skippedRows).toEqual([
+        {
+          date: "2025-01-15",
+          amount: 300,
+          currencyCode: "USD",
+          payee: "",
+          reason: "duplicateTransfer",
+        },
+      ]);
     });
 
     it("Cash with transfer account creates linked transactions like XOut", async () => {

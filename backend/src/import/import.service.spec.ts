@@ -1,7 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
-import { DataSource } from "typeorm";
+import { DataSource, QueryFailedError } from "typeorm";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { EXTERNAL_ID_INDEX } from "../transactions/transaction-external-id";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -3131,6 +3132,102 @@ describe("ImportService", () => {
       expect(mockedParseOfx).toHaveBeenCalledWith(dto.content);
       expect(result).toBeDefined();
       expect(result.imported).toBeDefined();
+    });
+
+    describe("a row whose bank id another writer committed first", () => {
+      const ofxRow = (overrides: Record<string, unknown>) => ({
+        date: "2025-03-01",
+        amount: -50,
+        payee: "Store",
+        memo: "",
+        number: "",
+        cleared: true,
+        reconciled: false,
+        category: "",
+        isTransfer: false,
+        transferAccount: "",
+        splits: [],
+        security: "",
+        action: "",
+        price: 0,
+        quantity: 0,
+        commission: 0,
+        ...overrides,
+      });
+
+      const importTwoRows = async (constraint: string) => {
+        mockedValidateOfxContent.mockReturnValue({ valid: true });
+        mockedParseOfx.mockReturnValue({
+          accountType: "CHEQUING",
+          accountName: "",
+          transactions: [
+            ofxRow({ fitId: "A1" }),
+            ofxRow({ date: "2025-03-02", amount: -7.5, fitId: "A2" }),
+          ],
+          categories: [],
+          transferAccounts: [],
+          securities: [],
+          detectedDateFormat: "YYYY-MM-DD",
+          sampleDates: [],
+          openingBalance: null,
+          openingBalanceDate: null,
+        });
+        accountsRepository.findOne.mockResolvedValue(mockChequingAccount);
+        // The lookup missed (findOne answers null), and the unique index
+        // refuses the insert of the first row: the race the lookup cannot see.
+        const save = mockQueryRunner.manager.save.getMockImplementation();
+        mockQueryRunner.manager.save.mockImplementation(
+          (entity: { externalId?: string | null }) =>
+            entity?.externalId === "ofx:A1"
+              ? Promise.reject(
+                  new QueryFailedError("INSERT INTO transactions", [], {
+                    code: "23505",
+                    constraint,
+                  } as unknown as Error),
+                )
+              : save!(entity),
+        );
+
+        return service.importOfxFile(userId, {
+          content: "<OFX>...</OFX>",
+          accountId: "acct-1",
+          categoryMappings: [],
+          accountMappings: [],
+        });
+      };
+
+      it("rolls the row back and counts it as already imported, not as an error", async () => {
+        const result = await importTwoRows(EXTERNAL_ID_INDEX);
+
+        expect(result.errors).toBe(0);
+        expect(result.errorMessages).toEqual([]);
+        expect(result.imported).toBe(1);
+        expect(result.skipped).toBe(1);
+        expect(result.skippedRows).toEqual([
+          {
+            date: "2025-03-01",
+            amount: -50,
+            currencyCode: "CAD",
+            payee: "Store",
+            reason: "alreadyImported",
+          },
+        ]);
+        const sqls = mockQueryRunner.query.mock.calls.map((call) => call[0]);
+        expect(sqls).toContain("ROLLBACK TO SAVEPOINT tx_import_1");
+        expect(sqls).toContain("RELEASE SAVEPOINT tx_import_2");
+        // Each row created its payee, and the first one's was rolled back with
+        // it, so only the second counts.
+        expect(result.payeesCreated).toBe(1);
+      });
+
+      it("still reports a violation of another constraint as an error", async () => {
+        const result = await importTwoRows("some_other_index");
+
+        expect(result.errors).toBe(1);
+        expect(result.skipped).toBe(0);
+        expect(result.skippedRows).toEqual([]);
+        expect(result.imported).toBe(1);
+      });
     });
   });
 

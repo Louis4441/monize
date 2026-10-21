@@ -11,7 +11,18 @@ import { Payee } from "../payees/entities/payee.entity";
 import { PayeeAlias } from "../payees/entities/payee-alias.entity";
 import { TransactionTag } from "../tags/entities/transaction-tag.entity";
 import { TransactionSplitTag } from "../tags/entities/transaction-split-tag.entity";
-import { ImportContext, updateAccountBalance } from "./import-context";
+import {
+  ImportContext,
+  recordSkippedRow,
+  updateAccountBalance,
+} from "./import-context";
+import { holdKey, isSameBankRow, ofxExternalId } from "./ofx-external-id";
+import {
+  adoptKeyOnRecordedTransfer,
+  countTransferTurn,
+  isDuplicateTransfer,
+  isQuickenMergedSplitTransfer,
+} from "./import-transfer-dedupe";
 import { deletionBalanceEffect } from "../common/deletion-balance.util";
 import { tr } from "../i18n/translate";
 import { TransactionRulesApplierService } from "../transaction-rules/transaction-rules-applier.service";
@@ -23,14 +34,47 @@ export class ImportRegularProcessorService {
   constructor(private readonly rulesApplier: TransactionRulesApplierService) {}
 
   async processTransaction(ctx: ImportContext, qifTx: any): Promise<void> {
+    // A row whose bank id the account already holds, on a row of the same date
+    // and amount, was imported from an earlier file. The lookup is advisory:
+    // two imports racing past it both insert, the unique index on
+    // (account_id, external_id) refuses the second, and the import loop counts
+    // that row as skipped too (`isExternalIdConflict`).
+    let externalId = ofxExternalId(qifTx.fitId);
+    if (externalId) {
+      const holder = ctx.heldExternalIds.get(externalId);
+      if (holder && isSameBankRow(holder, qifTx)) {
+        // The held row is one of the transfers the counted check sees, so
+        // this line still takes its turn in the counters; otherwise a later
+        // line without a bank id and of the same signature would be matched
+        // against it and skipped.
+        countTransferTurn(ctx, qifTx);
+        recordSkippedRow(
+          ctx.importResult,
+          qifTx,
+          "alreadyImported",
+          ctx.account.currencyCode,
+        );
+        return;
+      }
+      // A different row holds the id: the bank reused it (a counter that
+      // restarts each statement, say), so it does not name this row, and the
+      // row imports without a key rather than being lost.
+      if (holder) externalId = null;
+    }
+
     // Check for duplicate transfers (from prior imports or earlier account blocks)
-    if (await this.isDuplicateTransfer(ctx, qifTx)) {
-      ctx.importResult.skipped++;
+    if (await this.isRecordedTransfer(ctx, qifTx, externalId)) {
+      recordSkippedRow(
+        ctx.importResult,
+        qifTx,
+        "duplicateTransfer",
+        ctx.account.currencyCode,
+      );
       return;
     }
 
     // Check for pending cross-currency transfers to update
-    if (await this.matchPendingTransfer(ctx, qifTx)) {
+    if (await this.matchPendingTransfer(ctx, qifTx, externalId)) {
       ctx.importResult.imported++;
       return;
     }
@@ -76,6 +120,7 @@ export class ImportRegularProcessorService {
       currencyCode: ctx.account.currencyCode,
       isSplit,
       isTransfer,
+      externalId,
       createdAt: baseTime,
     });
 
@@ -112,6 +157,7 @@ export class ImportRegularProcessorService {
       await this.applyImportRules(ctx, savedTx.id, qifTx.payee);
     }
 
+    if (externalId) holdKey(ctx.heldExternalIds, externalId, qifTx);
     ctx.importResult.imported++;
   }
 
@@ -178,156 +224,27 @@ export class ImportRegularProcessorService {
     return qifTx.memo ? `${qifTx.memo} ${note}` : note;
   }
 
-  private async isDuplicateTransfer(
+  /**
+   * Whether a transfer line is one the account already records. A line with a
+   * bank id claims one recorded transfer of its signature that has none, so
+   * its order in the file does not matter (`import-transfer-dedupe.ts`); a line
+   * without one is counted against the recorded rows.
+   */
+  private async isRecordedTransfer(
     ctx: ImportContext,
     qifTx: any,
+    externalId: string | null,
   ): Promise<boolean> {
-    // Check for duplicate linked transfers using counting to avoid false positives.
-    // Multiple genuinely different transfers can share the same date, amount, and
-    // account pair (e.g. two $150 transfers to the same account on the same day
-    // with different payees). We count how many matching linked transfers already
-    // exist in the DB and how many same-signature QIF entries we have seen in this
-    // block; only skip when the seen count does not exceed the existing count.
-    if (qifTx.isTransfer && qifTx.transferAccount) {
-      let mappedTransferAccountId =
-        ctx.accountMap.get(qifTx.transferAccount) ?? undefined;
-      // Case-insensitive fallback (matches resolveTransactionTarget behavior)
-      if (!mappedTransferAccountId) {
-        const lowerName = qifTx.transferAccount.toLowerCase();
-        for (const [name, id] of ctx.accountMap) {
-          if (id && name.toLowerCase() === lowerName) {
-            mappedTransferAccountId = id;
-            break;
-          }
-        }
-      }
-      if (mappedTransferAccountId) {
-        const existingCount = await ctx.manager
-          .createQueryBuilder(Transaction, "t")
-          .innerJoin(
-            Transaction,
-            "linked",
-            "t.linked_transaction_id = linked.id",
-          )
-          .where("t.user_id = :userId", { userId: ctx.userId })
-          .andWhere("t.account_id = :accountId", {
-            accountId: ctx.accountId,
-          })
-          .andWhere("t.is_transfer = true")
-          .andWhere("t.transaction_date = :date", { date: qifTx.date })
-          .andWhere("t.amount = :amount", { amount: qifTx.amount })
-          .andWhere("linked.account_id = :linkedAccountId", {
-            linkedAccountId: mappedTransferAccountId,
-          })
-          .getCount();
-
-        // Always count every QIF entry with this signature, even when
-        // existingCount is zero (fresh import). This ensures that when the
-        // next entry with the same signature arrives and finds existingCount=1,
-        // seenSoFar is already 1 so seenSoFar+1=2 > 1 and it is not
-        // incorrectly skipped. Matches processCashTransfer counting logic.
-        const sigKey = `linked|${qifTx.date}|${qifTx.amount}|${mappedTransferAccountId}`;
-        const seenSoFar = ctx.transferDupCounts.get(sigKey) || 0;
-        ctx.transferDupCounts.set(sigKey, seenSoFar + 1);
-        if (existingCount > 0 && seenSoFar + 1 <= existingCount) {
-          return true;
-        }
-      }
-    }
-
-    // Check for split-linked transfers (same counting approach)
-    if (qifTx.isTransfer) {
-      const existingCount = await ctx.manager
-        .createQueryBuilder(Transaction, "t")
-        .innerJoin(
-          TransactionSplit,
-          "split",
-          "split.linked_transaction_id = t.id",
-        )
-        .where("t.user_id = :userId", { userId: ctx.userId })
-        .andWhere("t.account_id = :accountId", {
-          accountId: ctx.accountId,
-        })
-        .andWhere("t.is_transfer = true")
-        .andWhere("t.transaction_date = :date", { date: qifTx.date })
-        .andWhere("t.amount = :amount", { amount: qifTx.amount })
-        .getCount();
-
-      // Always count (same rationale as linked transfers above)
-      const sigKey = `split|${qifTx.date}|${qifTx.amount}`;
-      const seenSoFar = ctx.transferDupCounts.get(sigKey) || 0;
-      ctx.transferDupCounts.set(sigKey, seenSoFar + 1);
-      if (existingCount > 0 && seenSoFar + 1 <= existingCount) {
-        return true;
-      }
-    }
-
-    // Check for Quicken merged split transfers.
-    // Quicken merges multiple split transfers to the same account into a single
-    // transaction on the receiving side (e.g. splits of $50+$40 to Account-B
-    // become a single $90 in Account-B). Since we create individual split-linked
-    // transactions, the merged one is a duplicate.
-    if (qifTx.isTransfer && qifTx.transferAccount) {
-      let mergedTransferAccountId =
-        ctx.accountMap.get(qifTx.transferAccount) ?? undefined;
-      if (!mergedTransferAccountId) {
-        const lowerName = qifTx.transferAccount.toLowerCase();
-        for (const [name, id] of ctx.accountMap) {
-          if (id && name.toLowerCase() === lowerName) {
-            mergedTransferAccountId = id;
-            break;
-          }
-        }
-      }
-      if (mergedTransferAccountId) {
-        const mergedGroups: Array<{
-          parentId: string;
-          totalAmount: string;
-          splitCount: string;
-        }> = await ctx.manager
-          .createQueryBuilder(Transaction, "t")
-          .innerJoin(
-            TransactionSplit,
-            "split",
-            "split.linked_transaction_id = t.id",
-          )
-          .innerJoin(Transaction, "parent", "split.transaction_id = parent.id")
-          .where("t.user_id = :userId", { userId: ctx.userId })
-          .andWhere("t.account_id = :accountId", {
-            accountId: ctx.accountId,
-          })
-          .andWhere("t.transaction_date = :date", { date: qifTx.date })
-          .andWhere("t.is_transfer = true")
-          .andWhere("parent.account_id = :transferAccountId", {
-            transferAccountId: mergedTransferAccountId,
-          })
-          .andWhere("parent.is_split = true")
-          .select("parent.id", "parentId")
-          .addSelect("SUM(t.amount)", "totalAmount")
-          .addSelect("COUNT(*)", "splitCount")
-          .groupBy("parent.id")
-          .getRawMany();
-
-        for (const group of mergedGroups) {
-          const total = Math.round(Number(group.totalAmount) * 10000);
-          const expected = Math.round(qifTx.amount * 10000);
-          if (total === expected && Number(group.splitCount) >= 2) {
-            this.logger.debug(
-              `Skipping Quicken merged split transfer: ${qifTx.amount} on ${qifTx.date} ` +
-                `(sum of ${group.splitCount} split transfers from parent ${group.parentId})`,
-            );
-            return true;
-          }
-        }
-      }
-    }
-
-    return false;
+    if (!externalId) return isDuplicateTransfer(ctx, qifTx, this.logger);
+    countTransferTurn(ctx, qifTx);
+    if (await adoptKeyOnRecordedTransfer(ctx, qifTx, externalId)) return true;
+    return isQuickenMergedSplitTransfer(ctx, qifTx, this.logger);
   }
 
   private async matchPendingTransfer(
     ctx: ImportContext,
     qifTx: any,
+    externalId: string | null,
   ): Promise<boolean> {
     if (!qifTx.isTransfer || !qifTx.transferAccount) return false;
 
@@ -364,10 +281,17 @@ export class ImportRegularProcessorService {
       description: qifTx.memo || null,
       payeeName: qifTx.payee || pendingTransfer.payeeName,
       referenceNumber: qifTx.number || pendingTransfer.referenceNumber,
+      // The row now stands for this line of the file, so it takes the line's
+      // bank id, and a later download of the same line is skipped; a key the
+      // row already holds is kept.
+      ...(externalId && !pendingTransfer.externalId ? { externalId } : {}),
     });
 
     if (balanceDiff !== 0) {
       await updateAccountBalance(ctx.manager, ctx.accountId, balanceDiff);
+    }
+    if (externalId && !pendingTransfer.externalId) {
+      holdKey(ctx.heldExternalIds, externalId, qifTx);
     }
 
     return true;
