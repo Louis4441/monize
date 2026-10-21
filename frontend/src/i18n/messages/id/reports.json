@@ -1190,7 +1190,10 @@
     "colMonth": "Bulan",
     "colAssets": "Aset",
     "colLiabilities": "Liabilitas",
-    "colNetWorth": "Nilai Bersih"
+    "colNetWorth": "Nilai Bersih",
+    "barStyle": "Gaya batang",
+    "barStyleNetWorth": "Nilai bersih",
+    "barStyleAccountType": "Menurut jenis akun"
   },
   "portfolioValue": {
     "highestValue": "Nilai Tertinggi",

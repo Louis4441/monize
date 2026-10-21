@@ -1190,7 +1190,10 @@
     "colMonth": "[XX-Month-XX]",
     "colAssets": "[XX-Assets-XX]",
     "colLiabilities": "[XX-Liabilities-XX]",
-    "colNetWorth": "[XX-Net Worth-XX]"
+    "colNetWorth": "[XX-Net Worth-XX]",
+    "barStyle": "[XX-Bar style-XX]",
+    "barStyleNetWorth": "[XX-Net worth-XX]",
+    "barStyleAccountType": "[XX-By account type-XX]"
   },
   "portfolioValue": {
     "highestValue": "[XX-Highest Value-XX]",

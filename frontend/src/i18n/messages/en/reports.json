@@ -1190,7 +1190,10 @@
     "colMonth": "Month",
     "colAssets": "Assets",
     "colLiabilities": "Liabilities",
-    "colNetWorth": "Net Worth"
+    "colNetWorth": "Net Worth",
+    "barStyle": "Bar style",
+    "barStyleNetWorth": "Net worth",
+    "barStyleAccountType": "By account type"
   },
   "portfolioValue": {
     "highestValue": "Highest Value",

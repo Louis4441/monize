@@ -1190,7 +1190,10 @@
     "colMonth": "月",
     "colAssets": "資産",
     "colLiabilities": "負債",
-    "colNetWorth": "純資産"
+    "colNetWorth": "純資産",
+    "barStyle": "棒の表示",
+    "barStyleNetWorth": "純資産",
+    "barStyleAccountType": "口座の種類別"
   },
   "portfolioValue": {
     "highestValue": "最高値",

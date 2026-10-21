@@ -1190,7 +1190,10 @@
     "colMonth": "Месяц",
     "colAssets": "Активы",
     "colLiabilities": "Обязательства",
-    "colNetWorth": "Чистая стоимость"
+    "colNetWorth": "Чистая стоимость",
+    "barStyle": "Стиль столбцов",
+    "barStyleNetWorth": "Чистая стоимость",
+    "barStyleAccountType": "По типу счёта"
   },
   "portfolioValue": {
     "highestValue": "Наибольшая стоимость",

@@ -1190,7 +1190,10 @@
     "colMonth": "Місяць",
     "colAssets": "Активи",
     "colLiabilities": "Пасиви",
-    "colNetWorth": "Чистий капітал"
+    "colNetWorth": "Чистий капітал",
+    "barStyle": "Стиль стовпців",
+    "barStyleNetWorth": "Чисті активи",
+    "barStyleAccountType": "За типом рахунку"
   },
   "portfolioValue": {
     "highestValue": "Найвища вартість",

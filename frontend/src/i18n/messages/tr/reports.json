@@ -1190,7 +1190,10 @@
     "colMonth": "Ay",
     "colAssets": "Varlıklar",
     "colLiabilities": "Yükümlülükler",
-    "colNetWorth": "Net Değer"
+    "colNetWorth": "Net Değer",
+    "barStyle": "Çubuk stili",
+    "barStyleNetWorth": "Net değer",
+    "barStyleAccountType": "Hesap türüne göre"
   },
   "portfolioValue": {
     "highestValue": "En Yüksek Değer",

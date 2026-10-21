@@ -1190,7 +1190,10 @@
     "colMonth": "月份",
     "colAssets": "资产",
     "colLiabilities": "负债",
-    "colNetWorth": "资产净值"
+    "colNetWorth": "资产净值",
+    "barStyle": "柱形样式",
+    "barStyleNetWorth": "资产净值",
+    "barStyleAccountType": "按账户类型"
   },
   "portfolioValue": {
     "highestValue": "最高价值",

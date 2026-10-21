@@ -1190,7 +1190,10 @@
     "colMonth": "महीना",
     "colAssets": "संपत्ति",
     "colLiabilities": "देनदारियाँ",
-    "colNetWorth": "निवल मूल्य"
+    "colNetWorth": "निवल मूल्य",
+    "barStyle": "बार शैली",
+    "barStyleNetWorth": "शुद्ध संपत्ति",
+    "barStyleAccountType": "खाता प्रकार के अनुसार"
   },
   "portfolioValue": {
     "highestValue": "उच्चतम मूल्य",

@@ -29,7 +29,8 @@ import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ReportToolbarActions } from '@/components/reports/ReportToolbarActions';
-import { NetWorthByAccountTypeChart } from '@/components/reports/NetWorthByAccountTypeChart';
+import { NetWorthByAccountTypeChart, type NetWorthBarStyle } from '@/components/reports/NetWorthByAccountTypeChart';
+import { SEGMENTED_GROUP_CLASS, segmentClass } from '@/components/ui/segmented-control';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { exportToCsv } from '@/lib/csv-export';
 import { useReportData } from '@/hooks/useReportData';
@@ -106,6 +107,10 @@ export function NetWorthReport() {
   const [chartType, setChartType] = useLocalStorage<'line' | 'bar' | 'stacked' | 'table'>(
     'reports.net-worth.chartType',
     'bar',
+  );
+  const [barStyle, setBarStyle] = useLocalStorage<NetWorthBarStyle>(
+    'reports.net-worth.barStyle',
+    'accountType',
   );
   const chartRef = useRef<HTMLDivElement>(null);
   const { dateRange, setDateRange, startDate, setStartDate, endDate, setEndDate, resolvedRange, isValid } = useDateRange({ defaultRange: '1y', alignment: 'month' });
@@ -348,7 +353,7 @@ export function NetWorthReport() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
           <DateRangeSelector
-            ranges={['1y', '2y', '5y', 'all']}
+            ranges={['1y', '2y', '5y', '10y', 'all']}
             value={dateRange}
             onChange={setDateRange}
             showCustom
@@ -367,6 +372,21 @@ export function NetWorthReport() {
               onChange={(v) => setChartType(v as 'line' | 'bar' | 'stacked' | 'table')}
               options={['bar', 'stacked', 'line', 'table']}
             />
+            {chartType === 'bar' && (
+              <div className={SEGMENTED_GROUP_CLASS} role="group" aria-label={t('netWorth.barStyle')}>
+                {(['netWorth', 'accountType'] as const).map((style) => (
+                  <button
+                    key={style}
+                    type="button"
+                    aria-pressed={barStyle === style}
+                    className={segmentClass(barStyle === style)}
+                    onClick={() => setBarStyle(style)}
+                  >
+                    {style === 'netWorth' ? t('netWorth.barStyleNetWorth') : t('netWorth.barStyleAccountType')}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               onClick={handleRecalculate}
               disabled={isRecalculating}
@@ -465,10 +485,12 @@ export function NetWorthReport() {
         ) : (
           <div ref={chartRef} className="h-96">
             {chartType === 'bar' ? (
-              // Stacked by account type: what each type adds to (or, owed,
-              // takes from) net worth, with net worth itself as the line.
+              // One solid bar of net worth a month, or stacked by account
+              // type: what each type adds to (or, owed, takes from) net worth,
+              // with net worth itself as the line.
               <NetWorthByAccountTypeChart
                 data={accountTypeData}
+                barStyle={barStyle}
                 formatCurrency={formatCurrency}
                 formatXTick={formatXAxisTick}
                 xTicks={xAxisTicks}
