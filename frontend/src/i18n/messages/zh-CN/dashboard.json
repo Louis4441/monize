@@ -194,6 +194,7 @@
     "accounts": "账户",
     "chartType": "图表类型",
     "view": "视图",
+    "viewCalloutsHint": "标签需要更宽的屏幕。放不下时将显示图例。",
     "displayName": "显示名称",
     "description": "描述",
     "descriptionPlaceholder": "添加可选描述",

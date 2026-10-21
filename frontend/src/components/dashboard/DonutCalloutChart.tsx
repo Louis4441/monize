@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { ChartLegend } from '@/components/ui/ChartLegend';
 import { DonutCenterTotal } from '@/components/ui/DonutCenterTotal';
@@ -53,6 +54,18 @@ interface DonutCalloutChartProps<T extends DonutCalloutSlice> {
   legendRadii?: { inner: PieRadius; outer: PieRadius };
   /** Height classes of the legend view's chart area. */
   legendAreaClassName?: string;
+}
+
+/**
+ * The help line under a donut widget's View setting. The callout view falls
+ * back to the legend where its boxes do not fit, which on a phone is always
+ * (boxes on both sides of a donut with a centre figure need about 408px, and a
+ * phone's card leaves about 325), so the setting says so rather than offering
+ * a choice that silently does nothing there.
+ */
+export function DonutCalloutViewHint() {
+  const t = useTranslations('dashboard');
+  return <p className="text-xs text-gray-500 dark:text-gray-400">{t('widgets.viewCalloutsHint')}</p>;
 }
 
 interface Size {

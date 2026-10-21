@@ -194,6 +194,7 @@
     "accounts": "Accounts",
     "chartType": "Chart type",
     "view": "View",
+    "viewCalloutsHint": "Labels need a wider screen. Where they don't fit, the legend is shown.",
     "displayName": "Display name",
     "description": "Description",
     "descriptionPlaceholder": "Add an optional description",

@@ -194,6 +194,7 @@
     "accounts": "口座",
     "chartType": "グラフの種類",
     "view": "表示",
+    "viewCalloutsHint": "ラベルには広い画面が必要です。収まらない場合は凡例が表示されます。",
     "displayName": "表示名",
     "description": "説明",
     "descriptionPlaceholder": "任意の説明を追加",

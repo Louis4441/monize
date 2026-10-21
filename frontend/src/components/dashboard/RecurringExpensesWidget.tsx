@@ -13,7 +13,7 @@ import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
 import { WidgetSegmentedControl } from './WidgetSegmentedControl';
-import { DonutCalloutChart, DonutCalloutSlice } from './DonutCalloutChart';
+import { DonutCalloutChart, DonutCalloutSlice, DonutCalloutViewHint } from './DonutCalloutChart';
 import { RECURRING_EXPENSES_DEFAULT, RECURRING_RANGES, RecurringConfig } from './widget-config';
 
 const WIDGET_ID = 'recurring-expenses';
@@ -93,6 +93,7 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
             { value: 'legend', label: t('recurringExpenses.viewLegend') },
           ]}
         />
+        <DonutCalloutViewHint />
       </WidgetConfigRow>
     </>
   );

@@ -194,6 +194,7 @@
     "accounts": "Konta",
     "chartType": "Typ wykresu",
     "view": "Widok",
+    "viewCalloutsHint": "Etykiety wymagają szerszego ekranu. Gdy się nie mieszczą, wyświetlana jest legenda.",
     "displayName": "Nazwa wyświetlana",
     "description": "Opis",
     "descriptionPlaceholder": "Dodaj opcjonalny opis",

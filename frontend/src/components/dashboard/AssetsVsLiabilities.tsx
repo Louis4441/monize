@@ -9,7 +9,7 @@ import { useWidgetConfig } from '@/hooks/useWidgetConfig';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { WidgetCard, WidgetConfigRow, WidgetMessage } from './WidgetCard';
 import { WidgetSegmentedControl } from './WidgetSegmentedControl';
-import { DonutCalloutChart, DonutCalloutSlice } from './DonutCalloutChart';
+import { DonutCalloutChart, DonutCalloutSlice, DonutCalloutViewHint } from './DonutCalloutChart';
 import { ASSETS_LIABILITIES_DEFAULT, AssetsLiabilitiesConfig } from './widget-config';
 
 const WIDGET_ID = 'assets-liabilities';
@@ -80,6 +80,7 @@ export function AssetsVsLiabilities({ data, isLoading }: AssetsVsLiabilitiesProp
           { value: 'legend', label: t('assetsVsLiabilities.viewLegend') },
         ]}
       />
+      <DonutCalloutViewHint />
     </WidgetConfigRow>
   );
 

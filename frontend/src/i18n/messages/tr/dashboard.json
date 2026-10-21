@@ -194,6 +194,7 @@
     "accounts": "Hesaplar",
     "chartType": "Grafik türü",
     "view": "Görünüm",
+    "viewCalloutsHint": "Etiketler daha geniş bir ekran gerektirir. Sığmadıkları yerde gösterge gösterilir.",
     "displayName": "Görünen ad",
     "description": "Açıklama",
     "descriptionPlaceholder": "İsteğe bağlı bir açıklama ekleyin",

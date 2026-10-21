@@ -194,6 +194,7 @@
     "accounts": "Cuentas",
     "chartType": "Tipo de gráfico",
     "view": "Vista",
+    "viewCalloutsHint": "Las etiquetas necesitan una pantalla más ancha. Donde no caben, se muestra la leyenda.",
     "displayName": "Nombre visible",
     "description": "Descripción",
     "descriptionPlaceholder": "Añade una descripción opcional",

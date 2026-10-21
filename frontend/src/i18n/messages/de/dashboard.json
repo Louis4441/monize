@@ -194,6 +194,7 @@
     "accounts": "Konten",
     "chartType": "Diagrammtyp",
     "view": "Ansicht",
+    "viewCalloutsHint": "Beschriftungen brauchen einen breiteren Bildschirm. Wo sie nicht passen, wird die Legende angezeigt.",
     "displayName": "Anzeigename",
     "description": "Beschreibung",
     "descriptionPlaceholder": "Optionale Beschreibung hinzufügen",

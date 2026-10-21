@@ -194,6 +194,7 @@
     "accounts": "Comptes",
     "chartType": "Type de graphique",
     "view": "Vue",
+    "viewCalloutsHint": "Les étiquettes nécessitent un écran plus large. Là où elles ne tiennent pas, la légende s'affiche.",
     "displayName": "Nom d'affichage",
     "description": "Description",
     "descriptionPlaceholder": "Ajoutez une description facultative",

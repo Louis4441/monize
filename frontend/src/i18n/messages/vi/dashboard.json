@@ -194,6 +194,7 @@
     "accounts": "Tài khoản",
     "chartType": "Loại biểu đồ",
     "view": "Chế độ xem",
+    "viewCalloutsHint": "Nhãn cần màn hình rộng hơn. Khi không đủ chỗ, chú giải sẽ được hiển thị.",
     "displayName": "Tên hiển thị",
     "description": "Mô tả",
     "descriptionPlaceholder": "Thêm mô tả tùy chọn",

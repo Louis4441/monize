@@ -194,6 +194,7 @@
     "accounts": "계정",
     "chartType": "차트 유형",
     "view": "보기",
+    "viewCalloutsHint": "레이블은 더 넓은 화면이 필요합니다. 공간이 부족하면 범례가 표시됩니다.",
     "displayName": "표시 이름",
     "description": "설명",
     "descriptionPlaceholder": "선택적인 설명을 추가하세요",

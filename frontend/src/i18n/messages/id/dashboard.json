@@ -194,6 +194,7 @@
     "accounts": "Akun",
     "chartType": "Tipe Grafik",
     "view": "Tampilan",
+    "viewCalloutsHint": "Label memerlukan layar yang lebih lebar. Jika tidak muat, keterangan yang ditampilkan.",
     "displayName": "Nama tampilan",
     "description": "Deskripsi",
     "descriptionPlaceholder": "Tambahkan deskripsi opsional",

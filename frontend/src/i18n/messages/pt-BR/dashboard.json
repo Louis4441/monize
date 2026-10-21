@@ -194,6 +194,7 @@
     "accounts": "Contas",
     "chartType": "Tipo de gráfico",
     "view": "Visualização",
+    "viewCalloutsHint": "Os rótulos precisam de uma tela mais larga. Onde não cabem, a legenda é exibida.",
     "displayName": "Nome de exibição",
     "description": "Descrição",
     "descriptionPlaceholder": "Adicione uma descrição opcional",

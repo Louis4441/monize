@@ -387,6 +387,7 @@ describe('ExpensesPieChart', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Configure Expenses by Category' }));
     });
+    expect(screen.getByText("Labels need a wider screen. Where they don't fit, the legend is shown.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Labels' }));
     expect(mockUpdateConfig).toHaveBeenCalledWith({ view: 'callouts' });
   });

@@ -194,6 +194,7 @@
     "accounts": "Conti",
     "chartType": "Tipo di grafico",
     "view": "Vista",
+    "viewCalloutsHint": "Le etichette richiedono uno schermo più ampio. Dove non c'è spazio, viene mostrata la legenda.",
     "displayName": "Nome visualizzato",
     "description": "Descrizione",
     "descriptionPlaceholder": "Aggiungi una descrizione facoltativa",

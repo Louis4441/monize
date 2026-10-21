@@ -151,6 +151,9 @@ describe('AssetsVsLiabilities', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Configure Assets vs Liabilities' }));
     });
+    // Says where the labels will not appear, rather than leaving a phone
+    // user to wonder why choosing them changed nothing.
+    expect(screen.getByText("Labels need a wider screen. Where they don't fit, the legend is shown.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Labels' }));
     expect(updateConfig).toHaveBeenCalledWith({ view: 'callouts' });
   });

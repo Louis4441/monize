@@ -194,6 +194,7 @@
     "accounts": "खाते",
     "chartType": "चार्ट प्रकार",
     "view": "दृश्य",
+    "viewCalloutsHint": "लेबल के लिए चौड़ी स्क्रीन चाहिए। जहाँ वे फ़िट नहीं होते, वहाँ संकेत दिखाया जाता है।",
     "displayName": "प्रदर्शन नाम",
     "description": "विवरण",
     "descriptionPlaceholder": "एक वैकल्पिक विवरण जोड़ें",

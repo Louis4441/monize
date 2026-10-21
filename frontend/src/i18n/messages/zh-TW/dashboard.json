@@ -194,6 +194,7 @@
     "accounts": "科目",
     "chartType": "圖表類型",
     "view": "檢視",
+    "viewCalloutsHint": "標籤需要更寬的螢幕。放不下時會顯示圖例。",
     "displayName": "顯示名稱",
     "description": "描述",
     "descriptionPlaceholder": "新增選填的描述",

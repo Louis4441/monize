@@ -301,6 +301,7 @@ describe('RecurringExpensesWidget', () => {
 
     it('switches between labels and legend', async () => {
       await openSettings();
+      expect(screen.getByText("Labels need a wider screen. Where they don't fit, the legend is shown.")).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Legend' }));
       expect(updateConfig).toHaveBeenCalledWith({ view: 'legend' });
     });

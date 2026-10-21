@@ -194,6 +194,7 @@
     "accounts": "Rekeningen",
     "chartType": "Grafiektype",
     "view": "Weergave",
+    "viewCalloutsHint": "Labels hebben een breder scherm nodig. Waar ze niet passen, wordt de legenda getoond.",
     "displayName": "Weergavenaam",
     "description": "Beschrijving",
     "descriptionPlaceholder": "Voeg een optionele beschrijving toe",
