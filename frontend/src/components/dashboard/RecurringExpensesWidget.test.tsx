@@ -172,6 +172,15 @@ describe('RecurringExpensesWidget', () => {
     expect(within(screen.getByTestId('donut-chart-area')).getByText('$123456')).toBeInTheDocument();
   });
 
+  it('links the title to the Recurring Expenses Tracker report', async () => {
+    respond([item('Netflix', 'p1', 90)]);
+    await renderWidget();
+    expect(screen.getByRole('link', { name: 'Top Recurring Expenses' })).toHaveAttribute(
+      'href',
+      '/reports/recurring-expenses',
+    );
+  });
+
   it('asks for the configured range', async () => {
     configState.current = { minOccurrences: 4, range: '5y', view: 'legend' };
     respond([item('Netflix', 'p1', 90)]);

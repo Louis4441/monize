@@ -102,6 +102,7 @@ export function RecurringExpensesWidget({ isLoading }: RecurringExpensesWidgetPr
   return (
     <WidgetCard
       title={t('recurringExpenses.title')}
+      titleHref="/reports/recurring-expenses"
       widgetId={WIDGET_ID}
       headerRight={
         <span className="text-sm text-gray-500 dark:text-gray-400">{rangeLabel(config.range)}</span>
